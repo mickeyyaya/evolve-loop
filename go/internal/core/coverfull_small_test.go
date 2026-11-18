@@ -316,8 +316,20 @@ func TestArchiveRepairPrompts_RenameFailureWarns(t *testing.T) {
 }
 
 func TestEmitPhaseOutputsSignal_UnreadableWorkspace(t *testing.T) {
-	t.Parallel()
-	emitPhaseOutputsSignal(filepath.Join(t.TempDir(), "absent"), 1, nil, nil)
+	absent := filepath.Join(t.TempDir(), "absent")
+
+	skipped := captureStderr(t, func() { emitPhaseOutputsSignal(absent, 1, nil, nil) })
+	empty := captureStderr(t, func() { emitPhaseOutputsSignal("", 1, nil, nil) })
+
+	if !strings.Contains(skipped, "phase-outputs survey skipped for cycle 1") {
+		t.Errorf("an unreadable workspace must report the skipped survey, got %q", skipped)
+	}
+	if strings.Contains(skipped, "[orchestrator] cycle 1 ") {
+		t.Errorf("an unreadable workspace must not emit the survey, got %q", skipped)
+	}
+	if empty != "" {
+		t.Errorf("an empty workspace must stay silent, got %q", empty)
+	}
 }
 
 func TestBackfillExhaustedArtifact_WriteFailureAndLedgerFailure(t *testing.T) {

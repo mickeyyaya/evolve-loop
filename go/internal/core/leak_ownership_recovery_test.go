@@ -371,8 +371,8 @@ func TestMaybeRemediate_FixDispatchBaselineExcludesASiblingWriteDuringTheGate(t 
 		t.Fatalf("remediation failed: %v", err)
 	}
 
-	if gate.calls != 1 {
-		t.Fatalf("the gate must re-run after the fix dispatch; calls=%d", gate.calls)
+	if reruns := gate.calls; reruns != 1 {
+		t.Fatalf("the gate must re-run after the fix dispatch; calls=%d", reruns)
 	}
 	requireTreeFile(t, repo, siblingLeak, "package sibling\n")
 	requireAbsent(t, wt, siblingLeak)

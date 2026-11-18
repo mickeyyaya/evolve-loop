@@ -1,9 +1,11 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -147,9 +149,26 @@ func TestRecordRoutingDecision_ArtifactFailIsSwallowed(t *testing.T) {
 
 func TestRecordRoutingDecision_LedgerFailIsSwallowed(t *testing.T) {
 	t.Parallel()
-	o := &Orchestrator{ledger: &fakeLedger{failOnAppend: true}, now: coverNow}
+	led := &fakeLedger{failOnAppend: true}
+	var stderr bytes.Buffer
+	o := &Orchestrator{ledger: led, now: coverNow, stderr: &stderr}
+
 	o.recordRoutingDecision(context.Background(), 5, CycleState{WorkspacePath: t.TempDir()}, 1,
 		router.RouterDecision{NextPhase: "audit", SkipPhases: []string{"tester"}})
+
+	if !strings.Contains(stderr.String(), "WARN routing_decision ledger append") {
+		t.Errorf("a failed routing append must be reported, got %q", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "WARN phase_skipped ledger append") {
+		t.Errorf("a failed skip append must be reported, got %q", stderr.String())
+	}
+	var kinds []string
+	for _, e := range led.attempts {
+		kinds = append(kinds, e.Kind+":"+e.Role)
+	}
+	if !slices.Contains(kinds, "phase_skipped:tester") || !slices.Contains(kinds, "routing_decision:orchestrator") {
+		t.Errorf("the decision and its skipped phase must both reach the ledger, got %v", kinds)
+	}
 }
 
 func TestRecordPhasePlan_HappyAndClamps(t *testing.T) {
@@ -226,10 +245,23 @@ func TestRecordPhasePlan_ArtifactFailIsSwallowed(t *testing.T) {
 
 func TestRecordPhasePlan_LedgerFailIsSwallowed(t *testing.T) {
 	t.Parallel()
-	o := &Orchestrator{ledger: &fakeLedger{failOnAppend: true}, now: coverNow}
+	led := &fakeLedger{failOnAppend: true}
+	var stderr bytes.Buffer
+	o := &Orchestrator{ledger: led, now: coverNow, stderr: &stderr}
 	plan := &router.PhasePlan{Entries: []router.PhasePlanEntry{{Phase: "build", Run: true}}}
+
 	o.recordPhasePlan(context.Background(), 5, CycleState{WorkspacePath: t.TempDir()}, plan,
 		[]router.Clamp{{Rule: "ship-requires-build", Proposed: "build=skip", Forced: "build=run"}})
+
+	if !strings.Contains(stderr.String(), "WARN phase_plan ledger append") {
+		t.Errorf("a failed plan append must be reported, got %q", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "integrity-floor clamp: ship-requires-build (build=skip → build=run)") {
+		t.Errorf("the clamp must be reported, got %q", stderr.String())
+	}
+	if len(led.attempts) != 1 || led.attempts[0].Kind != "phase_plan" || led.attempts[0].Cycle != 5 {
+		t.Errorf("the plan must reach the ledger as phase_plan for cycle 5, got %+v", led.attempts)
+	}
 }
 
 func TestArchivePollutedWorkspace_Branches(t *testing.T) {

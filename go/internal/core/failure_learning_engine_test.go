@@ -34,8 +34,9 @@ func TestFailureLearning_LiteralOrchestratorGetsTheEngineOnce(t *testing.T) {
 	o.recordFailedApproachState(fl)
 	o.now = func() time.Time { return time.Date(2027, 2, 2, 0, 0, 0, 0, time.UTC) }
 	o.recordFailedApproachState(fl)
-	if st.FailedAt[0].TS != "2026-01-01T00:00:00Z" || st.FailedAt[1].TS != "2027-02-02T00:00:00Z" {
-		t.Fatalf("the engine's clock is a closure over o.now, never a snapshot: %s / %s", st.FailedAt[0].TS, st.FailedAt[1].TS)
+	firstStamp, secondStamp := st.FailedAt[0].TS, st.FailedAt[1].TS
+	if firstStamp != "2026-01-01T00:00:00Z" || secondStamp != "2027-02-02T00:00:00Z" {
+		t.Fatalf("the engine's clock is a closure over o.now, never a snapshot: %s / %s", firstStamp, secondStamp)
 	}
 }
 

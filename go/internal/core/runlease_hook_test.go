@@ -32,10 +32,16 @@ func TestStartRunLease_WritesInitialLeaseBeforeReturn(t *testing.T) {
 }
 
 func TestStartRunLease_EmptyWorkspace_NoOp(t *testing.T) {
-	t.Parallel()
+	cwd := t.TempDir()
+	enterDir(t, cwd)
 
 	stop := startRunLease("", "run-abc", time.Now, time.Hour)
-	stop() // must not panic
+	stop()
+	stop()
+
+	if names := listing(t, cwd); names != "" {
+		t.Errorf("an empty workspace must write no lease into the working directory, got %q", names)
+	}
 }
 
 func TestRunLeaseHeartbeat_RefreshesOnTick(t *testing.T) {

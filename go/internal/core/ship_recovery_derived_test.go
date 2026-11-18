@@ -745,10 +745,21 @@ func TestStageEntryWith_ASpawnFailureIsAnError(t *testing.T) {
 }
 
 func TestNormalizeDerivedProjections_EmptyWorktree_NoOp(t *testing.T) {
-	t.Parallel()
+	cwd, git := initTempRepo(t)
+	writeFile(t, filepath.Join(cwd, "base.txt"), "base\n")
+	git("add", "-A")
+	git("commit", "-m", "base")
+	writeFile(t, filepath.Join(cwd, "docs", "research-index", "entry.md"), "new\n")
+	enterDir(t, cwd)
 
-	o := &Orchestrator{}
-	o.normalizeDerivedProjections(context.Background(), "")
+	logged := captureStderr(t, func() { (&Orchestrator{}).normalizeDerivedProjections(context.Background(), "") })
+
+	if logged != "" {
+		t.Errorf("an empty worktree must regenerate nothing in the working directory, got %q", logged)
+	}
+	if names := listing(t, filepath.Join(cwd, "docs")); names != "research-index" {
+		t.Errorf("the working directory's docs changed: %q", names)
+	}
 }
 
 func TestNormalizeDerivedProjections_CleanWorktree_NoRegen(t *testing.T) {

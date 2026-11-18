@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/coherence"
@@ -43,7 +44,23 @@ func TestRecordShipError_WorkspaceFailuresStillAppendLedger(t *testing.T) {
 
 func TestRecordDebuggerDecision_LedgerFailureIsNonFatal(t *testing.T) {
 	t.Parallel()
-	orchestratorWithFailingLedger().recordDebuggerDecision(context.Background(), 1, CycleState{WorkspacePath: t.TempDir()}, PhaseResponse{})
+	ws := t.TempDir()
+	writeFileAt(t, filepath.Join(ws, "debug-decision.json"), "{}")
+	led := &fakeLedger{failOnAppend: true}
+	o := NewOrchestrator(&fakeStorage{}, led, nil)
+
+	o.recordDebuggerDecision(context.Background(), 4, CycleState{WorkspacePath: ws}, PhaseResponse{})
+
+	if len(led.attempts) != 1 {
+		t.Fatalf("one debugger decision must reach the ledger, got %d", len(led.attempts))
+	}
+	got := led.attempts[0]
+	if got.Kind != "debugger_decision" || got.Role != "debugger" || got.Cycle != 4 {
+		t.Errorf("debugger entry = kind %q role %q cycle %d", got.Kind, got.Role, got.Cycle)
+	}
+	if got.ArtifactPath != filepath.Join(ws, "debug-decision.json") || got.ArtifactSHA256 == "" {
+		t.Errorf("the entry must bind the decision artifact: %q %q", got.ArtifactPath, got.ArtifactSHA256)
+	}
 }
 
 func TestRecordPlanRejectionsKind_Failures(t *testing.T) {
@@ -114,11 +131,20 @@ func TestSameClassStreak_BlankLastClassificationIsZero(t *testing.T) {
 }
 
 func TestRecordPhaseOutcome_NonAbortGradeIsAnnounced(t *testing.T) {
-	t.Parallel()
 	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, nil)
 	var res CycleResult
 	var timings []phaseTimingEntry
-	o.recordPhaseOutcome(&res, &timings, t.TempDir(), recovery.PhaseOutcome{Phase: "build", AbortReason: "missing_challenge_token"})
+
+	announced := captureStderr(t, func() {
+		o.recordPhaseOutcome(&res, &timings, t.TempDir(), recovery.PhaseOutcome{Phase: "build", AbortReason: "missing_challenge_token"})
+	})
+
+	if !strings.Contains(announced, `[graduated-enforcement SHADOW] phase build abort reason "missing_challenge_token" would grade as`) {
+		t.Errorf("a non-abort grade must be announced, got %q", announced)
+	}
+	if len(timings) != 1 || timings[0].Phase != "build" {
+		t.Errorf("the outcome must be recorded as a build timing, got %+v", timings)
+	}
 }
 
 func TestRetroStateWriteFailuresAreNonFatal(t *testing.T) {

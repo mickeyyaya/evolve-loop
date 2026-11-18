@@ -124,9 +124,36 @@ func TestBuildSelfCheck_NoGoChangesIsNoOp(t *testing.T) {
 }
 
 func TestBuildSelfCheck_EmptyWorktreeIsNoOp(t *testing.T) {
-	t.Parallel()
+	cwd := initGitWorktree(t)
+	changed := filepath.Join(cwd, "go", "internal", "foo", "foo.go")
+	if err := os.MkdirAll(filepath.Dir(changed), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(changed, []byte("package foo\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	artifact := filepath.Join(cwd, ".evolve", "build-selfcheck.json")
+	if err := os.MkdirAll(filepath.Dir(artifact), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(artifact, []byte("[]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	enterDir(t, cwd)
+	runs := 0
+	old := buildSelfCheckRunner
+	t.Cleanup(func() { buildSelfCheckRunner = old })
+	buildSelfCheckRunner = func(_ context.Context, _, _ string) (string, bool) { runs++; return "", false }
 
 	(&Orchestrator{}).buildSelfCheck(context.Background(), "")
+
+	if runs != 0 {
+		t.Errorf("an empty worktree must not run the unit tests of the working directory, ran %d", runs)
+	}
+	raw, err := os.ReadFile(artifact)
+	if err != nil || string(raw) != "[]\n" {
+		t.Errorf("an empty worktree must leave the working directory's artifact alone: %q, %v", raw, err)
+	}
 }
 
 func TestRealGoUnitTest_DetectsPassAndFail(t *testing.T) {

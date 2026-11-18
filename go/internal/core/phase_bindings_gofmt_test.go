@@ -34,9 +34,26 @@ func TestNormalizeBuildGofmt_FormatsWorktreeGoModule(t *testing.T) {
 }
 
 func TestNormalizeBuildGofmt_EmptyWorktreeIsNoOp(t *testing.T) {
-	t.Parallel()
+	cwd := t.TempDir()
+	fp := filepath.Join(cwd, "amp.go")
+	dirty := "package sample\n\nfunc Sample() int {\n\tx :=  1\n\treturn x\n}\n"
+	if err := os.WriteFile(fp, []byte(dirty), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	enterDir(t, cwd)
 
-	normalizeBuildGofmt("")
+	logged := captureStderr(t, func() { normalizeBuildGofmt("") })
+
+	if logged != "" {
+		t.Errorf("an empty worktree must be skipped without a word, got %q", logged)
+	}
+	got, err := os.ReadFile(fp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != dirty {
+		t.Errorf("an empty worktree must not format the working directory:\n%q", got)
+	}
 }
 
 func TestNormalizeBuildWorktree_GofmtsAfterNonBuildPhase(t *testing.T) {

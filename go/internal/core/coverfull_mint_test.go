@@ -149,9 +149,26 @@ func TestLexicalPath_RelativeAndAbsoluteSpellingsAgree(t *testing.T) {
 func TestCheckpointInterruptedPhase_CheckpointFailureWarns(t *testing.T) {
 	old := ResumeBoundaryCheckpointer
 	t.Cleanup(func() { ResumeBoundaryCheckpointer = old })
-	ResumeBoundaryCheckpointer = func(CycleState, string, time.Time) error { return errors.New("checkpoint refused") }
+	var roots []string
+	ResumeBoundaryCheckpointer = func(_ CycleState, root string, _ time.Time) error {
+		roots = append(roots, root)
+		return errors.New("checkpoint refused")
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	cr := &cycleRun{ctx: ctx, o: &Orchestrator{now: time.Now}}
-	cr.checkpointInterruptedPhase(context.Canceled)
+	cr := &cycleRun{ctx: ctx, cs: CycleState{Phase: "build"}, req: CycleRequest{ProjectRoot: "/the/project"}, o: &Orchestrator{now: time.Now}}
+
+	warned := captureStderr(t, func() { cr.checkpointInterruptedPhase(context.Canceled) })
+
+	if len(roots) != 1 || roots[0] != "/the/project" {
+		t.Errorf("an interrupted phase must checkpoint once for its project root, got %v", roots)
+	}
+	if !strings.Contains(warned, "interrupt checkpoint failed for active phase build") {
+		t.Errorf("a refused checkpoint must warn with the phase, got %q", warned)
+	}
+	live := &cycleRun{ctx: context.Background(), o: &Orchestrator{now: time.Now}}
+	live.checkpointInterruptedPhase(context.Canceled)
+	if len(roots) != 1 {
+		t.Errorf("a live context must not checkpoint, got %v", roots)
+	}
 }

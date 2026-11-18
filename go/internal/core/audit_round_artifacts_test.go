@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"os"
@@ -63,10 +64,38 @@ func TestRetireSupersededAuditArtifacts_NeverClobbersAnExistingArchive(t *testin
 }
 
 func TestRetireSupersededAuditArtifacts_MissingFilesAndWorkspaceAreQuiet(t *testing.T) {
-	t.Parallel()
+	cwd := t.TempDir()
+	mustWriteRoundArtifact(t, filepath.Join(cwd, "acs-verdict.json"), "working-directory")
+	enterDir(t, cwd)
+	var warned bytes.Buffer
 
-	retireSupersededAuditArtifacts("", 1, io.Discard)
-	retireSupersededAuditArtifacts(t.TempDir(), 1, io.Discard)
+	retireSupersededAuditArtifacts("", 1, &warned)
+	if got := mustReadRoundArtifact(t, filepath.Join(cwd, "acs-verdict.json")); got != "working-directory" {
+		t.Errorf("an empty workspace must leave the working directory alone, got %q", got)
+	}
+
+	roundZero := t.TempDir()
+	mustWriteRoundArtifact(t, filepath.Join(roundZero, "acs-verdict.json"), "pre-staged")
+	retireSupersededAuditArtifacts(roundZero, 0, &warned)
+	if got := mustReadRoundArtifact(t, filepath.Join(roundZero, "acs-verdict.json")); got != "pre-staged" {
+		t.Errorf("round 0 must not archive, got %q", got)
+	}
+
+	missing := t.TempDir()
+	retireSupersededAuditArtifacts(missing, 1, &warned)
+	if names := listing(t, missing); names != "" {
+		t.Errorf("a workspace without artifacts must stay empty, got %q", names)
+	}
+
+	moved := t.TempDir()
+	mustWriteRoundArtifact(t, filepath.Join(moved, "acs-verdict.json"), "round-one")
+	retireSupersededAuditArtifacts(moved, 1, &warned)
+	if got := mustReadRoundArtifact(t, filepath.Join(moved, "acs-verdict.round1.json")); got != "round-one" {
+		t.Errorf("the superseded verdict must be archived, got %q", got)
+	}
+	if warned.Len() != 0 {
+		t.Errorf("quiet cases must not warn, got %q", warned.String())
+	}
 }
 
 func TestCompletedAuditRounds_CountsOnlyAuditOccurrences(t *testing.T) {

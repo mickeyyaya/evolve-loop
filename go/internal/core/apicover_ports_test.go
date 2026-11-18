@@ -7,14 +7,13 @@ import (
 )
 
 type apicoverGuard struct {
-	gotIn    GuardInput
-	decision GuardDecision
+	gotIn GuardInput
 }
 
 func (g *apicoverGuard) Name() string { return "apicover-fake" }
 func (g *apicoverGuard) Decide(_ context.Context, in GuardInput) GuardDecision {
 	g.gotIn = in
-	return g.decision
+	return GuardDecision{Allow: in.ToolName != "Bash", Reason: "apicover guard saw " + in.ToolName + " in " + in.CWD}
 }
 
 func TestStoragePort_SatisfiedByFakeAndRoundTrips(t *testing.T) {
@@ -52,28 +51,46 @@ func TestLedgerPort_SatisfiedByFakeAndAppends(t *testing.T) {
 
 func TestBridgePort_SatisfiedByFakeAndLaunches(t *testing.T) {
 	t.Parallel()
-	fb := &fakeBridge{stdout: "ok"}
-	var b Bridge = fb
+	rb := &recoverableBridge{fakeBridge: fakeBridge{stdout: "ok"}}
+	var b Bridge = rb
 	ctx := context.Background()
-	resp, err := b.Launch(ctx, BridgeRequest{CLI: "claude-tmux", Cycle: 7})
+	resp, err := LaunchWithFreshSession(ctx, b, BridgeRequest{CLI: "claude-tmux", Cycle: 7})
 	if err != nil {
-		t.Fatalf("Bridge.Launch: %v", err)
+		t.Fatalf("LaunchWithFreshSession: %v", err)
 	}
-	if resp.Stdout != "ok" {
-		t.Errorf("Launch stdout = %q, want %q", resp.Stdout, "ok")
+	if resp.Stdout != "ok" || resp.SessionRecoverable {
+		t.Errorf("response = stdout %q recoverable %v, want ok and a cleared recoverable flag", resp.Stdout, resp.SessionRecoverable)
 	}
-	if fb.gotReq.CLI != "claude-tmux" || fb.gotReq.Cycle != 7 {
-		t.Errorf("Launch did not forward request: %+v", fb.gotReq)
+	reqs := rb.reqs
+	if len(reqs) != 2 {
+		t.Fatalf("a recoverable first launch must be retried once, got %d launches", len(reqs))
+	}
+	if reqs[0].CLI != "claude-tmux" || reqs[0].Cycle != 7 || reqs[0].FreshSession {
+		t.Errorf("first launch lost the request: %+v", reqs[0])
+	}
+	if reqs[1].CLI != "claude-tmux" || reqs[1].Cycle != 7 || !reqs[1].FreshSession {
+		t.Errorf("retry must repeat the request on a fresh session: %+v", reqs[1])
 	}
 	if _, err := b.Probe(ctx); err != nil {
 		t.Fatalf("Bridge.Probe: %v", err)
 	}
 }
 
+type recoverableBridge struct {
+	fakeBridge
+	reqs []BridgeRequest
+}
+
+func (r *recoverableBridge) Launch(ctx context.Context, req BridgeRequest) (BridgeResponse, error) {
+	r.reqs = append(r.reqs, req)
+	resp, err := r.fakeBridge.Launch(ctx, req)
+	resp.SessionRecoverable = len(r.reqs) == 1
+	return resp, err
+}
+
 func TestGuardPort_DecideBindsInputAndDecision(t *testing.T) {
 	t.Parallel()
-	want := GuardDecision{Allow: false, Reason: "blocked by apicover guard"}
-	impl := &apicoverGuard{decision: want}
+	impl := &apicoverGuard{}
 	var g Guard = impl
 	in := GuardInput{
 		ToolName:       "Bash",
@@ -85,11 +102,12 @@ func TestGuardPort_DecideBindsInputAndDecision(t *testing.T) {
 		t.Fatalf("Guard.Name() = %q, want apicover-fake", g.Name())
 	}
 	got := g.Decide(context.Background(), in)
-	if got.Allow != want.Allow || got.Reason != want.Reason {
-		t.Errorf("Decide returned %+v, want %+v", got, want)
+	if got.Allow || got.Reason != "apicover guard saw Bash in /proj" {
+		t.Errorf("Decide returned %+v, want a denial that names the tool and directory", got)
 	}
-	if impl.gotIn.ToolName != "Bash" || impl.gotIn.CWD != "/proj" {
-		t.Errorf("GuardInput did not reach Decide: %+v", impl.gotIn)
+	seen := impl.gotIn
+	if seen.ToolName != "Bash" || seen.CWD != "/proj" || seen.CycleStatePath != "/proj/.evolve/cycle-state.json" {
+		t.Errorf("GuardInput did not reach Decide: %+v", seen)
 	}
 }
 

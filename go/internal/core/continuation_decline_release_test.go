@@ -32,7 +32,30 @@ func TestReleaseDeclinedBinding_NilAndEmptyAreNoops(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
+	if err := continuation.WriteRegistryEntry(root, "a", continuation.Continuation{Cycle: 5, SnapshotSHA: "aaaa"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := continuation.WriteRegistryEntry(root, "b", continuation.Continuation{Cycle: 6, SnapshotSHA: "bbbb"}); err != nil {
+		t.Fatal(err)
+	}
+	live := func(id string) bool {
+		_, ok, _ := continuation.ReadRegistryEntry(root, id)
+		return ok
+	}
+
 	releaseDeclinedBinding(root, nil, nil)
 	releaseDeclinedBinding(root, []string{"a"}, nil)
-	releaseDeclinedBinding(root, nil, &continuation.Continuation{Cycle: 1})
+	releaseDeclinedBinding(root, nil, &continuation.Continuation{Cycle: 5})
+	if !live("a") || !live("b") {
+		t.Fatal("a nil declined continuation or an empty scope list must release nothing")
+	}
+
+	releaseDeclinedBinding(root, []string{"", "a", "b"}, &continuation.Continuation{Cycle: 5})
+
+	if live("a") {
+		t.Error("the binding to the declined cycle must be released")
+	}
+	if !live("b") {
+		t.Error("a binding to another cycle must survive")
+	}
 }

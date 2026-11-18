@@ -115,13 +115,12 @@ func TestWithFailurePolicy_InjectsResolvedPolicy(t *testing.T) {
 	t.Parallel()
 
 	o := &Orchestrator{}
+	if o.failurePolicy.IsFloor(policy.CategoryVerdictIncoherence) {
+		t.Fatal("a bare orchestrator must start without the floor")
+	}
 	WithFailurePolicy(policy.DefaultSystemFailurePolicy())(o)
 	if !o.failurePolicy.IsFloor(policy.CategoryVerdictIncoherence) {
 		t.Error("WithFailurePolicy did not inject the resolved policy (floor missing)")
-	}
-	sig := SystemFailureSignal{Category: policy.CategoryVerdictIncoherence, Level: policy.LevelSystem, Halt: true}
-	if !sig.Halt {
-		t.Error("SystemFailureSignal.Halt not set")
 	}
 }
 

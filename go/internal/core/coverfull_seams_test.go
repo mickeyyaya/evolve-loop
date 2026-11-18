@@ -83,8 +83,24 @@ func TestEmitPhaseOutputsSignal_UnwritableWorkspaceStillReturns(t *testing.T) {
 
 func TestAppendPhaseIOShadowMismatch_LedgerFailureIsNonFatal(t *testing.T) {
 	t.Parallel()
-	appendPhaseIOShadowMismatch(context.Background(), &fakeLedger{failOnAppend: true}, "ts", 1, "r", PhaseBuild,
+	led := &fakeLedger{failOnAppend: true}
+	appendPhaseIOShadowMismatch(context.Background(), led, "ts", 1, "r", PhaseBuild,
 		[]phaseIOMismatch{{Field: "f", Want: "a", Got: "b"}})
+	if len(led.attempts) != 1 {
+		t.Fatalf("a non-empty mismatch list must reach the ledger once, got %d attempts", len(led.attempts))
+	}
+	got := led.attempts[0]
+	if got.Kind != "phaseio_shadow_mismatch" || got.Role != "build" || got.Cycle != 1 || got.RunID != "r" || got.TS != "ts" {
+		t.Errorf("shadow mismatch entry = kind %q role %q cycle %d run %q ts %q", got.Kind, got.Role, got.Cycle, got.RunID, got.TS)
+	}
+	if got.Message == "" {
+		t.Error("the entry must summarize the mismatches")
+	}
+	clean := &fakeLedger{}
+	appendPhaseIOShadowMismatch(context.Background(), clean, "ts", 1, "r", PhaseBuild, nil)
+	if len(clean.attempts) != 0 {
+		t.Errorf("no mismatches must append nothing, got %d", len(clean.attempts))
+	}
 }
 
 func TestEmitPhaseIOShadowWithSig_WriteFailureAndMismatchesAreReported(t *testing.T) {

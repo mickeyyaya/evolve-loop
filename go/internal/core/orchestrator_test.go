@@ -87,6 +87,7 @@ func (f *fakeStorage) AcquireLock(_ context.Context) (func() error, error) {
 
 type fakeLedger struct {
 	entries      []LedgerEntry
+	attempts     []LedgerEntry
 	mu           sync.Mutex
 	failOnAppend bool
 }
@@ -94,6 +95,7 @@ type fakeLedger struct {
 func (f *fakeLedger) Append(_ context.Context, e LedgerEntry) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.attempts = append(f.attempts, e)
 	if f.failOnAppend {
 		return errors.New("forced ledger append fail")
 	}
