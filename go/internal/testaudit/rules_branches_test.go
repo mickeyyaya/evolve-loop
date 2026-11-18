@@ -148,6 +148,32 @@ func TestIndexAssignProduction(t *testing.T) {
 	}
 }
 `), want: "asserts-own-setup"},
+	{name: "values derived from production or handed to it are not own setup", files: one(`
+func TestRangeDerivedKey(t *testing.T) {
+	seen := map[row]bool{}
+	for _, r := range f().Rows {
+		key := row{Code: r.Code}
+		if seen[key] {
+			t.Error("dup")
+		}
+		seen[key] = true
+	}
+}
+func TestHandedOut(t *testing.T) {
+	rec := &recorder{}
+	h := newHolder()
+	h.sink = rec
+	if rec.n == 0 {
+		t.Error("n")
+	}
+}
+func TestOwnKey(t *testing.T) {
+	key := row{Code: 1}
+	if key.Code != 2 {
+		t.Error("n")
+	}
+}
+`), want: "asserts-own-setup"},
 	{name: "skip on nil compare in else and not-nil", files: one(`
 func TestSkipElse(t *testing.T) {
 	err := f()

@@ -149,13 +149,9 @@ func TestDoctorReport_BoundByDoctor(t *testing.T) {
 		t.Fatalf("AuthInfo = %+v, want Configured via file:credentials.json", auth)
 	}
 
-	deep := res.DeepProbe
+	var deep DeepProbe = res.DeepProbe
 	if !deep.Ran || !deep.Passed || deep.Err != "" {
 		t.Fatalf("DeepProbe = %+v, want Ran && Passed without Err", deep)
-	}
-	failingDeep := DeepProbe{Ran: true, Passed: false, Err: "err"}
-	if failingDeep.Err != "err" {
-		t.Fatalf("DeepProbe.Err = %q, want err", failingDeep.Err)
 	}
 }
 

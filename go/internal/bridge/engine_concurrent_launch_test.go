@@ -20,6 +20,11 @@ func TestEngine_ConcurrentLaunch_OnBootRaceFree(t *testing.T) {
 	ws := t.TempDir()
 
 	const goroutines, iters = 8, 20
+	type outcome struct {
+		resp core.BridgeResponse
+		err  error
+	}
+	outcomes := make([]outcome, goroutines*iters)
 	var wg sync.WaitGroup
 	start := make(chan struct{})
 	for g := 0; g < goroutines; g++ {
@@ -29,7 +34,7 @@ func TestEngine_ConcurrentLaunch_OnBootRaceFree(t *testing.T) {
 			<-start
 			for i := 0; i < iters; i++ {
 				agent := fmt.Sprintf("a%d-%d", g, i)
-				_, _ = eng.Launch(context.Background(), core.BridgeRequest{
+				resp, err := eng.Launch(context.Background(), core.BridgeRequest{
 					CLI:          "claude-tmux",
 					Profile:      "__nonexistent_profile__",
 					Workspace:    ws,
@@ -37,9 +42,15 @@ func TestEngine_ConcurrentLaunch_OnBootRaceFree(t *testing.T) {
 					Prompt:       "x",
 					Agent:        agent,
 				})
+				outcomes[g*iters+i] = outcome{resp: resp, err: err}
 			}
 		}(g)
 	}
 	close(start)
 	wg.Wait()
+	for i, o := range outcomes {
+		if o.err == nil || o.resp.ExitCode != ExitBadFlags {
+			t.Fatalf("launch %d = exit %d, err %v; want the bad-flags refusal of the missing profile", i, o.resp.ExitCode, o.err)
+		}
+	}
 }

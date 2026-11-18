@@ -331,25 +331,58 @@ func (c *testCtx) assertsOwnSetup() bool {
 
 func (c *testCtx) literalVars() map[string]bool {
 	literals := map[string]bool{}
+	derived := map[string]bool{}
 	ast.Inspect(c.body, func(n ast.Node) bool {
-		as, ok := n.(*ast.AssignStmt)
-		if !ok || as.Tok != token.DEFINE || len(as.Lhs) != len(as.Rhs) {
-			return true
-		}
-		for i, lhs := range as.Lhs {
-			id, isID := lhs.(*ast.Ident)
-			rhs := unparen(as.Rhs[i])
-			if u, ok := rhs.(*ast.UnaryExpr); ok && u.Op == token.AND {
-				rhs = u.X
+		switch x := n.(type) {
+		case *ast.RangeStmt:
+			if pure, _ := pureOver(x.X, literals); !pure {
+				markDerived(derived, x.Key, x.Value)
 			}
-			if lit, ok := rhs.(*ast.CompositeLit); ok && isID && !containsCall(lit) {
-				literals[id.Name] = true
-			}
+		case *ast.AssignStmt:
+			c.recordDefinitions(x, literals, derived)
 		}
 		return true
 	})
 	c.dropEscaped(literals)
 	return literals
+}
+
+func markDerived(derived map[string]bool, exprs ...ast.Expr) {
+	for _, e := range exprs {
+		if id, ok := e.(*ast.Ident); ok {
+			derived[id.Name] = true
+		}
+	}
+}
+
+func (c *testCtx) recordDefinitions(as *ast.AssignStmt, literals, derived map[string]bool) {
+	if as.Tok != token.DEFINE || len(as.Lhs) != len(as.Rhs) {
+		return
+	}
+	for i, lhs := range as.Lhs {
+		id := lhs.(*ast.Ident)
+		rhs := unparen(as.Rhs[i])
+		if u, ok := rhs.(*ast.UnaryExpr); ok && u.Op == token.AND {
+			rhs = u.X
+		}
+		lit, ok := rhs.(*ast.CompositeLit)
+		if ok && !containsCall(lit) && !mentionsAny(lit, derived) {
+			literals[id.Name] = true
+			continue
+		}
+		derived[id.Name] = true
+	}
+}
+
+func mentionsAny(node ast.Node, names map[string]bool) bool {
+	found := false
+	ast.Inspect(node, func(n ast.Node) bool {
+		if id, ok := n.(*ast.Ident); ok && names[id.Name] {
+			found = true
+		}
+		return !found
+	})
+	return found
 }
 
 func (c *testCtx) dropEscaped(literals map[string]bool) {
@@ -368,12 +401,28 @@ func (c *testCtx) dropEscaped(literals map[string]bool) {
 		case *ast.AssignStmt:
 			if x.Tok != token.DEFINE {
 				dropProductionFilled(x.Lhs, x.Rhs, literals)
+				dropHandedOut(x.Lhs, x.Rhs, literals)
 			}
 		case *ast.IncDecStmt:
 			dropProductionFilled([]ast.Expr{x.X}, nil, literals)
 		}
 		return true
 	})
+}
+
+func dropHandedOut(lhs, rhs []ast.Expr, literals map[string]bool) {
+	for i, e := range rhs {
+		id, ok := unparen(e).(*ast.Ident)
+		if !ok || !literals[id.Name] || i >= len(lhs) {
+			continue
+		}
+		switch unparen(lhs[i]).(type) {
+		case *ast.SelectorExpr, *ast.IndexExpr:
+			if root := rootIdent(lhs[i]); root == nil || root.Name != id.Name {
+				delete(literals, id.Name)
+			}
+		}
+	}
 }
 
 func dropProductionFilled(lhs, rhs []ast.Expr, literals map[string]bool) {
