@@ -20,7 +20,7 @@ func TestCI_TheRunnerCanApplyTheAgentSandbox(t *testing.T) {
 	deps := Deps{Env: map[string]string{}, LookupEnv: mapLookup(nil), Stderr: &stderr}
 	wrap := defaultSandboxWrapWithProbe(deps, func() sandbox.ProbeResult { return probe })
 	prefix, ok := wrap(SandboxWrapRequest{Phase: "builder", RepoRoot: t.TempDir(), Worktree: t.TempDir(), Workspace: t.TempDir(), AllowNetwork: true})
-	if !ok {
+	if !ok.Applied {
 		t.Fatalf("the bridge refused to build the agent profile on this runner: binary=%s stderr=%q", probe.BinaryPath, stderr.String())
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

@@ -579,7 +579,7 @@ func seatPrefix(t *testing.T, probe sandbox.ProbeResult, h contractHost, execSta
 		DispatchStore: func() (dispatchcred.Store, error) { return h.dispatch, nil }}
 	deps.SandboxWrap = defaultSandboxWrapWithProbe(deps, func() sandbox.ProbeResult { return probe })
 	prefix, ok := sandboxPrefixForLaunch(deps, cfg, h.ownTTY)
-	if !ok {
+	if !ok.Applied {
 		t.Fatalf("the bridge refused to wrap the %s", seat)
 	}
 	return prefix
