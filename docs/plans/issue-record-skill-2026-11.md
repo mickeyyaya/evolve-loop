@@ -1,6 +1,6 @@
 # Plan: each issue, alert or mistake gets an incident record through one entry skill
 
-- **Status:** proposed, 2026-11-16. Components K1 to K3 are in this change; K4 to K6 are later code.
+- **Status:** proposed, 2026-11-16. Components K1 to K3 are built. Amended 2026-11-18: [the incident knowledge-base plan](incident-knowledge-base-2026-11.md) replaces K4, K5 and K6 with its components I4, I5 and I7. Do not build K4 to K6.
 - **Design:** the skills [issue-record](../../skills/issue-record/SKILL.md) (the entry point), [issue-analyze](../../skills/issue-analyze/SKILL.md) (the cause) and [docs-write](../../skills/docs-write/SKILL.md) (the text, unchanged). **Decision:** no ADR; the decisions D1 to D8 are in §5. They add skills and one rule, and change no runtime contract. **Research:** [issue-record-skills-2026-11.md](../research/issue-record-skills-2026-11.md).
 - **Rule:** [guidance/rules/issue-gets-a-record.md](../../guidance/rules/issue-gets-a-record.md). **First record:** [2026-11-16-tests-leak-evolve-ledgers-under-go.md](../incidents/2026-11-16-tests-leak-evolve-ledgers-under-go.md).
 
@@ -95,9 +95,9 @@ A fourth option, D, makes the phase `incident-postmortem` the entry point. It ru
 | K1 | `skills/issue-record/SKILL.md` and `skills/issue-analyze/SKILL.md`, listed in `.claude-plugin/plugin.json`, with stubs from `evolve skills generate` | `evolve skills check` fails until the manifest lists each skill (`go/internal/skillcheck/manifest.go`) | console, this change |
 | K2 | `guidance/rules/issue-gets-a-record.md`, rendered by `evolve guidance build` into the L0 digest | `evolve guidance check` reports a stale `guidance/index.md` until the build runs | console, this change |
 | K3 | The first record and its regression index rows | none: a document | console, this change |
-| K4 | `evolve issue stub --signal <cycle>:<seq> \| --incident <id>`: writes `docs/incidents/<date>-<slug>.md` with the five sections of the template. It fills the header, the timeline rows and the verbatim lines of the signal; the cause sections stay as `TODO(issue-analyze)`. | `TestIssueStub_ASignalGivesARecordWithItsCodeCycleAndTimeline`; `TestIssueStub_RedactsATokenInAField`; `TestIssueStub_RefusesAnExistingRecord` | lane, later |
-| K5 | The Signal Center hint: an `errors` or `selfheal.incident` event of WARN or more prints the line `next: issue-record` in `events watch` text output. The skill name comes from policy data, not code. | `TestFormatLine_AWarnEventNamesTheRecordSkill`; `TestFormatLine_AnInfoEventHasNoHint` | lane, later |
-| K6 | A self-heal incident record gets the field `record_doc`. A close with `repro_test` and no `record_doc` is refused. | `TestIncidentClose_RefusesWithoutARecordDoc` | lane, later |
+| K4 | Replaced by I4 of the incident knowledge-base plan. `evolve issue stub --signal <cycle>:<seq> \| --incident <id>`: writes `docs/incidents/<date>-<slug>.md` with the five sections of the template. It fills the header, the timeline rows and the verbatim lines of the signal; the cause sections stay as `TODO(issue-analyze)`. | `TestIssueStub_ASignalGivesARecordWithItsCodeCycleAndTimeline`; `TestIssueStub_RedactsATokenInAField`; `TestIssueStub_RefusesAnExistingRecord` | lane, later |
+| K5 | Replaced by I5 of the incident knowledge-base plan. The Signal Center hint: an `errors` or `selfheal.incident` event of WARN or more prints the line `next: issue-record` in `events watch` text output. The skill name comes from policy data, not code. | `TestFormatLine_AWarnEventNamesTheRecordSkill`; `TestFormatLine_AnInfoEventHasNoHint` | lane, later |
+| K6 | Replaced by I7 of the incident knowledge-base plan. A self-heal incident record gets the field `record_doc`. A close with `repro_test` and no `record_doc` is refused. | `TestIncidentClose_RefusesWithoutARecordDoc` | lane, later |
 
 ## 7. Order
 
