@@ -48,21 +48,23 @@ func QuarantineDirtyTree(ctx context.Context, repoRoot, label string) (bool, err
 }
 
 func porcelainPaths(ctx context.Context, repoRoot string) ([]string, error) {
-	cmd := sysexec.Command(ctx, "git", "status", "--porcelain")
+	cmd := sysexec.Command(ctx, "git", "status", "--porcelain", "-z")
 	cmd.Dir = repoRoot
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("quarantine: git status: %w", err)
 	}
 	var paths []string
-	for _, line := range strings.Split(string(out), "\n") {
-		if len(line) < 4 {
+	entries := strings.Split(string(out), "\x00")
+	for i := 0; i < len(entries); i++ {
+		entry := entries[i]
+		if len(entry) < 4 {
 			continue
 		}
-		p := porcelainDestination(strings.TrimSpace(line[3:]))
-		if p != "" {
-			paths = append(paths, p)
+		if entry[0] == 'R' || entry[0] == 'C' || entry[1] == 'R' || entry[1] == 'C' {
+			i++
 		}
+		paths = append(paths, entry[3:])
 	}
 	return paths, nil
 }
@@ -75,12 +77,4 @@ func ShipSHAMismatch(binPath, expectedSHA string) (bool, string, error) {
 	sum := sha256.Sum256(data)
 	actual := hex.EncodeToString(sum[:])
 	return actual != expectedSHA, actual, nil
-}
-
-func porcelainDestination(entry string) string {
-	const renameArrow = " -> "
-	if idx := strings.Index(entry, renameArrow); idx >= 0 {
-		entry = entry[idx+len(renameArrow):]
-	}
-	return strings.Trim(entry, "\"")
 }

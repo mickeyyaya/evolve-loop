@@ -5,6 +5,11 @@
     "A symlinked module dir filters correctly",
     "A filename with spaces round-trips"
   ],
+  "consumed": {
+    "at": "2026-11-18T00:20:03Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-10-11T18:37:31Z",
   "files": [
     "go/internal/core/boot_preflight.go",

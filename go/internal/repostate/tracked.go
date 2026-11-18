@@ -29,7 +29,7 @@ func TrackedFiles(root, relDir string) ([]string, error) {
 }
 
 func TrackedTree(root, relDir string) ([]string, error) {
-	out, err := sysexec.Command(context.Background(), "git", "-C", root, "ls-files", "--", relDir).Output()
+	out, err := sysexec.Command(context.Background(), "git", "-C", root, "ls-files", "-z", "--", relDir).Output()
 	if err != nil {
 		var ee *exec.ExitError
 		if errors.As(err, &ee) && len(ee.Stderr) > 0 {
@@ -38,8 +38,8 @@ func TrackedTree(root, relDir string) ([]string, error) {
 		return nil, fmt.Errorf("git ls-files %s in %s: %w", relDir, root, err)
 	}
 	var files []string
-	for _, line := range strings.Split(string(out), "\n") {
-		if rel := strings.TrimSpace(line); rel != "" {
+	for _, rel := range strings.Split(string(out), "\x00") {
+		if rel != "" {
 			files = append(files, rel)
 		}
 	}
