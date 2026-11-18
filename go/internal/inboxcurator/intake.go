@@ -69,7 +69,7 @@ func UnderivedConsoleRoute(it inboxbatch.Item, isProtected func(string) bool) bo
 	return !derived
 }
 
-var ErrUnexplainedRoute = errors.New("no protected fix surface and no pipeline kind explain the console route; give the reason (--reason), or drop the route so a lane can take the item")
+var ErrUnexplainedRoute = errors.New("no protected fix surface and no pipeline kind explain the console route. Give a reason (--reason) or drop the route so a lane can take the item")
 
 type Rules struct {
 	Kinds       []string

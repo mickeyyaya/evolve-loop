@@ -20,7 +20,7 @@ const (
 
 var (
 	ErrUnknownPriorityClass = errors.New("unknown priority_class")
-	ErrNoPriorityClass      = errors.New("no priority_class, so the item would rank below every class")
+	ErrNoPriorityClass      = errors.New("no priority_class, so the item ranks below every class")
 )
 
 func RequirePriorityClass(class string) error {

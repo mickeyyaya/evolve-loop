@@ -118,7 +118,7 @@ func (s *devSweep) saveVerified(ctx context.Context, wt wtcheckpoint.Worktree, p
 	if saved.Ref == "" && pinHead {
 		pinned, err := wtcheckpoint.PinHead(ctx, wt, wtcheckpoint.SaveOptions{Label: devArchiveLabel, Now: s.o.Now})
 		if err != nil {
-			return "", fmt.Errorf("gc: refuse %s: its head could not be pinned, so the tree stays: %w", wt.Dir, err)
+			return "", fmt.Errorf("gc: refuse %s: its head cannot be pinned, so the tree stays: %w", wt.Dir, err)
 		}
 		return pinned.Ref, nil
 	}

@@ -35,8 +35,8 @@ func TestApplyDevWorktrees_ACheckpointThatCannotBeWrittenKeepsTheTree(t *testing
 	m := e.plan(o)
 	e.store.Git("update-ref", "refs/checkpoints/pin-fails/"+o.Now().UTC().Format("20060102T150405Z"), "main")
 	recs, err := e.apply(o, m)
-	if err == nil || len(recs) != 0 || !strings.Contains(err.Error(), "could not be pinned") {
-		t.Fatalf("apply = %+v, %v; want a refusal because the head could not be pinned", recs, err)
+	if err == nil || len(recs) != 0 || !strings.Contains(err.Error(), "cannot be pinned") {
+		t.Fatalf("apply = %+v, %v; want a refusal because the head cannot be pinned", recs, err)
 	}
 	if _, serr := os.Stat(dir); serr != nil {
 		t.Fatalf("the tree was removed: %v", serr)

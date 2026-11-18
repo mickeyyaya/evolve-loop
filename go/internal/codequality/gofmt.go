@@ -29,7 +29,7 @@ func UnformattedGoFiles(dir string) ([]string, error) {
 				sort.Strings(files)
 				return files, nil
 			}
-			return nil, fmt.Errorf("gofmt -l -s %s could not read the tree: %w: %s", dir, err, failure)
+			return nil, fmt.Errorf("gofmt -l -s %s cannot read the tree: %w: %s", dir, err, failure)
 		}
 		files = append(files, "gofmt parse error: "+firstLine(detail))
 		sort.Strings(files)

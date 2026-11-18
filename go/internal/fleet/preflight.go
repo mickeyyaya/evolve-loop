@@ -32,6 +32,6 @@ func PreflightControlPlane(repoRoot string) error {
 	if len(dirty) == 0 {
 		return nil
 	}
-	return fmt.Errorf("fleet: control-plane file(s) %s have uncommitted changes in %q; commit them via `evolve ship --class manual` before dispatching a wave",
+	return fmt.Errorf("fleet: control-plane file(s) %s have uncommitted changes in %q; commit them with `evolve ship --class manual` before dispatching a wave",
 		strings.Join(dirty, ", "), repoRoot)
 }

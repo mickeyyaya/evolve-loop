@@ -82,7 +82,7 @@ func runWaveWithRetry(ctx context.Context, run WaveRunner, wave []fleet.CycleSpe
 				}
 			}
 			if len(required) > 0 {
-				return nil, fmt.Errorf("cycle(s) %v failed after %d attempt(s)", scopeIDs(required), attempt+1)
+				return nil, fmt.Errorf("cycle(s) %v failed after %d tries", scopeIDs(required), attempt+1)
 			}
 			return failed, nil
 		}
