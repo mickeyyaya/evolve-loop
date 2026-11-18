@@ -881,3 +881,5 @@
 ./internal/plainfile
 ./internal/stagescore
 ./internal/scopedset
+./internal/testaudit
+./internal/fakecontract
