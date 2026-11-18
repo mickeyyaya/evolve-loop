@@ -131,7 +131,7 @@ func TestRun_NilSteps_FallbacksAssigned(t *testing.T) {
 	jp, repo := makeJournal(t, journalFull)
 	fakes := installFakeTools(t,
 		"case \"$2\" in view) pwd >> \"$FAKE_GH_PWD\"; exit 0;; *) exit 0;; esac\n",
-		"case \"$1\" in ls-remote) echo refs/tags/v1.2.3;; esac\nexit 0\n")
+		"case \"$1\" in ls-remote) printf 'abc123\\trefs/tags/v1.2.3\\n';; esac\nexit 0\n")
 	var buf strings.Builder
 	res, err := Run(Options{
 		JournalPath: jp,

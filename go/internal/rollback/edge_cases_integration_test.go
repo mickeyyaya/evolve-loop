@@ -185,7 +185,7 @@ func TestDefaultDeleteRemoteTag_TagPresent_PushFails(t *testing.T) {
 # Detect subcommand by scanning args.
 for arg in "$@"; do
   case "$arg" in
-    ls-remote) echo "refs/tags/v9.9.9"; exit 0 ;;
+    ls-remote) printf 'abc123\trefs/tags/v9.9.9\n'; exit 0 ;;
     push)      exit 1 ;;
   esac
 done
@@ -207,7 +207,7 @@ func TestDefaultDeleteRemoteTag_TagPresent_PushSucceeds(t *testing.T) {
 	script := `#!/bin/sh
 for arg in "$@"; do
   case "$arg" in
-    ls-remote) echo "refs/tags/v9.9.9"; exit 0 ;;
+    ls-remote) printf 'abc123\trefs/tags/v9.9.9\n'; exit 0 ;;
     push)      exit 0 ;;
   esac
 done
