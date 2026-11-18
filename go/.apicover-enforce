@@ -885,3 +885,4 @@
 ./internal/fakecontract
 ./internal/redact
 ./internal/incidentbundle
+./internal/evidencex
