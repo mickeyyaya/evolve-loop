@@ -1,7 +1,9 @@
 package agentclass
 
 import (
+	"maps"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -9,6 +11,7 @@ import (
 const (
 	RequestsDir  = "requests"
 	KindDispatch = "dispatch"
+	KindInboxAdd = "inbox-add"
 )
 
 var (
@@ -33,4 +36,19 @@ func ChildRequest(parent, file string) string {
 	return parent + "." + stem
 }
 
+func RequestKind(name string) string {
+	leaf := name[strings.LastIndex(name, ".")+1:]
+	kind, _, _ := RequestFile(leaf + ".json")
+	return kind
+}
+
 func ValidRequestName(name string) bool { return requestName.MatchString(name) }
+
+var requiredArgs = map[string][]string{
+	KindDispatch: {"role"},
+	KindInboxAdd: {"id", "title", "kind", "fix", "priority_class", "acceptance-1"},
+}
+
+func RequiredArgs(kind string) []string { return slices.Clone(requiredArgs[kind]) }
+
+func ArgKinds() []string { return slices.Sorted(maps.Keys(requiredArgs)) }

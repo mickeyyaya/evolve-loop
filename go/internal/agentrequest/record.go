@@ -9,8 +9,11 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/agentclass"
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inputindex"
 )
@@ -67,9 +70,13 @@ func digest(raw []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func recordCount(cell Cell) int {
+func recordCount(cell Cell, kind string) int {
 	records, _ := filepath.Glob(filepath.Join(inputindex.RequestsDir(cell.ProjectRoot, cell.Cycle), "*.json"))
-	return len(records)
+	return len(slices.DeleteFunc(records, func(path string) bool { return recordKind(path) != kind }))
+}
+
+func recordKind(path string) string {
+	return agentclass.RequestKind(originalName(strings.TrimSuffix(filepath.Base(path), ".json")))
 }
 
 func withSummary(r Record) Record {

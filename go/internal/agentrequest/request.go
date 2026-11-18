@@ -33,6 +33,16 @@ type Request struct {
 
 func (r Request) Role() string { return r.What.Args[roleArg] }
 
+func (r Request) missingArgs() []string {
+	var missing []string
+	for _, arg := range agentclass.RequiredArgs(r.Kind) {
+		if strings.TrimSpace(r.What.Args[arg]) == "" {
+			missing = append(missing, arg)
+		}
+	}
+	return missing
+}
+
 func parse(raw []byte) (Request, error) {
 	var r Request
 	dec := json.NewDecoder(bytes.NewReader(raw))

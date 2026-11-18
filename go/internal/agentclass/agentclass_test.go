@@ -203,3 +203,41 @@ func TestRequestName_TheFileTheChildAndTheNameShareOneGrammar(t *testing.T) {
 		}
 	}
 }
+
+func TestRequiredArgs_GiveACopyForEachKindWithAnExecutor(t *testing.T) {
+	t.Parallel()
+	if got := RequiredArgs(KindDispatch); !slices.Equal(got, []string{"role"}) {
+		t.Fatalf("dispatch args = %v", got)
+	}
+	got := RequiredArgs(KindInboxAdd)
+	if !slices.Equal(got, []string{"id", "title", "kind", "fix", "priority_class", "acceptance-1"}) {
+		t.Fatalf("inbox-add args = %v", got)
+	}
+	got[0] = "changed"
+	if RequiredArgs(KindInboxAdd)[0] != "id" || len(RequiredArgs("code-refresh")) != 0 {
+		t.Fatal("the accessor returns a copy, and a kind with no executor has no args")
+	}
+}
+
+func TestRequestKind_IsTheKindOfTheLeafOfAName(t *testing.T) {
+	t.Parallel()
+	for name, want := range map[string]string{
+		"dispatch-1":                KindDispatch,
+		"dispatch-3.inbox-add-1":    KindInboxAdd,
+		"dispatch-1.dispatch-2.x-9": "x",
+		"notes":                     "",
+		"":                          "",
+		"dispatch-1.":               "",
+	} {
+		if got := RequestKind(name); got != want {
+			t.Errorf("RequestKind(%q) = %q, want %q", name, got, want)
+		}
+	}
+}
+
+func TestArgKinds_ListTheKindsThatHaveRequiredArgs(t *testing.T) {
+	t.Parallel()
+	if got := ArgKinds(); !slices.Equal(got, []string{KindDispatch, KindInboxAdd}) {
+		t.Fatalf("ArgKinds() = %v, want the sorted kinds of the required-args table", got)
+	}
+}

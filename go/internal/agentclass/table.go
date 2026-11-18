@@ -63,7 +63,7 @@ var table = []Verb{
 	{Path: "quality compare", Class: Request, Kind: "quality-reading"},
 	{Path: "agent run", Class: Request, Kind: KindDispatch},
 	{Path: "phase <name>", Class: Request, Kind: KindDispatch},
-	{Path: "inbox add", Class: Request, Kind: "inbox-add"},
+	{Path: "inbox add", Class: Request, Kind: KindInboxAdd},
 	{Path: "code refresh", Class: Request, Kind: "code-refresh"},
 	{Path: "clihealth usage", Class: Denied},
 	{Path: "inbox consume", Class: Denied},
