@@ -1,0 +1,107 @@
+# Cycle 2492 Dossier
+
+**Goal:** Wave 180.
+
+Work the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.
+
+Every cycle must:
+- commit to a claimed inbox item (an empty top_n must not run the spine);
+- bind its audit to the changes tree that it ships;
+- disposition its own defect ledger and the inherited ids;
+- record a terminal outcome on every exit;
+- never change a protected control-plane file with a tool;
+- leave no stale worktree.
+
+Routing:
+- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.
+- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.
+- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.
+
+Craft:
+- New and changed code has no comments. Names, types and tests give the intent.
+- Write each new document and each new log text in ASD-STE100.
+- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.
+- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.
+
+Evidence:
+- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.
+
+The measure of this wave is the number of shipped cycles. Keep each cycle shipping.
+
+Wave 179 facts (run 20261117T184146Z): 11 of 22 cycles shipped.
+- 2 older cycles are not shown.
+- Cycle 2468: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.
+- Cycle 2469: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.
+- Cycle 2470: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.
+- Cycle 2471: final verdict PASS. It shipped.
+- Cycle 2472: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.
+- Cycle 2473: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…d6b823a649f6876d91e6701b0) — re-run Auditor on the new state (carry not re-bound: the carry of cycle-N names main at c33a0ee552aebe2ec3dfe72f4307ae363b00a4ee). Last phase: aborted. It did not ship.
+- Cycle 2474: final verdict PASS. It shipped.
+- Cycle 2475: final verdict PASS. It shipped.
+- Cycle 2476: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.
+- Cycle 2477: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.
+- Cycle 2478: final verdict PASS. It shipped.
+- Cycle 2479: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.
+- Cycle 2480: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.
+- Cycle 2481: final verdict PASS. It shipped.
+- Cycle 2482: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.
+- Cycle 2483: final verdict PASS. It shipped.
+- Cycle 2484: final verdict PASS. It shipped.
+- Cycle 2485: final verdict PASS. It shipped.
+- Cycle 2486: final verdict PASS. It shipped.
+- Cycle 2487: final verdict PASS. It shipped.
+- Pull requests merged at this boundary: none.
+
+Earlier waves:
+- Wave 176 (run 20261116T142321Z): 1 of 6 cycles shipped.
+- Wave 177 (run 20261116T224405Z): 11 of 12 cycles shipped.
+- Wave 178 (run 20261117T101039Z): 10 of 11 cycles shipped.
+**Final verdict:** FAIL
+**Run ID:** 01M7PJ6Z85DWYHHQX2EDASD21P
+**Committed:** `core-shadow-batch-overlap-test-depends-on-sleep-timing`
+
+## Phases
+
+| Phase | Archetype | Verdict | Duration | Key Findings |
+|-------|-----------|---------|----------|--------------|
+| scout | plan | PASS | 3m0s |  |
+| triage | plan | PASS | 30s |  |
+| tdd | plan | PASS | 4m57s |  |
+| build | build | PASS | 27m6s |  |
+| audit | evaluate | FAIL | 6m16s |  |
+| retro | control | PASS | 2m35s |  |
+
+## Timing
+
+**Total:** 44m23s across 6 phases (0 retried) · **Longest:** build 27m6s
+
+| Archetype | Wall-clock |
+|-----------|------------|
+| build | 27m6s |
+| control | 2m35s |
+| evaluate | 6m16s |
+| plan | 8m27s |
+
+## Defects
+
+- **audit-fail** (HIGH): cycle did not pass audit; see audit-report.md + acs-verdict.json — fix: address the audit findings recorded for this cycle
+
+
+## Failure
+
+**Fingerprint:** `audit|verdict-fail|3410752a88de` · **Class:** verdict-fail
+
+- phase audit verdict FAIL routed to retro (agent-graded; see the audit report artifact) defect=H1: evolve acs suite --cycle-N reports green=3 red=47: operator policy /Users/danleemh/ai/claude/evolve-lo
+
+
+## System Failure
+
+**Category:** verdict-incoherence
+**Level:** system
+**Evidence:** orchestrator-classified verdict-incoherence: kernel acs-verdict.json: verdict PASS, red_count 0, ship_eligible true, project_root /Users/danleemh/ai/claude/evolve-loop/runtime; audit FAIL rests on the auditor's own suite run (acs-verdict.candidate.1483416033.json red=47) that read /Users/danleemh/ai/claude/evolve-loop/.evolve/policy.json through mainProjectRoot in go/cmd/evolve/cmd_acs.go:48-58
+**Halt:** true
+
+## Carryover
+
+- **address-audit-findings** (high): resolve the audit findings that failed cycle 2492
+
