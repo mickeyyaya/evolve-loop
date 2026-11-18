@@ -71,7 +71,21 @@ func (c *fakeClock) Advance(d time.Duration) {
 		if t == nil {
 			return
 		}
-		t.f()
+		c.runOffCaller(t.f)
+	}
+}
+
+const callbackSettle = 200 * time.Millisecond
+
+func (c *fakeClock) runOffCaller(f func()) {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		f()
+	}()
+	select {
+	case <-done:
+	case <-time.After(callbackSettle):
 	}
 }
 
