@@ -39,7 +39,7 @@ func TestServer_AFailingStdoutFailsEveryPrintingCommand(t *testing.T) {
 	target := map[byte]string{'t': "w"}
 	for name, inv := range map[string]invocation{
 		"show-options":    {flags: target, args: []string{"@o"}},
-		"capture-pane":    {flags: target},
+		"capture-pane":    {flags: map[byte]string{'t': "w", 'p': ""}},
 		"display-message": {flags: target, args: []string{"#{pane_pid}"}},
 		"list-panes":      {flags: target},
 		"list-sessions":   {flags: map[byte]string{}},
@@ -73,7 +73,7 @@ func TestServer_BrokenStateFilesFailTheCommandsThatReadThem(t *testing.T) {
 	if err := os.Remove(sess.path("screen")); err != nil {
 		t.Fatal(err)
 	}
-	target := invocation{flags: map[byte]string{'t': "b", 'b': "b"}, args: []string{"x"}}
+	target := invocation{flags: map[byte]string{'t': "b", 'b': "b", 'p': ""}, args: []string{"x"}}
 
 	wantErr(t, s.capturePane(target), "no such file")
 	wantErr(t, s.sendKeys(target), "no such file")

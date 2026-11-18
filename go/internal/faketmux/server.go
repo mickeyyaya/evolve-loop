@@ -86,7 +86,11 @@ func (s *server) newSession(inv invocation) error {
 	if !validName(name) {
 		return fmt.Errorf("bad session name %q", name)
 	}
-	height, err := strconv.Atoi(cmp.Or(inv.flags['y'], "24"))
+	width, err := windowDimension("width", cmp.Or(inv.flags['x'], strconv.Itoa(defaultWidth)))
+	if err != nil {
+		return err
+	}
+	height, err := strconv.Atoi(cmp.Or(inv.flags['y'], strconv.Itoa(defaultHeight)))
 	if err != nil {
 		return fmt.Errorf("bad height: %w", err)
 	}
@@ -97,7 +101,10 @@ func (s *server) newSession(inv invocation) error {
 	if err := errors.Join(os.RemoveAll(sess.dir), os.MkdirAll(sess.dir, 0o700)); err != nil {
 		return err
 	}
-	return sess.start(paneArgv(inv.args), inv.flags['c'], height)
+	if err := sess.start(paneArgv(inv.args), inv.flags['c'], height); err != nil {
+		return err
+	}
+	return sess.writeFile("width", strconv.Itoa(width))
 }
 
 func validName(name string) bool {
@@ -211,6 +218,9 @@ func (s *server) capturePane(inv invocation) error {
 	if err != nil {
 		return err
 	}
+	if _, print := inv.flags['p']; !print {
+		return nil
+	}
 	scrollback, err := scrollbackOf(inv.flags['S'])
 	if err != nil {
 		return err
@@ -273,8 +283,60 @@ func (s *server) listSessions(inv invocation) error {
 }
 
 func (s *server) resizeWindow(inv invocation) error {
-	_, err := s.target(inv)
-	return err
+	sess, err := s.target(inv)
+	if err != nil {
+		return err
+	}
+	width, height := sess.width(), sess.height()
+	for _, step := range []struct {
+		flag  byte
+		name  string
+		into  *int
+		sign  int
+		fresh bool
+	}{
+		{'x', "width", &width, 1, true},
+		{'y', "height", &height, 1, true},
+		{'L', "width", &width, -1, false},
+		{'R', "width", &width, 1, false},
+		{'U', "height", &height, -1, false},
+		{'D', "height", &height, 1, false},
+	} {
+		value, ok := inv.flags[step.flag]
+		if !ok {
+			continue
+		}
+		n, err := windowDimension(step.name, value)
+		if err != nil && step.fresh {
+			return err
+		}
+		if !step.fresh {
+			if err != nil || n < 0 {
+				return fmt.Errorf("bad adjustment %q", value)
+			}
+			n = *step.into + step.sign*n
+			if n < minWindow || n > maxWindow {
+				return fmt.Errorf("size out of range: %d", n)
+			}
+		}
+		*step.into = n
+	}
+	return sess.writeSize(width, height)
+}
+
+const (
+	defaultWidth  = 80
+	defaultHeight = 24
+	minWindow     = 1
+	maxWindow     = 10000
+)
+
+func windowDimension(name, value string) (int, error) {
+	n, err := strconv.Atoi(value)
+	if err != nil || n < minWindow || n > maxWindow {
+		return 0, fmt.Errorf("%s %q out of range %d-%d", name, value, minWindow, maxWindow)
+	}
+	return n, nil
 }
 
 func (s *server) printFormat(sess session, format string) error {

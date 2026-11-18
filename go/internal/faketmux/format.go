@@ -40,6 +40,10 @@ func (s *server) variable(sess session, pid int, name string) (string, error) {
 		return sess.name, nil
 	case "pane_pid":
 		return strconv.Itoa(pid), nil
+	case "window_width":
+		return strconv.Itoa(sess.width()), nil
+	case "window_height":
+		return strconv.Itoa(sess.height()), nil
 	case "window_activity":
 		return sess.activity(), nil
 	case "pane_current_command":

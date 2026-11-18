@@ -196,8 +196,7 @@ func (s session) capture(scrollback int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	text := strings.ReplaceAll(strings.ReplaceAll(string(body), "\r\n", "\n"), "\r", "")
-	lines := strings.Split(strings.TrimSuffix(text, "\n"), "\n")
+	lines := screenRows(string(body))
 	if rows := rec.height + scrollback; scrollback >= 0 && len(lines) > rows {
 		lines = lines[len(lines)-rows:]
 	}
@@ -223,4 +222,61 @@ func (s session) activity() string {
 		return "0"
 	}
 	return strconv.FormatInt(info.ModTime().Unix(), 10)
+}
+
+func screenRows(raw string) []string {
+	text := strings.ReplaceAll(raw, "\r\n", "\n")
+	rows := strings.Split(strings.TrimSuffix(text, "\n"), "\n")
+	for i, row := range rows {
+		rows[i] = overwriteRow(row)
+	}
+	return rows
+}
+
+func overwriteRow(row string) string {
+	if !strings.Contains(row, "\r") {
+		return row
+	}
+	var cells []rune
+	col := 0
+	for _, r := range row {
+		if r == '\r' {
+			col = 0
+			continue
+		}
+		if col < len(cells) {
+			cells[col] = r
+		} else {
+			cells = append(cells, r)
+		}
+		col++
+	}
+	return string(cells)
+}
+
+func (s session) width() int {
+	body, err := os.ReadFile(s.path("width"))
+	if n, convErr := strconv.Atoi(strings.TrimSpace(string(body))); err == nil && convErr == nil {
+		return n
+	}
+	return defaultWidth
+}
+
+func (s session) height() int {
+	rec, err := s.pane()
+	if err != nil {
+		return defaultHeight
+	}
+	return rec.height
+}
+
+func (s session) writeSize(width, height int) error {
+	rec, err := s.pane()
+	if err != nil {
+		return err
+	}
+	if err := s.writeFile("width", strconv.Itoa(width)); err != nil {
+		return err
+	}
+	return s.writeFile("pane", fmt.Sprintf("%d %d %s", rec.pid, height, rec.begun))
 }

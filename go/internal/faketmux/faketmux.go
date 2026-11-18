@@ -37,7 +37,7 @@ var commands = map[string]command{
 	"display-message": {valued: "cdtF", run: (*server).displayMessage},
 	"list-panes":      {valued: "tFf", run: (*server).listPanes},
 	"list-sessions":   {valued: "Ff", run: (*server).listSessions},
-	"resize-window":   {valued: "txy", run: (*server).resizeWindow},
+	"resize-window":   {valued: "txyLRUD", run: (*server).resizeWindow},
 }
 
 func Run(root string, args []string, stdout, stderr io.Writer) int {
