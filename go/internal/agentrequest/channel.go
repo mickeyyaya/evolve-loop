@@ -106,7 +106,7 @@ func (c Channel) kindStage(file string) string {
 	if !ok {
 		return ""
 	}
-	return ex.Stage()
+	return string(ex.Stage())
 }
 
 func (c Channel) read(ctx context.Context, f frame) error {
