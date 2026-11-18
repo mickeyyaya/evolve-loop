@@ -219,7 +219,7 @@ func runInPane(t *testing.T, probe sandbox.ProbeResult, target parityTarget, mut
 	wrap := defaultSandboxWrapWithProbe(deps, func() sandbox.ProbeResult { return probe })
 	deps.SandboxWrap = func(req SandboxWrapRequest) ([]string, WrapOutcome) {
 		prefix, ok := wrap(req)
-		if ok && mutate != nil {
+		if ok.Applied && mutate != nil {
 			mutate(t, prefix[2])
 		}
 		return prefix, ok
