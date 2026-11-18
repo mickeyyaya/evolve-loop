@@ -40,3 +40,12 @@ func TestAutoModel_NamedSeamExpandsAuto(t *testing.T) {
 		t.Errorf("AutoModel invoked with role = %q, want audit (the phase, not the agent)", gotRole)
 	}
 }
+
+func TestSameFamily_NamedSeamComparesBaseFamilies(t *testing.T) {
+	if !SameFamily("claude", "claude") {
+		t.Error("SameFamily(claude, claude) = false, want true")
+	}
+	if SameFamily("claude", "codex") {
+		t.Error("SameFamily(claude, codex) = true, want false")
+	}
+}

@@ -42,11 +42,16 @@ type Plan struct {
 	Effort        string
 
 	TierCeiling map[string][]string
+
+	Admit func(cli, tier string) bool
 }
 
 func (p Plan) Permits(cli, tier string) bool {
 	if name := policy.TierName(policy.TierRank(tier)); name != "" {
 		tier = name
+	}
+	if p.Admit != nil && !p.Admit(cli, tier) {
+		return false
 	}
 	allowed, capped := p.TierCeiling[tier]
 	if !capped {
@@ -250,6 +255,8 @@ func Family(cli string) string {
 	}
 	return cli
 }
+
+func SameFamily(a, b string) bool { return Family(a) == Family(b) }
 
 func Binary(cli string) string { return cliBinaryFor[cli] }
 

@@ -125,3 +125,26 @@ func TestDefaultDriverForFamily_MapsAFamilyToItsTmuxDriver(t *testing.T) {
 		}
 	}
 }
+
+func TestPlanPermits_AdmitNarrowsTheCeilingAndReadsTheCanonicalTier(t *testing.T) {
+	var seen []string
+	p := Plan{
+		TierCeiling: map[string][]string{"deep": {"claude", "codex"}},
+		Admit: func(cli, tier string) bool {
+			seen = append(seen, cli+"@"+tier)
+			return Family(cli) != "claude"
+		},
+	}
+	if p.Permits("claude-tmux", "opus") {
+		t.Error("Admit refused claude, so Permits must be false")
+	}
+	if !p.Permits("codex-tmux", "opus") {
+		t.Error("Admit allowed codex inside the ceiling, so Permits must be true")
+	}
+	if p.Permits("agy-tmux", "deep") {
+		t.Error("the ceiling must still exclude agy: Admit never widens it")
+	}
+	if len(seen) == 0 || seen[0] != "claude-tmux@deep" {
+		t.Errorf("Admit must see the canonical tier, saw %v", seen)
+	}
+}

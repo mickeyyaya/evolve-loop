@@ -50,6 +50,14 @@ type Walking struct {
 	bench   BenchFunc
 	now     func() time.Time
 	logf    Logf
+	admit   CandidateSpec
+}
+
+type CandidateSpec func(cli, tier string) bool
+
+type Seat struct {
+	CLI  string
+	Tier string
 }
 
 type Option func(*Walking)
@@ -57,6 +65,8 @@ type Option func(*Walking)
 func WithBench(b BenchFunc) Option { return func(w *Walking) { w.bench = b } }
 
 func WithClock(now func() time.Time) Option { return func(w *Walking) { w.now = now } }
+
+func WithCandidateFilter(spec CandidateSpec) Option { return func(w *Walking) { w.admit = spec } }
 
 func WithLog(l Logf) Option { return func(w *Walking) { w.logf = l } }
 
@@ -71,22 +81,30 @@ func New(inner core.Bridge, resolve PlanResolver, opts ...Option) *Walking {
 func (w *Walking) Probe(ctx context.Context) (core.BridgeProbe, error) { return w.inner.Probe(ctx) }
 
 func (w *Walking) Launch(ctx context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
+	_, resp, err := w.LaunchSeat(ctx, req)
+	return resp, err
+}
+
+func (w *Walking) launchPinned(ctx context.Context, req core.BridgeRequest) (Seat, core.BridgeResponse, error) {
+	if w.admit != nil && !w.admit(req.CLI, req.Model) {
+		return Seat{}, core.BridgeResponse{}, fmt.Errorf("bridge-chain: agent %s: cli %s tier %s: %w", req.Agent, req.CLI, req.Model, llmroute.ErrNoPermittedAttempt)
+	}
+	resp, err := w.inner.Launch(ctx, req)
+	return Seat{CLI: req.CLI, Tier: req.Model}, resp, err
+}
+
+func (w *Walking) LaunchSeat(ctx context.Context, req core.BridgeRequest) (Seat, core.BridgeResponse, error) {
 	if req.ChainAttempt || w.resolve == nil {
-		return w.inner.Launch(ctx, req)
+		return w.launchPinned(ctx, req)
 	}
 	plan, err := w.resolve(req)
 	if err != nil {
-		return core.BridgeResponse{}, fmt.Errorf("bridge-chain: agent %s: %w", req.Agent, err)
+		return Seat{}, core.BridgeResponse{}, fmt.Errorf("bridge-chain: agent %s: %w", req.Agent, err)
 	}
-	if len(plan.Candidates) == 0 {
-		plan.Candidates = []string{req.CLI}
+	if w.admit != nil {
+		plan.Admit = w.admit
 	}
-	if len(plan.Triggers) == 0 {
-		plan.Triggers = llmroute.DefaultTriggers()
-	}
-	if len(plan.Tiers) == 0 {
-		plan.Tiers = []string{req.Model}
-	}
+	plan = withDefaults(plan, req)
 	var last core.BridgeResponse
 	var lastErr error
 	var attempts []string
@@ -113,9 +131,23 @@ func (w *Walking) Launch(ctx context.Context, req core.BridgeRequest) (core.Brid
 		w.logf("[bridge-chain] agent=%s tier step-down %s -> %s (every CLI at %s exited %d)\n", req.Agent, from, to, from, exitQuota)
 	})
 	if err := Unlaunched(walk, plan); err != nil {
-		return core.BridgeResponse{}, fmt.Errorf("bridge-chain: agent %s: %w", req.Agent, err)
+		return Seat{}, core.BridgeResponse{}, fmt.Errorf("bridge-chain: agent %s: %w", req.Agent, err)
 	}
-	return keeper.Surface(walk, last, lastErr)
+	resp, err := keeper.Surface(walk, last, lastErr)
+	return Seat{CLI: walk.CLI, Tier: walk.Tier}, resp, err
+}
+
+func withDefaults(plan llmroute.Plan, req core.BridgeRequest) llmroute.Plan {
+	if len(plan.Candidates) == 0 {
+		plan.Candidates = []string{req.CLI}
+	}
+	if len(plan.Triggers) == 0 {
+		plan.Triggers = llmroute.DefaultTriggers()
+	}
+	if len(plan.Tiers) == 0 {
+		plan.Tiers = []string{req.Model}
+	}
+	return plan
 }
 
 func DefaultPlanResolver(router *cliroute.Router) PlanResolver {

@@ -195,6 +195,24 @@ The request block puts each ask text on one line, so a text from the inbox canno
 
 The block and the check build the request through one helper, `request.ForPair`. The block reads the item files that the upper half of the task contract read (`fleet_scope_paths` first). So the `request_digest` in the prompt equals the digest that the check rebuilds.
 
+### Where the judge seat is walked (H10)
+
+The judge uses the one seat walker, `bridgechain.Walking`. It does not walk its own seats. One walker keeps the exit-85 bench and the fresh session for the judge.
+
+`bridgechain.WithCandidateFilter` takes a `CandidateSpec`. A `CandidateSpec` is a function of a CLI and a tier. It returns true when the seat is allowed. The walker skips a refused seat and never launches it. When the filter refuses each seat, the walk launches nothing. It returns `llmroute.ErrNoPermittedAttempt`.
+
+The filter only narrows the plan. It never widens the tier ceiling of the plan.
+
+A request with `ChainAttempt` set does not bypass the filter. The walker refuses a refused seat on that path too.
+
+`Walking.LaunchSeat` returns the `Seat` that served the request. The seat holds the CLI and the tier of the last launch. It is the routed driver, not the head of the plan.
+
+`handoff.Independents` builds the filter of the judge from the `Author` of the ledger. It allows a seat of another family. It allows a seat of the same family only at a stronger tier than the tier of the author. It refuses each seat when the author is unattributed or has no CLI. It refuses a same-family seat when the tier of the author is empty or unknown.
+
+A test pins `policy.TierNames` equal to `modelcatalog.CanonicalTiers`. The two lists cannot drift apart.
+
+The judge is not in the tree yet. The seam has tests, and the judge will call it.
+
 ### Where the check runs (H8)
 
 `core.HandoffReviewer` (`go/internal/core/handoff_reviewer.go`) is a `core.DeliverableReviewer`. `go/cmd/evolve/cmd_cycle.go` puts it last in the reviewer chain of each cycle. At the end of the `tdd` phase it checks `triage-tdd`. At the end of the `build` phase it checks `tdd-build`. The other pairs have no check yet.
@@ -306,7 +324,7 @@ The `handoff` package depends on `inboxbatch`, `committedset` and the guards man
 | Each evidence pointer resolves in code. | the H3 resolver tests | planned |
 | A blocked exit needs proof, not a claim. | the H5 test: a claim with no proof is `unmet` | planned |
 | A round with no new met ask ends the loop. | the H4 test | planned |
-| A judge seat is not the model of the author at stage enforce. | the H10 refusal test | planned |
+| A judge seat is not the model of the author at stage enforce. | `TestIndependents_AdmitsOnlyAnotherFamilyOrAStrongerTier` and `TestWalking_IndependentsFilterRefusesTheAuthorsOwnModelAndLaunchesNothing` | seam done, judge planned |
 | Each pair starts at shadow. | the H6 default test | planned |
 | A check at stage shadow records its result and keeps the verdict. | `TestHandoffReviewer_AtShadowACycleWritesTheCheckAndKeepsItsVerdict` | done |
 | A blocked check at stage enforce ends the cycle as blocked and keeps the worktree. | `TestHandoffReviewer_AtEnforceABlockedCheckEndsTheCycleBlockedAndKeepsTheSalvageWorktree` | done |
