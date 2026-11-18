@@ -28,7 +28,7 @@ func TestDeclaredManifest_UnionsPriorAttemptViaContinuation(t *testing.T) {
 	}
 
 	got := Declared(curWS, reportFiles)
-	want := map[string]bool{}
+	want := make(map[string]bool)
 	for _, p := range got {
 		want[p] = true
 	}

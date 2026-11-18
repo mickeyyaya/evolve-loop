@@ -121,7 +121,7 @@ func TestLoadRejectsADuplicateBodyCycleID(t *testing.T) {
 	if len(rows) != 2 {
 		t.Fatalf("rows = %d, want 2", len(rows))
 	}
-	ids := map[int]bool{}
+	ids := make(map[int]bool)
 	for _, r := range rows {
 		if ids[r.Cycle] {
 			t.Fatalf("cycle %d appears twice — one cycle would be double-counted", r.Cycle)

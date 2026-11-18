@@ -20,7 +20,7 @@ func TestEmitDefectLedger_ARowTakesTheSeverityOfItsFindingInTheReport(t *testing
 	if err != nil || len(doc.Entries) != 2 {
 		t.Fatalf("ledger = %+v, %v", doc, err)
 	}
-	got := map[string]string{}
+	got := make(map[string]string)
 	for _, e := range doc.Entries {
 		got[e.Text] = e.Severity
 	}

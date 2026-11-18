@@ -28,17 +28,9 @@ func TestGateScopeAmplify_TwoChangedPackagesGiveOneSortedUniqueList(t *testing.T
 
 	got := GateScope(repo.Dir, "main")
 
-	seen := map[string]bool{}
-	prev := ""
-	for _, p := range got.Packages {
-		if seen[p] || p < prev {
-			t.Fatalf("Packages = %v: want sorted and unique", got.Packages)
-		}
-		seen[p] = true
-		prev = p
-	}
-	if !seen["./a/..."] {
-		t.Fatalf("Packages = %v: changed package a missing", got.Packages)
+	want := []string{"./a/...", "./b/...", "./c/..."}
+	if got.Full || !reflect.DeepEqual(got.Packages, want) {
+		t.Fatalf("GateScope = %+v, want %v", got, want)
 	}
 }
 

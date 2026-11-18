@@ -161,7 +161,7 @@ func TestQueryTerms_ShortTokensDropped(t *testing.T) {
 			t.Errorf("term %q has length < 3; noise tokens must be dropped", term)
 		}
 	}
-	found := map[string]bool{}
+	found := make(map[string]bool)
 	for _, term := range terms {
 		found[term] = true
 	}

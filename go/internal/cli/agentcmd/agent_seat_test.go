@@ -337,7 +337,7 @@ func TestAgentList_NamesTheBuildSeatAsAWriter(t *testing.T) {
 	if code != 0 || json.Unmarshal(stdout.Bytes(), &got) != nil {
 		t.Fatalf("exit %d stdout %q", code, stdout.String())
 	}
-	writers := map[string]bool{}
+	writers := make(map[string]bool)
 	for _, p := range got {
 		writers[p.Name] = p.WritesSource
 	}

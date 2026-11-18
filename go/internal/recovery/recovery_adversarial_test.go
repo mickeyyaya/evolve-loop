@@ -70,6 +70,11 @@ func TestChainStallPolicy_ZeroThresholdNoAttempts(t *testing.T) {
 
 func TestPromote_NilReceiverNoOp(t *testing.T) {
 	t.Parallel()
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("Promote on nil receiver panicked: %v", r)
+		}
+	}()
 	var nilD *FatalPaneDetector
 	nilD.Promote(FatalSignature{Substr: "something", Cause: CauseDeadShell, Note: "test"})
 }

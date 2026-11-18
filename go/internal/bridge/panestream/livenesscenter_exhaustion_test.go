@@ -48,8 +48,13 @@ func TestSignalCenter_DispatchesExhaustionToHandler(t *testing.T) {
 func TestSignalCenter_RegisterNilSignalHandler_NoOp(t *testing.T) {
 	sc := NewLivenessCenter()
 	sc.RegisterLivenessHandler(nil)
+	var events []LivenessEvent
+	sc.RegisterLivenessHandler(func(ev LivenessEvent) { events = append(events, ev) })
 	p := PaneProfile{Name: "agy", ExhaustedRegex: `(?i)quota reached`}
 	sc.Observe("s1", "⚠ quota reached\n", p)
+	if len(events) != 1 || events[0].State != LivenessExhausted || events[0].SessionKey != "s1" {
+		t.Errorf("events = %+v, want one exhausted event for s1", events)
+	}
 }
 
 func TestSignalCenter_ConcurrentDispatchAndRegister_RaceClean(t *testing.T) {

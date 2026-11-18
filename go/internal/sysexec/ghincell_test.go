@@ -46,7 +46,7 @@ func TestGhCalls_EachEntryIsCompleteAndTheTableIsACopy(t *testing.T) {
 	if len(calls) == 0 {
 		t.Fatal("no gh call listed")
 	}
-	seen := map[string]bool{}
+	seen := make(map[string]bool)
 	for _, c := range calls {
 		if c.Site == "" || c.Verb == "" || !strings.HasPrefix(c.Command, "gh ") || len(strings.Fields(c.Purpose)) < 3 {
 			t.Errorf("incomplete entry %+v", c)

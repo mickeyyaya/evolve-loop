@@ -365,9 +365,39 @@ func (c *testCtx) dropEscaped(literals map[string]bool) {
 			if x.Op == token.AND {
 				dropIdents(x.X, literals)
 			}
+		case *ast.AssignStmt:
+			if x.Tok != token.DEFINE {
+				dropProductionFilled(x.Lhs, x.Rhs, literals)
+			}
+		case *ast.IncDecStmt:
+			dropProductionFilled([]ast.Expr{x.X}, nil, literals)
 		}
 		return true
 	})
+}
+
+func dropProductionFilled(lhs, rhs []ast.Expr, literals map[string]bool) {
+	impure := false
+	for _, e := range rhs {
+		if pure, _ := pureOver(e, literals); !pure {
+			impure = true
+		}
+	}
+	for _, e := range lhs {
+		if ix, ok := unparen(e).(*ast.IndexExpr); ok {
+			if pure, _ := pureOver(ix.Index, literals); !pure {
+				impure = true
+			}
+		}
+	}
+	if !impure {
+		return
+	}
+	for _, e := range lhs {
+		if root := rootIdent(e); root != nil {
+			delete(literals, root.Name)
+		}
+	}
 }
 
 func dropIdents(node ast.Node, literals map[string]bool) {

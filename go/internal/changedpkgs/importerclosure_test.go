@@ -2,6 +2,7 @@ package changedpkgs
 
 import (
 	"path/filepath"
+	"slices"
 	"sort"
 	"testing"
 )
@@ -92,12 +93,11 @@ func TestImporterClosure_SortedDedupedAndModuleRoot(t *testing.T) {
 	if !sort.StringsAreSorted(got) {
 		t.Errorf("closure output is not sorted: %v", got)
 	}
-	seen := map[string]int{}
-	for _, g := range got {
-		seen[g]++
-		if seen[g] > 1 {
-			t.Errorf("closure output has duplicate %q: %v", g, got)
-		}
+	if len(slices.Compact(slices.Clone(got))) != len(got) {
+		t.Errorf("closure output has duplicates: %v", got)
+	}
+	if !contains(got, "./internal/router/...") {
+		t.Errorf("closure omits the requested package: %v", got)
 	}
 
 	rootGot := ImporterClosure(root, []string{"./..."})

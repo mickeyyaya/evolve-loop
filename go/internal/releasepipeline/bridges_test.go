@@ -85,7 +85,9 @@ func TestRunRollbackLib_MissingJournal_ReturnsError(t *testing.T) {
 
 func TestRunMarketplacePollLib_EmptyDir_NoPanic(t *testing.T) {
 	err := runMarketplacePollLib(t.TempDir(), "1.2.3", 100*time.Millisecond, "")
-	_ = err
+	if err == nil || !strings.Contains(err.Error(), "marketplace dir not found") {
+		t.Errorf("empty marketplace dir: err = %v, want marketplace dir not found", err)
+	}
 }
 
 func TestRunChangelogGenLib_EmptyRefs_ReturnsError(t *testing.T) {

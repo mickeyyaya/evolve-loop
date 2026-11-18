@@ -3,6 +3,7 @@ package panestream
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 )
 
@@ -42,7 +43,9 @@ func TestSignalCenter_UnknownProfileFallsToDefault(t *testing.T) {
 
 func TestSignalCenter_EmptyCenter_DefinedState(t *testing.T) {
 	sc := NewLivenessCenter()
-	_ = sc.Aggregate()
+	if got := sc.Aggregate(); got != 0 {
+		t.Errorf("Aggregate on an empty center = %v, want the zero LivenessState", got)
+	}
 }
 
 func TestSignalCenter_ParallelProducerRaceClean(t *testing.T) {
@@ -74,6 +77,9 @@ func TestSignalCenter_ParallelProducerRaceClean(t *testing.T) {
 
 	wg.Wait()
 	<-readerDone
+	if got := sc.Aggregate(); got == 0 {
+		t.Errorf("Aggregate after parallel producers = 0 (unset); want a valid LivenessState")
+	}
 }
 
 func TestSignalCenter_RegisterHandlerRoutesNewCLI(t *testing.T) {
@@ -103,24 +109,41 @@ func TestSignalCenter_UnregisteredProfileFallsToDefault(t *testing.T) {
 
 func TestSignalCenter_RegisterEmptyOrDuplicateNoPanic(t *testing.T) {
 	sc := NewLivenessCenter()
-	sc.RegisterHandler("", func() LivenessProbe { return NewDefaultDetector(0) })
-	sc.RegisterHandler("claude", func() LivenessProbe { return NewClaudeDetector(0) })
-	sc.RegisterHandler("claude", func() LivenessProbe { return NewClaudeDetector(0) })
+	emptyCalls, firstCalls, secondCalls := 0, 0, 0
+	sc.RegisterHandler("", func() LivenessProbe { emptyCalls++; return NewDefaultDetector(0) })
+	sc.RegisterHandler("claude", func() LivenessProbe { firstCalls++; return NewClaudeDetector(0) })
+	sc.RegisterHandler("claude", func() LivenessProbe { secondCalls++; return NewClaudeDetector(0) })
+	sc.Observe("a", "content\n~ \n", PaneProfile{Name: "", BoundaryMarker: "~"})
+	sc.Observe("b", "content\n~ \n", PaneProfile{Name: "claude", BoundaryMarker: "~"})
+	if emptyCalls != 0 {
+		t.Errorf("empty-name factory called %d times, want 0", emptyCalls)
+	}
+	if firstCalls != 0 || secondCalls != 1 {
+		t.Errorf("duplicate registration calls first=%d second=%d, want 0 and 1", firstCalls, secondCalls)
+	}
 }
 
 func TestSignalCenter_RegisterConcurrent(t *testing.T) {
 	sc := NewLivenessCenter()
 	p := Profiles["claude-repl-v1"]
+	var calls atomic.Int64
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
 			sc.RegisterHandler(fmt.Sprintf("cli-%d", id), func() LivenessProbe {
+				calls.Add(1)
 				return NewDefaultDetector(0)
 			})
 			sc.Observe(fmt.Sprintf("sess-%d", id), fmt.Sprintf("content-%d\n❯ \n", id), p)
 		}(i)
 	}
 	wg.Wait()
+	for i := 0; i < 8; i++ {
+		sc.Observe(fmt.Sprintf("fresh-%d", i), "content\n~ \n", PaneProfile{Name: fmt.Sprintf("cli-%d", i), BoundaryMarker: "~"})
+	}
+	if got := calls.Load(); got != 8 {
+		t.Errorf("registered factories invoked %d times, want 8", got)
+	}
 }

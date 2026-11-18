@@ -64,7 +64,13 @@ func mkwave(ids ...string) []fleet.CycleSpec {
 
 func TestWaveRunner_MethodValueSatisfiesType(t *testing.T) {
 	r := &recordingRunner{}
-	var _ WaveRunner = r.run
+	var run WaveRunner = r.run
+	if err := RunWaves(context.Background(), [][]fleet.CycleSpec{mkwave("a")}, run, RunOptions{ProgressPath: filepath.Join(t.TempDir(), "prog.json")}); err != nil {
+		t.Fatalf("RunWaves: %v", err)
+	}
+	if r.calls != 1 || len(r.ranScopes) != 1 || r.ranScopes[0][0] != "a" {
+		t.Errorf("calls=%d scopes=%v, want one call with [a]", r.calls, r.ranScopes)
+	}
 }
 
 func TestRunWaves_ResumeSkipsCompletedWaves(t *testing.T) {

@@ -45,7 +45,7 @@ func TestLiveFeatureFlags_ExcludesCoreInfraAndNonActive(t *testing.T) {
 			t.Errorf("LiveFeatureFlags returned core-infra flag %s — core infra is not a feature dial", f.Name)
 		}
 	}
-	names := map[string]bool{}
+	names := make(map[string]bool)
 	for _, f := range live {
 		names[f.Name] = true
 	}

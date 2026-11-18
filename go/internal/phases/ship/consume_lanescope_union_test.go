@@ -32,7 +32,7 @@ func TestCommittedInboxIDs_UnionsLaneScopeWithDecomposedTopN(t *testing.T) {
 	writeLaneScope(t, ws, `"park-consume-releases-continuation-binding"`)
 	body := []byte(`{"schema_version":1,"top_n":[{"id":"registry-release-on-park-consume"},{"id":"planner-adoption-live-item-guard"}]}`)
 	ids := committedInboxIDs(ws, body, true)
-	want := map[string]bool{}
+	want := make(map[string]bool)
 	for _, id := range ids {
 		want[id] = true
 	}
@@ -50,7 +50,7 @@ func TestCommittedInboxIDs_TriageDeferredScopeIDStaysPickable(t *testing.T) {
 	writeLaneScope(t, ws, `"renamed-work","postponed-item"`)
 	body := []byte(`{"schema_version":1,"top_n":[{"id":"sub-task-a"}],"deferred":[{"id":"postponed-item","reason":"needs the other fix first"}]}`)
 	ids := committedInboxIDs(ws, body, true)
-	got := map[string]bool{}
+	got := make(map[string]bool)
 	for _, id := range ids {
 		got[id] = true
 	}
@@ -87,7 +87,7 @@ func TestCommittedInboxIDs_PendingMenuMateStaysPickable(t *testing.T) {
 	ws := t.TempDir()
 	writeLaneScope(t, ws, `"worked-item","pending-mate"`)
 	body := []byte(`{"schema_version":1,"top_n":[{"id":"worked-item"}]}`)
-	got := map[string]bool{}
+	got := make(map[string]bool)
 	for _, id := range committedInboxIDs(ws, body, true) {
 		got[id] = true
 	}

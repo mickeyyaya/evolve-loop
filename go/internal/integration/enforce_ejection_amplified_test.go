@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 )
@@ -52,31 +53,26 @@ func TestEnforceActorAmplified_EachEjectedMemberGetsExactlyOneEventOfItsOwnCycle
 	if err != nil {
 		t.Fatalf("Flush: %v", err)
 	}
-	want := map[int]bool{}
+	var ejected []int
 	for c, m := range res.Members {
 		if m.Status == MemberEjected {
-			want[c] = true
+			ejected = append(ejected, c)
 		}
 	}
-	if len(want) == 0 {
+	if len(ejected) == 0 {
 		t.Fatal("no member ejected, want the red CI to eject")
 	}
 	out.mu.Lock()
 	defer out.mu.Unlock()
-	got := map[int]int{}
+	var evented []int
 	for _, e := range out.events {
 		if e.Code == CodeEjected {
-			got[e.Cycle]++
+			evented = append(evented, e.Cycle)
 		}
 	}
-	for c := range want {
-		if got[c] != 1 {
-			t.Errorf("cycle %d got %d ejected events, want 1", c, got[c])
-		}
-	}
-	for c := range got {
-		if !want[c] {
-			t.Errorf("event for cycle %d that was not ejected", c)
-		}
+	slices.Sort(ejected)
+	slices.Sort(evented)
+	if !slices.Equal(evented, ejected) {
+		t.Errorf("ejected events by cycle = %v, want exactly one per ejected cycle %v", evented, ejected)
 	}
 }

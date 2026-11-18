@@ -1,6 +1,7 @@
 package llmroute
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -27,11 +28,7 @@ func TestApplySoftOverlay_CLIPromotedToPrimaryChainPreserved(t *testing.T) {
 	if out.Candidates[0] != "codex-tmux" {
 		t.Errorf("primary = %q, want codex-tmux (bare family normalized via defaultDriverForFamily, mirroring the pin path)", out.Candidates[0])
 	}
-	found := map[string]bool{}
-	for _, c := range out.Candidates {
-		found[c] = true
-	}
-	if !found["claude-tmux"] {
+	if !slices.Contains(out.Candidates, "claude-tmux") {
 		t.Errorf("Candidates = %v, want claude-tmux still present (soft overlay never drops a fallback candidate)", out.Candidates)
 	}
 }
@@ -84,11 +81,10 @@ func TestApplySoftOverlay_TierChainHonorsPhaseEnvelopeFloor(t *testing.T) {
 }
 
 func TestApplySoftOverlay_PureDoesNotMutateInput(t *testing.T) {
-	inCandidates := []string{"claude-tmux", "codex-tmux"}
-	in := Plan{Candidates: inCandidates}
+	in := Plan{Candidates: []string{"claude-tmux", "codex-tmux"}}
 	_ = ApplySoftOverlay(in, Overlay{CLI: "codex"}, nil)
-	if inCandidates[0] != "claude-tmux" || inCandidates[1] != "codex-tmux" {
-		t.Errorf("input Candidates mutated in place: %v", inCandidates)
+	if !slices.Equal(in.Candidates, []string{"claude-tmux", "codex-tmux"}) {
+		t.Errorf("input Candidates mutated in place: %v", in.Candidates)
 	}
 }
 
@@ -101,14 +97,10 @@ func TestApplySoftOverlay_PromotesAnExistingCandidateWithoutRewritingItsTranspor
 	if len(out.Candidates) != 2 {
 		t.Errorf("Candidates = %v, want 2 (promotion, not addition)", out.Candidates)
 	}
-	found := map[string]bool{}
-	for _, c := range out.Candidates {
-		found[c] = true
-	}
-	if !found["claude-p"] {
+	if !slices.Contains(out.Candidates, "claude-p") {
 		t.Errorf("Candidates = %v, want claude-p still present (soft overlay never drops a fallback candidate)", out.Candidates)
 	}
-	if found["codex-tmux"] {
+	if slices.Contains(out.Candidates, "codex-tmux") {
 		t.Errorf("Candidates = %v, want NO codex-tmux — a transport the phase never chose", out.Candidates)
 	}
 }

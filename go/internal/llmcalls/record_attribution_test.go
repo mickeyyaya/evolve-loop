@@ -45,11 +45,17 @@ func TestRecord_UnattributedRowWritesNoAttributionKeys(t *testing.T) {
 
 func TestPurposeVocabulary_IsTheThreeBridgeDerivedValues(t *testing.T) {
 	t.Parallel()
-	got := []string{PurposeFirst, PurposeRetry, PurposeContractCorrection}
-	want := []string{"first", "retry", "contract_correction"}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Errorf("purpose %d = %q, want %q", i, got[i], want[i])
+	for purpose, want := range map[string]string{
+		PurposeFirst:              "first",
+		PurposeRetry:              "retry",
+		PurposeContractCorrection: "contract_correction",
+	} {
+		raw, err := json.Marshal(Record{Purpose: purpose})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(raw), `"purpose":"`+want+`"`) {
+			t.Errorf("purpose %q serialized as %s, want purpose %q", purpose, raw, want)
 		}
 	}
 }

@@ -2,6 +2,7 @@ package sessionreaper
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -9,24 +10,31 @@ import (
 )
 
 func TestExportedAPIContract(t *testing.T) {
-	var kill swarm.TmuxKiller = func(context.Context, string) error { return nil }
-	opts := Options{
-		Now:      func() time.Time { return time.Unix(0, 0) },
-		LeaseTTL: time.Minute,
-		Kill:     kill,
-	}
-	orphan := OrphanReap{RunDir: "run", Report: swarm.ReapRunReport{Killed: 1}}
-	report := Report{LiveRunsSkipped: 1, Orphaned: []OrphanReap{orphan}}
-	if opts.Now == nil || opts.LeaseTTL != time.Minute || opts.Kill == nil {
-		t.Fatal("Options fields not bound")
-	}
-	if report.LiveRunsSkipped != 1 || report.Orphaned[0].RunDir != "run" || report.Orphaned[0].Report.Killed != 1 {
-		t.Fatal("Report or OrphanReap fields not bound")
-	}
 	if DefaultReapTimeout != 15*time.Second {
 		t.Fatal("DefaultReapTimeout must stay boot-scale (orphanGCTimeout discipline, (0, 30s])")
 	}
-	if _, err := ReapOrphans(context.Background(), t.TempDir(), opts); err != nil {
+	evolveDir, runDir := makeRun(t, "contract", "evolve-bridge-contract")
+	var killed []string
+	var kill swarm.TmuxKiller = func(_ context.Context, session string) error {
+		killed = append(killed, session)
+		return nil
+	}
+	rep, err := ReapOrphans(context.Background(), evolveDir, Options{
+		Now:      func() time.Time { return time.Unix(0, 0) },
+		LeaseTTL: time.Minute,
+		Kill:     kill,
+	})
+	if err != nil {
 		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(killed, []string{"evolve-bridge-contract"}) {
+		t.Fatalf("killed = %v, want the registered session", killed)
+	}
+	if rep.LiveRunsSkipped != 0 || len(rep.Orphaned) != 1 {
+		t.Fatalf("report = %+v, want one orphan", rep)
+	}
+	var orphan OrphanReap = rep.Orphaned[0]
+	if orphan.RunDir != runDir || orphan.Report.Killed != 1 {
+		t.Fatalf("orphan = %+v, want run %s with Killed=1", orphan, runDir)
 	}
 }

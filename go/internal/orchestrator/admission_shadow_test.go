@@ -48,7 +48,14 @@ func TestRecordShadow_PublishesTheTodoItsCellsAndItsHolder(t *testing.T) {
 }
 
 func TestRecordShadow_ANilPublisherDropsTheRecord(t *testing.T) {
-	RecordShadow(nil)(admission.ShadowAdmission{ID: "x", HeldBy: "y"})
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("a nil publisher panicked: %v", r)
+		}
+	}()
+	record := RecordShadow(nil)
+	record(admission.ShadowAdmission{ID: "x", HeldBy: "y"})
+	record(admission.ShadowAdmission{ID: "x", HeldBy: "y"})
 }
 
 func TestAdmitByCell_AtShadowAHeldImportIsRecordedAndStillWaits(t *testing.T) {

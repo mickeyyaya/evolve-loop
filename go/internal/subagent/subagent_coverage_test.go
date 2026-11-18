@@ -115,9 +115,9 @@ func TestDefaultHashFile_MissingFile(t *testing.T) {
 
 func TestDefaultHashFile_Directory(t *testing.T) {
 	dir := t.TempDir()
-	_, err := defaultHashFile(dir)
-	if err == nil {
-		t.Log("defaultHashFile(directory) succeeded on this platform — acceptable")
+	sum, err := defaultHashFile(dir)
+	if err == nil || sum != "" {
+		t.Errorf("hashing a directory must fail with no digest, got %q, %v", sum, err)
 	}
 }
 

@@ -125,15 +125,17 @@ func TestPlanWaves_ThreadsOutputContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := map[string]string{}
+	if len(waves) != 1 || len(waves[0]) != 2 {
+		t.Fatalf("want 1 wave of 2 specs, got %v", scopesOf(waves))
+	}
+	want := map[string]string{
+		"a": "delete EVOLVE_FOO; FlagCeiling toward 35",
+		"b": "delete EVOLVE_BAR",
+	}
 	for _, spec := range waves[0] {
-		got[spec.Scope[0]] = spec.OutputContract
-	}
-	if got["a"] != "delete EVOLVE_FOO; FlagCeiling toward 35" {
-		t.Errorf("cycle a contract = %q", got["a"])
-	}
-	if got["b"] != "delete EVOLVE_BAR" {
-		t.Errorf("cycle b contract = %q", got["b"])
+		if len(spec.Scope) != 1 || spec.OutputContract != want[spec.Scope[0]] {
+			t.Errorf("spec %v contract = %q, want %q", spec.Scope, spec.OutputContract, want[spec.Scope[0]])
+		}
 	}
 }
 

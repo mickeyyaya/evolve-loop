@@ -77,7 +77,7 @@ func TestInlinePromptProvider_SatisfiedAndExercised(t *testing.T) {
 	if resp.Verdict != core.VerdictPASS {
 		t.Errorf("Verdict=%q, want PASS", resp.Verdict)
 	}
-	if base.gotComposeBody != "INLINE Q" {
-		t.Errorf("ComposePrompt body=%q, want the inline body 'INLINE Q'", base.gotComposeBody)
+	if got := base.gotComposeBody; got != "INLINE Q" {
+		t.Errorf("ComposePrompt body=%q, want the inline body 'INLINE Q'", got)
 	}
 }

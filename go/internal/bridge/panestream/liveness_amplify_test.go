@@ -130,20 +130,15 @@ func TestAmp_DetectorFor_UnknownProfileReturnsProbe(t *testing.T) {
 		t.Fatal("DetectorFor(unknown profile) = nil; want non-nil probe (safe default expected)")
 	}
 
+	ref := NewDefaultDetector(0)
+
 	probe.Assess("some content\n$ \n", unknown)
 	state, conf := probe.Assess("some more content\n$ \n", unknown)
+	ref.Assess("some content\n$ \n", unknown)
+	wantState, wantConf := ref.Assess("some more content\n$ \n", unknown)
 
-	if conf < 0 || conf > 1.0 {
-		t.Errorf("unknown-profile probe: confidence %v out of [0,1]", conf)
-	}
-	validStates := map[LivenessState]bool{
-		LivenessConverging:      true,
-		LivenessBusyButStagnant: true,
-		LivenessIdle:            true,
-		LivenessHung:            true,
-	}
-	if !validStates[state] {
-		t.Errorf("unknown-profile probe: returned invalid LivenessState %v", state)
+	if state != wantState || conf != wantConf {
+		t.Errorf("unknown-profile probe = (%v, %v), want the default detector's (%v, %v)", state, conf, wantState, wantConf)
 	}
 }
 

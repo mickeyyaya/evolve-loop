@@ -3,9 +3,15 @@ package capabilities
 import "testing"
 
 func TestKeyBinding_FieldsNamed(t *testing.T) {
-	kb := KeyBinding{Keys: "ctrl+c", Action: "interrupt"}
-	if kb.Keys != "ctrl+c" || kb.Action != "interrupt" {
-		t.Errorf("KeyBinding fields not addressable as set: %+v", kb)
+	c, err := parseCatalog("x", []byte(`{"key_bindings":[{"keys":"ctrl+c","action":"interrupt"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.KeyBindings) != 1 {
+		t.Fatalf("KeyBindings = %+v, want one entry", c.KeyBindings)
+	}
+	if got := c.KeyBindings[0]; got != (KeyBinding{Keys: "ctrl+c", Action: "interrupt"}) {
+		t.Errorf("KeyBinding decoded as %+v, want keys=ctrl+c action=interrupt", got)
 	}
 }
 

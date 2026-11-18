@@ -10,8 +10,8 @@ import (
 func boolRef(b bool) *bool { return &b }
 
 func TestDefaults_CoverTheSubscribedCLIsAndKeepTheOptionalOnesOff(t *testing.T) {
-	on := map[string]string{}
-	off := map[string]string{}
+	on := make(map[string]string)
+	off := make(map[string]string)
 	for _, s := range Defaults() {
 		if s.Enabled {
 			on[s.ID] = s.Family
@@ -36,7 +36,7 @@ func TestDefaults_CoverTheSubscribedCLIsAndKeepTheOptionalOnesOff(t *testing.T) 
 }
 
 func TestDefaults_EachSourceIsValid(t *testing.T) {
-	seen := map[string]bool{}
+	seen := make(map[string]bool)
 	for _, s := range Defaults() {
 		if err := s.validate(); err != nil {
 			t.Errorf("default %s: %v", s.ID, err)

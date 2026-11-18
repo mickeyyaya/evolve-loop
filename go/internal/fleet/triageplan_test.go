@@ -26,7 +26,7 @@ func TestPlanFromTriage_DisjointScopesAcrossLanes(t *testing.T) {
 	if len(specs) != 2 {
 		t.Fatalf("len(specs) = %d, want 2 (3 disjoint floors spread across 2 lanes, per PlanCycles' least-loaded partitioning)", len(specs))
 	}
-	seen := map[string]bool{}
+	seen := make(map[string]bool)
 	for i, spec := range specs {
 		ids := scopeIDs(spec)
 		if len(ids) == 0 {
@@ -55,12 +55,7 @@ func TestPlanFromTriage_FallsBackToCardPackagesWhenFloorsAbsent(t *testing.T) {
 	if len(specs) != 2 {
 		t.Fatalf("len(specs) = %d, want 2 (2 disjoint card-package fallbacks, one lane each)", len(specs))
 	}
-	seen := map[string]bool{}
-	for _, spec := range specs {
-		for id := range scopeIDs(spec) {
-			seen[id] = true
-		}
-	}
+	seen := specScopeUnion(t, specs)
 	if !seen["core"] || !seen["audit"] {
 		t.Errorf("scoped todo ids = %v, want both %q and %q (card-package fallback when floors are absent)", seen, "core", "audit")
 	}
@@ -116,12 +111,7 @@ func TestPlanFromTriage_ProductionFixtureTopNOnlyFallback(t *testing.T) {
 	if len(specs) == 0 {
 		t.Fatalf("PlanFromTriage(top_n-only production fixture) returned 0 specs — a real production triage-decision.json with top_n cards and no committed_floors/cardPackages must still yield at least one lane (the D1 severity amplifier)")
 	}
-	union := map[string]bool{}
-	for _, spec := range specs {
-		for id := range scopeIDs(spec) {
-			union[id] = true
-		}
-	}
+	union := specScopeUnion(t, specs)
 	for _, want := range []string{"fleet-policy-block", "fleet-policy-docs"} {
 		if !union[want] {
 			t.Errorf("scoped ids = %v, missing top_n card id %q", union, want)

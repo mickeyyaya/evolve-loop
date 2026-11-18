@@ -123,18 +123,31 @@ func TestCoreAdapter_Start_StopsCleanlyOnCancel(t *testing.T) {
 
 func TestCoreAdapter_Start_ConcurrentSamePhase_IsIsolatedSafe(t *testing.T) {
 	a := NewCoreAdapter(fastObserverPolicy())
+	workspaces := make([]string, 3)
+	for i := range workspaces {
+		workspaces[i] = t.TempDir()
+	}
 	var wg sync.WaitGroup
-	for i := 0; i < 3; i++ {
+	for _, ws := range workspaces {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			ws := t.TempDir()
 			cancel := a.Start(context.Background(), "scout", core.PhaseRequest{Workspace: ws, Cycle: 1})
-			defer cancel()
-			time.Sleep(50 * time.Millisecond)
+			cancel()
 		}()
 	}
 	wg.Wait()
+	for _, ws := range workspaces {
+		body, err := os.ReadFile(filepath.Join(ws, "scout-observer-events.ndjson"))
+		if err != nil {
+			t.Fatalf("workspace %s: events file unreadable: %v", ws, err)
+		}
+		for _, kind := range []string{`"started"`, `"stopped"`} {
+			if !strings.Contains(string(body), kind) {
+				t.Errorf("workspace %s: events file lacks %s; got:\n%s", ws, kind, body)
+			}
+		}
+	}
 }
 
 func fastObserverPolicy() policy.ObserverPolicy {

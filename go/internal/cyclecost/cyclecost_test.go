@@ -98,15 +98,19 @@ func TestCycleCost_PrefersSidecarOverEvents(t *testing.T) {
 	}
 	wantScout := PhaseCost{Phase: "scout", CostUSD: 0.99, InputTokens: 900, OutputTokens: 90, CacheReadInputTokens: 9, CacheCreationInputTokens: 9}
 	wantBuild := PhaseCost{Phase: "build", CostUSD: 0.30, InputTokens: 500, OutputTokens: 60, CacheReadInputTokens: 7, CacheCreationInputTokens: 8}
-	byPhase := map[string]PhaseCost{}
-	for _, pc := range s.Phases {
-		byPhase[pc.Phase] = pc
+	phaseOf := func(name string) PhaseCost {
+		for _, pc := range s.Phases {
+			if pc.Phase == name {
+				return pc
+			}
+		}
+		return PhaseCost{}
 	}
-	if byPhase["scout"] != wantScout {
-		t.Fatalf("scout: got %+v want %+v (events.ndjson must win when both sources exist)", byPhase["scout"], wantScout)
+	if gotScout := phaseOf("scout"); gotScout != wantScout {
+		t.Fatalf("scout: got %+v want %+v (events.ndjson must win when both sources exist)", gotScout, wantScout)
 	}
-	if byPhase["build"] != wantBuild {
-		t.Fatalf("build: got %+v want %+v (sidecar recovers a phase with no events.ndjson)", byPhase["build"], wantBuild)
+	if gotBuild := phaseOf("build"); gotBuild != wantBuild {
+		t.Fatalf("build: got %+v want %+v (sidecar recovers a phase with no events.ndjson)", gotBuild, wantBuild)
 	}
 	if got, want := s.Total.CostUSD, 1.29; diffAbs(got, want) > 1e-9 {
 		t.Fatalf("total cost=%v want %v", got, want)

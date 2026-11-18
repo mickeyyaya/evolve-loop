@@ -110,11 +110,17 @@ func TestRefusalDisposition_OnlyTheBuildRejectionYieldsToInfrastructure(t *testi
 }
 
 func TestRepairHandoffSignal_IsTheSpellingThatTheReadersMatch(t *testing.T) {
-	got := []string{RepairHandoffSignal, RepairDecisionField, RepairReasonField, RepairBlockersField, RepairDecisionNone, RepairDecisionWould, RepairDecisionStop}
-	want := []string{"REPAIR_HANDOFF", "decision", "reason", "blockers", "none", "would_stop", "stop"}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Errorf("name %d = %q, want %q", i, got[i], want[i])
+	for _, c := range []struct{ got, want string }{
+		{RepairHandoffSignal, "REPAIR_HANDOFF"},
+		{RepairDecisionField, "decision"},
+		{RepairReasonField, "reason"},
+		{RepairBlockersField, "blockers"},
+		{RepairDecisionNone, "none"},
+		{RepairDecisionWould, "would_stop"},
+		{RepairDecisionStop, "stop"},
+	} {
+		if c.got != c.want {
+			t.Errorf("name = %q, want %q", c.got, c.want)
 		}
 	}
 }

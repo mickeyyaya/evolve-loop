@@ -8,40 +8,52 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 )
 
+func wireOf(t *testing.T, v any) map[string]any {
+	t.Helper()
+	raw, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	var out map[string]any
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	return out
+}
+
 func TestDefect_Named(t *testing.T) {
-	d := Defect{
-		ID:       "d-001",
-		Severity: "HIGH",
-		Summary:  "test defect",
-		Fix:      "fix it",
+	w := wireOf(t, Defect{ID: "d-001", Severity: "HIGH", Summary: "test defect", Fix: "fix it"})
+	for key, want := range map[string]string{"id": "d-001", "severity": "HIGH", "summary": "test defect", "fix": "fix it"} {
+		if w[key] != want {
+			t.Errorf("Defect wire %q = %v, want %q", key, w[key], want)
+		}
 	}
-	if d.ID != "d-001" {
-		t.Errorf("Defect.ID: got %q, want %q", d.ID, "d-001")
-	}
-	if d.Severity != "HIGH" {
-		t.Errorf("Defect.Severity: got %q, want %q", d.Severity, "HIGH")
+	if _, ok := wireOf(t, Defect{ID: "d"})["fix"]; ok {
+		t.Error("Defect.Fix must be omitted when empty")
 	}
 }
 
 func TestLesson_Named(t *testing.T) {
-	l := Lesson{
-		ID:               "l-001",
-		Pattern:          "recurring nil dereference",
-		PreventiveAction: "add nil guard at boundary",
+	w := wireOf(t, Lesson{ID: "l-001", Pattern: "recurring nil dereference", PreventiveAction: "add nil guard at boundary"})
+	for key, want := range map[string]string{"id": "l-001", "pattern": "recurring nil dereference", "preventive_action": "add nil guard at boundary"} {
+		if w[key] != want {
+			t.Errorf("Lesson wire %q = %v, want %q", key, w[key], want)
+		}
 	}
-	if l.ID != "l-001" {
-		t.Errorf("Lesson.ID: got %q, want %q", l.ID, "l-001")
+	if _, ok := wireOf(t, Lesson{ID: "l"})["preventive_action"]; ok {
+		t.Error("Lesson.PreventiveAction must be omitted when empty")
 	}
 }
 
 func TestCarryover_Named(t *testing.T) {
-	c := Carryover{
-		ID:       "c-001",
-		Action:   "fix the router nil path",
-		Priority: "P0",
+	w := wireOf(t, Carryover{ID: "c-001", Action: "fix the router nil path", Priority: "P0"})
+	for key, want := range map[string]string{"id": "c-001", "action": "fix the router nil path", "priority": "P0"} {
+		if w[key] != want {
+			t.Errorf("Carryover wire %q = %v, want %q", key, w[key], want)
+		}
 	}
-	if c.ID != "c-001" {
-		t.Errorf("Carryover.ID: got %q, want %q", c.ID, "c-001")
+	if _, ok := wireOf(t, Carryover{ID: "c"})["priority"]; ok {
+		t.Error("Carryover.Priority must be omitted when empty")
 	}
 }
 
@@ -147,26 +159,25 @@ func TestSchemaVersionAndSkipEvidence_Named(t *testing.T) {
 }
 
 func TestPhaseRecord_Named(t *testing.T) {
-	pr := PhaseRecord{
-		Name:        "scout",
-		Verdict:     VerdictPass,
-		KeyFindings: "found nothing",
-		ArtifactSHA: "abc123",
-		Signals:     map[string]any{"k": "v"},
+	w := wireOf(t, PhaseRecord{Name: "scout", Verdict: VerdictPass, KeyFindings: "found nothing", ArtifactSHA: "abc123", Signals: map[string]any{"k": "v"}})
+	for key, want := range map[string]string{"name": "scout", "verdict": VerdictPass, "key_findings": "found nothing", "artifact_sha": "abc123"} {
+		if w[key] != want {
+			t.Errorf("PhaseRecord wire %q = %v, want %q", key, w[key], want)
+		}
 	}
-	if pr.Name != "scout" {
-		t.Errorf("PhaseRecord.Name: got %q, want %q", pr.Name, "scout")
+	signals, ok := w["signals"].(map[string]any)
+	if !ok || signals["k"] != "v" {
+		t.Errorf("PhaseRecord signals = %v, want k=v", w["signals"])
 	}
 }
 
 func TestBuildOpts_Named(t *testing.T) {
-	opts := BuildOpts{
-		WorkspacePath: "/tmp/ws",
-		Goal:          "test goal",
-		RunID:         "01ABCDEF",
+	d, err := Build(3, BuildOpts{WorkspacePath: t.TempDir(), Goal: "test goal", RunID: "01ABCDEF", FinalVerdict: VerdictWarn})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
 	}
-	if opts.Goal != "test goal" {
-		t.Errorf("BuildOpts.Goal: got %q, want %q", opts.Goal, "test goal")
+	if d.Cycle != 3 || d.Goal != "test goal" || d.RunID != "01ABCDEF" || d.FinalVerdict != VerdictWarn {
+		t.Errorf("Build did not carry BuildOpts into the dossier: %+v", d)
 	}
 }
 

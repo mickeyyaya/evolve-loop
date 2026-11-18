@@ -81,7 +81,7 @@ func TestDoctorVersions_LatestFlagsLaggingCLIAndExitsOne(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &p); err != nil {
 		t.Fatalf("stdout is not JSON: %v\n%s", err, out)
 	}
-	lagging := map[string]bool{}
+	lagging := make(map[string]bool)
 	for _, r := range p.Versions {
 		lagging[r.CLI] = r.Lagging
 	}

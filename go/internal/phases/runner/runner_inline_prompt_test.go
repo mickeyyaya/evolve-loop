@@ -35,8 +35,8 @@ func TestRun_InlinePrompt_UsesBodyAndSkipsLoader(t *testing.T) {
 	if resp.Verdict != core.VerdictPASS {
 		t.Errorf("Verdict=%q, want PASS", resp.Verdict)
 	}
-	if base.gotComposeBody != "INLINE BODY" {
-		t.Errorf("ComposePrompt body=%q, want the inline body", base.gotComposeBody)
+	if got := base.gotComposeBody; got != "INLINE BODY" {
+		t.Errorf("ComposePrompt body=%q, want the inline body", got)
 	}
 }
 
@@ -54,8 +54,8 @@ func TestRun_InlinePrompt_EmptyBodyButOptedIn_SkipsLoader(t *testing.T) {
 	if resp.Verdict != core.VerdictPASS {
 		t.Errorf("Verdict=%q, want PASS", resp.Verdict)
 	}
-	if base.gotComposeBody != "" {
-		t.Errorf("ComposePrompt body=%q, want empty (the opted-in inline body)", base.gotComposeBody)
+	if got := base.gotComposeBody; got != "" {
+		t.Errorf("ComposePrompt body=%q, want empty (the opted-in inline body)", got)
 	}
 }
 
@@ -73,7 +73,7 @@ func TestRun_InlinePrompt_EmptyFallsBackToLoader(t *testing.T) {
 	if resp.Verdict != core.VerdictPASS {
 		t.Errorf("Verdict=%q, want PASS", resp.Verdict)
 	}
-	if base.gotComposeBody != "DISK BODY" {
-		t.Errorf("ComposePrompt body=%q, want the on-disk agent body", base.gotComposeBody)
+	if got := base.gotComposeBody; got != "DISK BODY" {
+		t.Errorf("ComposePrompt body=%q, want the on-disk agent body", got)
 	}
 }

@@ -10,7 +10,7 @@ import (
 )
 
 func TestRetroPhase_CompactEnabled_PreviousPASS_StillSkips(t *testing.T) {
-	fb := &fakeBridge{}
+	fb := new(fakeBridge)
 	cfg := Config{Bridge: fb, Prompts: fakePromptsFS("body")}
 
 	v := reflect.ValueOf(&cfg).Elem()
@@ -31,7 +31,7 @@ func TestRetroPhase_CompactEnabled_PreviousPASS_StillSkips(t *testing.T) {
 	if resp.Verdict != core.VerdictSKIPPED {
 		t.Errorf("Verdict=%q with CompactPrompts=true and previous=PASS; want SKIPPED — compaction flag must not alter the short-circuit", resp.Verdict)
 	}
-	if fb.gotReq.Cycle != 0 {
+	if fb.launches != 0 {
 		t.Error("bridge.Launch was called when previous=PASS and CompactPrompts=true — PASS short-circuit is broken by compaction flag")
 	}
 }

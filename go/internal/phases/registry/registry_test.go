@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -120,20 +121,28 @@ func TestConcurrentLookupsAreSafe(t *testing.T) {
 	Register("c", factory("c"))
 
 	var wg sync.WaitGroup
+	var bad atomic.Int64
 	const workers = 16
 	wg.Add(workers)
 	for i := 0; i < workers; i++ {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < 100; j++ {
-				_, _ = For("a")
-				_, _ = For("b")
-				_, _ = For("c")
-				_ = Names()
+				for _, n := range []string{"a", "b", "c"} {
+					if _, ok := For(n); !ok {
+						bad.Add(1)
+					}
+				}
+				if len(Names()) != 3 {
+					bad.Add(1)
+				}
 			}
 		}()
 	}
 	wg.Wait()
+	if n := bad.Load(); n != 0 {
+		t.Fatalf("%d concurrent lookups saw a missing factory or wrong name count", n)
+	}
 }
 
 func TestResetForTesting_Clears(t *testing.T) {

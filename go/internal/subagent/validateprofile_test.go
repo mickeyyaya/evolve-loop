@@ -285,7 +285,7 @@ func TestValidateProfile_AdapterOverridesExtracted(t *testing.T) {
 		}
 	}`
 	opts := happyOpts(body, "claude")
-	captured := map[string]string{}
+	captured := make(map[string]string)
 	opts.ExecAdapter = func(_ context.Context, _ string, env map[string]string) (int, error) {
 		for k, v := range env {
 			captured[k] = v

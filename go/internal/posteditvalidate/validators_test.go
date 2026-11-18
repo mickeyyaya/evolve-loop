@@ -86,8 +86,11 @@ func TestDefaultValidatePy_SyntaxError(t *testing.T) {
 }
 
 func TestCleanPyCache_MissingDir_NoCrash(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "x.py")
-	cleanPyCache(path)
+	dir := t.TempDir()
+	cleanPyCache(filepath.Join(dir, "x.py"))
+	if _, err := os.Stat(filepath.Join(dir, "__pycache__")); !os.IsNotExist(err) {
+		t.Errorf("cleanPyCache must not create __pycache__, stat err = %v", err)
+	}
 }
 
 func TestCleanPyCache_RemovesMatchingFiles(t *testing.T) {

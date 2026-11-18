@@ -613,10 +613,9 @@ func TestValidateSHA(t *testing.T) {
 func TestGitRefOutput(t *testing.T) {
 	dir := t.TempDir()
 	stdout, stderr, code, err := GitRefOutput(dir, "HEAD", "status")
-	_ = stdout
-	_ = stderr
-	_ = code
-	_ = err
+	if err == nil || code != 128 || stdout != "" || !strings.Contains(stderr, "not a git repository") {
+		t.Errorf("git status in a plain directory: stdout=%q stderr=%q code=%d err=%v, want exit 128, an error and not a git repository", stdout, stderr, code, err)
+	}
 }
 
 func TestGitSHAOutput(t *testing.T) {

@@ -306,7 +306,11 @@ var (
 )
 
 func TestLifecycle_Persist_NilStateIsInert(t *testing.T) {
-	New().Persist(context.Background(), panickyStore{}, nil)
+	l, got := observed()
+	l.Persist(context.Background(), panickyStore{}, nil)
+	if len(*got) != 0 {
+		t.Fatalf("a nil state is inert and emits no signal: %+v", *got)
+	}
 }
 
 func TestLifecycle_Persist_NilStorePanicsRatherThanDroppingTheState(t *testing.T) {

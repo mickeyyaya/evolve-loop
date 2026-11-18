@@ -28,15 +28,11 @@ func TestBuild_ProjectsPhaseTokens(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
-	byName := map[string]PhaseRecord{}
-	for _, p := range d.Phases {
-		byName[p.Name] = p
-	}
 	want := cyclestate.TokenUsage{Input: 1200, Output: 340, CacheRead: 80, CacheWrite: 16}
-	if byName["build"].Tokens != want {
-		t.Fatalf("build PhaseRecord.Tokens = %+v, want %+v", byName["build"].Tokens, want)
+	if got := phaseRecordNamed(d, "build").Tokens; got != want {
+		t.Fatalf("build PhaseRecord.Tokens = %+v, want %+v", got, want)
 	}
-	if byName["scout"].Tokens.Input != 600 {
-		t.Fatalf("scout PhaseRecord.Tokens.Input = %d, want 600", byName["scout"].Tokens.Input)
+	if got := phaseRecordNamed(d, "scout").Tokens.Input; got != 600 {
+		t.Fatalf("scout PhaseRecord.Tokens.Input = %d, want 600", got)
 	}
 }

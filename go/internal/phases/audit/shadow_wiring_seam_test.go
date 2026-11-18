@@ -31,7 +31,7 @@ func TestProductionPath_BothShadowSignalsReachTheCenter(t *testing.T) {
 	}
 	rec.Flush()
 
-	counts := map[signalcenter.Code]int{}
+	counts := make(map[signalcenter.Code]int)
 	for _, e := range *events {
 		counts[e.Code]++
 	}

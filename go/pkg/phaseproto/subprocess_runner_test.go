@@ -63,7 +63,10 @@ func TestHelperProcess(t *testing.T) {
 		}
 
 	case "garbage_stdout":
-		fmt.Fprintln(os.Stdout, `{"this":"is","not":"an envelope"}`)
+		if _, err := fmt.Fprintln(os.Stdout, `{"this":"is","not":"an envelope"}`); err != nil {
+			t.Errorf("write garbage envelope: %v", err)
+			os.Exit(2)
+		}
 
 	case "crash":
 		os.Exit(7)

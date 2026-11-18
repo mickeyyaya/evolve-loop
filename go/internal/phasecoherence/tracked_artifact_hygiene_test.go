@@ -73,7 +73,7 @@ func TestNoRuntimeArtifactsTracked(t *testing.T) {
 	}
 
 	var violations []string
-	usedAllowance := map[string]bool{}
+	usedAllowance := make(map[string]bool)
 	for _, p := range tracked {
 		if p == "" {
 			continue

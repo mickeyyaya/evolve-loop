@@ -182,7 +182,9 @@ func TestPersonaPath_EmptyRole_DoesNotPanic(t *testing.T) {
 	root := t.TempDir()
 	spec := phasespec.PhaseSpec{Name: "some-phase"}
 	path := personaPath(root, spec, "")
-	_ = path
+	if path != "" {
+		t.Errorf("an empty role matches no persona file; got %q", path)
+	}
 }
 
 func TestSpliceMarkedRegion_NeitherMarkerNorAnchor(t *testing.T) {

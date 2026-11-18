@@ -58,10 +58,25 @@ func TestConsole_Errorf_WritesToErr(t *testing.T) {
 
 func TestConsole_NilSinks_NoPanic(t *testing.T) {
 	t.Parallel()
-	c := Console{}
-	c.Infof("x")
-	c.Warnf("y")
-	c.Errorf("z")
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("nil sinks panicked: %v", r)
+		}
+	}()
+	Console{}.Infof("x")
+	Console{}.Warnf("y")
+	Console{}.Errorf("z")
+	var errb strings.Builder
+	Console{Err: &errb}.Infof("info")
+	if errb.String() != "" {
+		t.Errorf("Infof with nil Out wrote to Err: %q", errb.String())
+	}
+	var out strings.Builder
+	Console{Out: &out}.Errorf("bad")
+	Console{Out: &out}.Warnf("warn")
+	if out.String() != "" {
+		t.Errorf("Warnf/Errorf with nil Err wrote to Out: %q", out.String())
+	}
 }
 
 func TestDefault_WiresStdStreams(t *testing.T) {

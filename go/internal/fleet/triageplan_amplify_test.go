@@ -3,6 +3,7 @@ package fleet
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"testing"
 )
 
@@ -30,12 +31,12 @@ func TestPlanFromTriage_DuplicateFloorsNeverOverSchedule(t *testing.T) {
 		t.Fatalf("len(specs) = %d, want 2 (duplicate floors dedup to 2 distinct ids; empty buckets yield no spec)", len(specs))
 	}
 	for i, spec := range specs {
-		seen := map[string]bool{}
+		var seen []string
 		for _, id := range spec.Scope {
-			if seen[id] {
+			if slices.Contains(seen, id) {
 				t.Errorf("spec[%d].Scope lists id %q more than once — duplicates must collapse before partitioning", i, id)
 			}
-			seen[id] = true
+			seen = append(seen, id)
 		}
 	}
 	union := specScopeUnion(t, specs)

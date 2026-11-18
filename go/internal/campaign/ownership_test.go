@@ -106,7 +106,23 @@ func TestAcquireOwnership_CreatesMissingLeaseDir(t *testing.T) {
 }
 
 func TestOwnershipLease_PublicTypeIsNamed(t *testing.T) {
-	var _ *OwnershipLease
+	dir := t.TempDir()
+	lease, err := AcquireOwnership(dir, "hashL", sampleOwner(1, "/wt/l"))
+	if err != nil {
+		t.Fatalf("acquire: %v", err)
+	}
+	var held *HeldError
+	if _, err := AcquireOwnership(dir, "hashL", sampleOwner(2, "/wt/m")); !errors.As(err, &held) {
+		t.Fatalf("second acquire while held = %v, want *HeldError", err)
+	}
+	lease.Release()
+	again, err := AcquireOwnership(dir, "hashL", sampleOwner(3, "/wt/n"))
+	if err != nil {
+		t.Fatalf("acquire after Release: %v", err)
+	}
+	again.Release()
+	var nilLease *OwnershipLease
+	nilLease.Release()
 }
 
 func TestHeldError_MessageNamesOwner(t *testing.T) {

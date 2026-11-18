@@ -111,7 +111,7 @@ func TestDefaultPlanResolver_TheCycleReachesTheDeepTierShare(t *testing.T) {
 		Tiers: map[string]policy.TierRule{"deep": {CLIs: []string{"agy", "claude"}, SharePct: 50}}}
 	resolve := bridgechain.DefaultPlanResolver(routerOver(t, dir, policy.Policy{CLIRouting: &block}))
 
-	leads := map[string]bool{}
+	leads := make(map[string]bool)
 	for cycle := 1; cycle <= 20; cycle++ {
 		plan := mustPlan(t, resolve, core.BridgeRequest{Agent: "retrospective", Model: "deep", ProjectRoot: root, Cycle: cycle})
 		leads[plan.Candidates[0]] = true

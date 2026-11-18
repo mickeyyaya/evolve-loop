@@ -370,7 +370,7 @@ func TestSchema_NoDrift_CatchesTheMutationsThatMatter(t *testing.T) {
 	})
 }
 
-func TestSchema_EveryRegisteredTypeIsReachedFromTheRoot(t *testing.T) {
+func reachableStructs(root reflect.Type) map[reflect.Type]bool {
 	seen := map[reflect.Type]bool{}
 	var walk func(reflect.Type)
 	walk = func(rt reflect.Type) {
@@ -385,7 +385,12 @@ func TestSchema_EveryRegisteredTypeIsReachedFromTheRoot(t *testing.T) {
 			walk(f.typ)
 		}
 	}
-	walk(reflect.TypeOf(Dossier{}))
+	walk(root)
+	return seen
+}
+
+func TestSchema_EveryRegisteredTypeIsReachedFromTheRoot(t *testing.T) {
+	seen := reachableStructs(reflect.TypeOf(Dossier{}))
 
 	for name, rt := range schemaObjects {
 		if name == "" {

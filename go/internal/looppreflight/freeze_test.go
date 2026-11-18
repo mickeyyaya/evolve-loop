@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -224,14 +225,47 @@ func TestRun_VersionFreeze_ClaudeNoSettings_Passes(t *testing.T) {
 }
 
 func TestDefaultSelfUpdateEvidence_Codex(t *testing.T) {
-	_, _, err := defaultSelfUpdateEvidence("codex")
-	if err != nil {
-		t.Logf("defaultSelfUpdateEvidence(codex): %v (expected only if home dir unresolvable)", err)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	stubManifestOffSwitch(t, "", false)
+	ok, evidence, err := defaultSelfUpdateEvidence("codex")
+	if err != nil || ok || evidence != "" {
+		t.Fatalf("no codex updater state: got (%v, %q, %v), want (false, \"\", nil)", ok, evidence, err)
+	}
+	state := filepath.Join(home, ".codex", "version.json")
+	if err := os.MkdirAll(filepath.Dir(state), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(state, []byte(`{}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ok, evidence, err = defaultSelfUpdateEvidence("codex")
+	if err != nil || !ok {
+		t.Fatalf("codex updater state present: got (%v, %q, %v), want risky with no error", ok, evidence, err)
+	}
+	if want := state + " present (codex updater state)"; evidence != want {
+		t.Errorf("evidence = %q, want %q", evidence, want)
 	}
 }
 
 func TestDefaultPinnedLister_Smoke(t *testing.T) {
-	_, _ = defaultPinnedLister()
+	bin := t.TempDir()
+	script := "#!/bin/sh\nprintf 'claude\\n\\n  codex  \\n'\n"
+	if err := os.WriteFile(filepath.Join(bin, "brew"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	pins, err := defaultPinnedLister()
+	if err != nil {
+		t.Fatalf("defaultPinnedLister: %v", err)
+	}
+	if want := []string{"claude", "codex"}; !slices.Equal(pins, want) {
+		t.Errorf("pins = %q, want %q", pins, want)
+	}
+	t.Setenv("PATH", t.TempDir())
+	if pins, err := defaultPinnedLister(); err == nil || pins != nil {
+		t.Errorf("missing brew: got (%q, %v), want nil pins and an error", pins, err)
+	}
 }
 
 func TestDefaultSelfUpdateEvidence_ClaudeAutoUpdatesDisabled(t *testing.T) {

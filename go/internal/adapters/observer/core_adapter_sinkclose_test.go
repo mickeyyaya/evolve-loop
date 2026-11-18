@@ -65,5 +65,7 @@ func TestCoreAdapter_CloseSinkAfterWait_NilCloserSafe(t *testing.T) {
 	t.Parallel()
 	done := make(chan struct{})
 	close(done)
-	closeSinkAfterWait(done, 200*time.Millisecond, nil)
+	if !closeSinkAfterWait(done, 200*time.Millisecond, nil) {
+		t.Fatal("a closed done channel with a nil closer must report the watcher as finished")
+	}
 }

@@ -102,5 +102,21 @@ func TestReadBreaker_EmptyPath_ReturnsZero(t *testing.T) {
 }
 
 func TestWriteBreaker_EmptyPath_NoPanic(t *testing.T) {
-	writeBreaker("", 42)
+	orig, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(orig) })
+	stderr := amplCaptureStderrBreaker(t, func() { writeBreaker("", 42) })
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 || stderr != "" {
+		t.Fatalf("an empty path must write nothing: files=%d stderr=%q", len(entries), stderr)
+	}
 }

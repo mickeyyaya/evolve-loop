@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -389,14 +390,22 @@ func TestWatch_ContextCancelReturnsErr(t *testing.T) {
 
 func TestWatch_MissingLogFile(t *testing.T) {
 	t.Parallel()
+	var sink bytes.Buffer
 	o := New(Config{
 		StallS: 50 * time.Millisecond, PollS: 10 * time.Millisecond,
 		Cycle: 1, Phase: "x", Agent: "x",
 		StdoutLog: "/no/such/log",
-	}, &bytes.Buffer{})
+	}, &sink)
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	defer cancel()
-	_ = o.Watch(ctx)
+	if err := o.Watch(ctx); !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("Watch = %v, want context.DeadlineExceeded", err)
+	}
+	for _, kind := range []string{`"started"`, `"stopped"`} {
+		if !strings.Contains(sink.String(), kind) {
+			t.Errorf("missing log file: events lack %s; got:\n%s", kind, sink.String())
+		}
+	}
 }
 
 func TestEvent_NDJSONFormat(t *testing.T) {

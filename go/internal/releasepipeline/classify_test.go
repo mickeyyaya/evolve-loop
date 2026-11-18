@@ -139,7 +139,10 @@ func TestClassifyRelease(t *testing.T) {
 }
 
 func TestReleaseClassification_Fields(t *testing.T) {
-	c := ReleaseClassification{Class: BinaryRelease, SinceVersion: "22.3.0"}
+	c, err := classifyRelease("22.3.0", "v22.2.0", nil, probeFromMap(map[string]bool{"v22.2.0..HEAD": true}))
+	if err != nil {
+		t.Fatalf("classifyRelease: %v", err)
+	}
 	if c.Class != BinaryRelease {
 		t.Errorf("Class = %q, want %q", c.Class, BinaryRelease)
 	}

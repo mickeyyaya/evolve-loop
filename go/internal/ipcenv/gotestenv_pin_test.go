@@ -555,9 +555,9 @@ func TestGoTestSpawners_TheTreeScanFindsEveryKnownProductionSpawner(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	seen := map[string]bool{}
+	var seen []string
 	for _, s := range findSpawners(parseTree(t, root)) {
-		seen[s.path] = true
+		seen = append(seen, s.path)
 	}
 	for _, path := range []string{
 		"internal/core/task_contract.go",
@@ -572,7 +572,7 @@ func TestGoTestSpawners_TheTreeScanFindsEveryKnownProductionSpawner(t *testing.T
 		"internal/releasepreflight/releasepreflight.go",
 		"pkg/acsassert/go_tests.go",
 	} {
-		if !seen[path] {
+		if !slices.Contains(seen, path) {
 			t.Errorf("the scan does not see %s as a go test spawner; its env would go unchecked", path)
 		}
 	}
@@ -689,9 +689,9 @@ func TestBaseRunnerCallers_EveryProductionCallerPassesANamedProjection(t *testin
 	for _, violation := range violations {
 		t.Error(violation)
 	}
-	seen := map[string]bool{}
+	var seen []string
 	for _, site := range calls {
-		seen[site[:strings.LastIndex(site, ":")]] = true
+		seen = append(seen, site[:strings.LastIndex(site, ":")])
 	}
 	for _, path := range []string{
 		"cmd/evolve/cmd_integration.go",
@@ -699,7 +699,7 @@ func TestBaseRunnerCallers_EveryProductionCallerPassesANamedProjection(t *testin
 		"internal/phases/audit/ciparity.go",
 		"internal/phases/ship/base_red.go",
 	} {
-		if !seen[path] {
+		if !slices.Contains(seen, path) {
 			t.Errorf("the scan does not see the base runner call in %s; its env would go unchecked", path)
 		}
 	}

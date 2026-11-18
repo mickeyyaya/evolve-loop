@@ -1,0 +1,850 @@
+{
+  "rows": [
+    {
+      "package": "internal/adapters/observer",
+      "test": "TestCoreAdapter_CloseSinkAfterWait_NilCloserSafe",
+      "rule": "no-assertion",
+      "file": "core_adapter_sinkclose_test.go"
+    },
+    {
+      "package": "internal/adapters/observer",
+      "test": "TestCoreAdapter_Start_ConcurrentSamePhase_IsIsolatedSafe",
+      "rule": "no-assertion",
+      "file": "core_adapter_test.go"
+    },
+    {
+      "package": "internal/adapters/observer",
+      "test": "TestWatch_MissingLogFile",
+      "rule": "no-assertion",
+      "file": "observer_test.go"
+    },
+    {
+      "package": "internal/adapters/storage",
+      "test": "TestHelperStateUpdater",
+      "rule": "no-assertion",
+      "file": "updatestate_test.go"
+    },
+    {
+      "package": "internal/auditcascade",
+      "test": "TestRecord_CarriesTheDecisionBesideTheAuditFacts",
+      "rule": "asserts-own-setup",
+      "file": "auditcascade_test.go"
+    },
+    {
+      "package": "internal/auditchain",
+      "test": "TestRequiredEvidence_EachLinkHasSomethingToReadItFrom",
+      "rule": "asserts-own-setup",
+      "file": "evidence_access_test.go"
+    },
+    {
+      "package": "internal/bridge/capabilities",
+      "test": "TestKeyBinding_FieldsNamed",
+      "rule": "asserts-own-setup",
+      "file": "apicover_named_test.go"
+    },
+    {
+      "package": "internal/bridge/launchoutcome",
+      "test": "TestClassify_TableCoversEveryDeclaredExit",
+      "rule": "asserts-own-setup",
+      "file": "classify_test.go"
+    },
+    {
+      "package": "internal/bridge/panestream",
+      "test": "TestAmp_DetectorFor_UnknownProfileReturnsProbe",
+      "rule": "asserts-own-setup",
+      "file": "liveness_amplify_test.go"
+    },
+    {
+      "package": "internal/bridge/panestream",
+      "test": "TestAmp_SignalCenter_MultipleReadersConcurrent",
+      "rule": "no-assertion",
+      "file": "livenesscenter_amplify_test.go"
+    },
+    {
+      "package": "internal/bridge/panestream",
+      "test": "TestSeatHealth_StringNamesEachStateAndNoOtherValue",
+      "rule": "asserts-own-setup",
+      "file": "seathealth_test.go"
+    },
+    {
+      "package": "internal/bridge/panestream",
+      "test": "TestSignalCenter_EmptyCenter_DefinedState",
+      "rule": "no-assertion",
+      "file": "livenesscenter_test.go"
+    },
+    {
+      "package": "internal/bridge/panestream",
+      "test": "TestSignalCenter_ParallelProducerRaceClean",
+      "rule": "no-assertion",
+      "file": "livenesscenter_test.go"
+    },
+    {
+      "package": "internal/bridge/panestream",
+      "test": "TestSignalCenter_ProjectionsConcurrent",
+      "rule": "no-assertion",
+      "file": "livenesscenter_busychange_test.go"
+    },
+    {
+      "package": "internal/bridge/panestream",
+      "test": "TestSignalCenter_RegisterConcurrent",
+      "rule": "no-assertion",
+      "file": "livenesscenter_test.go"
+    },
+    {
+      "package": "internal/bridge/panestream",
+      "test": "TestSignalCenter_RegisterEmptyOrDuplicateNoPanic",
+      "rule": "no-assertion",
+      "file": "livenesscenter_test.go"
+    },
+    {
+      "package": "internal/bridge/panestream",
+      "test": "TestSignalCenter_RegisterNilSignalHandler_NoOp",
+      "rule": "no-assertion",
+      "file": "livenesscenter_exhaustion_test.go"
+    },
+    {
+      "package": "internal/bridge/recipe",
+      "test": "TestEngine_LogfNilSafe",
+      "rule": "no-assertion",
+      "file": "executor_test.go"
+    },
+    {
+      "package": "internal/bridgechain",
+      "test": "TestDefaultPlanResolver_TheCycleReachesTheDeepTierShare",
+      "rule": "asserts-own-setup",
+      "file": "cliroute_wiring_test.go"
+    },
+    {
+      "package": "internal/campaign",
+      "test": "TestOwnershipLease_PublicTypeIsNamed",
+      "rule": "no-assertion",
+      "file": "ownership_test.go"
+    },
+    {
+      "package": "internal/campaign",
+      "test": "TestWaveRunner_MethodValueSatisfiesType",
+      "rule": "no-assertion",
+      "file": "executor_test.go"
+    },
+    {
+      "package": "internal/changedpkgs",
+      "test": "TestGateScopeAmplify_TwoChangedPackagesGiveOneSortedUniqueList",
+      "rule": "asserts-own-setup",
+      "file": "gatescope_amplify_test.go"
+    },
+    {
+      "package": "internal/changedpkgs",
+      "test": "TestImporterClosure_SortedDedupedAndModuleRoot",
+      "rule": "asserts-own-setup",
+      "file": "importerclosure_test.go"
+    },
+    {
+      "package": "internal/ciparity",
+      "test": "TestCoverageTestArgs_ThreadsBothTagsAndPreservesPkgOrder",
+      "rule": "asserts-own-setup",
+      "file": "coverage_tagparity_test.go"
+    },
+    {
+      "package": "internal/ciparity",
+      "test": "TestGateSteps_NoRowDuplicatesAGateOrAStepWithinAJob",
+      "rule": "asserts-own-setup",
+      "file": "gatesteps_test.go"
+    },
+    {
+      "package": "internal/cli/agentcmd",
+      "test": "TestAgentList_NamesTheBuildSeatAsAWriter",
+      "rule": "asserts-own-setup",
+      "file": "agent_seat_test.go"
+    },
+    {
+      "package": "internal/cli/opscmd",
+      "test": "TestDoctorVersions_LatestFlagsLaggingCLIAndExitsOne",
+      "rule": "asserts-own-setup",
+      "file": "doctor_versions_test.go"
+    },
+    {
+      "package": "internal/cliroute/cliroutetest",
+      "test": "TestVariants_AreUniqueAndEachHasAHost",
+      "rule": "asserts-own-setup",
+      "file": "cliroutetest_test.go"
+    },
+    {
+      "package": "internal/codeindex",
+      "test": "TestAmp_RunBench_CancelledContext",
+      "rule": "no-assertion",
+      "file": "bench_amplified_test.go"
+    },
+    {
+      "package": "internal/codeindex",
+      "test": "TestAmp_SampleSymbols_NoDuplicates",
+      "rule": "asserts-own-setup",
+      "file": "bench_amplified_test.go"
+    },
+    {
+      "package": "internal/commitprefixgate",
+      "test": "TestAppendGuardsLog_EmptyPathNoOp",
+      "rule": "no-assertion",
+      "file": "coverage_test.go"
+    },
+    {
+      "package": "internal/contextfillcorrelate",
+      "test": "TestLoadRejectsADuplicateBodyCycleID",
+      "rule": "asserts-own-setup",
+      "file": "contextfillcorrelate_test.go"
+    },
+    {
+      "package": "internal/core/advisor",
+      "test": "TestAdvisorEvents_FieldVocabularyMatchesTheRegisteredReasons",
+      "rule": "asserts-own-setup",
+      "file": "advisor_test.go"
+    },
+    {
+      "package": "internal/core/carryover",
+      "test": "TestLifecycle_Persist_NilStateIsInert",
+      "rule": "no-assertion",
+      "file": "lifecycle_test.go"
+    },
+    {
+      "package": "internal/cyclecost",
+      "test": "TestCycleCost_PrefersSidecarOverEvents",
+      "rule": "asserts-own-setup",
+      "file": "cyclecost_test.go"
+    },
+    {
+      "package": "internal/cyclestate",
+      "test": "TestRepairHandoffSignal_IsTheSpellingThatTheReadersMatch",
+      "rule": "asserts-own-setup",
+      "file": "diagnostic_code_test.go"
+    },
+    {
+      "package": "internal/cyclestate",
+      "test": "TestSystemFailureSignal_Wire",
+      "rule": "asserts-own-setup",
+      "file": "result_test.go"
+    },
+    {
+      "package": "internal/deliverable",
+      "test": "TestWriteBreaker_EmptyPath_NoPanic",
+      "rule": "no-assertion",
+      "file": "reviewer_breaker_amplify_test.go"
+    },
+    {
+      "package": "internal/dispositionrouter",
+      "test": "TestExportedVocabularyNamed",
+      "rule": "asserts-own-setup",
+      "file": "apicover_named_test.go"
+    },
+    {
+      "package": "internal/dispositionrouter",
+      "test": "TestLayerNames_AreTheRetroLayerVocabulary",
+      "rule": "asserts-own-setup",
+      "file": "apicover_named_test.go"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestBuildOpts_Named",
+      "rule": "asserts-own-setup",
+      "file": "apicover_named_test.go"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestBuild_IngestsPhaseTiming",
+      "rule": "asserts-own-setup",
+      "file": "build_timing_test.go"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestBuild_ProjectsPhaseTokens",
+      "rule": "asserts-own-setup",
+      "file": "build_tokens_test.go"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestCarryover_Named",
+      "rule": "asserts-own-setup",
+      "file": "apicover_named_test.go"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestDefect_Named",
+      "rule": "asserts-own-setup",
+      "file": "apicover_named_test.go"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestLesson_Named",
+      "rule": "asserts-own-setup",
+      "file": "apicover_named_test.go"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestPhaseRecord_Named",
+      "rule": "asserts-own-setup",
+      "file": "apicover_named_test.go"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestSchema_EveryRegisteredTypeIsReachedFromTheRoot",
+      "rule": "asserts-own-setup",
+      "file": "schema_drift_test.go"
+    },
+    {
+      "package": "internal/fakecontract",
+      "test": "TestAPICover_NamesEveryExportedSymbol",
+      "rule": "asserts-own-setup",
+      "file": "apicover_named_test.go"
+    },
+    {
+      "package": "internal/flagregistry",
+      "test": "TestAll_NonEmptyAndWellFormed",
+      "rule": "asserts-own-setup",
+      "file": "registry_test.go"
+    },
+    {
+      "package": "internal/flagregistry",
+      "test": "TestLiveFeatureFlags_ExcludesCoreInfraAndNonActive",
+      "rule": "asserts-own-setup",
+      "file": "registry_livefeatureflags_test.go"
+    },
+    {
+      "package": "internal/fleet",
+      "test": "TestPlanCycles_DisjointScopesPlusDeferred",
+      "rule": "asserts-own-setup",
+      "file": "partition_test.go"
+    },
+    {
+      "package": "internal/fleet",
+      "test": "TestPlanFromTriage_DisjointScopesAcrossLanes",
+      "rule": "asserts-own-setup",
+      "file": "triageplan_test.go"
+    },
+    {
+      "package": "internal/fleet",
+      "test": "TestPlanFromTriage_DuplicateFloorsNeverOverSchedule",
+      "rule": "asserts-own-setup",
+      "file": "triageplan_amplify_test.go"
+    },
+    {
+      "package": "internal/fleet",
+      "test": "TestPlanFromTriage_FallsBackToCardPackagesWhenFloorsAbsent",
+      "rule": "asserts-own-setup",
+      "file": "triageplan_test.go"
+    },
+    {
+      "package": "internal/fleet",
+      "test": "TestPlanFromTriage_ProductionFixtureTopNOnlyFallback",
+      "rule": "asserts-own-setup",
+      "file": "triageplan_test.go"
+    },
+    {
+      "package": "internal/fleet",
+      "test": "TestPlanFromTriage_WaveLevelFileDisjoint",
+      "rule": "asserts-own-setup",
+      "file": "wave_disjoint_test.go"
+    },
+    {
+      "package": "internal/fleet",
+      "test": "TestPlanWaves_ThreadsOutputContract",
+      "rule": "asserts-own-setup",
+      "file": "waves_test.go"
+    },
+    {
+      "package": "internal/fleet",
+      "test": "TestRunPool_EachTransitionNamesItsKindAndItsTodo",
+      "rule": "asserts-own-setup",
+      "file": "pool_hooks_test.go"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestDiscover_EmptyCurrentWorkspace_FreshLeaseStaysLive",
+      "rule": "asserts-own-setup",
+      "file": "discover_fleet_lease_test.go"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestDiscover_LivenessFromRunStateAndLease",
+      "rule": "asserts-own-setup",
+      "file": "discover_test.go"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestGCPolicyModeDefaultsOff",
+      "rule": "asserts-own-setup",
+      "file": "gc_test.go"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestPlanWorktrees_BranchBacklogSweep_NotCheckedOutMergedOnly",
+      "rule": "asserts-own-setup",
+      "file": "worktrees_test.go"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestPlanWorktrees_KeepRecentAndMinAge",
+      "rule": "asserts-own-setup",
+      "file": "worktrees_test.go"
+    },
+    {
+      "package": "internal/inboxmover",
+      "test": "TestLedgerAppender_SatisfiedByFileLedger",
+      "rule": "no-assertion",
+      "file": "ledger_chained_test.go"
+    },
+    {
+      "package": "internal/inboxmover",
+      "test": "TestReleaseStaleClaims_ReleasesOnlyStaleHolders",
+      "rule": "asserts-own-setup",
+      "file": "claims_test.go"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestAPI_EveryExportIsNamed",
+      "rule": "asserts-own-setup",
+      "file": "apicover_named_test.go"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestAPI_TheKeepExportsAreNamed",
+      "rule": "no-assertion",
+      "file": "release_keep_test.go"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestEnforceActorAmplified_EachEjectedMemberGetsExactlyOneEventOfItsOwnCycle",
+      "rule": "asserts-own-setup",
+      "file": "enforce_ejection_amplified_test.go"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestEnforceActor_WaveEndPendingRaisesFailure",
+      "rule": "asserts-own-setup",
+      "file": "enforce_actor_test.go"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestExportedSymbolsAreNamedByAnExecutedAssertion",
+      "rule": "asserts-own-setup",
+      "file": "apicover_named_test.go"
+    },
+    {
+      "package": "internal/ipcenv",
+      "test": "TestBaseRunnerCallers_EveryProductionCallerPassesANamedProjection",
+      "rule": "asserts-own-setup",
+      "file": "gotestenv_pin_test.go"
+    },
+    {
+      "package": "internal/ipcenv",
+      "test": "TestGoTestSpawners_TheTreeScanFindsEveryKnownProductionSpawner",
+      "rule": "asserts-own-setup",
+      "file": "gotestenv_pin_test.go"
+    },
+    {
+      "package": "internal/llmcalls",
+      "test": "TestPurposeVocabulary_IsTheThreeBridgeDerivedValues",
+      "rule": "asserts-own-setup",
+      "file": "record_attribution_test.go"
+    },
+    {
+      "package": "internal/llmroute",
+      "test": "TestApplySoftOverlay_CLIPromotedToPrimaryChainPreserved",
+      "rule": "asserts-own-setup",
+      "file": "model_routing_overlay_test.go"
+    },
+    {
+      "package": "internal/llmroute",
+      "test": "TestApplySoftOverlay_PromotesAnExistingCandidateWithoutRewritingItsTransport",
+      "rule": "asserts-own-setup",
+      "file": "model_routing_overlay_test.go"
+    },
+    {
+      "package": "internal/llmroute",
+      "test": "TestApplySoftOverlay_PureDoesNotMutateInput",
+      "rule": "asserts-own-setup",
+      "file": "model_routing_overlay_test.go"
+    },
+    {
+      "package": "internal/log",
+      "test": "TestConsole_NilSinks_NoPanic",
+      "rule": "no-assertion",
+      "file": "console_test.go"
+    },
+    {
+      "package": "internal/log",
+      "test": "TestEmitPhase_NilLoggerIsNoOp",
+      "rule": "no-assertion",
+      "file": "events_test.go"
+    },
+    {
+      "package": "internal/looppreflight",
+      "test": "TestDefaultPinnedLister_Smoke",
+      "rule": "no-assertion",
+      "file": "freeze_test.go"
+    },
+    {
+      "package": "internal/looppreflight",
+      "test": "TestDefaultSelfUpdateEvidence_Codex",
+      "rule": "log-only",
+      "file": "freeze_test.go"
+    },
+    {
+      "package": "internal/loopwave",
+      "test": "TestPreviewAmplify_NoItemAppearsInTwoLanes",
+      "rule": "asserts-own-setup",
+      "file": "preview_amplify_test.go"
+    },
+    {
+      "package": "internal/loopwave",
+      "test": "TestPreview_ExcludesUnmetDependencyAndConsoleRoutedItems",
+      "rule": "asserts-own-setup",
+      "file": "preview_test.go"
+    },
+    {
+      "package": "internal/loopwave",
+      "test": "TestPreview_LanesAndWeightsEqualWhatDispatchLaunches",
+      "rule": "asserts-own-setup",
+      "file": "preview_test.go"
+    },
+    {
+      "package": "internal/modelcatalog",
+      "test": "TestRefreshDegradedEventAmplify_ManyEventsAllReachTheCenter",
+      "rule": "asserts-own-setup",
+      "file": "degraded_event_amplify_test.go"
+    },
+    {
+      "package": "internal/orchestrator",
+      "test": "TestRecordShadow_ANilPublisherDropsTheRecord",
+      "rule": "no-assertion",
+      "file": "admission_shadow_test.go"
+    },
+    {
+      "package": "internal/orchestrator",
+      "test": "TestSupply_TheNarrowFenceAdmitsNonGateFilesOfBridgeCoreAndTheInboxLifecycle",
+      "rule": "asserts-own-setup",
+      "file": "supply_narrow_fence_test.go"
+    },
+    {
+      "package": "internal/phasecoherence",
+      "test": "TestNoRuntimeArtifactsTracked",
+      "rule": "asserts-own-setup",
+      "file": "tracked_artifact_hygiene_test.go"
+    },
+    {
+      "package": "internal/phasecoherence",
+      "test": "TestTrackedCorpusDirsAllowNewBirths",
+      "rule": "asserts-own-setup",
+      "file": "gitignore_birth_test.go"
+    },
+    {
+      "package": "internal/phasecontract",
+      "test": "TestContracts_ReturnsWholeRegistry",
+      "rule": "asserts-own-setup",
+      "file": "contract_registry_test.go"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestClassify_RejectingAuditEmitsDefectLedger",
+      "rule": "asserts-own-setup",
+      "file": "defect_ledger_test.go"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestEmitDefectLedger_ARowTakesTheSeverityOfItsFindingInTheReport",
+      "rule": "asserts-own-setup",
+      "file": "defect_ledger_severity_test.go"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestProductionPath_BothShadowSignalsReachTheCenter",
+      "rule": "asserts-own-setup",
+      "file": "shadow_wiring_seam_test.go"
+    },
+    {
+      "package": "internal/phases/registry",
+      "test": "TestConcurrentLookupsAreSafe",
+      "rule": "no-assertion",
+      "file": "registry_test.go"
+    },
+    {
+      "package": "internal/phases/retro",
+      "test": "TestRetroPhase_CompactEnabled_PreviousPASS_StillSkips",
+      "rule": "asserts-own-setup",
+      "file": "retro_compaction_amplified_test.go"
+    },
+    {
+      "package": "internal/phases/runner",
+      "test": "TestInlinePromptProvider_SatisfiedAndExercised",
+      "rule": "asserts-own-setup",
+      "file": "apicover_named_test.go"
+    },
+    {
+      "package": "internal/phases/runner",
+      "test": "TestRun_InlinePrompt_EmptyBodyButOptedIn_SkipsLoader",
+      "rule": "asserts-own-setup",
+      "file": "runner_inline_prompt_test.go"
+    },
+    {
+      "package": "internal/phases/runner",
+      "test": "TestRun_InlinePrompt_EmptyFallsBackToLoader",
+      "rule": "asserts-own-setup",
+      "file": "runner_inline_prompt_test.go"
+    },
+    {
+      "package": "internal/phases/runner",
+      "test": "TestRun_InlinePrompt_UsesBodyAndSkipsLoader",
+      "rule": "asserts-own-setup",
+      "file": "runner_inline_prompt_test.go"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestCommittedInboxIDs_PendingMenuMateStaysPickable",
+      "rule": "asserts-own-setup",
+      "file": "consume_lanescope_union_test.go"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestCommittedInboxIDs_TriageDeferredScopeIDStaysPickable",
+      "rule": "asserts-own-setup",
+      "file": "consume_lanescope_union_test.go"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestCommittedInboxIDs_UnionsLaneScopeWithDecomposedTopN",
+      "rule": "asserts-own-setup",
+      "file": "consume_lanescope_union_test.go"
+    },
+    {
+      "package": "internal/phases/swarmrunner",
+      "test": "TestBridgeLauncher_MergesPerWorkerEnvOverPhaseEnv",
+      "rule": "asserts-own-setup",
+      "file": "swarmrunner_test.go"
+    },
+    {
+      "package": "internal/phases/swarmrunner",
+      "test": "TestBridgeLauncher_NoOverlayKeepsPhaseEnv",
+      "rule": "asserts-own-setup",
+      "file": "swarmrunner_test.go"
+    },
+    {
+      "package": "internal/phasewatchdog",
+      "test": "TestAppendAbnormalEvent_BadWorkspaceNoop",
+      "rule": "no-assertion",
+      "file": "phasewatchdog_test.go"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestCompiledDefaultOverlays_SolutionSkillsOnDocumentCycles",
+      "rule": "asserts-own-setup",
+      "file": "overlays_when_test.go"
+    },
+    {
+      "package": "internal/posteditvalidate",
+      "test": "TestCleanPyCache_MissingDir_NoCrash",
+      "rule": "no-assertion",
+      "file": "validators_test.go"
+    },
+    {
+      "package": "internal/practicewatch",
+      "test": "TestDefaults_CoverTheSubscribedCLIsAndKeepTheOptionalOnesOff",
+      "rule": "asserts-own-setup",
+      "file": "source_test.go"
+    },
+    {
+      "package": "internal/practicewatch",
+      "test": "TestDefaults_EachSourceIsValid",
+      "rule": "asserts-own-setup",
+      "file": "source_test.go"
+    },
+    {
+      "package": "internal/recovery",
+      "test": "TestPromote_NilReceiverNoOp",
+      "rule": "no-assertion",
+      "file": "recovery_adversarial_test.go"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestReleaseClassification_Fields",
+      "rule": "asserts-own-setup",
+      "file": "classify_test.go"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestRunMarketplacePollLib_EmptyDir_NoPanic",
+      "rule": "no-assertion",
+      "file": "bridges_test.go"
+    },
+    {
+      "package": "internal/releasetargets",
+      "test": "TestParseConfig_RealRepo",
+      "rule": "asserts-own-setup",
+      "file": "releasetargets_test.go"
+    },
+    {
+      "package": "internal/releasetargets",
+      "test": "TestParseConfig_UniversalBinary",
+      "rule": "asserts-own-setup",
+      "file": "releasetargets_test.go"
+    },
+    {
+      "package": "internal/releasetargets",
+      "test": "TestParseConfig_UniversalBinary_Replace",
+      "rule": "asserts-own-setup",
+      "file": "releasetargets_test.go"
+    },
+    {
+      "package": "internal/research",
+      "test": "TestQueryTerms_ShortTokensDropped",
+      "rule": "asserts-own-setup",
+      "file": "research_adversarial_test.go"
+    },
+    {
+      "package": "internal/retrofile",
+      "test": "TestFileActions_EndToEndFromFixtureRetro",
+      "rule": "asserts-own-setup",
+      "file": "retrofile_test.go"
+    },
+    {
+      "package": "internal/routingtest",
+      "test": "TestDimension_ExpandsInMatrix",
+      "rule": "asserts-own-setup",
+      "file": "apicover_named_test.go"
+    },
+    {
+      "package": "internal/routingtest",
+      "test": "TestMatrix_CrossProductCount",
+      "rule": "asserts-own-setup",
+      "file": "consistency_test.go"
+    },
+    {
+      "package": "internal/scopedelta",
+      "test": "TestClosureRule_DefaultsImplementTheInterface",
+      "rule": "asserts-own-setup",
+      "file": "apicover_named_test.go"
+    },
+    {
+      "package": "internal/sessionreaper",
+      "test": "TestExportedAPIContract",
+      "rule": "asserts-own-setup",
+      "file": "apicover_named_test.go"
+    },
+    {
+      "package": "internal/setup",
+      "test": "TestDetect_NilDoctorAndCapTierSeams",
+      "rule": "asserts-own-setup",
+      "file": "setup_test.go"
+    },
+    {
+      "package": "internal/shiperr",
+      "test": "TestSignalCode_ProjectsEveryShipErrorCodeAndRegistersItWithADoc",
+      "rule": "asserts-own-setup",
+      "file": "signalcodes_test.go"
+    },
+    {
+      "package": "internal/shipmanifest",
+      "test": "TestDeclaredManifest_UnionsPriorAttemptViaContinuation",
+      "rule": "asserts-own-setup",
+      "file": "manifest_continuation_test.go"
+    },
+    {
+      "package": "internal/signalcenter",
+      "test": "TestNDJSONSink_TwoProcessesAppendToTheSameCycleFile",
+      "rule": "asserts-own-setup",
+      "file": "sinks_test.go"
+    },
+    {
+      "package": "internal/skillcheck",
+      "test": "TestInstructionDiffs_TheCheckedInGeminiFileMatchesItsRender",
+      "rule": "asserts-own-setup",
+      "file": "instructions_test.go"
+    },
+    {
+      "package": "internal/skillcheck",
+      "test": "TestPersonaPath_EmptyRole_DoesNotPanic",
+      "rule": "no-assertion",
+      "file": "skillcheck_adv_test.go"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestAgentRoles_SSOTIntegrity",
+      "rule": "asserts-own-setup",
+      "file": "conformance_registry_test.go"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestDefaultHashFile_Directory",
+      "rule": "log-only",
+      "file": "subagent_coverage_test.go"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestRun_FacadeProjectsEverySeamByName",
+      "rule": "asserts-own-setup",
+      "file": "run_seam_test.go"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestValidateProfile_AdapterOverridesExtracted",
+      "rule": "asserts-own-setup",
+      "file": "validateprofile_test.go"
+    },
+    {
+      "package": "internal/sysexec",
+      "test": "TestGhCalls_EachEntryIsCompleteAndTheTableIsACopy",
+      "rule": "asserts-own-setup",
+      "file": "ghincell_test.go"
+    },
+    {
+      "package": "internal/tokenusage",
+      "test": "TestResultPeakUsageNamed",
+      "rule": "asserts-own-setup",
+      "file": "apicover_named_test.go"
+    },
+    {
+      "package": "internal/triagecap",
+      "test": "TestExpandWithClusterMates_CrossLaneFilesStayDisjoint",
+      "rule": "asserts-own-setup",
+      "file": "lane_menu_test.go"
+    },
+    {
+      "package": "internal/triagecap",
+      "test": "TestProjectDecisionJSON_ExtractIDsPromotesOnlyTopN",
+      "rule": "asserts-own-setup",
+      "file": "project_test.go"
+    },
+    {
+      "package": "internal/triagecap",
+      "test": "TestReadInboxBacklog_SkipsConsoleRoutedAndBackfills",
+      "rule": "asserts-own-setup",
+      "file": "wave_seed_consoleroute_test.go"
+    },
+    {
+      "package": "internal/triagecap",
+      "test": "TestSelectWaveSeedMenus_CommittedOverlapNeverDropped",
+      "rule": "asserts-own-setup",
+      "file": "lane_menu_test.go"
+    },
+    {
+      "package": "internal/triagecap",
+      "test": "TestTopN_FleetWidthAware_ThreeDisjointTwoOverlapping_PacksTwoDisjoint",
+      "rule": "asserts-own-setup",
+      "file": "topn_width_test.go"
+    },
+    {
+      "package": "internal/verifyeval",
+      "test": "TestDefaultRunner_BinaryMissing",
+      "rule": "no-assertion",
+      "file": "verifyeval_integration_test.go"
+    },
+    {
+      "package": "pkg/acsassert",
+      "test": "TestGitRefOutput",
+      "rule": "no-assertion",
+      "file": "assertions_test.go"
+    },
+    {
+      "package": "pkg/phaseproto",
+      "test": "TestHelperProcess",
+      "rule": "no-assertion",
+      "file": "subprocess_runner_test.go"
+    }
+  ]
+}

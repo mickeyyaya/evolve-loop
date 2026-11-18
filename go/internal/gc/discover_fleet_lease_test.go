@@ -28,7 +28,7 @@ func TestDiscover_EmptyCurrentWorkspace_FreshLeaseStaysLive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Discover: %v", err)
 	}
-	live := map[string]bool{}
+	live := make(map[string]bool)
 	for _, r := range got {
 		live[filepath.Base(r.Path)] = r.Live
 	}

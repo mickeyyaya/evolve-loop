@@ -10,7 +10,41 @@ import (
 )
 
 func TestLedgerAppender_SatisfiedByFileLedger(t *testing.T) {
-	var _ LedgerAppender = ledger.New(t.TempDir())
+	l := ledger.New(t.TempDir())
+	var appender LedgerAppender = l
+	ctx := context.Background()
+	if err := l.Append(ctx, core.LedgerEntry{TS: "2026-08-11T00:00:00Z", Role: "orchestrator", Kind: "test"}); err != nil {
+		t.Fatal(err)
+	}
+	rec := ledger.LifecycleRecord{TS: "2026-08-11T00:00:01Z", Action: "claim", TaskID: "t-9", Message: "m", Cycle: 3}
+	if err := appender.AppendLifecycle(ctx, rec); err != nil {
+		t.Fatalf("AppendLifecycle: %v", err)
+	}
+	if err := l.Verify(ctx); err != nil {
+		t.Fatalf("chain broken by AppendLifecycle: %v", err)
+	}
+	it, err := l.Iter(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = it.Close() }()
+	var got []core.LedgerEntry
+	for {
+		e, ok, err := it.Next()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !ok {
+			break
+		}
+		got = append(got, e)
+	}
+	if len(got) != 2 {
+		t.Fatalf("ledger holds %d entries, want 2", len(got))
+	}
+	if e := got[1]; e.Kind != "inbox-lifecycle" || e.Action != "claim" || e.TaskID != "t-9" || e.Message != "m" || e.Cycle != 3 || e.PrevHash == "" {
+		t.Errorf("lifecycle entry = %+v, want a chained inbox-lifecycle claim of t-9 in cycle 3", e)
+	}
 }
 
 func TestLedgerWrites_AreChainValid(t *testing.T) {

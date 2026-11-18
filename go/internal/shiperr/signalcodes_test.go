@@ -15,7 +15,7 @@ func TestSignalCode_ProjectsEveryShipErrorCodeAndRegistersItWithADoc(t *testing.
 	if len(codes) == 0 {
 		t.Fatal("AllCodes lists the vocabulary")
 	}
-	docs := map[signalcenter.Code]string{}
+	docs := make(map[signalcenter.Code]string)
 	for _, d := range signalcenter.RegisteredCodes()[signalcenter.ModuleShip] {
 		docs[d.Code] = d.Doc
 	}

@@ -1,6 +1,7 @@
 package auditcascade
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 )
@@ -45,8 +46,13 @@ func TestDecide_AZeroFileBoundNeverEscalatesOnSize(t *testing.T) {
 func TestRecord_CarriesTheDecisionBesideTheAuditFacts(t *testing.T) {
 	t.Parallel()
 	rec := Record{Stage: "shadow", Cycle: 7, Verdict: "PASS", ChangedFiles: 1, Decision: Decision{Escalate: true, Reasons: []string{"x"}}}
-	if !rec.Escalate || rec.Reasons[0] != "x" {
-		t.Errorf("Record = %+v", rec)
+	body, err := json.Marshal(rec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"stage":"shadow","cycle":7,"verdict":"PASS","changed_files":1,"would_escalate":true,"reasons":["x"]}`
+	if string(body) != want {
+		t.Errorf("Record JSON = %s, want %s", body, want)
 	}
 	if RecordFile != "audit-cascade-shadow.json" {
 		t.Errorf("RecordFile = %q, the name the dossier soak reads", RecordFile)

@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -46,11 +47,7 @@ func TestCoverageTestArgs_ThreadsBothTagsAndPreservesPkgOrder(t *testing.T) {
 		t.Fatalf("CoverageTestArgs did not emit a `-tags <value>` pair: %v", args)
 	}
 	fields := strings.Fields(tagVal)
-	seen := map[string]bool{}
-	for _, f := range fields {
-		seen[f] = true
-	}
-	if !seen["integration"] || !seen["acs"] {
+	if !slices.Contains(fields, "integration") || !slices.Contains(fields, "acs") {
 		t.Errorf("`-tags` value = %q; want it to carry BOTH \"integration\" and \"acs\" so the scoped run measures both tiers", tagVal)
 	}
 

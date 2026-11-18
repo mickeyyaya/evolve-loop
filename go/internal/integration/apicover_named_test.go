@@ -11,12 +11,12 @@ import (
 
 func TestExportedSymbolsAreNamedByAnExecutedAssertion(t *testing.T) {
 	triggers := []FlushTrigger{TriggerNone, TriggerWaveEnd, TriggerCapReached, TriggerMaxAge, TriggerUnblocksQueuedWork, TriggerRiskyAlone}
-	seen := map[FlushTrigger]bool{}
+	var seen []FlushTrigger
 	for _, trigger := range triggers {
-		if seen[trigger] {
+		if slices.Contains(seen, trigger) {
 			t.Errorf("trigger %q repeats; each trigger must be a distinct value", trigger)
 		}
-		seen[trigger] = true
+		seen = append(seen, trigger)
 	}
 	if TriggerNone != "" {
 		t.Errorf("TriggerNone = %q, want the empty trigger", TriggerNone)
@@ -43,9 +43,6 @@ func TestExportedSymbolsAreNamedByAnExecutedAssertion(t *testing.T) {
 		Deps:             []string{"upstream"},
 		UnblocksCount:    2,
 		VerificationCost: 3,
-	}
-	if d.InboxRank != 1 || len(d.Deps) != 1 || d.UnblocksCount != 2 || d.VerificationCost != 3 {
-		t.Errorf("deliverable fields inconsistent: %+v", d)
 	}
 	ordered := OrderDeliverables([]Deliverable{d})
 	if len(ordered) != 1 || ordered[0].ID != "sample" {

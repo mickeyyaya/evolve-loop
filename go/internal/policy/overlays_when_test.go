@@ -71,7 +71,7 @@ func TestCompiledDefaultOverlays_SolutionSkillsOnDocumentCycles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	have := map[string]bool{}
+	have := make(map[string]bool)
 	for _, s := range registry {
 		have[s] = true
 	}

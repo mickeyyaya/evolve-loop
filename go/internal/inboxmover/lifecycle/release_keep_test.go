@@ -289,4 +289,7 @@ func TestAPI_TheKeepExportsAreNamed(t *testing.T) {
 		_ KeepCopy                                                                     = KeepRoot
 		_ KeepCopy                                                                     = KeepClaim
 	)
+	if KeepRoot != "root" || KeepClaim != "claim" || !KeepRoot.Valid() || !KeepClaim.Valid() || KeepRoot == KeepClaim {
+		t.Errorf("the keep exports must be distinct valid copies: root=%q claim=%q", KeepRoot, KeepClaim)
+	}
 }

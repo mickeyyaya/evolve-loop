@@ -16,9 +16,16 @@ func TestSystemFailureSignal_Wire(t *testing.T) {
 			t.Errorf("SystemFailureSignal JSON missing %s: %s", want, b)
 		}
 	}
-	r := CycleResult{SystemFailure: &SystemFailureSignal{Category: "verdict-incoherence", Halt: true}}
-	if r.SystemFailure == nil || !r.SystemFailure.Halt {
-		t.Error("CycleResult.SystemFailure not wired")
+	rb, err := json.Marshal(CycleResult{SystemFailure: &SystemFailureSignal{Category: "verdict-incoherence", Halt: true}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var back CycleResult
+	if err := json.Unmarshal(rb, &back); err != nil {
+		t.Fatal(err)
+	}
+	if back.SystemFailure == nil || !back.SystemFailure.Halt || back.SystemFailure.Category != "verdict-incoherence" {
+		t.Errorf("CycleResult.SystemFailure not wired: %s", rb)
 	}
 }
 

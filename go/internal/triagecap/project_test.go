@@ -124,7 +124,7 @@ func TestProjectDecisionJSON_ExtractIDsPromotesOnlyTopN(t *testing.T) {
 	if len(d.Deferred) == 0 || len(d.Dropped) == 0 {
 		t.Fatal("fixture invalid: deferred/dropped not parsed")
 	}
-	deferredDropped := map[string]bool{}
+	deferredDropped := make(map[string]bool)
 	for _, e := range d.Deferred {
 		deferredDropped[e.ID] = true
 	}

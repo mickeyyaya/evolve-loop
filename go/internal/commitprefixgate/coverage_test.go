@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -175,7 +176,18 @@ func TestRun_DefaultsGetDiffPathsWhenNil(t *testing.T) {
 
 func TestAppendGuardsLog_EmptyPathNoOp(t *testing.T) {
 	t.Parallel()
+	dir := t.TempDir()
 	appendGuardsLog("", fixedTime(), "ignored")
+	entries, err := os.ReadDir(dir)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("temp dir after empty-path append = %v, %v; want empty", entries, err)
+	}
+	logPath := filepath.Join(dir, "guards.log")
+	appendGuardsLog(logPath, fixedTime(), "kept")
+	b, err := os.ReadFile(logPath)
+	if err != nil || !strings.Contains(string(b), "[commit-prefix-gate] kept") {
+		t.Errorf("guards.log = %q, %v; want the kept line", b, err)
+	}
 }
 
 func TestAppendGuardsLog_OpenErrorIsSwallowed(t *testing.T) {

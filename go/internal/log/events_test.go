@@ -212,7 +212,16 @@ func TestParseLevel(t *testing.T) {
 }
 
 func TestEmitPhase_NilLoggerIsNoOp(t *testing.T) {
-	EmitPhase(nil, "scout", "started", nil)
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("EmitPhase with a nil logger panicked: %v", r)
+		}
+	}()
+	extra := map[string]any{"k": "v"}
+	EmitPhase(nil, "scout", "started", extra)
+	if len(extra) != 1 || extra["k"] != "v" {
+		t.Errorf("extra mutated: %v", extra)
+	}
 }
 
 func TestEmitPhase_NoExtraFields(t *testing.T) {

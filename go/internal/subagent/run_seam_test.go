@@ -63,7 +63,7 @@ func nonTestSourcesMentioning(t *testing.T, needle, allowed string) []string {
 
 func TestRun_FacadeProjectsEverySeamByName(t *testing.T) {
 	root, ws, worktree := unit16Dirs(t)
-	calls := map[string]int{}
+	calls := make(map[string]int)
 	hit := func(name string) { calls[name]++ }
 	clock := fixedClock(t, "2026-05-23T17:00:00Z")
 	opts := RunOptions{

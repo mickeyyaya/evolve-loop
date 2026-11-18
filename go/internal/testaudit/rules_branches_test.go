@@ -125,6 +125,29 @@ func TestNoFailInBody(t *testing.T) {
 	}
 }
 `), want: "asserts-own-setup,log-only,skip-hides-error"},
+	{name: "incdec and index writes decide whether a container is production filled", files: one(`
+func TestIncLiteral(t *testing.T) {
+	m := map[string]int{"a": 1}
+	m["a"]++
+	if m["a"] != 2 {
+		t.Error("n")
+	}
+}
+func TestIncProduction(t *testing.T) {
+	m := map[string]int{"a": 1}
+	m[f()]++
+	if m["a"] != 2 {
+		t.Error("n")
+	}
+}
+func TestIndexAssignProduction(t *testing.T) {
+	m := map[string]int{}
+	m[f()] = 1
+	if m["a"] != 1 {
+		t.Error("n")
+	}
+}
+`), want: "asserts-own-setup"},
 	{name: "skip on nil compare in else and not-nil", files: one(`
 func TestSkipElse(t *testing.T) {
 	err := f()

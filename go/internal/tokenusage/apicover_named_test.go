@@ -1,6 +1,7 @@
 package tokenusage
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
@@ -35,10 +36,20 @@ func TestResultPeakPromptTokensNamed(t *testing.T) {
 }
 
 func TestResultPeakUsageNamed(t *testing.T) {
-	peak := cyclestate.TokenUsage{Input: 200, CacheRead: 6_800}
-	r := Result{Usage: cyclestate.TokenUsage{Input: 1_200, CacheRead: 7_800}, PeakUsage: peak}
-	if r.PeakUsage != peak {
-		t.Fatalf("PeakUsage = %+v, want %+v", r.PeakUsage, peak)
+	worktree := "/repo/worktrees/cycle-peak"
+	root := t.TempDir()
+	body := `{"type":"user","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:01Z","message":{"id":"u1","content":[{"type":"text","text":"go"}]}}
+{"type":"assistant","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:05Z","message":{"id":"m1","usage":{"input_tokens":200,"output_tokens":7,"cache_read_input_tokens":6800,"cache_creation_input_tokens":0}}}
+{"type":"assistant","cwd":"` + worktree + `","timestamp":"2026-07-07T10:00:09Z","message":{"id":"m2","usage":{"input_tokens":1000,"output_tokens":9,"cache_read_input_tokens":1000,"cache_creation_input_tokens":0}}}
+`
+	writeTranscript(t, filepath.Join(root, "projects", "p"), "s.jsonl", body)
+	r, err := ScanConfigRoot(root, Window{Worktree: worktree, Start: mustParse(t, launchWindowStart), End: mustParse(t, launchWindowEnd)})
+	if err != nil {
+		t.Fatalf("ScanConfigRoot: %v", err)
+	}
+	want := cyclestate.TokenUsage{Input: 200, Output: 7, CacheRead: 6_800}
+	if r.PeakUsage != want || r.PeakPromptTokens != 7_000 {
+		t.Fatalf("PeakUsage = %+v peak = %d, want %+v and 7000 (the largest single prompt, not the sum)", r.PeakUsage, r.PeakPromptTokens, want)
 	}
 }
 

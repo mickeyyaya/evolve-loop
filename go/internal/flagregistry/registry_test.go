@@ -11,7 +11,7 @@ func TestAll_NonEmptyAndWellFormed(t *testing.T) {
 		t.Fatal("registry is empty")
 	}
 	nameRE := regexp.MustCompile(`^EVOLVE(_[A-Z0-9]+)+$`)
-	seen := map[string]bool{}
+	seen := make(map[string]bool)
 	for _, f := range All {
 		if !nameRE.MatchString(f.Name) {
 			t.Errorf("malformed flag name %q", f.Name)

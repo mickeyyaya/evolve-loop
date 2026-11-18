@@ -67,8 +67,8 @@ func TestExpandWithClusterMates_CrossLaneFilesStayDisjoint(t *testing.T) {
 		cand("m2", 0.6, "go/internal/x/extra.go", "go/internal/y/b.go"),
 	}
 	menus := ExpandWithClusterMates(sel, backlog, 4)
-	fileOwner := map[string]int{}
-	idSeen := map[string]bool{}
+	fileOwner := make(map[string]int)
+	idSeen := make(map[string]bool)
 	for lane, m := range menus {
 		for _, c := range m {
 			if idSeen[c.ID] {
@@ -209,7 +209,7 @@ func TestSelectWaveSeedMenus_CommittedOverlapNeverDropped(t *testing.T) {
 	}
 	menus := SelectWaveSeedMenus(evolveDir, committed, 2, 4, nil)
 
-	seen := map[string]bool{}
+	seen := make(map[string]bool)
 	for _, m := range menus {
 		for _, c := range m {
 			seen[c.ID] = true

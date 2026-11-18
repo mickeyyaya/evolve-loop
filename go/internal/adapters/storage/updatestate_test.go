@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -58,8 +57,7 @@ func TestHelperStateUpdater(t *testing.T) {
 		if _, err := s.UpdateState(context.Background(), func(st *core.State) {
 			st.LastCycleNumber++
 		}); err != nil {
-			fmt.Fprintf(os.Stderr, "child update %d: %v\n", i, err)
-			os.Exit(1)
+			t.Fatalf("child update %d: %v", i, err)
 		}
 	}
 }

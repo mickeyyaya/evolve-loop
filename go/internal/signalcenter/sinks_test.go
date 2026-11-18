@@ -203,7 +203,7 @@ func TestNDJSONSink_TwoProcessesAppendToTheSameCycleFile(t *testing.T) {
 	if len(lines) != 4 {
 		t.Fatalf("both processes append to one file: got %d lines", len(lines))
 	}
-	lastSeq := map[int]uint64{}
+	lastSeq := make(map[int]uint64)
 	for _, e := range lines {
 		if e.PID != 101 && e.PID != 202 {
 			t.Errorf("every line carries the writer's pid: %+v", e)

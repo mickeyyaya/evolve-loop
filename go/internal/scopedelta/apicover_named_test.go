@@ -29,7 +29,7 @@ func TestClosureRule_DefaultsImplementTheInterface(t *testing.T) {
 	if len(rules) == 0 {
 		t.Fatal("no closure rules: every out-of-scope path would need adjudication, including a change's own covering test")
 	}
-	seen := map[string]bool{}
+	seen := make(map[string]bool)
 	for _, r := range rules {
 		var _ ClosureRule = r
 		if r.Name() == "" {

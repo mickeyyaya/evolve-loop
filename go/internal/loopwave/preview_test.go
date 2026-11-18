@@ -61,7 +61,7 @@ func TestPreview_LanesAndWeightsEqualWhatDispatchLaunches(t *testing.T) {
 	if plan.Width != 2 || plan.Reason == "" {
 		t.Errorf("width=%d reason=%q", plan.Width, plan.Reason)
 	}
-	weights := map[string]float64{}
+	weights := make(map[string]float64)
 	for _, lane := range plan.Lanes {
 		for _, it := range lane.Items {
 			weights[it.ID] = it.Weight
@@ -81,7 +81,7 @@ func TestPreview_ExcludesUnmetDependencyAndConsoleRoutedItems(t *testing.T) {
 
 	plan := h.e.Preview(context.Background(), waveFleet(2), nil, nil, budgethistory.Throughput{}, time.Time{})
 
-	reasons := map[string]string{}
+	reasons := make(map[string]string)
 	for _, ex := range plan.Excluded {
 		reasons[ex.ID] = ex.Reason
 	}

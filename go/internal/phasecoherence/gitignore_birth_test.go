@@ -77,7 +77,7 @@ func TestTrackedCorpusDirsAllowNewBirths(t *testing.T) {
 			t.Fatalf("batched check-ignore probe failed: %v", runErr)
 		}
 	}
-	ignored := map[string]bool{}
+	ignored := make(map[string]bool)
 	for _, line := range strings.Split(strings.TrimSpace(string(out2)), "\n") {
 		if line != "" {
 			ignored[line] = true

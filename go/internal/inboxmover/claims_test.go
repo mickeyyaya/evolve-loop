@@ -274,8 +274,15 @@ func TestReleaseStaleClaims_ReleasesOnlyStaleHolders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if outcomes := []ClaimOutcome{ClaimReleased, ClaimDuplicateRemoved, ClaimNotHeld}; outcomes[0] != "released" || outcomes[1] != "duplicate-removed" || outcomes[2] != "not-claimed" {
-		t.Errorf("the outcomes are spelled as the --json output: %v", outcomes)
+	if ClaimReleased != "released" || ClaimDuplicateRemoved != "duplicate-removed" || ClaimNotHeld != "not-claimed" {
+		t.Errorf("the outcomes are spelled as the --json output: %q %q %q", ClaimReleased, ClaimDuplicateRemoved, ClaimNotHeld)
+	}
+	var outcome ClaimOutcome = ClaimNotHeld
+	if len(released) == 1 {
+		outcome = released[0].Outcome
+	}
+	if outcome != ClaimReleased {
+		t.Errorf("outcome = %q, want %q", outcome, ClaimReleased)
 	}
 	if len(released) != 1 || released[0].ID != "stale-item" || released[0].Cycle != 1828 || released[0].Outcome != ClaimReleased || released[0].Holder.Verdict != HolderStale {
 		t.Errorf("released = %+v, want only stale-item", released)

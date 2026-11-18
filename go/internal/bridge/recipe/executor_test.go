@@ -286,6 +286,12 @@ func TestEngineRun_UnresolvedParamAtStep(t *testing.T) {
 func TestEngine_LogfNilSafe(t *testing.T) {
 	e := &Engine{}
 	e.logf("ignored %d", 1)
+	var buf bytes.Buffer
+	e.Log = &buf
+	e.logf("kept %d", 2)
+	if got := buf.String(); got != "kept 2" {
+		t.Errorf("Log after nil-safe logf = %q, want %q", got, "kept 2")
+	}
 }
 
 func TestEngine_LogfWritesWhenSet(t *testing.T) {

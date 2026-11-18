@@ -108,6 +108,17 @@ func TestSignalCenter_ProjectionsConcurrent(t *testing.T) {
 
 	wg.Wait()
 	<-readerDone
+
+	oddPane := "⏺ content-1\n❯ \n"
+	if got, want := sc.Busy("sess-1"), PaneBusy(oddPane, p); got != want {
+		t.Errorf("Busy(sess-1) = %v, want %v", got, want)
+	}
+	if sc.Changed("sess-1") {
+		t.Error("Changed(sess-1) = true after a single Observe, want false")
+	}
+	if sc.Aggregate() == 0 {
+		t.Error("Aggregate = zero state after concurrent observes, want a valid state")
+	}
 }
 
 var funcDefRE = regexp.MustCompile(`(?m)^func\s+(cleanPane|PaneHasSubstantiveChange)\s*\(`)

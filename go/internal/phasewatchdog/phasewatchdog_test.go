@@ -291,7 +291,11 @@ func TestNewestMatch_PicksNewest(t *testing.T) {
 
 func TestAppendAbnormalEvent_BadWorkspaceNoop(t *testing.T) {
 	t.Parallel()
-	appendAbnormalEvent("/nonexistent-dir-xyz", "x", time.Now)
+	ws := filepath.Join(t.TempDir(), "absent")
+	appendAbnormalEvent(ws, "x", time.Now)
+	if _, err := os.Stat(ws); !os.IsNotExist(err) {
+		t.Errorf("missing workspace must stay absent, stat err = %v", err)
+	}
 }
 
 func TestMtimeUnix_EmptyPathIsZero(t *testing.T) {

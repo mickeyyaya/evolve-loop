@@ -1,7 +1,9 @@
 package dispositionrouter_test
 
 import (
+	"encoding/json"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispositionrouter"
@@ -22,19 +24,28 @@ func TestExportedVocabularyNamed(t *testing.T) {
 	if d.Route != dispositionrouter.RouteConsole || d.Reason == "" || !d.Forced {
 		t.Fatalf("Decision = %+v", d)
 	}
-	in := dispositionrouter.Intent{Cycle: 1, Pattern: "p", ItemID: "i", Action: dispositionrouter.ActionAutofile, Route: dispositionrouter.RouteQueue, Recurrence: 2, Weight: 0.5, Reason: "r"}
-	if in.Action != "autofile" || in.Route != "queue" {
-		t.Fatalf("Intent vocabulary drifted: %+v", in)
+	raw, err := json.Marshal(dispositionrouter.Intent{Cycle: 1, Pattern: "p", ItemID: "i", Action: dispositionrouter.ActionAutofile, Route: dispositionrouter.RouteQueue, Recurrence: 2, Weight: 0.5, Reason: "r"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`"action":"autofile"`, `"route":"queue"`, `"recurrence":2`} {
+		if !strings.Contains(string(raw), want) {
+			t.Fatalf("Intent wire %s missing %s", raw, want)
+		}
 	}
 }
 
 func TestLayerNames_AreTheRetroLayerVocabulary(t *testing.T) {
 	t.Parallel()
-	got := []string{dispositionrouter.LayerTaskCode, dispositionrouter.LayerPipelineCode, dispositionrouter.LayerHarness, dispositionrouter.LayerInfra, dispositionrouter.LayerEvalContract}
-	want := []string{"task-code", "pipeline-code", "harness", "infra", "eval-contract"}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Errorf("layer %d = %q; want %q, the disposition.json root_cause.layer value", i, got[i], want[i])
+	for _, c := range []struct{ got, want string }{
+		{dispositionrouter.LayerTaskCode, "task-code"},
+		{dispositionrouter.LayerPipelineCode, "pipeline-code"},
+		{dispositionrouter.LayerHarness, "harness"},
+		{dispositionrouter.LayerInfra, "infra"},
+		{dispositionrouter.LayerEvalContract, "eval-contract"},
+	} {
+		if c.got != c.want {
+			t.Errorf("layer = %q; want %q, the disposition.json root_cause.layer value", c.got, c.want)
 		}
 	}
 }

@@ -206,7 +206,7 @@ func (b *envBridge) Probe(context.Context) (core.BridgeProbe, error) {
 }
 
 func TestBridgeLauncher_MergesPerWorkerEnvOverPhaseEnv(t *testing.T) {
-	b := &envBridge{}
+	b := new(envBridge)
 	l := bridgeLauncher{bridge: b, env: map[string]string{"A": "1", "PORT": "9000"}}
 
 	if _, err := l.Launch(context.Background(), swarm.LaunchRequest{
@@ -269,7 +269,7 @@ func TestSwarmRunnerBridgeLauncherThreadsSkills(t *testing.T) {
 }
 
 func TestBridgeLauncher_NoOverlayKeepsPhaseEnv(t *testing.T) {
-	b := &envBridge{}
+	b := new(envBridge)
 	phaseEnv := map[string]string{"A": "1"}
 	l := bridgeLauncher{bridge: b, env: phaseEnv}
 

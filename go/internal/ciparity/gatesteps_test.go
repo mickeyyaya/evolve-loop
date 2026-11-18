@@ -103,7 +103,7 @@ func TestGateSteps_ApicoverBoundHoldsTheEnforcedPackageList(t *testing.T) {
 
 func TestGateSteps_NoRowDuplicatesAGateOrAStepWithinAJob(t *testing.T) {
 	t.Parallel()
-	seen := map[string]bool{}
+	seen := make(map[string]bool)
 	for _, row := range GateSteps {
 		for _, key := range []string{"gate\x00" + row.Gate, "step\x00" + row.Job + "\x00" + row.Step} {
 			if seen[key] {

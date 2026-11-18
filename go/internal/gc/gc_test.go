@@ -539,9 +539,11 @@ func TestPlan_KeepFullCountsLiveRunsPositionally(t *testing.T) {
 }
 
 func TestGCPolicyModeDefaultsOff(t *testing.T) {
-	pol := Policy{}
-	if pol.Mode != "" {
-		t.Errorf("Policy{}.Mode = %q, want \"\" (absent mode — runGCHook resolves it to shadow)", pol.Mode)
+	if got := (Policy{}).WithDefaults().Mode; got != "" {
+		t.Errorf("Policy{}.WithDefaults().Mode = %q, want \"\" (absent mode — runGCHook resolves it to shadow)", got)
+	}
+	if got := (Policy{Mode: "enforce"}).WithDefaults().Mode; got != "enforce" {
+		t.Errorf("WithDefaults dropped an explicit mode: got %q, want enforce", got)
 	}
 }
 

@@ -156,13 +156,6 @@ func TestRunPool_EachTransitionNamesItsKindAndItsTodo(t *testing.T) {
 		got = append(got, pt)
 		mu.Unlock()
 	})
-	kinds := map[PoolTransitionKind]int{}
-	for _, pt := range got {
-		kinds[pt.Kind]++
-	}
-	if kinds[PoolLaunched] != 1 || kinds[PoolExited] != 2 || kinds[PoolBackfilled] != 1 || kinds[PoolIdle] != 1 {
-		t.Errorf("transition kinds = %v, want one launch, two exits, one backfill and one idle", kinds)
-	}
 	want := []PoolTransition{
 		{Kind: PoolLaunched, Todo: "A", Live: 1, Target: 1, Pending: 1},
 		{Kind: PoolExited, Todo: "A", Live: 0, Target: 1, Pending: 1},

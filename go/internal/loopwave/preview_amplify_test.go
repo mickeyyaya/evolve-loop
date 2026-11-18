@@ -116,7 +116,7 @@ func TestPreviewAmplify_NoItemAppearsInTwoLanes(t *testing.T) {
 		writeInbox(t, h, id, 0.5, []string{"pkg/" + id + "/x.go"})
 	}
 	plan := h.e.Preview(context.Background(), waveFleet(3), nil, nil, budgethistory.Throughput{}, time.Time{})
-	seen := map[string]bool{}
+	seen := make(map[string]bool)
 	for _, ids := range laneIDs(plan) {
 		for _, id := range ids {
 			if seen[id] {

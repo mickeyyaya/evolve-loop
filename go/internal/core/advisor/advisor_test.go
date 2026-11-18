@@ -138,7 +138,7 @@ func TestAdvisorCodes_AreRegisteredWithDocsUnderModuleAdvisor(t *testing.T) {
 }
 
 func TestAdvisorEvents_FieldVocabularyMatchesTheRegisteredReasons(t *testing.T) {
-	docs := map[signalcenter.Code]string{}
+	docs := make(map[signalcenter.Code]string)
 	for _, cd := range signalcenter.RegisteredCodes()[signalcenter.ModuleAdvisor] {
 		docs[cd.Code] = cd.Doc
 	}
@@ -168,7 +168,7 @@ func TestAdvisorEvents_FieldVocabularyMatchesTheRegisteredReasons(t *testing.T) 
 		run.call(a)
 		events = append(events, *got...)
 	}
-	steps := map[string]bool{}
+	steps := make(map[string]bool)
 	for _, e := range events {
 		steps[e.Fields["step"]] = true
 		for field, form := range map[string]string{"step": "fields.step=", "cause": "", "op": ""} {

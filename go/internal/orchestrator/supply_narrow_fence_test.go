@@ -55,7 +55,7 @@ func TestSupply_TheNarrowFenceAdmitsNonGateFilesOfBridgeCoreAndTheInboxLifecycle
 	if got.Counts[ClassAdmissible] != len(lane) || got.Counts[ClassConsoleProtected] != len(gate) {
 		t.Errorf("counts = %v, want %d admissible (the non-gate files) and %d console_protected (the gate files)", got.Counts, len(lane), len(gate))
 	}
-	refused := map[string]bool{}
+	refused := make(map[string]bool)
 	for _, r := range got.Refusals {
 		refused[r.ID] = true
 	}

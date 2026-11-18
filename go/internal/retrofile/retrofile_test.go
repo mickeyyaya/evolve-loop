@@ -104,7 +104,7 @@ func TestFileActions_EndToEndFromFixtureRetro(t *testing.T) {
 		t.Fatalf("wrote %d items, want 2", len(written))
 	}
 	got := readInboxIDs(t, inbox)
-	ids := map[string]bool{}
+	ids := make(map[string]bool)
 	for fname, id := range got {
 		ids[id] = true
 		if len(fname) < len("auto-retro-640-") || fname[:len("auto-retro-640-")] != "auto-retro-640-" {

@@ -54,7 +54,7 @@ func TestAmp_SampleSymbols_Deterministic(t *testing.T) {
 }
 
 func TestAmp_SampleSymbols_NoDuplicates(t *testing.T) {
-	seen := map[string]bool{}
+	seen := make(map[string]bool)
 	for _, s := range codeindex.SampleSymbols(pool(20), 10, []string{"a", "b"}) {
 		if seen[s.Name] {
 			t.Fatalf("duplicate %s", s.Name)
@@ -137,7 +137,10 @@ func TestAmp_RunBench_NoBackendsNoSymbolsNoRows(t *testing.T) {
 func TestAmp_RunBench_CancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, _ = codeindex.RunBench(ctx, codeindex.BenchRun{Symbols: pool(2), Rounds: 1, LoadAvg: func() float64 { return 0 }})
+	_, err := codeindex.RunBench(ctx, benchRun(pool(2), callersFake("fake", codeindex.AllCapabilities(), nil)))
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
 }
 
 func TestAmp_GrepCheck_MissingRootErrors(t *testing.T) {

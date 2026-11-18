@@ -40,7 +40,7 @@ func TestInstructionDiffs_TheCheckedInGeminiFileMatchesItsRender(t *testing.T) {
 	if err != nil {
 		t.Fatalf("instructionDiffs: %v", err)
 	}
-	seen := map[string]bool{}
+	seen := make(map[string]bool)
 	for _, d := range diffs {
 		seen[d.rel] = true
 		if d.drifted {

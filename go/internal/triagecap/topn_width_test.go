@@ -27,7 +27,7 @@ func TestTopN_FleetWidthAware_ThreeDisjointTwoOverlapping_PacksTwoDisjoint(t *te
 		t.Fatalf("top_n = %+v, want exactly 2 mutually-disjoint items for fleet.count=2", got)
 	}
 	assertMutuallyDisjoint(t, got)
-	ids := map[string]bool{}
+	ids := make(map[string]bool)
 	for _, c := range got {
 		ids[c.ID] = true
 	}

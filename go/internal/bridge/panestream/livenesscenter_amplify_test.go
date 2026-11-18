@@ -230,6 +230,9 @@ func TestAmp_SignalCenter_MultipleReadersConcurrent(t *testing.T) {
 	}
 
 	wg.Wait()
+	if got := sc.Aggregate(); got == 0 {
+		t.Errorf("Aggregate after concurrent readers and writers = 0 (unset); want a valid LivenessState")
+	}
 }
 
 func TestAmp_SignalCenter_SingleObservationPerSession(t *testing.T) {

@@ -368,7 +368,7 @@ func TestDetect_NilDoctorAndCapTierSeams(t *testing.T) {
 	if len(rep.Phases) != len(Roles) {
 		t.Errorf("phases len = %d, want %d (one per Role)", len(rep.Phases), len(Roles))
 	}
-	seen := map[string]bool{}
+	seen := make(map[string]bool)
 	for _, c := range rep.CLIs {
 		if seen[c.CLI] {
 			t.Errorf("duplicate CLI family in report: %q", c.CLI)

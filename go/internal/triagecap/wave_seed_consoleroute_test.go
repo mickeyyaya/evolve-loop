@@ -23,7 +23,7 @@ func TestReadInboxBacklog_SkipsConsoleRoutedAndBackfills(t *testing.T) {
 	write("d.json", `{"id":"lane-second","weight":0.85}`)
 
 	got := ReadInboxBacklog(evolveDir, func(p string) bool { return p == "go/internal/guards/role.go" })
-	ids := map[string]bool{}
+	ids := make(map[string]bool)
 	for _, c := range got {
 		ids[c.ID] = true
 	}

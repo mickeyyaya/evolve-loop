@@ -28,7 +28,7 @@ func variantNamed(t *testing.T, name string) Variant {
 }
 
 func TestVariants_AreUniqueAndEachHasAHost(t *testing.T) {
-	seen := map[string]bool{}
+	seen := make(map[string]bool)
 	for _, v := range Variants() {
 		if seen[v.Name] {
 			t.Fatalf("duplicate variant %s", v.Name)

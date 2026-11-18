@@ -9,6 +9,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
+func phaseRecordNamed(d *Dossier, name string) PhaseRecord {
+	for _, p := range d.Phases {
+		if p.Name == name {
+			return p
+		}
+	}
+	return PhaseRecord{}
+}
+
 func TestBuild_IngestsPhaseTiming(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
@@ -33,15 +42,11 @@ func TestBuild_IngestsPhaseTiming(t *testing.T) {
 	if len(d.Phases) != 3 {
 		t.Fatalf("want 3 phase records from the timing log, got %d: %+v", len(d.Phases), d.Phases)
 	}
-	byName := map[string]PhaseRecord{}
-	for _, p := range d.Phases {
-		byName[p.Name] = p
+	if got := phaseRecordNamed(d, "build"); got.DurationMS != 700_000 {
+		t.Errorf("build PhaseRecord DurationMS=%d, want 700000", got.DurationMS)
 	}
-	if byName["build"].DurationMS != 700_000 {
-		t.Errorf("build PhaseRecord DurationMS=%d, want 700000", byName["build"].DurationMS)
-	}
-	if byName["scout"].Archetype != "plan" || byName["scout"].StartedAt == "" {
-		t.Errorf("scout record must carry archetype+start: %+v", byName["scout"])
+	if got := phaseRecordNamed(d, "scout"); got.Archetype != "plan" || got.StartedAt == "" {
+		t.Errorf("scout record must carry archetype+start: %+v", got)
 	}
 
 	if d.Timing == nil {

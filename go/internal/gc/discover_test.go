@@ -85,7 +85,7 @@ func TestDiscover_LivenessFromRunStateAndLease(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Discover: %v", err)
 	}
-	live := map[string]bool{}
+	live := make(map[string]bool)
 	for _, r := range got {
 		live[r.Path] = r.Live
 	}

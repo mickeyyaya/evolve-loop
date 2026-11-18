@@ -102,7 +102,7 @@ func TestClassify_TableCoversEveryDeclaredExit(t *testing.T) {
 	if len(exitClasses) != len(want) {
 		t.Fatalf("exitClasses has %d rows, want %d", len(exitClasses), len(want))
 	}
-	seen := map[int]bool{}
+	seen := make(map[int]bool)
 	for i, row := range exitClasses {
 		if row.code != want[i] {
 			t.Errorf("row %d: code %d, want %d", i, row.code, want[i])

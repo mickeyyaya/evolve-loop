@@ -315,7 +315,7 @@ func TestPlanWorktrees_KeepRecentAndMinAge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PlanWorktrees: %v", err)
 	}
-	removedPaths := map[string]bool{}
+	removedPaths := make(map[string]bool)
 	for _, it := range itemsWithAction(m.Items, WorktreeActionRemove) {
 		removedPaths[it.Path] = true
 	}
@@ -342,7 +342,7 @@ func TestPlanWorktrees_BranchBacklogSweep_NotCheckedOutMergedOnly(t *testing.T) 
 		t.Fatalf("PlanWorktrees: %v", err)
 	}
 
-	deletes := map[string]bool{}
+	deletes := make(map[string]bool)
 	for _, it := range itemsWithAction(m.Items, WorktreeActionDeleteBranch) {
 		deletes[it.Branch] = true
 	}
@@ -352,7 +352,7 @@ func TestPlanWorktrees_BranchBacklogSweep_NotCheckedOutMergedOnly(t *testing.T) 
 	if deletes["cycle-legacyB-8-integration"] {
 		t.Errorf("the unmerged orphan branch must never be deleted: %+v", m.Items)
 	}
-	flagged := map[string]bool{}
+	flagged := make(map[string]bool)
 	for _, it := range itemsWithAction(m.Items, WorktreeActionFlagUnmerged) {
 		flagged[it.Branch] = true
 	}

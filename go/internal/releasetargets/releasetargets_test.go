@@ -87,7 +87,7 @@ checksum:
 	if err != nil {
 		t.Fatalf("ParseConfig: %v", err)
 	}
-	have := map[string]bool{}
+	have := make(map[string]bool)
 	for _, tg := range cfg.Targets {
 		name, err := cfg.AssetName(tg)
 		if err != nil {
@@ -124,7 +124,7 @@ checksum: { name_template: 'checksums.txt' }
 	if err != nil {
 		t.Fatalf("ParseConfig: %v", err)
 	}
-	have := map[string]bool{}
+	have := make(map[string]bool)
 	for _, tg := range cfg.Targets {
 		name, err := cfg.AssetName(tg)
 		if err != nil {
@@ -252,7 +252,7 @@ func TestParseConfig_RealRepo(t *testing.T) {
 	if len(cfg.Targets) < 4 {
 		t.Fatalf("real config has %d targets, expected the full release matrix", len(cfg.Targets))
 	}
-	have := map[string]bool{}
+	have := make(map[string]bool)
 	for _, tg := range cfg.Targets {
 		name, err := cfg.AssetName(tg)
 		if err != nil {

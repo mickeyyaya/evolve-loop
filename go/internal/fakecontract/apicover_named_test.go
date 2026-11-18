@@ -1,11 +1,18 @@
 package fakecontract
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func TestAPICover_NamesEveryExportedSymbol(t *testing.T) {
 	t.Parallel()
-	suite := Suite{Tool: "git"}
-	if suite.Tool != "git" {
-		t.Errorf("Suite.Tool = %q, want git", suite.Tool)
+	typ := reflect.TypeOf(Suite{})
+	if typ.NumField() != 1 {
+		t.Fatalf("Suite has %d fields, want only Tool", typ.NumField())
+	}
+	f, ok := typ.FieldByName("Tool")
+	if !ok || f.Type.Kind() != reflect.String {
+		t.Errorf("Suite.Tool = %+v, want a string field", f)
 	}
 }

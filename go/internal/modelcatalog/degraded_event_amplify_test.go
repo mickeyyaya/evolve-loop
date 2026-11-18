@@ -67,7 +67,7 @@ func TestRefreshDegradedEventAmplify_ManyEventsAllReachTheCenter(t *testing.T) {
 	center.Flush()
 
 	got := center.Recent()
-	seen := map[string]bool{}
+	seen := make(map[string]bool)
 	for _, e := range got {
 		if e.Code == modelcatalog.CodeRefreshDegraded {
 			seen[e.Fields["cli"]] = true

@@ -104,7 +104,7 @@ func TestClassify_RejectingAuditEmitsDefectLedger(t *testing.T) {
 	if len(doc.Entries) != len(defects) {
 		t.Fatalf("entries = %d, want %d (one per structured defect)", len(doc.Entries), len(defects))
 	}
-	seenIDs := map[string]bool{}
+	seenIDs := make(map[string]bool)
 	for i, e := range doc.Entries {
 		if e.Status != "OPEN" {
 			t.Errorf("entry %d status = %q, want OPEN on first emission", i, e.Status)

@@ -120,7 +120,8 @@ func TestEnforceActor_LandingFeedNotifiedOnEjection(t *testing.T) {
 
 func TestEnforceActor_WaveEndPendingRaisesFailure(t *testing.T) {
 	t.Parallel()
-	ports := &stubEnforcePorts{syncOut: SyncCurrent}
+	ports := new(stubEnforcePorts)
+	ports.syncOut = SyncCurrent
 	a := EnforceActor{Plane: ports, Now: func() time.Time { return time.Unix(200, 0).UTC() }}
 	out, err := a.WaveEnd(context.Background(), WaveRecord{
 		Pool:       2,
@@ -128,8 +129,11 @@ func TestEnforceActor_WaveEndPendingRaisesFailure(t *testing.T) {
 		ShadowBase: testSHA,
 		Members:    map[int]MemberState{4: {Status: MemberPending}},
 	})
-	if err == nil || len(out.Failures) == 0 {
-		t.Fatalf("WaveEnd with pending member: err=%v failures=%v", err, out.Failures)
+	if err == nil || !strings.Contains(err.Error(), "member 4 still pending") {
+		t.Fatalf("WaveEnd with pending member: err=%v, want it to name member 4", err)
+	}
+	if len(out.Failures) != 1 || out.Failures[0].Step != stepWaveEnd || !strings.Contains(out.Failures[0].Error, "member 4 still pending") {
+		t.Fatalf("failures = %+v, want one wave-end failure for member 4", out.Failures)
 	}
 	if ports.synced != 1 {
 		t.Fatalf("synced = %d, want 1", ports.synced)

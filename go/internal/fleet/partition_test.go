@@ -134,7 +134,7 @@ func TestPlanCycles_DisjointScopesPlusDeferred(t *testing.T) {
 	if len(specs) != 2 {
 		t.Fatalf("specs=%d want 2", len(specs))
 	}
-	seen := map[string]bool{}
+	seen := make(map[string]bool)
 	for i, s := range specs {
 		if len(s.Scope) == 0 {
 			t.Errorf("spec %d has empty Scope", i)

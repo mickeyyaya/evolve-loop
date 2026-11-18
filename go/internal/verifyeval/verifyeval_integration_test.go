@@ -49,6 +49,8 @@ func TestDefaultRunner_StdoutCaptured(t *testing.T) {
 }
 
 func TestDefaultRunner_BinaryMissing(t *testing.T) {
-	_, _, _, err := DefaultRunner(context.Background(), "", "/no/such/binary/zzz")
-	_ = err
+	_, stderr, code, err := DefaultRunner(context.Background(), "", "/no/such/binary/zzz")
+	if err != nil || code != 127 || !strings.Contains(stderr, "No such file") {
+		t.Errorf("a missing binary is a shell exit 127 with a diagnostic, not a runner error: code=%d err=%v stderr=%q", code, err, stderr)
+	}
 }

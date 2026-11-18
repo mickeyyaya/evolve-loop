@@ -1,6 +1,7 @@
 package auditchain
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -30,14 +31,10 @@ func TestRequiredEvidence_EachLinkHasSomethingToReadItFrom(t *testing.T) {
 			t.Errorf("link %s has no declared evidence source — an auditor could only assert it", id)
 		}
 	}
-	entitled := map[string]bool{}
-	for _, a := range ev {
-		entitled[a] = true
-	}
 	for _, id := range RequiredLinks() {
 		srcs, _ := EvidenceFor(id)
 		for _, s := range srcs {
-			if !entitled[s] {
+			if !slices.Contains(ev, s) {
 				t.Errorf("link %s needs %q, which the audit is not entitled to read", id, s)
 			}
 		}

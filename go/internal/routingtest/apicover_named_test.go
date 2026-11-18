@@ -22,7 +22,10 @@ func TestDimension_ExpandsInMatrix(t *testing.T) {
 	if len(specs) != 2 {
 		t.Fatalf("Matrix expanded to %d specs, want 2 (one per variant)", len(specs))
 	}
-	wantNames := map[string]bool{"size=trivial": true, "size=medium": true}
+	wantNames := make(map[string]bool)
+	for _, n := range []string{"size=trivial", "size=medium"} {
+		wantNames[n] = true
+	}
 	for _, s := range specs {
 		if !wantNames[s.Name] {
 			t.Errorf("unexpected scenario name %q; want one of %v", s.Name, wantNames)

@@ -109,7 +109,7 @@ func TestMatrix_CrossProductCount(t *testing.T) {
 	if len(specs) != 6 {
 		t.Fatalf("cross-product count=%d, want 6 (2×3)", len(specs))
 	}
-	seen := map[string]bool{}
+	seen := make(map[string]bool)
 	for _, s := range specs {
 		if seen[s.Name] {
 			t.Errorf("duplicate scenario name %q", s.Name)

@@ -123,7 +123,7 @@ func TestContracts_ReturnsWholeRegistry(t *testing.T) {
 	if len(all) != 13 {
 		t.Fatalf("Contracts() len=%d, want 13", len(all))
 	}
-	seen := map[string]bool{}
+	seen := make(map[string]bool)
 	for _, c := range all {
 		seen[c.Phase] = true
 	}

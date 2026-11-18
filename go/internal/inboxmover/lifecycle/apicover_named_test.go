@@ -60,12 +60,10 @@ func TestAPI_EveryExportIsNamed(t *testing.T) {
 		_                                                                    = ClaimedItem{Duplicate: true}
 		_ func(*Mover) ([]Absorbed, error)                                   = (*Mover).AbsorbRootCopies
 		_ AbsorbOutcome                                                      = AbsorbParked
+		_ EditOp                                                             = EditSet
 	)
-	if ops := []EditOp{EditSet, EditAdd, EditRemove}; ops[0] != "set" || ops[1] != "add" || ops[2] != "remove" {
-		t.Errorf("the edit ops are spelled as the CLI flags: %v", ops)
-	}
-	if edit := (FieldEdit{Op: EditSet, Field: "weight", Value: "0.4"}); edit.Field != "weight" || edit.Value != "0.4" {
-		t.Errorf("a field edit carries its field and value: %+v", edit)
+	if EditSet != "set" || EditAdd != "add" || EditRemove != "remove" {
+		t.Errorf("the edit ops are spelled as the CLI flags: %q %q %q", EditSet, EditAdd, EditRemove)
 	}
 	var appender LedgerAppender = &recordingAppender{}
 	if err := appender.AppendLifecycle(context.Background(), ledger.LifecycleRecord{}); err != nil {
@@ -86,11 +84,13 @@ func TestAPI_EveryExportIsNamed(t *testing.T) {
 	if LegacyPrefix != "[inbox-mover] " {
 		t.Errorf("LegacyPrefix = %q", LegacyPrefix)
 	}
-	p := Policy{Ceiling: 2, SystemLevel: false, Committed: map[string]bool{"a": true}}
-	loc := Location{Path: "p", Cycle: 1}
-	cr, pr, rr, po := ClaimResult{SrcPath: "s", DestPath: "d"}, PromoteResult{NoOp: true}, RecoverResult{Recovered: 1, Paths: []string{"x"}}, PromoteOpts{Cycle: "1", CommitSHA: "s"}
-	round := Round{Try: 1, CarryFindings: true, RaiseEffort: true, ChangeStrategy: true}
-	if p.Ceiling != 2 || loc.Cycle != 1 || cr.SrcPath != "s" || !pr.NoOp || rr.Recovered != 1 || po.Cycle != "1" || round.Try != 1 || !round.CarryFindings || !round.RaiseEffort || !round.ChangeStrategy || round.Plan() != "fresh-deep-plan" {
-		t.Error("the value objects carry their fields")
+	if first := PlanRound(0, 3); first.Try != 1 || first.CarryFindings || first.RaiseEffort || first.ChangeStrategy || first.Plan() != "raise-with-findings" {
+		t.Errorf("PlanRound(0, 3) = %+v, want a first plain try", first)
+	}
+	if last := PlanRound(2, 3); last.Try != 3 || !last.CarryFindings || !last.RaiseEffort || !last.ChangeStrategy || last.Plan() != "fresh-deep-plan" {
+		t.Errorf("PlanRound(2, 3) = %+v, want a third try that changes strategy", last)
+	}
+	if !ShouldQuarantine(2, 2, false) || ShouldQuarantine(1, 2, false) || ShouldQuarantine(2, 2, true) || ShouldQuarantine(5, 0, false) {
+		t.Error("ShouldQuarantine must trip only at the ceiling for a non-system failure")
 	}
 }

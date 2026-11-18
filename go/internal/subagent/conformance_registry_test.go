@@ -51,7 +51,7 @@ func TestAgentRoles_SSOTIntegrity(t *testing.T) {
 	if len(agentRoles) == 0 {
 		t.Fatal("agentRoles is empty")
 	}
-	seen := map[string]bool{}
+	seen := make(map[string]bool)
 	for _, role := range agentRoles {
 		if seen[role] {
 			t.Errorf("duplicate role in agentRoles: %q", role)

@@ -50,7 +50,7 @@ func TestSeatHealth_StringNamesEachStateAndNoOtherValue(t *testing.T) {
 	if got := SeatHealth(0).String(); got != "unknown" {
 		t.Errorf("the zero SeatHealth reads %q, want unknown", got)
 	}
-	seen := map[string]bool{}
+	seen := make(map[string]bool)
 	for _, name := range want {
 		if seen[name] {
 			t.Errorf("state name %q repeats", name)
