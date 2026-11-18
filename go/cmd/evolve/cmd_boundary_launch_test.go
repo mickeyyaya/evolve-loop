@@ -75,15 +75,14 @@ func TestBoundaryRun_LaunchStepPassesTheRealLoopArgumentParser(t *testing.T) {
 
 func TestBoundaryRun_RefusedLaunchReturnsTheLoopsExitCodeAfterTheRelease(t *testing.T) {
 	t.Parallel()
-	fake := &fakeBoundaryVerbs{failAt: 15, code: exitUsage}
+	fake := &fakeBoundaryVerbs{failAt: 17, code: exitUsage}
 	var stdout, stderr bytes.Buffer
 	rc := runBoundaryWith(fake.dispatch, []string{"run", "--merge", "12", "--goal-text-file", fakeBoundaryGoalFile(t)}, &stdout, &stderr)
 	if rc != exitUsage {
 		t.Errorf("rc = %d, want the refused launch's own exit code %d\n%s%s", rc, exitUsage, stdout.String(), stderr.String())
 	}
-	want := []string{"loop-stop", "pr", boundaryRatchetVerb, "sync-main", queueApplyVerb, waveBuildVerb, "inbox", "selfheal", "selfheal", "quality", "gc", "code", "loop-stop", boundaryLogVerb, "loop"}
-	if got := fake.verbs(); !slices.Equal(got, want) {
-		t.Errorf("dispatched %v, want %v ending at the refused launch", got, want)
+	if got := fake.verbs(); !slices.Equal(got, boundaryFullVerbs) {
+		t.Errorf("dispatched %v, want %v ending at the refused launch", got, boundaryFullVerbs)
 	}
 	if !strings.Contains(stderr.String(), "released") {
 		t.Errorf("a refused launch must tell the operator the brake is no longer engaged\n%s", stderr.String())

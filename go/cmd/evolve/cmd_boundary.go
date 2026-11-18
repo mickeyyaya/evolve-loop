@@ -26,9 +26,10 @@ const (
 type boundaryDispatch func(verb string, args []string, stdout, stderr io.Writer) int
 
 type boundaryStep struct {
-	verb string
-	args []string
-	desc string
+	verb     string
+	args     []string
+	desc     string
+	advisory bool
 }
 
 func (s boundaryStep) String() string {
@@ -67,7 +68,7 @@ var planeBinaryVerbs = []string{"inbox", "selfheal", "gc", "code"}
 
 func dispatchPlaneVerbs(run sysexec.RunFunc) boundaryDispatch {
 	handlers := map[string]func([]string, io.Reader, io.Writer, io.Writer) int{
-		"loop-stop": runLoopStop, "pr": runPR, "sync-main": runSyncMain, "quality": runQuality, "loop": gatedLoop(defaultDispatchGate),
+		"loop-stop": runLoopStop, "pr": runPR, "sync-main": runSyncMain, "quality": runQuality, "ci": runCI, "wave": runWave, "loop": gatedLoop(defaultDispatchGate),
 		boundaryLogVerb: runBoundaryLog, boundaryRatchetVerb: runBoundaryRatchetTighten, queueApplyVerb: runQueueApply,
 		waveBuildVerb: func(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 			return runWaveBuild(run, args, stdout, stderr)
@@ -232,6 +233,8 @@ func boundaryHaltSteps(a boundaryArgs, root string) []boundaryStep {
 		boundaryStep{verb: "selfheal", args: append([]string{"incidents"}, at...)},
 		boundaryStep{verb: "selfheal", args: append([]string{"propose"}, at...)},
 		boundaryStep{verb: "quality", args: append([]string{"report", "--scope", "wave"}, at...)},
+		boundaryStep{verb: "ci", args: append([]string{"latency", "check"}, at...), advisory: true},
+		boundaryStep{verb: "wave", args: append([]string{"latency", "--check"}, at...), advisory: true},
 		boundaryStep{verb: "gc", args: append([]string{"--lease-wait", boundaryGCLeaseWait}, at...)})
 }
 
@@ -262,7 +265,10 @@ func runBoundarySteps(dispatch boundaryDispatch, steps []boundaryStep, stdout, s
 	released := false
 	for i, s := range steps {
 		fmt.Fprintf(stdout, "boundary: step %d/%d: %s\n", i+1, len(steps), s)
-		if rc, tail := dispatchKeepingStderrTail(dispatch, s.verb, s.args, stdout, stderr); rc != 0 {
+		if rc, tail := dispatchKeepingStderrTail(dispatch, s.verb, s.args, stdout, stderr); rc != 0 && s.advisory {
+			fmt.Fprintf(stderr, "%sWARN: step %d/%d (%s) failed rc=%d; the latency check is advisory, the boundary continues\n", boundaryPrefix, i+1, len(steps), s, rc)
+			writeStderrTail(stderr, tail)
+		} else if rc != 0 {
 			brake := "the loop-stop brake stays engaged"
 			if released {
 				brake = "the brake was already released"
