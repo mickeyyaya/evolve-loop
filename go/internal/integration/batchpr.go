@@ -36,6 +36,7 @@ type Main interface {
 type Composition struct {
 	Batch   Batch
 	Kept    []DeliverableRecord
+	OnMain  []DeliverableRecord
 	Ejected []*Ejection
 }
 
@@ -45,6 +46,7 @@ type Merger struct {
 	Compose func(ctx context.Context, recs []DeliverableRecord) (Composition, error)
 	Heads   func(ctx context.Context, recs []DeliverableRecord) ([]*Ejection, error)
 	Eject   func(ctx context.Context, rec DeliverableRecord, cause error) error
+	Base    func(ctx context.Context, base string) error
 
 	Progress func(Step)
 }
@@ -57,6 +59,7 @@ const (
 	StepRerun   StepKind = "rerun"
 	StepSplit   StepKind = "split"
 	StepLand    StepKind = "land"
+	StepHold    StepKind = "hold"
 )
 
 type Step struct {
@@ -64,6 +67,9 @@ type Step struct {
 	PRs     []int
 	Batch   int
 	Verdict Verdict
+	Tip     string
+	Base    string
+	Err     error
 }
 
 func (m Merger) step(s Step) {
@@ -75,6 +81,7 @@ func (m Merger) step(s Step) {
 type Outcome struct {
 	Landed       []int
 	Ejected      []int
+	OnMain       []int
 	Flaked       bool
 	ConfirmedRed bool
 	Via          map[int]int
@@ -99,6 +106,7 @@ func (m Merger) land(ctx context.Context, recs []DeliverableRecord, out *Outcome
 		if err := m.eject(ctx, recs, comp.Ejected, out); err != nil {
 			return err
 		}
+		out.OnMain = append(out.OnMain, refsOf(comp.OnMain)...)
 		if len(comp.Kept) == 0 {
 			return nil
 		}
@@ -109,8 +117,7 @@ func (m Merger) land(ctx context.Context, recs []DeliverableRecord, out *Outcome
 			return err
 		}
 		if verdict == Red {
-			out.ConfirmedRed = true
-			return m.split(ctx, recs, out)
+			return m.splitRed(ctx, b, pr, recs, out)
 		}
 		rest, changed, err := m.recheck(ctx, recs, out)
 		if err != nil {
@@ -126,13 +133,32 @@ func (m Merger) land(ctx context.Context, recs []DeliverableRecord, out *Outcome
 		landed, err := m.fastForward(ctx, b)
 		if landed {
 			out.record(recs, pr)
-			m.step(Step{Kind: StepLand, PRs: refsOf(recs), Batch: pr.Number})
+			m.step(Step{Kind: StepLand, PRs: refsOf(recs), Batch: pr.Number, Tip: pr.Tip})
 		}
 		if err != nil || landed {
 			return err
 		}
 	}
 	return fmt.Errorf("integration: main moved %d times while the batch was tested", MaxMoves+1)
+}
+
+func (m Merger) splitRed(ctx context.Context, b Batch, pr PR, recs []DeliverableRecord, out *Outcome) error {
+	out.ConfirmedRed = true
+	if err := m.holdBase(ctx, b, pr, recs); err != nil {
+		return err
+	}
+	return m.split(ctx, recs, out)
+}
+
+func (m Merger) holdBase(ctx context.Context, b Batch, pr PR, recs []DeliverableRecord) error {
+	if m.Base == nil {
+		return nil
+	}
+	err := m.Base(ctx, b.Base)
+	if err != nil {
+		m.step(Step{Kind: StepHold, PRs: refsOf(recs), Batch: pr.Number, Tip: pr.Tip, Base: b.Base, Err: err})
+	}
+	return err
 }
 
 func (m Merger) recheck(ctx context.Context, recs []DeliverableRecord, out *Outcome) ([]DeliverableRecord, bool, error) {
@@ -175,12 +201,12 @@ func (m Merger) test(ctx context.Context, b Batch, refs []int, out *Outcome) (Ve
 	if err != nil {
 		return "", PR{}, err
 	}
-	m.step(Step{Kind: StepTest, PRs: refs, Batch: pr.Number})
+	m.step(Step{Kind: StepTest, PRs: refs, Batch: pr.Number, Tip: pr.Tip})
 	verdict, err := m.watch(ctx, pr, refs)
 	if err != nil || verdict == Green {
 		return verdict, pr, err
 	}
-	m.step(Step{Kind: StepRerun, PRs: refs, Batch: pr.Number})
+	m.step(Step{Kind: StepRerun, PRs: refs, Batch: pr.Number, Tip: pr.Tip})
 	if err := m.CI.Rerun(ctx, pr); err != nil {
 		return "", pr, err
 	}
@@ -193,7 +219,7 @@ func (m Merger) test(ctx context.Context, b Batch, refs []int, out *Outcome) (Ve
 func (m Merger) watch(ctx context.Context, pr PR, refs []int) (Verdict, error) {
 	verdict, err := m.CI.Watch(ctx, pr)
 	if err == nil {
-		m.step(Step{Kind: StepVerdict, PRs: refs, Batch: pr.Number, Verdict: verdict})
+		m.step(Step{Kind: StepVerdict, PRs: refs, Batch: pr.Number, Verdict: verdict, Tip: pr.Tip})
 	}
 	return verdict, err
 }
