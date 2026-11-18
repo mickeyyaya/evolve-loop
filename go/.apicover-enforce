@@ -883,3 +883,5 @@
 ./internal/scopedset
 ./internal/testaudit
 ./internal/fakecontract
+./internal/redact
+./internal/incidentbundle

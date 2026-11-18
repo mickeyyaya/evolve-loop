@@ -5,6 +5,8 @@ package panetrust
 import (
 	"regexp"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/redact"
 )
 
 var ansiRE = regexp.MustCompile("\x1b\\[[0-9;]*[a-zA-Z]|\x1b\\][^\x07]*\x07")
@@ -16,27 +18,7 @@ var markerBreaks = [...][2]string{
 	{`"evolve_channel"`, `"evolve_channel` + defangTag + `"`},
 }
 
-const redactedToken = "[REDACTED]"
-
-var secretREs = []*regexp.Regexp{
-	regexp.MustCompile(`\bsk-[A-Za-z0-9_-]{10,}`),
-	regexp.MustCompile(`\bAKIA[0-9A-Z]{16}\b`),
-	regexp.MustCompile(`\b(?:ghp|gho|ghu|ghs)_[A-Za-z0-9]{20,}\b`),
-	regexp.MustCompile(`\bgithub_pat_[A-Za-z0-9_]{20,}\b`),
-	regexp.MustCompile(`\bxox[a-z]-[A-Za-z0-9-]{10,}`),
-	regexp.MustCompile(`\bxapp-[A-Za-z0-9-]{10,}`),
-	regexp.MustCompile(`\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]*`),
-	regexp.MustCompile(`-----BEGIN [A-Z ]*PRIVATE KEY-----`),
-}
-
-var kvSecretRE = regexp.MustCompile(`(?i)\b(access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|private[_-]?key|api[_-]?key|credential|secret|token|password|passwd|authorization)(\s*[:=]\s*)\S+`)
-
-func redactSecrets(s string) string {
-	for _, re := range secretREs {
-		s = re.ReplaceAllString(s, redactedToken)
-	}
-	return kvSecretRE.ReplaceAllString(s, "${1}${2}"+redactedToken)
-}
+func redactSecrets(s string) string { return redact.Secrets(s) }
 
 func RedactSecrets(s string) string { return redactSecrets(s) }
 

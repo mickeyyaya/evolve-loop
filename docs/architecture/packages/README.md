@@ -70,6 +70,8 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/preflight` | probes the host once and emits the capability profile the dispatcher configures itself from | [internal-preflight.md](internal-preflight.md) |
 | `internal/paths` | resolves the canonical `.evolve/*` layout once per command | [internal-paths.md](internal-paths.md) |
 | `internal/panetrust` | the single trust boundary for text captured from a tmux pane | [internal-panetrust.md](internal-panetrust.md) |
+| `internal/redact` | the one secret-redaction pattern list and the entropy rule | [internal-redact.md](internal-redact.md) |
+| `internal/incidentbundle` | the redacted evidence bundle of an incident record, with its manifest, size limit and check | [internal-incidentbundle.md](internal-incidentbundle.md) |
 | `internal/adapters/ledger` | the hash-chained append-only ledger, its seals and anchors | [internal-adapters-ledger.md](internal-adapters-ledger.md) |
 | `internal/ledgerartifacts` | the ledger's write-once, content-addressed evidence store (`.evolve/ledger-artifacts/sha256/<2>/<62>`) | [internal-ledgerartifacts.md](internal-ledgerartifacts.md) |
 | `internal/attemptpostmortem` | records how a phase dispatch ended: the cause, the last commands, the suspect command and the pane tail. It renders the record into the next prompt (ADR-0130, R2) | [internal-attemptpostmortem.md](internal-attemptpostmortem.md) |

@@ -57,6 +57,8 @@ Commands:
               ( treewalk snapshot --root DIR --out FILE | treewalk check --root DIR --baseline FILE )
   kb         Read-only graph over cycle dossiers and inbox items
               ( kb graph neighbors <node-id> [--hops N] | kb graph recurrences <fingerprint> )
+  issue      Redacted evidence bundle of an incident record
+              ( issue evidence add <incident-id> <source-file> | issue check [<incident-id>] )
   land       Land a patch or a salvaged cycle uncommitted on a dev worktree at origin/main
               ( land --branch B (--patch F | --salvage <leaf>) [--project-root P] )
   gc         Release what finished cycles left behind: tmux sessions/sockets,
