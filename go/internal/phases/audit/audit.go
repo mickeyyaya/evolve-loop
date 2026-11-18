@@ -50,6 +50,7 @@ type hooks struct {
 	apicoverNewPkgGraduationCheck func(req core.PhaseRequest) ([]string, error)
 	phaseIO                       config.Stage
 	ledger                        *defectledger.Ledger
+	signals                       shadowEmitter
 }
 
 func (hooks) PhaseName() string       { return string(core.PhaseAudit) }
@@ -284,6 +285,7 @@ func newHooks(c Config) hooks {
 		apicoverNewPkgGraduationCheck: c.CheckApicoverNewPkgGraduation,
 		phaseIO:                       c.PhaseIO,
 		ledger:                        wiredDefectLedger(c.Signals),
+		signals:                       c.Signals,
 	}
 }
 
@@ -304,7 +306,6 @@ func NewDefaultWithStageCompactSpec(br core.Bridge, prm *prompts.Loader, stage c
 		SolutionSpec:           spec,
 		Bridge:                 br,
 		Prompts:                prm,
-		GenerateVerdict:        generateACSVerdict,
 		BeginPredicateEvidence: beginPredicateEvidence,
 		CheckExplanation:       verifyExplanationDocumentation,
 		CheckGofmt:             gofmtCheckDefault,
@@ -312,6 +313,7 @@ func NewDefaultWithStageCompactSpec(br core.Bridge, prm *prompts.Loader, stage c
 		PhaseIO:                stage,
 		CompactPrompts:         compact,
 	}
+	cfg.GenerateVerdict = func(req core.PhaseRequest) error { return generateACSVerdictWith(req, cfg.Signals) }
 	for _, o := range opts {
 		o(&cfg)
 	}
@@ -360,12 +362,12 @@ func gofmtCheckDefault(req core.PhaseRequest) ([]string, error) {
 	return codequality.UnformattedGoFiles(codequality.ModuleDir(root))
 }
 
-func generateACSVerdict(req core.PhaseRequest) error {
+func generateACSVerdictWith(req core.PhaseRequest, sig shadowEmitter) error {
 	root := req.Worktree
 	if root == "" {
 		root = req.ProjectRoot
 	}
-	emitTIADecision(req, root)
+	_ = emitTIADecision(req, root, sig)
 	v, err := acssuite.Run(acssuite.Options{Root: root, ProjectRoot: req.ProjectRoot, Cycle: req.Cycle})
 	if err != nil {
 		return fmt.Errorf("acssuite run: %w", err)
@@ -379,10 +381,10 @@ func generateACSVerdict(req core.PhaseRequest) error {
 
 var tiaCompute = regressiontia.Compute
 
-func emitTIADecision(req core.PhaseRequest, root string) {
+func emitTIADecision(req core.PhaseRequest, root string, sig shadowEmitter) error {
 	stage := policy.RegressionTIAStageFor(req.ProjectRoot)
 	if stage == "off" {
-		return
+		return nil
 	}
 	changed, derivable := changedpkgs.FromGitChecked(root, "HEAD")
 	if !derivable {
@@ -390,9 +392,11 @@ func emitTIADecision(req core.PhaseRequest, root string) {
 	}
 	d := tiaCompute(stage, root, codequality.ModuleDir(root), changed)
 	if d.Stage == "" {
-		return
+		return nil
 	}
-	_, _ = regressiontia.Emit(req.Workspace, d)
+	_, err := regressiontia.Emit(req.Workspace, d)
+	sig.emit(tiaShadowEvent(req, d, err))
+	return err
 }
 
 func verdictConflictMessage(narrative string, overrodeBy []string) string {

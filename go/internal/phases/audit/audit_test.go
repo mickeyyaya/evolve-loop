@@ -735,9 +735,9 @@ func TestRun_GeneratorReturnsError_ErrorDiagAndFAIL(t *testing.T) {
 
 func TestGenerateACSVerdict_SuiteRunError_Propagates(t *testing.T) {
 	t.Parallel()
-	err := generateACSVerdict(core.PhaseRequest{
+	err := generateACSVerdictWith(core.PhaseRequest{
 		Cycle: 0, ProjectRoot: t.TempDir(), Worktree: t.TempDir(), Workspace: t.TempDir(),
-	})
+	}, nil)
 	if err == nil {
 		t.Fatal("err=nil, want acssuite run error (Cycle<=0)")
 	}
@@ -755,9 +755,9 @@ func TestGenerateACSVerdict_ZeroPredicatesWritesARedVerdictNamingTheCause(t *tes
 		t.Fatalf("mkdir ws: %v", err)
 	}
 
-	if err := generateACSVerdict(core.PhaseRequest{
+	if err := generateACSVerdictWith(core.PhaseRequest{
 		Cycle: 9, ProjectRoot: root, Worktree: root, Workspace: ws,
-	}); err != nil {
+	}, nil); err != nil {
 		t.Fatalf("generateACSVerdict: %v", err)
 	}
 	reading, err := readACSVerdict(filepath.Join(ws, "acs-verdict.json"))
