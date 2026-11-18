@@ -31,14 +31,14 @@ func TestClosureRule_DefaultsImplementTheInterface(t *testing.T) {
 	}
 	seen := make(map[string]bool)
 	for _, r := range rules {
-		var _ ClosureRule = r
-		if r.Name() == "" {
+		var rule ClosureRule = r
+		if rule.Name() == "" {
 			t.Error("a rule with no name cannot be recorded against the KEEP it licensed")
 		}
-		if seen[r.Name()] {
-			t.Errorf("duplicate rule name %q — the record could not say which rule fired", r.Name())
+		if seen[rule.Name()] {
+			t.Errorf("duplicate rule name %q — the record could not say which rule fired", rule.Name())
 		}
-		seen[r.Name()] = true
+		seen[rule.Name()] = true
 	}
 }
 

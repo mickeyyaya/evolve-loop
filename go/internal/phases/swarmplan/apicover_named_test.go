@@ -12,10 +12,13 @@ func TestPhase_NamedSatisfiesSkipperContract(t *testing.T) {
 	if p == nil {
 		t.Fatal("New must return a non-nil *Phase")
 	}
-	var _ runner.Hooks = p
-	var _ runner.Skipper = p
 
-	skip, verdict, next, _ := p.ShouldSkip(core.PhaseRequest{
+	var hooks runner.Hooks = p
+	if hooks.PhaseName() == "" {
+		t.Error("swarmplan hooks must name their phase")
+	}
+	var skipper runner.Skipper = p
+	skip, verdict, next, _ := skipper.ShouldSkip(core.PhaseRequest{
 		ProjectRoot: t.TempDir(),
 		Env:         map[string]string{"EVOLVE_SWARM_STAGE": "shadow"},
 	})

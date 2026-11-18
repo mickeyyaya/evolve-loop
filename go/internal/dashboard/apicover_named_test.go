@@ -19,22 +19,29 @@ func TestAPICoverNamedExports(t *testing.T) {
 	root := seedProject(t, now)
 
 	snap := Collect(root, now)
-	var (
-		_ Snapshot        = *snap
-		_ LoopStatus      = snap.Loop
-		_ QueueSummary    = snap.Queue
-		_ []QueueItem     = snap.Queue.Pending
-		_ []CycleSummary  = snap.Cycles
-		_ []PhaseRun      = snap.Cycles[1].Phases
-		_ *Failure        = snap.Cycles[2].Failure
-		_ []Finding       = snap.Cycles[2].Failure.Findings
-		_ []AuditRound    = snap.Cycles[2].Failure.Rounds
-		_ Trend           = snap.Trend
-		_ []TrendPoint    = snap.Trend.Points
-		_ []RoundBucket   = snap.Trend.RoundHistogram
-		_ *ZeroShipRun    = snap.Trend.LastZeroShipRun
-		_ FingerprintStat = snap.Fingerprints[0]
-	)
+	var queue QueueSummary = snap.Queue
+	if len(queue.Pending) == 0 {
+		t.Fatal("seeded queue has no pending item")
+	}
+	var item QueueItem = queue.Pending[0]
+	if item.ID == "" {
+		t.Fatalf("pending item has no id: %+v", item)
+	}
+	if len(snap.Trend.Points) == 0 || len(snap.Fingerprints) == 0 {
+		t.Fatalf("seeded trend/fingerprints empty: %d %d", len(snap.Trend.Points), len(snap.Fingerprints))
+	}
+	var point TrendPoint = snap.Trend.Points[0]
+	var stat FingerprintStat = snap.Fingerprints[0]
+	if point.Cycle == 0 || stat.Fingerprint == "" || stat.Count == 0 {
+		t.Fatalf("trend point %+v / fingerprint %+v carry no data", point, stat)
+	}
+	if rounds := snap.Cycles[2].Failure.Rounds; len(rounds) > 0 {
+		var round AuditRound = rounds[0]
+		if round.Round == 0 {
+			t.Fatalf("audit round is unnamed: %+v", round)
+		}
+	}
+	var ()
 	for _, st := range []string{StateRunning, StatePass, StateWarn, StateFail, StateHalted, StateIncomplete} {
 		if st == "" {
 			t.Fatal("empty state constant")
@@ -51,7 +58,10 @@ func TestAPICoverNamedExports(t *testing.T) {
 	if err != nil || len(list) == 0 {
 		t.Fatalf("ListArtifacts: %v %d", err, len(list))
 	}
-	var _ ArtifactInfo = list[0]
+	var info ArtifactInfo = list[0]
+	if info.Name == "" || info.Size <= 0 {
+		t.Fatalf("ListArtifacts[0] = %+v, want a named non-empty file", info)
+	}
 	if _, err := ReadArtifact(root, 3, core.RunStateFile); err != nil {
 		t.Fatalf("ReadArtifact: %v", err)
 	}

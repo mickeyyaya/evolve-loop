@@ -12,8 +12,8 @@ func TestDecorator_NamedConcreteType(t *testing.T) {
 	if d == nil {
 		t.Fatal("New must return a non-nil *Decorator")
 	}
-	if got := d.Name(); got != "build" {
+	var pr core.PhaseRunner = d
+	if got := pr.Name(); got != "build" {
 		t.Errorf("Name() = %q, want build (transparent inner name)", got)
 	}
-	var _ core.PhaseRunner = d
 }

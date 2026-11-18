@@ -65,8 +65,8 @@ func TestCheckDiversity_BindsDiversityStructs(t *testing.T) {
 		t.Fatalf("Files = %d, want 2 per-file fingerprints", len(res.Files))
 	}
 	negFiles := 0
-	for _, f := range res.Files {
-		var _ EvalDiversity = f
+	for _, file := range res.Files {
+		var f EvalDiversity = file
 		if f.HasNegative {
 			negFiles++
 		}

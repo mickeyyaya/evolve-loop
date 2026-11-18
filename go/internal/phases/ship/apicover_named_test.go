@@ -38,10 +38,10 @@ func TestNewWithDefaultRunnerStage(t *testing.T) {
 	if p.phaseIO != config.StageEnforce {
 		t.Errorf("phaseIO = %v, want StageEnforce", p.phaseIO)
 	}
-	if got, want := p.Name(), string(core.PhaseShip); got != want {
+	var pr core.PhaseRunner = p
+	if got, want := pr.Name(), string(core.PhaseShip); got != want {
 		t.Errorf("Name() = %q, want %q", got, want)
 	}
-	var _ core.PhaseRunner = p
 }
 
 func TestPluginVersion_Exported(t *testing.T) {

@@ -11,8 +11,8 @@ func TestPhase_NamedConcreteRunner(t *testing.T) {
 	if p == nil {
 		t.Fatal("New must return a non-nil *Phase")
 	}
-	if got := p.Name(); got != "retro" {
+	var pr core.PhaseRunner = p
+	if got := pr.Name(); got != "retro" {
 		t.Errorf("Name() = %q, want retro", got)
 	}
-	var _ core.PhaseRunner = p
 }

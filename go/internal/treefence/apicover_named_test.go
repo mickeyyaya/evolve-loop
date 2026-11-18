@@ -15,12 +15,11 @@ func TestAPICoverNamedExports(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var _ Snapshot = snap
-	res, err := snap.Restore(ctx)
+	var res Result
+	res, err = snap.Restore(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var _ Result = res
 	if snap.Worktree != dir || snap.Tree == "" || len(res.Restored) != 0 {
 		t.Fatalf("unexpected shapes: %+v %+v", snap, res)
 	}

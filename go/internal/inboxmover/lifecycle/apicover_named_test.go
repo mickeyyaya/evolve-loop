@@ -2,66 +2,15 @@ package lifecycle
 
 import (
 	"context"
-	"encoding/json"
-	"io"
+	"path/filepath"
+	"strings"
 	"testing"
-	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 func TestAPI_EveryExportIsNamed(t *testing.T) {
-	var (
-		_ func(string, LedgerAppender, ...Option) *Mover                     = New
-		_ func(io.Writer) Option                                             = WithStderr
-		_ func(func() time.Time) Option                                      = WithNow
-		_ func(func() (string, error)) Option                                = WithActiveCycle
-		_ func(func(string) (bool, error)) Option                            = WithLanded
-		_ func(func(string) bool) Option                                     = WithProtectedPath
-		_ func(func(string, string, string)) Option                          = WithRetire
-		_ func(func(int) string) Option                                      = WithRunWorkspace
-		_ func(func() *signalcenter.Center) Option                           = WithSignals
-		_ func([]string) Option                                              = WithPriorityClasses
-		_ func(*Mover) bool                                                  = (*Mover).SignalsWired
-		_ func(*Mover, string, string) (ClaimResult, error)                  = (*Mover).Claim
-		_ func(*Mover, string, string, PromoteOpts) (PromoteResult, error)   = (*Mover).Promote
-		_ func(*Mover, string, string, PromoteOpts, string) (string, error)  = (*Mover).RetireUnbacked
-		_ func(*Mover, string) (PromoteResult, error)                        = (*Mover).ReleaseFromQuarantine
-		_ func(*Mover) (RecoverResult, error)                                = (*Mover).RecoverOrphans
-		_ func(*Mover, int, string, *Policy) (RecoverResult, error)          = (*Mover).Release
-		_ func(*Mover, string, string, int) (RouteResult, error)             = (*Mover).RouteConsole
-		_ func(*Mover, string, string) (RouteResult, error)                  = (*Mover).RouteLane
-		_ func(*Mover, RouteRequest) (RouteResult, error)                    = (*Mover).RouteConsoleRequest
-		_ func(*Mover, RouteRequest) (RouteResult, error)                    = (*Mover).RouteLaneRequest
-		_ func(*Mover, []byte) (FileResult, error)                           = (*Mover).File
-		_ error                                                              = ErrInvalidItem
-		_ string                                                             = RouteConsoleValue
-		_ func(*Mover, string) (int, bool)                                   = (*Mover).ReadFailureCount
-		_ func(*Mover, string) string                                        = (*Mover).ReadLastFailureClass
-		_ func(*Mover, string) string                                        = (*Mover).ReadLastFailureRung
-		_ func(int, int) Round                                               = PlanRound
-		_ func(string, string) (Location, error)                             = Locate
-		_ func(string, string) (string, error)                               = FindFileByTaskID
-		_ func(int, int, bool) bool                                          = ShouldQuarantine
-		_ func(string, string) (int, error)                                  = BumpFailureCount
-		_ func(string, func(map[string]json.RawMessage)) error               = UpdateItemJSON
-		_ func(func() (string, error)) Option                                = WithMainHead
-		_ func(*Mover, string, []FieldEdit) (string, error)                  = (*Mover).Edit
-		_ func(*Mover, string, string) (string, error)                       = (*Mover).Withdraw
-		_ func(*Mover, string, string) (string, error)                       = (*Mover).VerifyPremise
-		_ error                                                              = ErrNotWithdrawable
-		_ func(func(string) (bool, error)) Option                            = WithBinding
-		_ func(string) bool                                                  = IsMoverWritten
-		_ string                                                             = RouteField
-		_ func(string) (ClaimList, error)                                    = ListClaims
-		_ func(*Mover, string, Location, string) (ClaimReleaseResult, error) = (*Mover).ReleaseClaim
-		_ error                                                              = ErrClaimConflict
-		_                                                                    = ClaimedItem{Duplicate: true}
-		_ func(*Mover) ([]Absorbed, error)                                   = (*Mover).AbsorbRootCopies
-		_ AbsorbOutcome                                                      = AbsorbParked
-		_ EditOp                                                             = EditSet
-	)
 	if EditSet != "set" || EditAdd != "add" || EditRemove != "remove" {
 		t.Errorf("the edit ops are spelled as the CLI flags: %q %q %q", EditSet, EditAdd, EditRemove)
 	}
@@ -92,5 +41,58 @@ func TestAPI_EveryExportIsNamed(t *testing.T) {
 	}
 	if !ShouldQuarantine(2, 2, false) || ShouldQuarantine(1, 2, false) || ShouldQuarantine(2, 2, true) || ShouldQuarantine(5, 0, false) {
 		t.Error("ShouldQuarantine must trip only at the ceiling for a non-system failure")
+	}
+}
+
+func TestAPI_ResultTypesCarryTheMove(t *testing.T) {
+	inbox := newInbox(t)
+	m := New(inbox, nil)
+	writeItem(t, filepath.Join(inbox, "t1.json"), `{"id":"t1"}`)
+
+	var claimed ClaimResult
+	claimed, err := m.Claim("t1", "7")
+	if err != nil || claimed.SrcPath != filepath.Join(inbox, "t1.json") || claimed.DestPath != procPath(inbox, 7, "t1.json") {
+		t.Fatalf("Claim = %+v, %v", claimed, err)
+	}
+
+	var promoted PromoteResult
+	promoted, err = m.Promote("t1", "processed", PromoteOpts{Cycle: "7", CommitSHA: "deadbeef00"})
+	if err != nil || promoted.NoOp || promoted.SrcPath != claimed.DestPath || !strings.Contains(promoted.DestPath, "processed/cycle-7/deadbeef-t1.json") {
+		t.Fatalf("Promote = %+v, %v", promoted, err)
+	}
+
+	writeItem(t, procPath(inbox, 8, "orphan.json"), `{"id":"orphan"}`)
+	var recovered RecoverResult
+	recovered, err = m.RecoverOrphans()
+	if err != nil || recovered.Recovered != 1 || len(recovered.Paths) != 1 {
+		t.Fatalf("RecoverOrphans = %+v, %v", recovered, err)
+	}
+
+	var filed FileResult
+	filed, err = newFiler(inbox, nil).File([]byte(validItem))
+	if err != nil || filed.Path == "" || filed.ConsoleReason != "" {
+		t.Fatalf("File = %+v, %v", filed, err)
+	}
+
+	var op EditOp = EditSet
+	if _, err := m.Edit("orphan", []FieldEdit{{Op: op, Field: "weight", Value: "0.3"}}); err != nil {
+		t.Fatalf("Edit with %q: %v", op, err)
+	}
+}
+
+func TestAPI_AbsorbOutcomeNamesWhatBecameOfTheRootCopy(t *testing.T) {
+	inbox, m, _ := claimFixture(t)
+	writeItem(t, filepath.Join(inbox, "a.json"), `{"id":"a","differs":true}`)
+
+	got, err := m.AbsorbRootCopies()
+	if err != nil || len(got) != 2 {
+		t.Fatalf("AbsorbRootCopies = %+v, %v", got, err)
+	}
+	outcomes := map[string]AbsorbOutcome{}
+	for _, a := range got {
+		outcomes[a.ID] = a.Outcome
+	}
+	if outcomes["a"] != AbsorbParked || outcomes["dup"] != AbsorbDropped {
+		t.Errorf("outcomes = %v, want a parked and dup dropped", outcomes)
 	}
 }

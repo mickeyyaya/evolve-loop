@@ -21,8 +21,8 @@ func TestNewDefaultWithStage_NamedPhase(t *testing.T) {
 	if enforce == nil {
 		t.Fatal("NewDefaultWithStage must return a non-nil *Phase")
 	}
-	var _ core.PhaseRunner = enforce
-	if got := enforce.Name(); got != string(core.PhaseAudit) {
+	var enforced core.PhaseRunner = enforce
+	if got := enforced.Name(); got != string(core.PhaseAudit) {
 		t.Fatalf("Name() = %q, want %q", got, core.PhaseAudit)
 	}
 
@@ -46,8 +46,8 @@ func TestNewDefaultWithStageCompact_NamedPhase(t *testing.T) {
 	if compactPhase == nil {
 		t.Fatal("NewDefaultWithStageCompact must return a non-nil *Phase")
 	}
-	var _ core.PhaseRunner = compactPhase
-	if got := compactPhase.Name(); got != string(core.PhaseAudit) {
+	var compacted core.PhaseRunner = compactPhase
+	if got := compacted.Name(); got != string(core.PhaseAudit) {
 		t.Fatalf("Name() = %q, want %q", got, core.PhaseAudit)
 	}
 

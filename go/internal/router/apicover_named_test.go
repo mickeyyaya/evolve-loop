@@ -176,8 +176,7 @@ func TestRouteInput_AdvisorContextTypes(t *testing.T) {
 func TestPhasePolicy_ProducerAndEnabled(t *testing.T) {
 	cfg := testCfg()
 	cfg.PhaseEnable["plan-review"] = config.EnableOff
-	p := NewPhasePolicy(cfg)
-	var _ PhasePolicy = p
+	var p PhasePolicy = NewPhasePolicy(cfg)
 	if !p.Enabled("build", RoutingSignals{}) {
 		t.Errorf("PhasePolicy.Enabled(build) = false, want true (mandatory)")
 	}

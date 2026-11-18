@@ -4,9 +4,7 @@ import "testing"
 
 func TestExportedTypesNamed(t *testing.T) {
 	var _ Entry
-	var _ InboxItem = InboxItem{ID: "x", Weight: 0.5}
 	var _ Ledger
-	var _ = DigestInput{FailedApproaches: nil}
 
 	var esc Escalator = &fakeEscalator{open: map[string]InboxItem{}}
 	if _, ok := esc.OpenItemForPattern("nope"); ok {

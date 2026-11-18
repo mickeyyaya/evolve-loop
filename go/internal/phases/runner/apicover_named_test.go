@@ -40,13 +40,16 @@ func TestBaseRunner_TypeNamedAndRuns(t *testing.T) {
 }
 
 func TestSkipper_SatisfiedAndExercised(t *testing.T) {
-	var _ Skipper = (*skippingHooks)(nil)
 
 	h := &skippingHooks{
 		fakeHooks: fakeHooks{phase: "triage", agent: "evolve-triage", model: "auto"},
 		skip:      true,
 	}
 	fb := &fakeBridge{}
+	var skipper Skipper = h
+	if skipped, verdict, _, _ := skipper.ShouldSkip(core.PhaseRequest{}); !skipped || verdict != core.VerdictSKIPPED {
+		t.Errorf("Skipper.ShouldSkip = %v %q, want skipped with SKIPPED", skipped, verdict)
+	}
 	br := New(Options{Hooks: h, Bridge: fb, Prompts: fakePromptsFS("evolve-triage", "x")})
 
 	resp, err := br.Run(context.Background(), core.PhaseRequest{ProjectRoot: t.TempDir(), Workspace: t.TempDir()})
@@ -62,11 +65,14 @@ func TestSkipper_SatisfiedAndExercised(t *testing.T) {
 }
 
 func TestInlinePromptProvider_SatisfiedAndExercised(t *testing.T) {
-	var _ InlinePromptProvider = inlineHooks{}
 
 	base := &fakeHooks{phase: "minted-q", agent: "evolve-minted-q", model: "auto",
 		prompt: "composed", verdict: core.VerdictPASS}
 	hk := inlineHooks{fakeHooks: base, body: "INLINE Q", hasIt: true}
+	var provider InlinePromptProvider = hk
+	if body, ok := provider.InlinePromptBody(); !ok || body != "INLINE Q" {
+		t.Errorf("InlinePromptBody = %q %v, want INLINE Q", body, ok)
+	}
 	fb := &fakeBridge{writeArtifact: "# q\n"}
 	br := New(Options{Hooks: hk, Bridge: fb, Prompts: emptyPromptsFS()})
 

@@ -6,18 +6,14 @@ import (
 )
 
 func TestNamePublicAPI(t *testing.T) {
-	var (
-		_ DigestSource = fakeSource{}
-		_ Provenance   = allOK
-		_ Digest
-		_ = ErrEmptyChain
-	)
-
-	d, err := Compute("scout", "run", "ts", "", fakeSource{bin: "b", commit: "c"})
+	var src DigestSource = fakeSource{bin: "b", commit: "c"}
+	var d Digest
+	d, err := Compute("scout", "run", "ts", "", src)
 	if err != nil {
 		t.Fatalf("Compute: %v", err)
 	}
-	if err := Verify([]Digest{d}, "b", "c", allOK); err != nil {
+	var prov Provenance = allOK
+	if err := Verify([]Digest{d}, "b", "c", prov); err != nil {
 		t.Fatalf("Verify: %v", err)
 	}
 

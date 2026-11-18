@@ -8,12 +8,6 @@ func TestNamedExports(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var (
-		_ Node       = Node{ID: "n", Kind: "k", Label: "l"}
-		_ Edge       = Edge{From: "a", To: "b", Kind: KindRecursAs}
-		_ Subgraph   = Subgraph{}
-		_ Recurrence = g.Recurrences("none")
-	)
 	kinds := []string{KindRecursAs, KindHasDefect, KindYielded, KindConnectsTo, KindDependsOn}
 	for _, k := range kinds {
 		if k == "" {
@@ -25,5 +19,31 @@ func TestNamedExports(t *testing.T) {
 	}
 	if _, err := g.Neighbors("cycle:1", 1); err == nil {
 		t.Error("Neighbors of an unknown node returned nil error")
+	}
+}
+
+func TestNamedGraphValues(t *testing.T) {
+	root := t.TempDir()
+	writeInbox(t, root, "a.json", `{"id":"a","connects_to":["b"]}`)
+	writeInbox(t, root, "b.json", `{"id":"b"}`)
+	g, err := Build(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var sub Subgraph
+	sub, err = g.Neighbors("item:a", 1)
+	if err != nil || len(sub.Nodes) != 2 || len(sub.Edges) != 1 || sub.Truncated {
+		t.Fatalf("Neighbors = %+v, %v; want two nodes and one edge", sub, err)
+	}
+	var node Node = sub.Nodes[0]
+	var edge Edge = sub.Edges[0]
+	if node.ID == "" || node.Kind == "" || edge.From != "item:a" || edge.To != "item:b" || edge.Kind != KindConnectsTo {
+		t.Errorf("node %+v / edge %+v do not carry the a->b connection", node, edge)
+	}
+
+	var rec Recurrence = g.Recurrences("no-such-fingerprint")
+	if rec.Fingerprint != "no-such-fingerprint" || rec.Count != 0 || len(rec.Cycles) != 0 {
+		t.Errorf("Recurrences of an unseen fingerprint = %+v, want zero", rec)
 	}
 }

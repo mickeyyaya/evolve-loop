@@ -19,7 +19,6 @@ func TestAPICover_NamesEveryExportedSymbol(t *testing.T) {
 	var (
 		_ Guard
 		_ Fake
-		_ Config = cfg
 	)
 	found, err := Analyze(dir, cfg)
 	if err != nil {
