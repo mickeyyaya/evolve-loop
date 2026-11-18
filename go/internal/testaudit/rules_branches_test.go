@@ -174,6 +174,94 @@ func TestOwnKey(t *testing.T) {
 	}
 }
 `), want: "asserts-own-setup"},
+	{name: "an alias of a literal is own setup", files: one(`
+func TestAlias(t *testing.T) {
+	v := 1
+	x := v
+	if x != 1 {
+		t.Error("n")
+	}
+}
+`), want: "asserts-own-setup"},
+	{name: "holders aliases and control flow clear what production can write", files: one(`
+func TestHolderRun(t *testing.T) {
+	st := &row{}
+	st.Code = 1
+	h := holder{r: st}
+	var g = h
+	run(g)
+	if st.Code != 2 {
+		t.Error("n")
+	}
+}
+func TestShadow(t *testing.T) {
+	x := 1
+	if x == 1 {
+		x := x
+		_ = x
+	}
+	var a, b = 1
+	var c int
+	if f() != a+b+c {
+		t.Error("n")
+	}
+}
+func TestClosureWrite(t *testing.T) {
+	n := 0
+	fn := func() { n++ }
+	fn()
+	if n != 1 {
+		t.Error("n")
+	}
+}
+func TestBranchWrite(t *testing.T) {
+	n := 0
+	m := 0
+	if f() {
+		n++
+	} else {
+		m--
+	}
+	if k := 0; f() {
+		k++
+	}
+	if n != 1 || m != 1 {
+		t.Error("n")
+	}
+}
+func TestLoopWrites(t *testing.T) {
+	n := 0
+	m := 0
+	for range f().Rows {
+		a := 1
+		_ = a
+		n += 1
+		m = 2
+		*g()++
+		*g() = 1
+	}
+	for i := 0; i < f(); i++ {
+		n++
+	}
+	for {
+		n++
+		break
+	}
+	if n != 1 || m != 2 {
+		t.Error("n")
+	}
+}
+func TestLoopCounter(t *testing.T) {
+	for i := 0; i < 3; i++ {
+		if i == 1 {
+			t.Error("n")
+		}
+	}
+	for ; ; {
+		break
+	}
+}
+`), want: ""},
 	{name: "skip on nil compare in else and not-nil", files: one(`
 func TestSkipElse(t *testing.T) {
 	err := f()

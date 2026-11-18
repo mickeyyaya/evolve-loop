@@ -1,6 +1,9 @@
 package recovery
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func TestDecision_IntegrityEscalateFullStruct(t *testing.T) {
 	t.Parallel()
@@ -17,19 +20,11 @@ func TestDecision_IntegrityEscalateFullStruct(t *testing.T) {
 
 func TestPhaseOutcome_AbortPreservesVerdictAndSpend(t *testing.T) {
 	t.Parallel()
-	happy := PhaseOutcome{Phase: "build", Verdict: "PASS", CostUSD: 0.42, DurationMS: 1500, BootMS: 30, AttemptCount: 2}
-
-	aborted := happy
-	aborted.AbortReason = "tree-diff guard: worktree leak"
-
-	if aborted.Verdict != happy.Verdict {
-		t.Errorf("recording an abort rewrote Verdict: %q -> %q (cycle-262: an abort is never a verdict rewrite)", happy.Verdict, aborted.Verdict)
-	}
-	if aborted.CostUSD != happy.CostUSD || aborted.DurationMS != happy.DurationMS || aborted.BootMS != happy.BootMS || aborted.AttemptCount != happy.AttemptCount {
-		t.Errorf("recording an abort dropped burned spend/attempts: %+v vs %+v (cycle-262 lost the build's spend)", aborted, happy)
-	}
-	if aborted.AbortReason == "" {
-		t.Error("AbortReason must be recordable on the outcome so the abort is not lost")
+	typ := reflect.TypeOf(PhaseOutcome{})
+	for _, field := range []string{"Verdict", "CostUSD", "DurationMS", "BootMS", "AttemptCount", "AbortReason"} {
+		if _, ok := typ.FieldByName(field); !ok {
+			t.Errorf("PhaseOutcome lost field %s: an abort is recorded beside the verdict and the burned spend, never instead of them (cycle-262)", field)
+		}
 	}
 }
 

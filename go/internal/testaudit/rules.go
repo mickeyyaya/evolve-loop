@@ -332,18 +332,30 @@ func (c *testCtx) assertsOwnSetup() bool {
 func (c *testCtx) literalVars() map[string]bool {
 	literals := map[string]bool{}
 	derived := map[string]bool{}
+	links := map[string][]string{}
 	ast.Inspect(c.body, func(n ast.Node) bool {
 		switch x := n.(type) {
 		case *ast.RangeStmt:
 			if pure, _ := pureOver(x.X, literals); !pure {
 				markDerived(derived, x.Key, x.Value)
 			}
+		case *ast.ForStmt:
+			if init, ok := x.Init.(*ast.AssignStmt); ok {
+				for _, id := range lhsIdents(init.Lhs) {
+					derived[id.Name] = true
+				}
+			}
 		case *ast.AssignStmt:
-			c.recordDefinitions(x, literals, derived)
+			if x.Tok == token.DEFINE {
+				c.recordDefinitions(lhsIdents(x.Lhs), x.Rhs, literals, derived, links)
+			}
+		case *ast.ValueSpec:
+			c.recordDefinitions(x.Names, x.Values, literals, derived, links)
 		}
 		return true
 	})
 	c.dropEscaped(literals)
+	propagateDrops(literals, links)
 	return literals
 }
 
@@ -355,23 +367,94 @@ func markDerived(derived map[string]bool, exprs ...ast.Expr) {
 	}
 }
 
-func (c *testCtx) recordDefinitions(as *ast.AssignStmt, literals, derived map[string]bool) {
-	if as.Tok != token.DEFINE || len(as.Lhs) != len(as.Rhs) {
+func lhsIdents(exprs []ast.Expr) []*ast.Ident {
+	ids := make([]*ast.Ident, 0, len(exprs))
+	for _, e := range exprs {
+		ids = append(ids, e.(*ast.Ident))
+	}
+	return ids
+}
+
+func (c *testCtx) recordDefinitions(names []*ast.Ident, values []ast.Expr, literals, derived map[string]bool, links map[string][]string) {
+	if len(names) != len(values) {
 		return
 	}
-	for i, lhs := range as.Lhs {
-		id := lhs.(*ast.Ident)
-		rhs := unparen(as.Rhs[i])
+	for i, id := range names {
+		if derived[id.Name] {
+			continue
+		}
+		rhs := unparen(values[i])
 		if u, ok := rhs.(*ast.UnaryExpr); ok && u.Op == token.AND {
 			rhs = u.X
 		}
-		lit, ok := rhs.(*ast.CompositeLit)
-		if ok && !containsCall(lit) && !mentionsAny(lit, derived) {
+		if ownSetupValue(rhs, literals, derived) {
+			linkDefinition(id.Name, rhs, literals, links)
 			literals[id.Name] = true
 			continue
 		}
 		derived[id.Name] = true
+		if _, holder := rhs.(*ast.CompositeLit); holder {
+			linkDefinition(id.Name, rhs, literals, links)
+			literals[id.Name] = false
+		}
 	}
+}
+
+func ownSetupValue(rhs ast.Expr, literals, derived map[string]bool) bool {
+	if lit, ok := rhs.(*ast.CompositeLit); ok {
+		return !containsCall(lit) && !mentionsAny(lit, derived)
+	}
+	pure, _ := pureOver(rhs, literals)
+	return pure
+}
+
+func linkDefinition(name string, rhs ast.Expr, literals map[string]bool, links map[string][]string) {
+	ast.Inspect(rhs, func(n ast.Node) bool {
+		if id, ok := n.(*ast.Ident); ok && literals[id.Name] && id.Name != name {
+			links[name] = append(links[name], id.Name)
+			links[id.Name] = append(links[id.Name], name)
+		}
+		return true
+	})
+}
+
+func propagateDrops(literals map[string]bool, links map[string][]string) {
+	var pending []string
+	for name := range links {
+		if _, live := literals[name]; !live {
+			pending = append(pending, name)
+		}
+	}
+	for len(pending) > 0 {
+		name := pending[len(pending)-1]
+		pending = pending[:len(pending)-1]
+		for _, linked := range links[name] {
+			if _, live := literals[linked]; live {
+				delete(literals, linked)
+				pending = append(pending, linked)
+			}
+		}
+	}
+}
+
+func dropControlled(body ast.Node, literals map[string]bool) {
+	ast.Inspect(body, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.AssignStmt:
+			if x.Tok != token.DEFINE {
+				for _, e := range x.Lhs {
+					if root := rootIdent(e); root != nil {
+						delete(literals, root.Name)
+					}
+				}
+			}
+		case *ast.IncDecStmt:
+			if root := rootIdent(x.X); root != nil {
+				delete(literals, root.Name)
+			}
+		}
+		return true
+	})
 }
 
 func mentionsAny(node ast.Node, names map[string]bool) bool {
@@ -405,6 +488,23 @@ func (c *testCtx) dropEscaped(literals map[string]bool) {
 			}
 		case *ast.IncDecStmt:
 			dropProductionFilled([]ast.Expr{x.X}, nil, literals)
+		case *ast.FuncLit:
+			dropControlled(x.Body, literals)
+		case *ast.IfStmt:
+			if pure, _ := pureOver(x.Cond, literals); !pure {
+				dropControlled(x.Body, literals)
+				if x.Else != nil {
+					dropControlled(x.Else, literals)
+				}
+			}
+		case *ast.RangeStmt:
+			if pure, _ := pureOver(x.X, literals); !pure {
+				dropControlled(x.Body, literals)
+			}
+		case *ast.ForStmt:
+			if pure, _ := pureOver(x.Cond, literals); x.Cond == nil || !pure {
+				dropControlled(x.Body, literals)
+			}
 		}
 		return true
 	})

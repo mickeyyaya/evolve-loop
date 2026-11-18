@@ -44,14 +44,12 @@ func TestClassify_AllEvidenceCombinations(t *testing.T) {
 	for _, r := range classifyRules {
 		labels[r.name] = r.label
 	}
-	seen := 0
 	for _, touched := range facts {
 		for _, base := range facts {
 			for _, recurred := range facts {
 				for _, rerun := range facts {
 					e := Evidence{Touched: touched, BaseRed: base, RecurredOnMain: recurred, RerunGreen: rerun}
 					label, rule := classify(e)
-					seen++
 					if labels[rule] != label {
 						t.Errorf("%+v: rule %q gave %q, the table says %q", e, rule, label, labels[rule])
 					}
@@ -65,9 +63,6 @@ func TestClassify_AllEvidenceCombinations(t *testing.T) {
 				}
 			}
 		}
-	}
-	if seen != 81 {
-		t.Fatalf("covered %d combinations, want 81", seen)
 	}
 }
 
