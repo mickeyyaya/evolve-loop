@@ -51,6 +51,7 @@ const (
 	swapsQuotaBoundaryCheckpointer  = "test swaps package variable QuotaBoundaryCheckpointer"
 	swapsStderr                     = "test swaps os.Stderr"
 	swapsWorktreeAddRetrySleep      = "test swaps package variable worktreeAddRetrySleep"
+	swapsResumedLadderStore         = "test writes package variable resumedLadderStore"
 	swapsGitOnPath                  = "test puts a faulting git shim on the process PATH"
 )
 
@@ -239,6 +240,11 @@ var serialRequiredTests = map[string]string{
 	"core.TestBootRecovery_RepinsAfterBuildNotJustBoot":                                             swapsPostBuildRepinProvenanceFn,
 	"core.TestCycleLoop_PostScoutHookFiresOncePreBuild":                                             swapsPostScoutReplanProbe,
 	"core.TestListACSPredicates_NoResolvableModuleIsALoudNote":                                      swapsPredicateModuleDir,
+	"core.TestResumedCorrection_AQuotaWallPausesAtTheRaisedRungAndTheNextResumeContinuesThere":      swapsQuotaBoundaryCheckpointer,
+	"core.TestResumedCorrection_ShadowQuotaPauseLeavesTheNextResumeDispatchUnchanged":               swapsQuotaBoundaryCheckpointer,
+	"core.TestAdoptedResumedLadder_ProgressMadeAfterTheAdoptionSurvivesTheNextDispatch":             swapsResumedLadderStore,
+	"core.TestResumedRun_AQuotaWallAfterLaterLadderProgressCheckpointsTheLaterRung":                 swapsQuotaBoundaryCheckpointer,
+	"core.TestAdoptedResumedLadder_ProgressMadeAfterTheAdoptionSurvivesAQuotaPause":                 swapsQuotaBoundaryCheckpointer,
 	"core.TestDispatch_AllFamiliesExhausted_NoFailureLearning":                                      swapsQuotaBoundaryCheckpointer,
 	"core.TestRunCycle_AnUndeliveredPromptAtEveryAttemptDoesNotPauseForQuota":                       swapsQuotaBoundaryCheckpointer,
 	"core.TestRunCycleFromPhase_AWalledResumedDispatchNamesItsWalk":                                 swapsQuotaBoundaryCheckpointer,

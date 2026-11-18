@@ -5,6 +5,7 @@ import "time"
 var ResumeBoundaryCheckpointer func(cs CycleState, projectRoot string, now time.Time) error
 
 func (cr *cycleRun) applyDispatchPolicy(next Phase, req *PhaseRequest) {
+	cr.adoptResumedLadder()
 	if next == PhaseBuild {
 		if tier, raised := cr.escalatedBuildTier(req.Assignment.Tier); raised {
 			req.Assignment.Tier = tier

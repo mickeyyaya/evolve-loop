@@ -433,6 +433,7 @@ type resumedCorrector struct {
 func (rv resumedCorrector) correct(req PhaseRequest, resp PhaseResponse, review ReviewResult) (PhaseResponse, error) {
 	o, cs, phase := rv.o, rv.scope.cycleState, rv.scope.phase
 	lr := &cycleRun{ctx: rv.ctx, predicatesAtBuild: rv.predicates.sources, predicateBaseFault: rv.predicates.fault, o: o, cs: cs, cycle: rv.cycle, req: CycleRequest{ProjectRoot: rv.scope.projectRoot}, retryConfig: o.retryConfig}
+	defer func() { keepResumedLadder(o, rv.cycle, lr.cs.Ladder) }()
 	maxCorrections := lr.correctionLimitFor(phase, o.retryConfig.ContractCorrectionRetries)
 	conv := o.newFloorConvergence(rv.cycle, phase, review.Failures)
 	var refused blockerStatement

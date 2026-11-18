@@ -4,6 +4,11 @@
     "test covers a quota-paused resume"
   ],
   "campaign": "docs/plans/retry-ladder-2026-10",
+  "consumed": {
+    "at": "2026-11-18T03:06:25Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-11-02T19:17:49Z",
   "deps": [],
   "files": [
@@ -17,15 +22,15 @@
   "priority_class": "correctness",
   "released_continuations": [
     {
-      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2157",
-      "branch": "cycle-cd3ae73e-2157",
-      "snapshot_sha": "60036361c19a838cd2c2af23d03396a5a60e1954",
       "base_sha": "f2fdca10fadc576fc4545956eeeaa02a699a024b",
-      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2157/audit-fail-reason.json",
+      "branch": "cycle-cd3ae73e-2157",
       "cycle": 2157,
-      "released_at": "2026-11-10T08:37:18Z",
+      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2157/audit-fail-reason.json",
       "reason": "older than 100 cycles",
-      "released_by": "evolve gc (continuation max age)"
+      "released_at": "2026-11-10T08:37:18Z",
+      "released_by": "evolve gc (continuation max age)",
+      "snapshot_sha": "60036361c19a838cd2c2af23d03396a5a60e1954",
+      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2157"
     }
   ],
   "route": "lane",

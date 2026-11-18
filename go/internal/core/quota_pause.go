@@ -13,6 +13,7 @@ func (cr *cycleRun) pauseForQuota(next Phase, resp PhaseResponse, attempt int, c
 	if wall.CountsAsQuotaPause() {
 		cr.emitQuotaPaused(next, phaseErr, wall)
 	}
+	cr.adoptResumedLadder()
 	cr.cs.QuotaWall = wall.Ends
 	cr.result.QuotaWall, cr.result.WallPhase = wall.Ends, string(next)
 	if QuotaBoundaryCheckpointer != nil {
