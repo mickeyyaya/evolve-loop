@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/derived"
 	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
@@ -29,6 +31,7 @@ type integrationEnv struct {
 	ProjectRootEnv string
 	Wave           string
 	Now            time.Time
+	Derived        func(worktree string) derived.Worktree
 
 	Run    integration.Command
 	Settle func(ctx context.Context) error
@@ -72,6 +75,7 @@ func productionIntegrationEnv(root string, now time.Time) integrationEnv {
 		ProjectRootEnv: os.Getenv("EVOLVE_PROJECT_ROOT"),
 		Wave:           "pr" + now.UTC().Format("20060102t150405"),
 		Now:            now,
+		Derived:        core.DerivedWorktree,
 		Run:            sysL2Command,
 		Settle:         pauseFor(registrationWait),
 		Emit:           emitIntegrationSignal,
