@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxtest"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -22,7 +23,7 @@ func convergenceRoot(t *testing.T, policyJSON string) string {
 		if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		writePolicy(t, root, policyJSON)
+		inboxtest.WritePolicy(t, root, policyJSON)
 	}
 	return root
 }

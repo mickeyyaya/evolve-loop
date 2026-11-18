@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxtest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,7 +34,7 @@ func trailerPRView(t *testing.T, body string, commits ...trailerCommit) string {
 func trailerStageMerger(t *testing.T, stage, view string) (prMerger, *fakePRGitHub, *bytes.Buffer, *bytes.Buffer) {
 	t.Helper()
 	root := t.TempDir()
-	seedCurationItems(t, root, map[string]string{
+	inboxtest.SeedItems(t, root, map[string]string{
 		"open-item.json":     `{"id":"open-item"}`,
 		"consumed/done.json": `{"id":"done-item"}`,
 	})

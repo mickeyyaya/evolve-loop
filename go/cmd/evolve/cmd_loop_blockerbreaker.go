@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cli/inboxcmd"
 	"io"
 	"path/filepath"
 
@@ -15,8 +16,8 @@ func blockerBreakerHalt(evolveDir, projectRoot string, batchStartCycle int, stde
 	fp := breakerFailurePolicy(evolveDir, stderr)
 	digests := core.CollectBatchFailureDigests(evolveDir, batchStartCycle+1)
 	deferrals := core.CollectBatchLaneDeferrals(evolveDir, batchStartCycle+1)
-	reconcileConsumedFingerprints(evolveDir, stderr)
-	reconcileConsumedBindings(projectRoot, evolveDir, stderr)
+	inboxcmd.ReconcileConsumedFingerprints(evolveDir, stderr)
+	inboxcmd.ReconcileConsumedBindings(projectRoot, evolveDir, stderr)
 	acked := breakerAckedFingerprints(evolveDir, stderr)
 	v := core.EvaluateBlockerBreaker(digests, core.BlockerBreakerConfig{
 		GuardClassCeiling:           fp.Thresholds.GuardClassHaltCeiling,
@@ -75,7 +76,7 @@ func noWorkHandoffHalt(evolveDir, projectRoot string, th policy.FailureThreshold
 }
 
 func noWorkHandoffHaltAfterWave(evolveDir, projectRoot string, stderr io.Writer, signals *signalcenter.Center) (rc int, halted bool) {
-	reconcileConsumedFingerprints(evolveDir, stderr)
+	inboxcmd.ReconcileConsumedFingerprints(evolveDir, stderr)
 	return noWorkHandoffHalt(evolveDir, projectRoot, breakerFailurePolicy(evolveDir, stderr).Thresholds, breakerAckedFingerprints(evolveDir, stderr), stderr, signals)
 }
 

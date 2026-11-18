@@ -72,7 +72,7 @@ func runCLIRoutingWrite(verb string, args []string, stdout, stderr io.Writer) in
 }
 
 func routingQueuedArgs(args []string) []string {
-	_, rest, _, _ := takeFlagValue(args, "--project-root")
+	_, rest, _, _ := cmdutil.TakeFlagValue(args, "--project-root")
 	return slices.DeleteFunc(slices.Clone(rest), func(a string) bool { return a == "--json" })
 }
 

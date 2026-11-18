@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxtest"
 	"io"
 	"os"
 	"path/filepath"
@@ -20,7 +21,7 @@ const queueEnforcePolicy = `{"isolation":{"i15":{"stage":"enforce"}}}`
 
 func queuedItemRoot(t *testing.T, policyJSON string) (root, item string) {
 	t.Helper()
-	root = emptyInboxRoot(t)
+	root = inboxtest.EmptyRoot(t)
 	if policyJSON != "" {
 		contractUnitWrite(t, root, ".evolve/policy.json", policyJSON)
 	}
@@ -160,7 +161,7 @@ func TestQueueApply_AppliesTheRequestsInTimeOrderAndEmitsOneSignalEach(t *testin
 	if rc != 0 || !strings.Contains(stdout.String(), "applied 2 of 3") {
 		t.Fatalf("rc %d stdout %q stderr %q, want exit 0 and the count", rc, stdout.String(), stderr.String())
 	}
-	if got := itemFields(t, item)["weight"]; got != 0.3 {
+	if got := inboxtest.ItemFields(t, item)["weight"]; got != 0.3 {
 		t.Errorf("weight = %v, want 0.3: the request queued last applies last", got)
 	}
 	if reqs := queuedRequests(t, root); len(reqs) != 0 {

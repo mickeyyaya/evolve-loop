@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxtest"
 	"io"
 	"io/fs"
 	"math"
@@ -184,7 +185,7 @@ func TestWaveLatency_TextSaysSoWhenNoPassExistsForAFamilyAndWhenThereIsNoSlotSam
 func TestWaveLatency_WritesNothing(t *testing.T) {
 	t.Parallel()
 	p := latencyPlane(t)
-	before := treeBytes(t, p.root)
+	before := inboxtest.TreeBytes(t, p.root)
 	h := newWaveHarness()
 
 	for _, args := range [][]string{
@@ -195,7 +196,7 @@ func TestWaveLatency_WritesNothing(t *testing.T) {
 		}
 	}
 
-	if after := treeBytes(t, p.root); !reflect.DeepEqual(before, after) {
+	if after := inboxtest.TreeBytes(t, p.root); !reflect.DeepEqual(before, after) {
 		t.Errorf("the verb changed the plane: it must read run dirs and signals and write no record, no signal and no lock\nbefore %v\nafter  %v", before, after)
 	}
 }

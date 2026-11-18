@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxtest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -106,7 +107,7 @@ func TestCmd_InboxRouteConsole_BlockedByRecordsTheDepsEdgeOnce(t *testing.T) {
 	if got := itemDeps(t, held); !slices.Equal(got, []string{"blocker"}) {
 		t.Errorf("deps = %v, want [blocker] once: a second route with the same blocker adds no second edge", got)
 	}
-	if got := readRouted(t, held); got.Route != "console-manual" || got.RoutedReason != "blocked on the fix" {
+	if got := inboxtest.ReadRouted(t, held); got.Route != "console-manual" || got.RoutedReason != "blocked on the fix" {
 		t.Errorf("item = %+v; want console-manual with the reason", got)
 	}
 }

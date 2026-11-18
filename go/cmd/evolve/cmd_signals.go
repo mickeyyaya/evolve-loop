@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"io"
 	"os"
 	"os/signal"
@@ -25,7 +26,7 @@ func runSignals(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) >= 1 && args[0] == "tail" {
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
-		root, rest, ok := takeProjectRoot(args[1:])
+		root, rest, ok := cmdutil.TakeProjectRoot(args[1:])
 		if !ok {
 			fmt.Fprintln(stderr, "usage: "+signalsTailUsage)
 			return cliExitUsage

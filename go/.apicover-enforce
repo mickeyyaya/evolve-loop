@@ -881,6 +881,10 @@
 ./internal/plainfile
 ./internal/stagescore
 ./internal/scopedset
+
+# Decoupling campaign (2026-11-18): internal/cli/inboxcmd holds the inbox verb group moved out of cmd/evolve package main (step 1 of docs/plans/split-cmd-evolve-2026-11.md); host functions arrive through Deps.
+./internal/cli/inboxcmd
+./internal/inboxtest
 ./internal/testaudit
 ./internal/fakecontract
 ./internal/redact

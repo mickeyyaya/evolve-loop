@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cli/inboxcmd"
 	"io"
 	"path/filepath"
 	"regexp"
@@ -402,7 +403,7 @@ func prTrailerText(pr prView) []byte {
 }
 
 func (m prMerger) checkTrailers(n string, pr prView) error {
-	_, _, violations := checkInboxTrailerBytes(m.root, prTrailerText(pr), "PR #"+n)
+	_, _, violations := inboxcmd.CheckInboxTrailerBytes(m.root, prTrailerText(pr), "PR #"+n)
 	if len(violations) == 0 {
 		return nil
 	}

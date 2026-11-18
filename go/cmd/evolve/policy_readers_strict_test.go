@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxtest"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -20,7 +21,7 @@ func strictPolicyRoot(t *testing.T, body string) string {
 	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writePolicy(t, root, body)
+	inboxtest.WritePolicy(t, root, body)
 	return root
 }
 

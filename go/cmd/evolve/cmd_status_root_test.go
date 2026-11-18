@@ -167,13 +167,13 @@ func TestInboxList_AnAbsentRootOrNoEvolveDirectoryExitsTwoWithTheSignalAndAnEmpt
 	t.Parallel()
 	absent := absentRoot(t)
 	var out, errb bytes.Buffer
-	rc := runInboxList(absent, []string{"--json"}, &out, &errb)
+	rc := runInbox([]string{"list", "--json", "--project-root", absent}, nil, &out, &errb)
 	assertRootSignal(t, "inbox list", rc, errb.String(), absent)
 	if out.Len() != 0 {
 		t.Errorf("stdout = %q, want none", out.String())
 	}
 	errb.Reset()
-	if rc := runInboxList(t.TempDir(), nil, &out, &errb); rc != 2 || !strings.Contains(errb.String(), rootNextStep) {
+	if rc := runInbox([]string{"list", "--project-root", t.TempDir()}, nil, &out, &errb); rc != 2 || !strings.Contains(errb.String(), rootNextStep) {
 		t.Errorf("no .evolve: rc %d %q", rc, errb.String())
 	}
 	empty := t.TempDir()
@@ -182,7 +182,7 @@ func TestInboxList_AnAbsentRootOrNoEvolveDirectoryExitsTwoWithTheSignalAndAnEmpt
 	}
 	out.Reset()
 	errb.Reset()
-	if rc := runInboxList(empty, []string{"--json"}, &out, &errb); rc != 0 || strings.TrimSpace(out.String()) != "[]" {
+	if rc := runInbox([]string{"list", "--json", "--project-root", empty}, nil, &out, &errb); rc != 0 || strings.TrimSpace(out.String()) != "[]" {
 		t.Errorf("empty .evolve: rc %d out %q err %q", rc, out.String(), errb.String())
 	}
 }

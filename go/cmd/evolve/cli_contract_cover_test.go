@@ -148,28 +148,6 @@ func TestRunLedgerVerify_AnUnreadableCwdIsAnIOFailure(t *testing.T) {
 	}
 }
 
-func TestRunInboxLint_TextNamesTheCitedProtectedBasenamesAndFailsOnEachLoadOrWriteError(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	contractUnitWrite(t, root, "go/internal/core/disposition_gate.go", "package core\n")
-	contractUnitWrite(t, root, ".evolve/inbox/cites.json", `{"id":"cites","kind":"bug","weight":0.9,"priority_class":"correctness","title":"disposition_gate.go misreads a row","summary":"s"}`)
-	contractUnitWrite(t, root, ".evolve/inbox/plain.json", `{"id":"plain","kind":"bug","weight":0.8,"priority_class":"correctness","title":"the queue renders slowly","summary":"s"}`)
-	var stdout, stderr bytes.Buffer
-	rc := runInboxLint(root, nil, &stdout, &stderr)
-	want := []string{"cites: undeclared surface (cites protected basename: disposition_gate.go)", "plain: undeclared surface"}
-	if rc != cliExitFailed || !strings.Contains(stdout.String(), want[0]) || !strings.Contains(stdout.String(), want[1]) {
-		t.Fatalf("rc %d stdout %q, want exit 1 and %q", rc, stdout.String(), want)
-	}
-	if rc := runInboxLint(root, []string{"--json"}, &failingWriter{}, &stderr); rc != cliExitFailed || !strings.Contains(stderr.String(), "inbox lint: encode: ") {
-		t.Errorf("an unwritable stdout: rc %d stderr %q", rc, stderr.String())
-	}
-	broken := t.TempDir()
-	contractUnitWrite(t, broken, ".evolve/inbox", "a file\n")
-	if rc := runInboxLint(broken, nil, &stdout, &stderr); rc != cliExitFailed || !strings.Contains(stderr.String(), "inbox lint: ") {
-		t.Errorf("an unreadable inbox: rc %d stderr %q", rc, stderr.String())
-	}
-}
-
 func TestRunSignals_ABareProjectRootFlagIsUsage(t *testing.T) {
 	t.Parallel()
 	var stdout, stderr bytes.Buffer

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxtest"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -20,7 +21,7 @@ func TestWaveSupply_PrintsTheClassesTheRefusalsAndWritesNothing(t *testing.T) {
 	t.Parallel()
 	p := newWavePlane(t)
 	seedSupplyInbox(t, p.evolveDir())
-	before := treeBytes(t, p.root)
+	before := inboxtest.TreeBytes(t, p.root)
 	h := newWaveHarness()
 
 	rc := h.run("supply", "--project-root", p.root)
@@ -40,7 +41,7 @@ func TestWaveSupply_PrintsTheClassesTheRefusalsAndWritesNothing(t *testing.T) {
 			t.Errorf("stdout lacks %q:\n%s", want, out)
 		}
 	}
-	if after := treeBytes(t, p.root); !reflect.DeepEqual(before, after) {
+	if after := inboxtest.TreeBytes(t, p.root); !reflect.DeepEqual(before, after) {
 		t.Errorf("the verb changed the plane: it must read the inbox and write no record, no signal and no lock\nbefore %v\nafter  %v", before, after)
 	}
 }
@@ -253,7 +254,7 @@ func TestWaveSupply_ProposesASplitOfAMixedItemWhenTheSupplyIsLow(t *testing.T) {
 		"acceptance": []string{"the guard flow passes"},
 	})
 	u13WriteJSON(t, filepath.Join(inbox, "guard-only.json"), map[string]any{"id": "guard-only", "weight": 0.7, "priority_class": "feature", "files": []string{"go/internal/guards/phase.go"}, "acceptance": []string{"it passes"}})
-	before := treeBytes(t, p.root)
+	before := inboxtest.TreeBytes(t, p.root)
 	h := newWaveHarness()
 
 	rc := h.run("supply", "--json", "--project-root", p.root)
@@ -266,7 +267,7 @@ func TestWaveSupply_ProposesASplitOfAMixedItemWhenTheSupplyIsLow(t *testing.T) {
 	if !reflect.DeepEqual(got.Proposals, want) {
 		t.Errorf("proposals = %+v, want only the mixed item split: guard-dir declares a directory that holds a protected file, so the judge of evolve inbox split refuses it and the census must too", got.Proposals)
 	}
-	if after := treeBytes(t, p.root); !reflect.DeepEqual(before, after) {
+	if after := inboxtest.TreeBytes(t, p.root); !reflect.DeepEqual(before, after) {
 		t.Errorf("a split proposal changed the plane: the census proposes and the console accepts with evolve inbox split")
 	}
 }

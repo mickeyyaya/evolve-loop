@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cli/inboxcmd"
 	"io"
 	"path/filepath"
 
@@ -14,7 +15,7 @@ func splitProposer(inboxDir string, isProtected func(string) bool, stderr io.Wri
 	return func(candidates []inboxbatch.Item, admissible, window int) []orchestrator.Proposal {
 		items := make([]inboxsplit.Item, 0, len(candidates))
 		for _, candidate := range candidates {
-			item, err := readInboxItemObject(filepath.Join(inboxDir, candidate.Path))
+			item, err := inboxcmd.ReadInboxItemObject(filepath.Join(inboxDir, candidate.Path))
 			if err != nil {
 				fmt.Fprintf(stderr, "[census] WARN: split proposal: %s: %v\n", candidate.ID, err)
 				continue

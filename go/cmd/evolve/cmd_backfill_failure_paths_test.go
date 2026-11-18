@@ -14,7 +14,6 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
-	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/pruneephemeral"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
@@ -203,61 +202,6 @@ func TestDispatchLogTTLDays_ACatalogWithoutTheDispatchCategoryFallsBackToTheLogs
 	if stderr.Len() != 0 {
 		t.Errorf("stderr = %q, want silence for a readable policy", stderr.String())
 	}
-}
-
-func TestPrintLoadWarnings(t *testing.T) {
-	t.Parallel()
-	var stderr bytes.Buffer
-
-	printLoadWarnings(&stderr, "inbox x", []inboxbatch.LoadWarning{
-		{Text: "a.json: not JSON", Unreadable: true},
-		{Text: "b.json: sanitized control characters in title"},
-	})
-	printLoadWarnings(&stderr, "inbox x", nil)
-
-	want := "inbox x: WARN skipped a.json: not JSON\ninbox x: WARN b.json: sanitized control characters in title\n"
-	if stderr.String() != want {
-		t.Errorf("stderr = %q, want %q", stderr.String(), want)
-	}
-}
-
-func TestRunInboxQuarantineList_FailurePaths(t *testing.T) {
-	t.Run("a quarantine path that is a file", func(t *testing.T) {
-		root := t.TempDir()
-		q := filepath.Join(root, ".evolve", "inbox", "quarantine")
-		if err := os.MkdirAll(filepath.Dir(q), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(q, nil, 0o644); err != nil {
-			t.Fatal(err)
-		}
-		t.Setenv("EVOLVE_PROJECT_ROOT", root)
-		var stdout, stderr bytes.Buffer
-
-		code := runInboxQuarantine(envOrCwd("EVOLVE_PROJECT_ROOT"), []string{"list"}, nil, &stdout, &stderr)
-
-		if code != 1 || !strings.HasPrefix(stderr.String(), "inbox quarantine list: ") || stdout.Len() != 0 {
-			t.Errorf("code=%d stdout=%q stderr=%q, want 1 and a scan error", code, stdout.String(), stderr.String())
-		}
-	})
-	t.Run("a broken stdout fails the JSON encode", func(t *testing.T) {
-		root := t.TempDir()
-		q := filepath.Join(root, ".evolve", "inbox", "quarantine")
-		if err := os.MkdirAll(q, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(q, "x.json"), []byte(`{"id":"x","title":"t"}`), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		t.Setenv("EVOLVE_PROJECT_ROOT", root)
-		var stderr bytes.Buffer
-
-		code := runInboxQuarantine(envOrCwd("EVOLVE_PROJECT_ROOT"), []string{"list", "--json"}, nil, &failingWriter{}, &stderr)
-
-		if code != 1 || !strings.Contains(stderr.String(), "inbox quarantine list: encode: broken pipe") {
-			t.Errorf("code=%d stderr=%q, want 1 and the encode failure", code, stderr.String())
-		}
-	})
 }
 
 func TestLoopStopRoot_AnUnresolvableRootWarnsAndKeepsTheGivenPath(t *testing.T) {

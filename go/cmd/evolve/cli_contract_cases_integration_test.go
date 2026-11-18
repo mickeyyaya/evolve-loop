@@ -8,6 +8,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxtest"
 	"io"
 	"io/fs"
 	"os"
@@ -129,7 +131,7 @@ func contractDossier(t *testing.T) map[string]string {
 func contractLeasedPlane(t *testing.T) map[string]string {
 	t.Helper()
 	vars := contractPlane(t)
-	contractLiveLease(t, vars["root"])
+	inboxtest.WriteLiveRunLease(t, vars["root"])
 	return vars
 }
 
@@ -205,8 +207,12 @@ func contractNoGH(t *testing.T) map[string]string {
 
 func contractOriginItem(t *testing.T) map[string]string {
 	t.Helper()
-	root, _ := originMainRoot(t)
-	return map[string]string{"root": root}
+	r := gittest.Fixture(t)
+	r.Git("commit", "-q", "--allow-empty", "-m", "base")
+	r.Git("update-ref", "refs/remotes/origin/main", r.Git("rev-parse", "HEAD"))
+	inboxtest.SeedItems(t, r.Dir, map[string]string{"stale.json": `{"id":"stale","weight":0.4}`, "consumed/gone.json": `{"id":"gone"}`})
+	t.Setenv("EVOLVE_PROJECT_ROOT", r.Dir)
+	return map[string]string{"root": r.Dir}
 }
 
 func contractConsoleItem(t *testing.T) map[string]string {
@@ -222,7 +228,7 @@ func contractConsoleItem(t *testing.T) map[string]string {
 func contractLeasedRouting(t *testing.T) map[string]string {
 	t.Helper()
 	vars := contractRouting(t)
-	contractLiveLease(t, vars["root"])
+	inboxtest.WriteLiveRunLease(t, vars["root"])
 	return vars
 }
 

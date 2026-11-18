@@ -1,0 +1,42 @@
+package inboxcmd
+
+import (
+	"bytes"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestRunInboxMover_ExitCodes2And3(t *testing.T) {
+	d := setupInbox(t, "task-1")
+	t.Setenv("EVOLVE_PROJECT_ROOT", d)
+	inbox := filepath.Join(d, ".evolve", "inbox")
+	if err := os.WriteFile(filepath.Join(inbox, "processing"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if rc := runMoverCmd([]string{"claim", "task-1", "5"}, nil, &stdout, &stderr); rc != 2 {
+		t.Errorf("claim with a FILE at processing/: rc = %d, want 2\nstderr=%s", rc, stderr.String())
+	}
+	if err := os.Remove(filepath.Join(inbox, "processing")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(inbox, "ops.json"), []byte(`{"id":"ops","route":"console-manual"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stderr.Reset()
+	if rc := runMoverCmd([]string{"claim", "ops", "5"}, nil, &stdout, &stderr); rc != 3 {
+		t.Errorf("claim of a console-routed item: rc = %d, want 3\nstderr=%s", rc, stderr.String())
+	}
+	if err := os.WriteFile(filepath.Join(inbox, "processed"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stderr.Reset()
+	if rc := runMoverCmd([]string{"promote", "task-1", "processed", "5"}, nil, &stdout, &stderr); rc != 2 {
+		t.Errorf("promote with a FILE at processed/: rc = %d, want 2\nstderr=%s", rc, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "promote did not deliver 'task-1'") {
+		t.Errorf("the cmd layer's non-delivery line: %q", stderr.String())
+	}
+}

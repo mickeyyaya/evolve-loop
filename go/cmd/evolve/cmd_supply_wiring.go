@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cli/inboxcmd"
 	"io"
 	"path/filepath"
 	"time"
@@ -68,7 +69,7 @@ func (w supplyWiring) census() orchestrator.Census {
 		FileCells:  w.fleet.Orchestrator.FileCells(),
 		Text:       engine.InboxText(w.iteration),
 		Window:     window,
-		Propose:    splitProposer(inboxDir, splitForbidden(protected), w.stderr),
+		Propose:    splitProposer(inboxDir, inboxcmd.SplitForbidden(protected), w.stderr),
 		Path:       waveSupplyPath(w.evolveDir),
 		Now:        w.now,
 	}

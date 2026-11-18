@@ -5,6 +5,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxtest"
 	"io"
 	"os"
 	"path/filepath"
@@ -111,21 +112,10 @@ func contractInboxItem(t *testing.T) map[string]string {
 	return vars
 }
 
-func contractLiveLease(t *testing.T, root string) {
-	t.Helper()
-	runDir := filepath.Join(root, ".evolve", "runs", "cycle-1790")
-	if err := os.MkdirAll(runDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := runlease.Write(runDir, runlease.Lease{RunID: "01LIVE", OwnerPID: os.Getpid()}, time.Now()); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func contractLeasedItem(t *testing.T) map[string]string {
 	t.Helper()
 	vars := contractInboxItem(t)
-	contractLiveLease(t, vars["root"])
+	inboxtest.WriteLiveRunLease(t, vars["root"])
 	return vars
 }
 
@@ -286,7 +276,7 @@ func contractCLIUpdateHost(t *testing.T) map[string]string {
 func contractLiveCLIUpdateHost(t *testing.T) map[string]string {
 	t.Helper()
 	vars := contractCLIUpdateHost(t)
-	contractLiveLease(t, vars["root"])
+	inboxtest.WriteLiveRunLease(t, vars["root"])
 	return vars
 }
 

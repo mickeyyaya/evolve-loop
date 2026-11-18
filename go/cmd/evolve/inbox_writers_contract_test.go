@@ -54,7 +54,8 @@ var inboxWritersThatFileNothing = map[string]string{
 	"internal/inboxfile":                            "the filing writer: File refuses an item without a known class; autofilers mint through inboxfile",
 	"internal/inboxmover/lifecycle":                 "the lifecycle writer: File refuses an item without a known class (ADR-0121 decision 6); every other write " + movesOrRewritesAnExistingItem,
 	"internal/phases/ship.stage":                    movesOrRewritesAnExistingItem + " (the ship's consumption into consumed/)",
-	"cmd/evolve.consumeInboxItem":                   movesOrRewritesAnExistingItem + " (evolve inbox consume and the boundary step of evolve inbox curate)",
+	"internal/cli/inboxcmd.consumeInboxItem":        movesOrRewritesAnExistingItem + " (evolve inbox consume and the boundary step of evolve inbox curate)",
+	"internal/inboxtest.SeedItems":                  "a test fixture: it seeds items into the temporary inbox of a test, never into the inbox of a project",
 	"internal/phases/ship/shiptest.LaneReadyToLand": "a test fixture: it writes one item into the temporary repository that it builds for a ship scenario, never into the inbox of a project",
 }
 

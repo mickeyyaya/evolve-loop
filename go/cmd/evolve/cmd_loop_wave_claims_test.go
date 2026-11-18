@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxtest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,7 +16,7 @@ import (
 )
 
 func TestWaveEngine_PassesTheLoopsGoalToTheClaimRelease(t *testing.T) {
-	root := curationRoot(t, map[string]string{
+	root := inboxtest.CurationRoot(t, map[string]string{
 		"processing/cycle-1836/held.json": `{"id":"held"}`,
 		"a.json":                          `{"id":"a","weight":0.5,"files":["pkg/a.go"]}`,
 		"b.json":                          `{"id":"b","weight":0.5,"files":["pkg/b.go"]}`,
