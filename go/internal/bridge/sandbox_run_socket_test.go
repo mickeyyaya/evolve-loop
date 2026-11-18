@@ -13,7 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
 
-func wrapDarwinBuild(t *testing.T, stderr io.Writer) ([]string, bool) {
+func wrapDarwinBuild(t *testing.T, stderr io.Writer) ([]string, WrapOutcome) {
 	t.Helper()
 	deps := Deps{SandboxMode: config.SandboxModeOn, Stderr: stderr}
 	return defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))(SandboxWrapRequest{
@@ -21,9 +21,9 @@ func wrapDarwinBuild(t *testing.T, stderr io.Writer) ([]string, bool) {
 	})
 }
 
-func readSBPL(t *testing.T, prefix []string, ok bool) string {
+func readSBPL(t *testing.T, prefix []string, ok WrapOutcome) string {
 	t.Helper()
-	if !ok {
+	if !ok.Applied {
 		t.Fatal("sandbox wrapper did not return a prefix")
 	}
 	raw, err := os.ReadFile(prefix[2])
@@ -82,8 +82,11 @@ func TestDefaultSandboxWrap_RefusesASocketGuardItCannotResolve(t *testing.T) {
 
 			prefix, ok := wrapDarwinBuild(t, tc.stderr)
 
-			if ok || prefix != nil {
+			if ok.Applied || prefix != nil {
 				t.Fatalf("a socket guard the bridge cannot resolve must refuse the wrap, not confine the agent without it; got %v", prefix)
+			}
+			if ok.Cause != CauseProfile || !strings.HasPrefix(ok.Reason, "sandbox tmux socket guard unavailable") {
+				t.Fatalf("outcome = %+v, want CauseProfile naming the socket guard", ok)
 			}
 			if buf, isBuf := tc.stderr.(*bytes.Buffer); isBuf && (!strings.Contains(buf.String(), "tmux socket guard unavailable") || !strings.Contains(buf.String(), tc.want)) {
 				t.Fatalf("stderr = %q, want the guard refusal naming %q", buf.String(), tc.want)
@@ -96,7 +99,10 @@ func TestOSSandboxPrefix_AnUnknownSystemGetsNoPrefix(t *testing.T) {
 	t.Parallel()
 	prefix, ok := osSandboxPrefix("plan9", Deps{}, SandboxWrapRequest{Phase: "build"}, sandbox.Config{})
 
-	if ok || prefix != nil {
+	if ok.Applied || prefix != nil {
 		t.Fatalf("osSandboxPrefix(plan9) = (%v, %v), want no prefix", prefix, ok)
+	}
+	if ok.Cause != CauseProbe || ok.Reason != sandbox.UnsupportedOSReason("plan9") {
+		t.Fatalf("outcome = %+v, want CauseProbe with a reason", ok)
 	}
 }

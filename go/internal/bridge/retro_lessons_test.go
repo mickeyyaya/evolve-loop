@@ -30,7 +30,7 @@ func TestRetrospectiveGrantRejectsRetargetedLessonScope(t *testing.T) {
 				if prefix, ok := wrap(SandboxWrapRequest{
 					Phase: "retrospective", RepoRoot: root, Worktree: t.TempDir(), Workspace: t.TempDir(),
 					WriteSubpaths: []string{".evolve/instincts/lessons"},
-				}); ok {
+				}); ok.Applied {
 					t.Fatalf("retargeted grant accepted: %v", prefix)
 				}
 			})

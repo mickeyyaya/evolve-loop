@@ -106,7 +106,7 @@ func TestDeliverableRecoveryLaunch_DeclaresNoNetworkAndTheWrapperStillForcesIt(t
 
 	prefix, ok := sandboxPrefixForLaunch(Deps{SandboxWrap: fw.wrap(), Stderr: &stderr}, cfg, "")
 
-	if !ok || len(prefix) == 0 || len(fw.calls) != 1 {
+	if !ok.Applied || len(prefix) == 0 || len(fw.calls) != 1 {
 		t.Fatalf("a helper without a worktree must still be confined: prefix=%v ok=%v calls=%d", prefix, ok, len(fw.calls))
 	}
 	if !fw.calls[0].AllowNetwork || !strings.Contains(stderr.String(), "forcing true") {

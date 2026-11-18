@@ -61,7 +61,7 @@ func seatHolderLaunch(t *testing.T, cli, readStage string) string {
 	prefix, ok := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))(SandboxWrapRequest{
 		CLI: cli, Phase: "build", Worktree: t.TempDir(), Workspace: t.TempDir(), RepoRoot: t.TempDir(),
 	})
-	if !ok {
+	if !ok.Applied {
 		t.Fatal("the wrap was refused")
 	}
 	body, err := os.ReadFile(prefix[2])
@@ -129,7 +129,7 @@ func TestSeatHolderDeny_AnEmptyHomeRefusesWithThePinnedText(t *testing.T) {
 	prefix, ok := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))(SandboxWrapRequest{
 		CLI: "claude", Phase: "build", Worktree: t.TempDir(), Workspace: t.TempDir(), RepoRoot: t.TempDir(),
 	})
-	if ok || prefix != nil {
+	if ok.Applied || prefix != nil {
 		t.Fatalf("a launch with no home must be refused, got (%v, %v)", prefix, ok)
 	}
 	want := "[bridge] the seat token holder cannot be created: the home directory is empty. The launch is refused, because the cell would run with no deny on the holder.\n"
@@ -154,7 +154,7 @@ func TestSeatHolderDeny_ABlockedDirectoryRefusesWithThePinnedText(t *testing.T) 
 	prefix, ok := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))(SandboxWrapRequest{
 		CLI: "codex", Phase: "build", Worktree: t.TempDir(), Workspace: t.TempDir(), RepoRoot: t.TempDir(),
 	})
-	if ok || prefix != nil {
+	if ok.Applied || prefix != nil {
 		t.Fatalf("a launch that cannot create the holder must be refused, got (%v, %v)", prefix, ok)
 	}
 	want := "[bridge] the seat token holder cannot be created: " + mkErr.Error() + ". The launch is refused, because the cell would run with no deny on the holder.\n"
@@ -191,7 +191,7 @@ func TestSeatHolderDeny_ALinuxLaunchMasksTheHolderAtBothSpellingsOfASymlinkedHom
 	prefix, ok := defaultSandboxWrapWithProbe(deps, fakeProbe("linux", true))(SandboxWrapRequest{
 		CLI: "claude", Phase: "build", Worktree: t.TempDir(), Workspace: t.TempDir(), RepoRoot: t.TempDir(),
 	})
-	if !ok {
+	if !ok.Applied {
 		t.Fatal("the wrap was refused")
 	}
 	canonical, err := filepath.EvalSymlinks(paths.SeatHolderDir(link))

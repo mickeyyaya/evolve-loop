@@ -65,7 +65,7 @@ func TestSandboxWrap_EnforceDeniesTheProtectedPathsOfTheWorktree(t *testing.T) {
 	prefix, ok := defaultSandboxWrapWithProbe(Deps{GuaranteeStage: "enforce", ExecStage: "off", SandboxMode: "on"}, fakeProbe("darwin", true))(SandboxWrapRequest{
 		Phase: "build", CLI: "agy-tmux", Worktree: wt, Workspace: t.TempDir(), RepoRoot: t.TempDir(),
 	})
-	if !ok {
+	if !ok.Applied {
 		t.Fatal("the wrap was refused")
 	}
 	sbpl, err := os.ReadFile(prefix[2])
@@ -88,7 +88,7 @@ func TestSandboxWrap_TheProtectedRulesNameTheRealPathsOfASymlinkedWorktreeAndThe
 	prefix, ok := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))(SandboxWrapRequest{
 		Phase: "build", CLI: "agy-tmux", Worktree: link, Workspace: t.TempDir(), RepoRoot: root,
 	})
-	if !ok {
+	if !ok.Applied {
 		t.Fatal("the wrap was refused")
 	}
 	sbpl, err := os.ReadFile(prefix[2])

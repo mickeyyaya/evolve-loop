@@ -44,6 +44,14 @@ func TestDefaultSandboxWrap_RefusesAProfileItCannotBuildSafely(t *testing.T) {
 			want: "sandbox write grant unavailable",
 		},
 		{
+			name: "a linked worktree whose git metadata cannot be resolved", os: "darwin",
+			req: func(t *testing.T) SandboxWrapRequest {
+				worktree, _ := linkedWorktreeFixture(t, "ref: refs/heads/feature", false)
+				return SandboxWrapRequest{Phase: "build", Worktree: worktree, Workspace: t.TempDir()}
+			},
+			want: "sandbox capability unavailable",
+		},
+		{
 			name: "a repository root the bridge cannot resolve", os: "darwin",
 			req: func(t *testing.T) SandboxWrapRequest {
 				return SandboxWrapRequest{Phase: "build", Workspace: t.TempDir(), RepoRoot: filepath.Join(lockedDir(t), "repo")}
@@ -55,7 +63,7 @@ func TestDefaultSandboxWrap_RefusesAProfileItCannotBuildSafely(t *testing.T) {
 			req: func(t *testing.T) SandboxWrapRequest {
 				return SandboxWrapRequest{Phase: "build", Worktree: t.TempDir(), Workspace: t.TempDir(), DenyPaths: []string{filepath.Join(t.TempDir(), "absent")}}
 			},
-			want: "Linux denial target",
+			want: "sandbox policy unavailable",
 		},
 		{
 			name: "a profile file the bridge cannot write", os: "darwin",
@@ -63,6 +71,7 @@ func TestDefaultSandboxWrap_RefusesAProfileItCannotBuildSafely(t *testing.T) {
 			req: func(t *testing.T) SandboxWrapRequest {
 				return SandboxWrapRequest{Phase: "build", Worktree: t.TempDir(), Workspace: t.TempDir()}
 			},
+			want: "sandbox profile unavailable",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -71,8 +80,11 @@ func TestDefaultSandboxWrap_RefusesAProfileItCannotBuildSafely(t *testing.T) {
 
 			prefix, ok := defaultSandboxWrapWithProbe(deps, fakeProbe(tc.os, true))(tc.req(t))
 
-			if ok || prefix != nil {
+			if ok.Applied || prefix != nil {
 				t.Fatalf("the wrapper must refuse rather than confine the agent with a wrong profile; got %v", prefix)
+			}
+			if ok.Cause != CauseProfile || !strings.HasPrefix(ok.Reason, tc.want) {
+				t.Fatalf("outcome = %+v, want CauseProfile with a reason starting %q", ok, tc.want)
 			}
 			if !strings.Contains(stderr.String(), tc.want) {
 				t.Fatalf("stderr = %q, want it to name %q", stderr.String(), tc.want)
