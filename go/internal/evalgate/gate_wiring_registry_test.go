@@ -12,6 +12,7 @@ var pinnedGateWirings = map[string]string{
 	"evals-materialized":            "TestMaterializationGate_WiredIntoReviewer",
 	"flaky-predicate-shape":         "TestFlakyShapeGate_WiredIntoReviewer",
 	"unsatisfiable-predicate-shape": "TestUnsatisfiableShapeGate_WiredIntoReviewer",
+	"source-text-predicate-shape":   "TestSourceTextGate_WiredIntoReviewer",
 	"protected-ac-predicate":        "TestProtectedACGate_WiredIntoReviewer",
 	"acceptance-rows":               "TestAcceptanceRowsGate_WiredIntoReviewer",
 }

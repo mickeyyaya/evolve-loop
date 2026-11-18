@@ -98,3 +98,24 @@ func TestLintUnsatisfiablePredicates_BindsReportAndFinding(t *testing.T) {
 		t.Errorf("finding kinds must be distinct")
 	}
 }
+
+func TestLintSourceTextPredicates_BindsReportAndFinding(t *testing.T) {
+	dir := t.TempDir()
+	src := "package p\n\nimport (\n\t\"testing\"\n\n\t\"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert\"\n)\n\nvar _ = acsassert.RepoRoot\n\nfunc TestX(t *testing.T) {\n\tacsassert.FileContains(t, \"a\", \"b\")\n}\n"
+	if err := os.WriteFile(filepath.Join(dir, "p_test.go"), []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var report SourceTextLintReport
+	report, err := LintSourceTextPredicates(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var f SourceTextFinding
+	if report.Linted() != 1 || len(report.Findings) != 1 {
+		t.Fatalf("report = %+v", report)
+	}
+	f = report.Findings[0]
+	if f.Func != "TestX" || f.File != "p_test.go" || f.Reason != sourceTextReason || SourceTextWaiver == "" {
+		t.Errorf("finding = %+v", f)
+	}
+}

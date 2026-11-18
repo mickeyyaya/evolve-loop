@@ -39,7 +39,7 @@ func NewReviewer(stage config.Stage, opts ...Option) core.DeliverableReviewer {
 	}
 	return &reviewer{
 		stage: stage,
-		gates: []gate{materializationGate{}, qualityGate{}, floorBindingGate{}, flakyShapeGate(), unsatisfiableShapeGate(), protectedACGate{file: o.fileFollowup}, acceptanceRowsGate{resolve: o.scopePathFor}},
+		gates: []gate{materializationGate{}, qualityGate{}, floorBindingGate{}, flakyShapeGate(), unsatisfiableShapeGate(), sourceTextShapeGate(), protectedACGate{file: o.fileFollowup}, acceptanceRowsGate{resolve: o.scopePathFor}},
 		logf:  func(f string, a ...any) { fmt.Fprintf(os.Stderr, f+"\n", a...) },
 	}
 }
