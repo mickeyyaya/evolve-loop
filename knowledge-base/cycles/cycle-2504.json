@@ -1,0 +1,212 @@
+{
+  "schema_version": 2,
+  "cycle": 2504,
+  "run_id": "01M7QAX2NZRYWFCXZ0QXBE5VCS",
+  "goal": "Wave 180.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 179 facts (run 20261117T184146Z): 11 of 22 cycles shipped.\n- 2 older cycles are not shown.\n- Cycle 2468: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.\n- Cycle 2469: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.\n- Cycle 2470: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.\n- Cycle 2471: final verdict PASS. It shipped.\n- Cycle 2472: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.\n- Cycle 2473: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…d6b823a649f6876d91e6701b0) — re-run Auditor on the new state (carry not re-bound: the carry of cycle-N names main at c33a0ee552aebe2ec3dfe72f4307ae363b00a4ee). Last phase: aborted. It did not ship.\n- Cycle 2474: final verdict PASS. It shipped.\n- Cycle 2475: final verdict PASS. It shipped.\n- Cycle 2476: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.\n- Cycle 2477: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.\n- Cycle 2478: final verdict PASS. It shipped.\n- Cycle 2479: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.\n- Cycle 2480: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.\n- Cycle 2481: final verdict PASS. It shipped.\n- Cycle 2482: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.\n- Cycle 2483: final verdict PASS. It shipped.\n- Cycle 2484: final verdict PASS. It shipped.\n- Cycle 2485: final verdict PASS. It shipped.\n- Cycle 2486: final verdict PASS. It shipped.\n- Cycle 2487: final verdict PASS. It shipped.\n- Pull requests merged at this boundary: none.\n\nEarlier waves:\n- Wave 176 (run 20261116T142321Z): 1 of 6 cycles shipped.\n- Wave 177 (run 20261116T224405Z): 11 of 12 cycles shipped.\n- Wave 178 (run 20261117T101039Z): 10 of 11 cycles shipped.",
+  "final_verdict": "PASS",
+  "commit_sha": "e876b054b6d7906db65bd7dedbb1706fd5817306",
+  "tree_sha": "a503a0fe0a537306609b3f4c3e979f7239fb3a09",
+  "tasks": [
+    "test-audit-t6b-tautology-bridge"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 43035,
+      "started_at": "2026-11-18T12:43:37Z",
+      "ended_at": "2026-11-18T12:44:21Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 14,
+        "output": 3233,
+        "cache_read": 420837,
+        "cache_write": 25005
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 52628,
+      "started_at": "2026-11-18T12:44:56Z",
+      "ended_at": "2026-11-18T12:45:50Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 18,
+        "output": 2615,
+        "cache_read": 662814,
+        "cache_write": 39042
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 73696,
+      "started_at": "2026-11-18T12:45:50Z",
+      "ended_at": "2026-11-18T12:55:36Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 12,
+        "output": 3218,
+        "cache_read": 427753,
+        "cache_write": 41385
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 574443,
+      "started_at": "2026-11-18T12:55:36Z",
+      "ended_at": "2026-11-18T13:06:36Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 62,
+        "output": 16968,
+        "cache_read": 2977090,
+        "cache_write": 74741
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 155179,
+      "started_at": "2026-11-18T13:06:57Z",
+      "ended_at": "2026-11-18T13:12:41Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 28,
+        "output": 9492,
+        "cache_read": 1126278,
+        "cache_write": 52748
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 221685,
+      "started_at": "2026-11-18T13:13:01Z",
+      "ended_at": "2026-11-18T13:18:07Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 12,
+        "output": 1660,
+        "cache_read": 413901,
+        "cache_write": 35161
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 112629,
+      "started_at": "2026-11-18T13:18:27Z",
+      "ended_at": "2026-11-18T13:23:09Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 20,
+        "output": 5885,
+        "cache_read": 728608,
+        "cache_write": 41993
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 325461,
+      "started_at": "2026-11-18T13:23:36Z",
+      "ended_at": "2026-11-18T13:29:02Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "explanation_corrections": [
+    "docs/explain/builds/cycle-2504-01m7qax2nzrywfcxz0qxbe5vcs.md:28 claims \"Seven bridge tests fail on the base commit and on this change alike\". The auditor's run of `go test -count=1 ./internal/bridge` on this change shows six failures (TestSeatJourney_ANoTokenHostGivesTheStoredShapeAndTheRecordSaysStored, TestCodexHeadlessManifest_PointsAtFamilyTable, TestLaunch_Codex_ResolvesTierViaFamilyManifest, TestCodexTmux_LaunchCmd_ModelMapAndMarker, TestLaunchArgs_Codex_ModelMap, TestAgyManifestTierModelsAreNamesAgyAccepts). The line should give the count that was observed, or name the tests. The rest is accurate. docs/explain/builds/cycle-2504-01m7qax2nzrywfcxz0qxbe5vcs.md:14 correctly explains go/internal/testaudit/rules.go:332-426 (derived-name tracking and dropHandedOut). Lines 11 and 21 give real rationale (fix the detector, not the callers; a single pass with no added setting). Changed Areas covers every diff path, including the only material path go/internal/testaudit/rules.go."
+  ],
+  "timing": {
+    "total_ms": 1558756,
+    "phase_count": 8,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 574443,
+    "by_archetype_ms": {
+      "build": 796128,
+      "control": 325461,
+      "evaluate": 267808,
+      "plan": 169359
+    },
+    "total_tokens": {
+      "input": 166,
+      "output": 43071,
+      "cache_read": 6757281,
+      "cache_write": 310075
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 74,
+        "output": 18628,
+        "cache_read": 3390991,
+        "cache_write": 109902
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 48,
+        "output": 15377,
+        "cache_read": 1854886,
+        "cache_write": 94741
+      },
+      "plan": {
+        "input": 44,
+        "output": 9066,
+        "cache_read": 1511404,
+        "cache_write": 105432
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9999754345095122,
+    "hot_phase_count": 7,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "tdd",
+      "build",
+      "audit",
+      "build",
+      "audit"
+    ]
+  },
+  "recalled_lessons": [
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "inst-L1549b",
+    "cycle-1492-remedy-on-disk-in-four-places-reaches-no-agent-with-authority-to-apply-it",
+    "cycle-93-build-report-commit-sha-fabrication",
+    "inst-L1544b"
+  ]
+}
