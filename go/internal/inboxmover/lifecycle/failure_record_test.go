@@ -86,7 +86,7 @@ func TestMover_Release_OnCeilingConsole(t *testing.T) {
 		t.Fatalf("res = %+v, err = %v", res, err)
 	}
 	doc := readJSON(t, filepath.Join(inbox, "task-con.json"))
-	if string(doc["route"]) != `"console-manual"` {
+	if string(doc["route"]) != `"`+RouteConsoleValue+`"` {
 		t.Errorf("route = %s, want console-manual", doc["route"])
 	}
 }

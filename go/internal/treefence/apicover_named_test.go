@@ -34,9 +34,11 @@ func TestAPICoverNamedExports(t *testing.T) {
 		t.Fatalf("live fence: %v", live.TakeErr())
 	}
 	write(t, dir, "src/mat.go", "mutated\n")
-	var _ string = RestoredMarker
 	var out Outcome = live.End(ctx)
 	diags := out.Diagnostics("audit")
+	if len(diags) != 1 || !strings.Contains(diags[0].Message, RestoredMarker) {
+		t.Fatalf("diagnostic must carry RestoredMarker: %+v", diags)
+	}
 	if len(out.Restored) != 1 || out.RestoreErr != nil || len(diags) != 1 ||
 		!strings.Contains(diags[0].Message, "read-only phase audit wrote 1 path(s)") || diags[0].Severity != "warning" {
 		t.Fatalf("outcome=%+v diags=%+v", out, diags)
