@@ -15,7 +15,7 @@ func gateCfg() *Config {
 func TestSandboxGate_NestedSessionDoesNotSatisfyRequirement(t *testing.T) {
 	t.Parallel()
 	deps := Deps{Env: map[string]string{"CLAUDECODE": "1"}}
-	if !sandboxRequiredButUnavailable(deps, gateCfg(), false) {
+	if !sandboxRequiredButUnavailable(deps, gateCfg(), WrapOutcome{}) {
 		t.Fatal("unverified outer confinement must fail a mandatory requirement")
 	}
 }
@@ -24,7 +24,7 @@ func TestSandboxGate_ExplicitOffIsAHostOptOutAndWarnsLoudly(t *testing.T) {
 	t.Parallel()
 	var errBuf strings.Builder
 	deps := Deps{SandboxMode: "off", Stderr: &errBuf}
-	if sandboxRequiredButUnavailable(deps, gateCfg(), false) {
+	if sandboxRequiredButUnavailable(deps, gateCfg(), WrapOutcome{}) {
 		t.Fatal("--sandbox-off is an explicit host opt-out — same posture as --human-input's host opt-in; it must be honoured")
 	}
 	if !strings.Contains(strings.ToLower(errBuf.String()), "unconfined") {
@@ -35,7 +35,7 @@ func TestSandboxGate_ExplicitOffIsAHostOptOutAndWarnsLoudly(t *testing.T) {
 func TestSandboxGate_UnavailableUnderAutoStillFailsClosed(t *testing.T) {
 	t.Parallel()
 	deps := Deps{Env: map[string]string{}}
-	if !sandboxRequiredButUnavailable(deps, gateCfg(), false) {
+	if !sandboxRequiredButUnavailable(deps, gateCfg(), WrapOutcome{}) {
 		t.Fatal("not nested, not opted out, wrap unavailable: THIS is the violation the gate exists for — it must fail closed")
 	}
 }
@@ -43,7 +43,7 @@ func TestSandboxGate_UnavailableUnderAutoStillFailsClosed(t *testing.T) {
 func TestSandboxGate_WrappedNeverGates(t *testing.T) {
 	t.Parallel()
 	deps := Deps{Env: map[string]string{}}
-	if sandboxRequiredButUnavailable(deps, gateCfg(), true) {
+	if sandboxRequiredButUnavailable(deps, gateCfg(), WrapOutcome{Applied: true}) {
 		t.Fatal("a wrapped launch satisfied the requirement outright")
 	}
 }
@@ -51,10 +51,10 @@ func TestSandboxGate_WrappedNeverGates(t *testing.T) {
 func TestSandboxGate_NoRequirementNeverGates(t *testing.T) {
 	t.Parallel()
 	deps := Deps{Env: map[string]string{}}
-	if sandboxRequiredButUnavailable(deps, &Config{Agent: "build"}, false) {
+	if sandboxRequiredButUnavailable(deps, &Config{Agent: "build"}, WrapOutcome{}) {
 		t.Fatal("RequireSandbox=false must never gate")
 	}
-	if sandboxRequiredButUnavailable(deps, nil, false) {
+	if sandboxRequiredButUnavailable(deps, nil, WrapOutcome{}) {
 		t.Fatal("nil cfg must never gate")
 	}
 }

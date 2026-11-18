@@ -79,7 +79,7 @@ func wrapCellProfile(t *testing.T, deps Deps, goos string, l cellLayout) string 
 	prefix, ok := defaultSandboxWrapWithProbe(deps, fakeProbe(goos, true))(SandboxWrapRequest{
 		Phase: "itest", CLI: "claude-tmux", Worktree: l.worktree, Workspace: l.workspace, RepoRoot: l.root,
 	})
-	if !ok {
+	if !ok.Applied {
 		t.Fatalf("%s on %s: the wrap was refused", l.name, goos)
 	}
 	if goos == "linux" {

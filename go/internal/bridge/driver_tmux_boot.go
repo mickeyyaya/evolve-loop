@@ -66,10 +66,10 @@ func bootTmuxREPL(
 		fmt.Fprintf(deps.Stderr, "%s safety gate: terminal lookup failed: %v\n", prep.prefix, err)
 		return nil, ExitSafetyGate, nil
 	}
-	if prefix, ok := sandboxPrefixForLaunch(deps, cfg, terminalPath); ok {
+	if prefix, wrapped := sandboxPrefixForLaunch(deps, cfg, terminalPath); wrapped.Applied {
 		launchCmd = joinPrefixForTmux(prefix) + " " + launchCmd
 		fmt.Fprintf(deps.Stderr, "%s sandbox prefix applied (%d argv elements)\n", prep.prefix, len(prefix))
-	} else if sandboxRequiredButUnavailable(deps, cfg, false) {
+	} else if sandboxRequiredButUnavailable(deps, cfg, wrapped) {
 		fmt.Fprintf(deps.Stderr, "%s safety gate: activated Build explanation contract requires OS sandbox confinement\n", prep.prefix)
 		return nil, ExitSafetyGate, nil
 	}

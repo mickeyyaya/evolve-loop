@@ -90,7 +90,7 @@ func (deps Deps) reusedSessionRefusal(ctx context.Context, cfg *Config, session 
 	if !exists {
 		return ""
 	}
-	if sandboxRequiredButUnavailable(deps, cfg, false) {
+	if sandboxRequiredButUnavailable(deps, cfg, WrapOutcome{}) {
 		return "existing named session cannot prove the requested sandbox policy; launch a new session"
 	}
 	if err := deps.checkReusedSessionEnv(ctx, cfg, session); err != nil {

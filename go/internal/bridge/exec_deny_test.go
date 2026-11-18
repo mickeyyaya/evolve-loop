@@ -49,7 +49,7 @@ func wrapForExecDeny(t *testing.T, deps Deps, goos, cli string) string {
 	prefix, ok := defaultSandboxWrapWithProbe(deps, fakeProbe(goos, true))(SandboxWrapRequest{
 		Phase: "build", CLI: cli, Worktree: t.TempDir(), Workspace: t.TempDir(), RepoRoot: t.TempDir(),
 	})
-	if !ok {
+	if !ok.Applied {
 		t.Fatalf("%s: the wrap was refused", goos)
 	}
 	if goos == "linux" {

@@ -45,9 +45,9 @@ func (d *seatStubDriver) deps() Deps {
 		Stderr:      io.Discard,
 		LookupEnv:   func(string) (string, bool) { return "", false },
 		SandboxMode: "on",
-		SandboxWrap: func(req SandboxWrapRequest) ([]string, bool) {
+		SandboxWrap: func(req SandboxWrapRequest) ([]string, WrapOutcome) {
 			d.req = &req
-			return []string{"sandbox-exec", "-f", "x"}, true
+			return []string{"sandbox-exec", "-f", "x"}, WrapOutcome{Applied: true}
 		},
 		onSeatLogin:   func(v string) { d.logins = append(d.logins, v) },
 		ListProcesses: func(context.Context) ([]proctree.Process, error) { return nil, nil },
@@ -289,7 +289,7 @@ func TestLaunchSwept_ATokenSeatRefusesWhenConfinementIsOffOrTheEnvStageIsOff(t *
 
 func TestLaunchSwept_AWrapThatFailsRefusesATokenSeatAndNotAHostWithNoToken(t *testing.T) {
 	home := seatHome(t)
-	failing := func(SandboxWrapRequest) ([]string, bool) { return nil, false }
+	failing := func(SandboxWrapRequest) ([]string, WrapOutcome) { return nil, WrapOutcome{} }
 	run := func() (bool, *Config) {
 		cfg := &Config{CLI: "claude-tmux", Agent: "scout"}
 		d := &seatStubDriver{}
@@ -410,7 +410,7 @@ func TestSandboxWrap_ASeatRootIsWritableAndTheStoredLoginIsNotWhenHostIsolated(t
 		}
 		deps := Deps{SandboxMode: "on"}
 		prefix, ok := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))(req)
-		if !ok {
+		if !ok.Applied {
 			t.Fatal("the wrap was refused")
 		}
 		body, err := os.ReadFile(prefix[2])

@@ -20,7 +20,7 @@ func isolatedSeatProfile(t *testing.T) (string, string) {
 	root := paths.SeatRoot(home)
 	req := SandboxWrapRequest{Phase: "itest", CLI: "claude-tmux", Worktree: t.TempDir(), Workspace: t.TempDir(), RepoRoot: t.TempDir(), HostIsolated: true, SeatRoot: root}
 	prefix, ok := defaultSandboxWrapWithProbe(Deps{SandboxMode: "on"}, fakeProbe("darwin", true))(req)
-	if !ok {
+	if !ok.Applied {
 		t.Fatal("no wrap")
 	}
 	body, err := os.ReadFile(prefix[2])
@@ -51,7 +51,7 @@ func TestSandboxWrap_TheSeatRootCannotBeRenamedFromAnIsolatedSeat(t *testing.T) 
 func TestSandboxWrap_ANoTokenHostThatWrappedOnceInspectsAsNone(t *testing.T) {
 	home := seatHome(t)
 	req := SandboxWrapRequest{Phase: "itest", CLI: "codex-tmux", Worktree: t.TempDir(), Workspace: t.TempDir(), RepoRoot: t.TempDir()}
-	if _, ok := defaultSandboxWrapWithProbe(Deps{SandboxMode: "on"}, fakeProbe("darwin", true))(req); !ok {
+	if _, ok := defaultSandboxWrapWithProbe(Deps{SandboxMode: "on"}, fakeProbe("darwin", true))(req); !ok.Applied {
 		t.Fatal("no wrap")
 	}
 	if got := seatlogin.Inspect(home, seatlogin.OS()); got.State != seatlogin.StateNone {

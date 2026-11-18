@@ -27,7 +27,7 @@ func renderSBPL(t *testing.T, req SandboxWrapRequest) string {
 	t.Helper()
 	wrap := defaultSandboxWrapWithProbe(Deps{}, fakeProbe("darwin", true))
 	prefix, ok := wrap(req)
-	if !ok {
+	if !ok.Applied {
 		t.Fatalf("wrapper refused the launch for phase %q (request %+v)", req.Phase, req)
 	}
 	raw, err := os.ReadFile(prefix[2])
@@ -128,9 +128,9 @@ func TestLaunchArgs_ProjectsProfileWriteSubpathsToTheWrapper(t *testing.T) {
 		t.Fatal(err)
 	}
 	var captured []SandboxWrapRequest
-	capture := func(req SandboxWrapRequest) ([]string, bool) {
+	capture := func(req SandboxWrapRequest) ([]string, WrapOutcome) {
 		captured = append(captured, req)
-		return []string{"sandbox-exec", "-f", "/tmp/x.sb"}, true
+		return []string{"sandbox-exec", "-f", "/tmp/x.sb"}, WrapOutcome{Applied: true}
 	}
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
 	code, stderr := runWithSandbox(t, fr, capture, fx.args("claude-p", "--worktree="+t.TempDir()))
