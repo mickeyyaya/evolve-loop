@@ -22,7 +22,7 @@ const CodeAttemptPostmortemFailed signalcenter.Code = "RUNNER_ATTEMPT_POSTMORTEM
 const worktreeDeltaTimeout = 30 * time.Second
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleRunner, CodeAttemptPostmortemFailed, "the runner could not list the stored attempt postmortems of a phase before a launch (fields.step=read, the dispatch goes on without the Previous attempts section), could not read one stored record (fields.step=read, fields.path names it; the section keeps the valid records), or could not collect and write the postmortem of an attempt that ended abnormally (fields.step=collect); the reason is the error (ADR-0130)")
+	signalcenter.RegisterCode(signalcenter.ModuleRunner, CodeAttemptPostmortemFailed, "the runner failed to list try postmortems (fields.step=read, skips Previous attempts), read one record (fields.path), or write an abnormal-end postmortem (fields.step=collect). The reason is the error (ADR-0130)")
 }
 
 type postmortemScope struct {

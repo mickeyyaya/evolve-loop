@@ -26,7 +26,7 @@ const (
 )
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleBuild, CodeBuilderSelfCheck, "a build closed with no GREEN self-check receipt for its tree and the handoff floor found findings (ADR-0158 decision 18); fields.stage is shadow or enforce; fields.source is gate (shadow: the findings of the review gate, no floor run in the wait) or bridge (enforce: the floor run before the close); fields.decision is would_return_in_session (shadow), delivered (enforce, the paste into the live session succeeded) or delivery_failed (enforce, fields.error names why); fields.receipt is absent, red or stale; fields.findings is the count")
+	signalcenter.RegisterCode(signalcenter.ModuleBuild, CodeBuilderSelfCheck, "a build closed without a GREEN self-check receipt, and the handoff floor found findings (ADR-0158 decision 18). fields.stage is shadow or enforce; fields.source is gate (shadow) or bridge (enforce). fields.decision is would_return_in_session (shadow), delivered, or delivery_failed (fields.error names why). fields.receipt is absent, red, or stale; fields.findings gives the count")
 }
 
 type builderSelfCheck struct {

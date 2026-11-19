@@ -19,7 +19,7 @@ const CodeFleetRebaseInboxResolved signalcenter.Code = "ORCHESTRATOR_FLEET_REBAS
 
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeFleetRebaseInboxResolved,
-		"the fleet rebase of the ship recovery met a conflict on the inbox item of the cycle itself, which the plane also stamped on main, and resolved it by a stated rule: main's stamps stay, the cycle's field changes and its consumption land, and the code tree is not touched; WARN; fields.paths (the resolved inbox paths)")
+		"ship-recovery fleet rebase hit a conflict on the cycle's inbox item (also stamped on main) and resolved it by rule. Main stamps stay, cycle field changes and consumption land, and code stays untouched; WARN. fields.paths (resolved inbox paths)")
 }
 
 type inboxStamps struct{ own map[string]bool }

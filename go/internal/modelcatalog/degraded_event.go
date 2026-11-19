@@ -9,7 +9,7 @@ import (
 const CodeRefreshDegraded signalcenter.Code = "CONFIG_CATALOG_REFRESH_DEGRADED"
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleConfig, CodeRefreshDegraded, "a catalog refresh could not list the live models of one CLI family, so the prior live pick of that family stays in the committed catalog; the fields name the family and the fallback reason, and the origin names the composition step")
+	signalcenter.RegisterCode(signalcenter.ModuleConfig, CodeRefreshDegraded, "a catalog refresh failed to list the live models of one CLI family. The prior live pick of that family stays in the committed catalog. The fields name the family and fallback reason, and the origin names the composition step")
 }
 
 func RefreshDegradedEvent(origin, cli, reason string) signalcenter.Event {

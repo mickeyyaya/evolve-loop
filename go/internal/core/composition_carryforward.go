@@ -18,7 +18,7 @@ const CodeComposedGateDeclined signalcenter.Code = "ORCHESTRATOR_COMPOSED_GATE_D
 
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeComposedGateDeclined,
-		"a composed-tree gate did not report pass at a MissingComposedGates trip site (RUNG 2 scopedMergeCarryForward or the ADR-0105 B3 identityCarryForward); fields.tail_<gate> carries each failing gate's output tail and the cycle falls back to a full re-audit instead of carrying the audit verdict forward")
+		"a composed-tree gate did not report pass at a MissingComposedGates site (RUNG 2 scopedMergeCarryForward or ADR-0105 B3 identityCarryForward). fields.tail_<gate> holds each failing gate tail. The cycle falls back to full re-audit")
 }
 
 const signalFieldRunes = 512

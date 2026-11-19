@@ -11,7 +11,7 @@ const CodeLanePinForged signalcenter.Code = "ISOLATION_LANE_PIN_FORGED"
 
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleIsolation, CodeLanePinForged,
-		"the lane-scope.json of a workspace lists other items than the host record .evolve/lineage/cycle-N.json; the host kept the record and no reader used the file; one event per cycle, at the host seam that follows a cell; fields.record, fields.file, fields.path")
+		"the workspace lane-scope.json lists other items than host record .evolve/lineage/cycle-N.json. The host kept its record and no reader used the file; emitted once per cycle after a cell. fields.record, fields.file, fields.path")
 }
 
 func (cr *cycleRun) reportLanePinDrift(phase Phase) {

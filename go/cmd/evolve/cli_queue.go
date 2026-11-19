@@ -40,7 +40,7 @@ const (
 )
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleCLI, codeCLIQueueFailed, "the boundary could not apply a queued CLI request (cli-contract.md §4 rule 3); the request moved to .evolve/queue/failed/; fields verb, request, rc, shelf")
+	signalcenter.RegisterCode(signalcenter.ModuleCLI, codeCLIQueueFailed, "the boundary failed to apply a queued CLI request (cli-contract.md §4 rule 3). The request moved to .evolve/queue/failed/. Fields: verb, request, rc, shelf")
 	signalcenter.RegisterCode(signalcenter.ModuleCLI, codeCLIQueueUnlanded, "the applied queue left tracked changes beyond the loop stamps; the next sync-main refuses them until an operator lands them (cli-contract.md §4.6); fields paths")
 }
 

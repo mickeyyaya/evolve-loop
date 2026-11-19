@@ -23,7 +23,7 @@ const (
 const modelLabelTailLines = 6
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeDispatchModelMismatch, "a target whose manifest declares launch_model_verification showed no footer label of its model_family within label_wait_s (the label on the footer-prefix line decides; any other label never counts; no prefix line means unreadable, which means 87; a footer label naming two families is no evidence), after the REPL booted and before the prompt was delivered; the session is killed and the launch exits 87, a walk trigger, so the attempt moves to the next CLI. The mismatch itself benches nothing; the usage-evidence decorator queries the family's usage as for any quota-explainable exit, and an exhausted verdict benches it (agy boots its Gemini default when the Claude group is exhausted); fields.expected (the target's model_family), observed (the last labelled footer's family, ambiguous, or unreadable), label (the last footer label read), cli, phase")
+	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeDispatchModelMismatch, "a target with launch_model_verification showed no footer label of its model_family within label_wait_s after REPL boot. Only the footer-prefix line counts; missing means unreadable (87), and two families give no evidence. The session stops and exits 87 to walk to the next CLI. Usage evidence queries the family; an exhausted verdict benches it. Fields: fields.expected, observed, label, cli, phase")
 }
 
 type LaunchModelVerification struct {

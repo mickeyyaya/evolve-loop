@@ -10,7 +10,7 @@ import (
 const CodeSelfReviewMissing signalcenter.Code = "RUNNER_SELF_REVIEW_MISSING"
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleRunner, CodeSelfReviewMissing, "a source-writing dispatch loaded the self-review skill (code-review-simplify) and handed off a report the phase accepted with no Self-Review section; advisory only, the verdict is unchanged (logic blocks, format does not); fields.skill, section")
+	signalcenter.RegisterCode(signalcenter.ModuleRunner, CodeSelfReviewMissing, "a source-writing dispatch loaded code-review-simplify and handed off an accepted report without a Self-Review section. Advisory only; verdict stays unchanged. fields.skill, section")
 }
 
 func (b *BaseRunner) warnSelfReviewMissing(d verdict.Dispatch) {

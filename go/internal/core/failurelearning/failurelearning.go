@@ -19,10 +19,10 @@ const (
 )
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleFailureLearning, CodePolicyLoadFailed, ".evolve/policy.json exists but could not be read or parsed while writing the deterministic floor (absence is silent); the novelty threshold and the remediation weight fall back to the compiled defaults and the floor proceeds — ONE read where two reads of one file fired two lines before; fields.step=floor, path")
-	signalcenter.RegisterCode(signalcenter.ModuleFailureLearning, CodeFloorWriteFailed, "the deterministic floor could not write retrospective-report.md, the lesson YAML or the inbox remediation (a faillearn error, including the id-collision refusal); the FailedRecord and the P0 todo already stand in memory, the recurrence closure still runs, the phase failure is never masked; fields.step=floor, lessons_dir, workspace")
-	signalcenter.RegisterCode(signalcenter.ModuleFailureLearning, CodeRemediationTruncated, "a failed phase self-reported more defects than the remediation cap; the first ones are filed as inbox items and the rest dropped — fix the emitter or raise the cap; fields.step=floor, reported, filed")
-	signalcenter.RegisterCode(signalcenter.ModuleFailureLearning, CodeRecurrenceLedgerFailed, "the recurrence ledger keyed by the failing pattern could not be loaded, updated or saved (fields.op = load | record | save); Count() stays stale for this pattern, the phase failure is never masked; fields.step=recurrence, path")
+	signalcenter.RegisterCode(signalcenter.ModuleFailureLearning, CodePolicyLoadFailed, ".evolve/policy.json exists, but failed to read or parse while writing the deterministic floor (absence is silent). Novelty threshold and remediation weight fall back to compiled defaults, and the floor proceeds. fields.step=floor, path")
+	signalcenter.RegisterCode(signalcenter.ModuleFailureLearning, CodeFloorWriteFailed, "the deterministic floor failed to write retrospective-report.md, lesson YAML, or inbox remediation (including id collisions). FailedRecord and P0 todo stand in memory, recurrence closure runs, and phase failure stays intact. fields.step=floor, lessons_dir, workspace")
+	signalcenter.RegisterCode(signalcenter.ModuleFailureLearning, CodeRemediationTruncated, "a failed phase self-reported more defects than the remediation cap. First items file as inbox items, and the rest drop; fix the emitter or raise the cap. fields.step=floor, reported, filed")
+	signalcenter.RegisterCode(signalcenter.ModuleFailureLearning, CodeRecurrenceLedgerFailed, "the recurrence ledger keyed by the failing pattern failed to load, update or save (fields.op = load | record | save). Count() stays stale for this pattern, and the phase failure is never masked. fields.step=recurrence, path")
 }
 
 type Failure struct {

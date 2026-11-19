@@ -12,7 +12,7 @@ import (
 const CodeProposal signalcenter.Code = "INBOX_CURATOR_PROPOSAL"
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleInbox, CodeProposal, "the inbox curator proposes a change to one open item: consume it, reroute it, merge it or quarantine it (fields.kind, id, target, trigger, deterministic, stage, applied, evidence); the curator applies a deterministic proposal only in the enforce stage at the wave boundary, and a judgment proposal waits for the operator or the orchestrator")
+	signalcenter.RegisterCode(signalcenter.ModuleInbox, CodeProposal, "the inbox curator proposes consuming, rerouting, merging, or quarantining one open item. Deterministic proposals apply only at enforce on wave boundaries; judgment proposals wait for operator or orchestrator. Fields: kind, id, target, trigger, deterministic, stage, applied, evidence")
 }
 
 type Inputs struct {

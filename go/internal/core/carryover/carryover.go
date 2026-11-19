@@ -14,9 +14,9 @@ const (
 )
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleCarryover, CodeWorkspaceReadFailed, "a cycle-workspace carryover document (carryover-todos.json or defect-ledger.json) exists but could not be read (not absence: permissions, a directory at the path); nothing is merged, the closeout proceeds; fields name the document and path")
-	signalcenter.RegisterCode(signalcenter.ModuleCarryover, CodeWorkspaceMalformed, "a cycle-workspace carryover document is not its documented JSON shape; the file is skipped whole, never aborting the cycle — a persona defect for the memo or audit owner; the reason carries the decode error")
-	signalcenter.RegisterCode(signalcenter.ModuleCarryover, CodePersistFailed, "state.json could not take this run's failure-learning arrays (fields.step: write = the legacy whole-state write, update = the serialized read-modify-write); the in-memory state stands and the caller proceeds — the FailedRecord and the P0 todo may be lost from disk")
+	signalcenter.RegisterCode(signalcenter.ModuleCarryover, CodeWorkspaceReadFailed, "a cycle-workspace carryover document (carryover-todos.json or defect-ledger.json) exists, but the reader failed to read it (absence is silent). Nothing merges and closeout proceeds. Fields name the document and path")
+	signalcenter.RegisterCode(signalcenter.ModuleCarryover, CodeWorkspaceMalformed, "a cycle-workspace carryover document is not its documented JSON shape. The file is skipped whole without aborting the cycle (memo or audit persona defect). The reason holds the decode error")
+	signalcenter.RegisterCode(signalcenter.ModuleCarryover, CodePersistFailed, "state.json failed to save this run's failure-learning arrays (fields.step: write = legacy write, update = serialized read-change-write). In-memory state stands and caller proceeds, so FailedRecord and P0 todo can be lost")
 }
 
 const (

@@ -20,9 +20,9 @@ const (
 )
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleBuild, CodeBuildFloorRetakeGreen, "a build floor test run was RED once and GREEN on its one serialized retake under the integration-tier lock, so the build goes on; fields.pkg (the package or the run), tests (the failed top-level test names of the first run; evolve ci classify also keys a failure on its package and top-level test), retake=green")
-	signalcenter.RegisterCode(signalcenter.ModuleBuild, CodeBuildFloorRetakeRed, "a build floor test run was RED and its one serialized retake under the integration-tier lock was RED again, so the floor fails; fields.pkg (the package or the run), tests (the failed top-level test names of the retake; evolve ci classify also keys a failure on its package and top-level test), retake=red")
-	signalcenter.RegisterCode(signalcenter.ModuleBuild, CodeBuildFloorFlakyNewTest, "a build floor test run was RED on a package where the cycle added a test file, and its serialized retake was GREEN; the floor fails the run as the ship added-test backstop does; fields.pkg (the new-test packages that were red), tests (the failed top-level test names of the first run), retake=green, class=flaky_new_test")
+	signalcenter.RegisterCode(signalcenter.ModuleBuild, CodeBuildFloorRetakeGreen, "a build floor test run was RED once and GREEN on its serialized retake under the integration-tier lock, so the build goes on. fields.pkg names the package or run; tests lists failed first-run names (used by evolve ci classify); retake=green")
+	signalcenter.RegisterCode(signalcenter.ModuleBuild, CodeBuildFloorRetakeRed, "a build floor test run was RED and its serialized retake under the integration-tier lock was RED again, so the floor fails. fields.pkg names the package or run; tests lists failed retake names (used by evolve ci classify); retake=red")
+	signalcenter.RegisterCode(signalcenter.ModuleBuild, CodeBuildFloorFlakyNewTest, "a build floor test run was RED on a package with a new test file, and its serialized retake was GREEN. The floor fails the run like the ship added-test backstop. Fields: fields.pkg, tests, retake=green, class=flaky_new_test")
 }
 
 func floorScopedPackages(pkgs []string, warn io.Writer) []string {

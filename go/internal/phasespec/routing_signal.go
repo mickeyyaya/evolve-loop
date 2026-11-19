@@ -5,7 +5,7 @@ import "github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 const CodeRoutingDefect signalcenter.Code = "CONFIG_PHASE_ROUTING_DEFECT"
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleConfig, CodeRoutingDefect, "loading or routing the phase catalog found a defect that the cycle survives: a builtin registry that does not load, a user spec dropped, clamped or demoted (no persona), an invalid spec left unrouted, a minted phase that is rejected or clashes with a runner, or an anchor that does not resolve, so the phase is placed before audit, a pre-build phase whose slot falls after build, which is left unrouted; the reason is the warning verbatim and the origin names the composition step (cycle wiring or a mint)")
+	signalcenter.RegisterCode(signalcenter.ModuleConfig, CodeRoutingDefect, "loading or routing the phase catalog found a defect that the cycle survives: unloadable builtin registry, dropped/clamped/demoted user spec, or unrouted invalid spec. Also minted phases rejected or clashing, or unresolved anchors placed before audit (pre-build after build stays unrouted). Reason is warning verbatim; origin names step")
 }
 
 func RoutingDefectEvent(origin, warning string) signalcenter.Event {

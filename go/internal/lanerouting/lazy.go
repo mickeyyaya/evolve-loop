@@ -13,7 +13,7 @@ const CodeRoutingFallback signalcenter.Code = "INBOX_ROUTING_FALLBACK"
 const fallbackScope = "protected surface and frozen checks"
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleInbox, CodeRoutingFallback, "the lane-routing predicate could not load the build profile (fields.profile, fields.project_root; the reason is the load error), so routing judges "+fallbackScope+" only and a sandbox-denied item can reach a lane; emitted once per predicate, on its first routing question")
+	signalcenter.RegisterCode(signalcenter.ModuleInbox, CodeRoutingFallback, "the lane-routing predicate failed to load the build profile (fields.profile, fields.project_root; reason holds the error). Routing judges "+fallbackScope+" only, so a sandbox-denied item can reach a lane. Emitted once per predicate")
 }
 
 func LazyForbidden(projectRoot, writerProfile string, emit signalcenter.Listener) func(string) bool {

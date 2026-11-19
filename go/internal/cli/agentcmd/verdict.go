@@ -23,8 +23,8 @@ const CodeVerdictParseDefect signalcenter.Code = "REVIEW_AGENT_RUN_VERDICT_PARSE
 const verdictSection = "Verdict"
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleReview, CodeVerdictMismatch, "evolve agent run found that the report body of a review fails while the verdict field passes: the body states FAIL, states no verdict, or lists a CRITICAL or HIGH finding; the run verdict is FAIL; run_id names the run, fields.field_verdict the field, fields.stated the stated verdict, fields.critical and fields.high the counts")
-	signalcenter.RegisterCode(signalcenter.ModuleReview, CodeVerdictParseDefect, "evolve agent run found no stated verdict in a review report that lists no CRITICAL and no HIGH finding; the parser or the report format has a defect, and the run verdict stays FAIL; run_id names the run, fields.field_verdict the field verdict")
+	signalcenter.RegisterCode(signalcenter.ModuleReview, CodeVerdictMismatch, "evolve agent run found a failing report body when the verdict field passes. The body states FAIL, states no verdict, or lists a CRITICAL or HIGH finding. The run verdict is FAIL. run_id names the run. Fields: fields.field_verdict, fields.stated, fields.critical, fields.high")
+	signalcenter.RegisterCode(signalcenter.ModuleReview, CodeVerdictParseDefect, "evolve agent run found no stated verdict in a review report that lists no CRITICAL or HIGH finding. The parser or report format has a defect. The run verdict stays FAIL. run_id names the run, and fields.field_verdict names the field verdict")
 }
 
 type derivedVerdict struct {

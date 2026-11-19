@@ -20,7 +20,7 @@ var (
 )
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleBuild, CodeBuildLintFloorSkipped, "the build floor did not run golangci-lint on the changed packages because the tool is missing or failed to run, so the floor passes this check and the CI lint job stays the backstop; fields.cause")
+	signalcenter.RegisterCode(signalcenter.ModuleBuild, CodeBuildLintFloorSkipped, "the build floor skipped golangci-lint on changed packages because the tool is missing or failed. The floor passes this check and CI lint stays the backstop. fields.cause")
 }
 
 type LintFn func(ctx context.Context, moduleDir string, pkgs []string) (findings string, err error)

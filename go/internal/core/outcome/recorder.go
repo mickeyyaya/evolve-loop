@@ -24,9 +24,9 @@ const (
 
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleOutcome, CodeSidecarSkipped, "the phase's <phase>-usage.json sidecar was not written because the workspace is empty (the CWD-relative leak guard); the in-memory record and the phase.outcome event still stand")
-	signalcenter.RegisterCode(signalcenter.ModuleOutcome, CodeSidecarWriteFailed, "the phase's <phase>-usage.json sidecar could not be encoded or written; the reason names the step and the error, fields name the phase and the path; the in-memory record stands")
+	signalcenter.RegisterCode(signalcenter.ModuleOutcome, CodeSidecarWriteFailed, "the phase's <phase>-usage.json sidecar failed to encode or write. The reason names the step and error; fields name the phase and path. The in-memory record stands")
 	signalcenter.RegisterCode(signalcenter.ModuleOutcome, CodeTimingSkipped, "phase-timing.json was not written because the workspace is empty; the composed timing set is returned to the caller unchanged")
-	signalcenter.RegisterCode(signalcenter.ModuleOutcome, CodeTimingWriteFailed, "phase-timing.json could not be encoded or written (marshal, temp write or rename); the reason names the step and the error; the composed set is still returned")
+	signalcenter.RegisterCode(signalcenter.ModuleOutcome, CodeTimingWriteFailed, "phase-timing.json failed to encode or write (marshal, temp write or rename). The reason names the step and error; the composed set still returns")
 }
 
 type UsageSidecar struct {

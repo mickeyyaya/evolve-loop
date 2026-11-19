@@ -12,7 +12,7 @@ import (
 const CodeShipRecoveryPath signalcenter.Code = "ORCHESTRATOR_SHIP_RECOVERY_PATH"
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeShipRecoveryPath, "a ship error that names a moved main (AUDIT_BINDING_HEAD_MOVED or GIT_FLEET_REBASE_NEEDED) took a recovery path; fields.path is rebind (the identity carry re-checked the merged tree and re-bound the audit, with no audit round), reaudit (an LLM audit round), rebuild, debugger, end, or the name of the next phase for any other route; fields.code is the routed code, fields.original_code the code ship raised and fields.reason why a moved HEAD was audited again")
+	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeShipRecoveryPath, "a ship error naming a moved main (AUDIT_BINDING_HEAD_MOVED or GIT_FLEET_REBASE_NEEDED) took a recovery path. fields.path is rebind (identity carry re-bound audit), reaudit, rebuild, debugger, end, or next phase. Fields: fields.code (routed), fields.original_code (raised), fields.reason (why moved HEAD re-audited)")
 }
 
 const (

@@ -8,7 +8,7 @@ import (
 
 var invariantDocs = []string{
 	"I-1 single launcher: a code path started an LLM binary outside the bridge launch API; fields.target names the binary (ADR-0154)",
-	"I-2 hermetic environment: the allowlist dropped a variable of the launcher; in shadow the child still got it (action=logged), in enforce it did not (action=refused); fields invariant, stage, action, cell, family, target (the name, never its value), rule, source (ADR-0154)",
+	"I-2 hermetic environment: the allowlist dropped a launcher variable. Shadow keeps it (action=logged); enforce drops it (action=refused). Fields: invariant, stage, action, cell, family, target, rule, source (ADR-0154)",
 	"I-3 no nested agency: a cell tried to start an LLM binary or an evolve dispatch; fields.target names it (ADR-0154)",
 	"I-4 pipeline-mediated communication: a cell tried to read raw output or to write its inputs; fields.target names the path (ADR-0154)",
 	"I-5 read isolation: a cell tried to read outside its index, its worktree and its CLI files; fields.target names the path (ADR-0154)",
@@ -35,6 +35,6 @@ func init() {
 	}
 	signalcenter.RegisterCode(signalcenter.ModuleIsolation, CodeContextRequiredUnopened, "the cell context index: a cell closed without a read of a required entry; fields.unopened lists the ids, and fields.source is sandbox (cell-context-index.md §8)")
 	signalcenter.RegisterCode(signalcenter.ModuleIsolation, CodeContextBudgetOver, "the cell context index: required entries of a layer passed its token budget and lost the flag; fields layer, limit_tokens, over (cell-context-index.md §6)")
-	signalcenter.RegisterCode(signalcenter.ModuleIsolation, CodeRequestRefused, "the request channel refused a request of a cell: the validator (schema, kind, role, input, cap or depth) or the orchestrator agent; fields request, kind, role, decision, precondition, reason, stage (cli-contract.md §4.5, llm-isolation.md §7.2.1)")
+	signalcenter.RegisterCode(signalcenter.ModuleIsolation, CodeRequestRefused, "the request channel refused a cell request through validator (schema, kind, role, input, cap, or depth) or orchestrator agent. Fields: request, kind, role, decision, precondition, reason, stage (cli-contract.md §4.5, llm-isolation.md §7.2.1)")
 	signalcenter.RegisterCode(signalcenter.ModuleIsolation, CodeRequestFailed, "the request channel approved a request of a cell, and the dispatch of the agent failed; the same fields as ISOLATION_REQUEST_REFUSED (llm-isolation.md §7.2.1)")
 }

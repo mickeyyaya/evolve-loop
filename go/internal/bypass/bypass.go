@@ -72,5 +72,5 @@ func Actor(current func() (*user.User, error)) string {
 }
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleControl, CodeUsed, "an audited bypass is in use (ADR-0156 I-16, X18d): an operator parameter, after its control_bypass ledger entry is written, or a policy opt-in at the bridge adapter start; fields name, actor, reason and at")
+	signalcenter.RegisterCode(signalcenter.ModuleControl, CodeUsed, "an audited bypass is in use (ADR-0156 I-16, X18d). It comes from an operator parameter after a control_bypass ledger write, or a bridge-start policy opt-in. Fields: name, actor, reason, at")
 }

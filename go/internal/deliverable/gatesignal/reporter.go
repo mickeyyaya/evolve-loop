@@ -22,11 +22,11 @@ const (
 
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleGateContract, CodeVerified, "the phase's declared deliverables were found in place (fields name the artifact, its size, the agent-owed files and the effects verified) and the phase advanced")
-	signalcenter.RegisterCode(signalcenter.ModuleGateContract, CodeRejected, "the gate refused the deliverable at enforce; the reason is the correction directive (one [code] message per violation), fields carry the codes and the breaker count (0 for a breaker-exempt phase, an optional evaluate phase whose exhausted ladder degrades to SKIPPED) — the orchestrator's ladder re-dispatches")
-	signalcenter.RegisterCode(signalcenter.ModuleGateContract, CodeWouldBlock, "the deliverable violated its contract but the stage (shadow/advisory, or the report-size gate's) lets the phase advance; the reason is what enforce would have refused")
+	signalcenter.RegisterCode(signalcenter.ModuleGateContract, CodeRejected, "the gate refused the deliverable at enforce. The reason is the correction directive (one [code] per violation). Fields hold the codes and breaker count (0 for breaker-exempt optional evaluate phases). The orchestrator ladder re-dispatches")
+	signalcenter.RegisterCode(signalcenter.ModuleGateContract, CodeWouldBlock, "the deliverable violated its contract, but the stage (shadow, advisory, or report-size) lets the phase advance. The reason names what enforce refuses")
 	signalcenter.RegisterCode(signalcenter.ModuleGateContract, CodeSalvaged, "a sole recoverable bad_verdict was repaired on disk and re-verified clean; the phase advanced on the repaired artifact")
 	signalcenter.RegisterCode(signalcenter.ModuleGateContract, CodeDemoted, "the breaker opened after N consecutive blocks and demoted enforce→advisory; the phase advanced UNVERIFIED — inspect the failing phase and policy.gates.contract_gate")
-	signalcenter.RegisterCode(signalcenter.ModuleGateContract, CodeFailOpen, "the gate could not decide (unknown phase, read fault) and failed open; re-dispatching an agent cannot fix this — the reason is the error")
+	signalcenter.RegisterCode(signalcenter.ModuleGateContract, CodeFailOpen, "the gate failed to decide (unknown phase, read fault) and failed open; re-dispatching an agent cannot fix this — the reason is the error")
 }
 
 type Check struct {

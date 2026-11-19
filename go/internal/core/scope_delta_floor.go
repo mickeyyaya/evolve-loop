@@ -12,7 +12,7 @@ import (
 const CodeScopeDelta signalcenter.Code = "ORCHESTRATOR_SCOPE_DELTA"
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeScopeDelta, "the build handoff floor found a changed path outside the lane's declared scope (ADR-0087): fields.path, fields.class (closure, opportunistic, boundary or cross-lane) and fields.disposition (keep, carve or refuse) carry scopedelta's classification, and the reason is the classifier's own; WARN for carve and refuse, INFO for a computed closure; the floor reports and never blocks (shadow rollout)")
+	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeScopeDelta, "the build handoff floor found a changed path outside declared scope (ADR-0087). fields.path, fields.class (closure, opportunistic, boundary, or cross-lane), and fields.disposition (keep, carve, or refuse) hold the classification; reason is the classifier's own. WARN for carve and refuse, INFO for closure; reports only (shadow)")
 }
 
 func ScopeDeltaFloorChecks(protected func(string) bool) BuildFloorCheckFn {

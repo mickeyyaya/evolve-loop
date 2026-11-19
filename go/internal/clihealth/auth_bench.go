@@ -18,7 +18,7 @@ const (
 )
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeAuthBenchCleared, "a launch, live smoke or usage read of a CLI family succeeded, so the cli-health store removed the auth bench (auth_recheck) of that family; quota benches stay; fields family, reason, source (clihealth.ClearSource: launch, smoke or usage_probe), key")
+	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeAuthBenchCleared, "a launch, live smoke or usage read of a CLI family succeeded. The cli-health store removed the auth bench (auth_recheck) of that family, while quota benches stay. Fields: family, reason, source (clihealth.ClearSource: launch, smoke or usage_probe), key")
 }
 
 func AuthBench(reason string) bool { return LoginPattern(reason) }

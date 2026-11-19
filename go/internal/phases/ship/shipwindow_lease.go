@@ -12,7 +12,7 @@ import (
 const codeShipWindowLeaseBroken signalcenter.Code = "SHIP_WINDOW_LEASE_BROKEN"
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleShip, codeShipWindowLeaseBroken, "a ship broke the ship-window lease of a live holder whose heartbeat passed the TTL, so two lanes can overlap in the window; fields.owner_pid and fields.heartbeat_at name the broken holder")
+	signalcenter.RegisterCode(signalcenter.ModuleShip, codeShipWindowLeaseBroken, "a ship broke the ship-window lease of a live holder whose heartbeat passed the TTL. Two lanes can overlap in the window. fields.owner_pid and fields.heartbeat_at name the holder")
 }
 
 func enterShipWindow(ctx context.Context, opts *Options, res *RunResult) func() {

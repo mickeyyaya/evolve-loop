@@ -16,7 +16,7 @@ import (
 const CodeSidecarWriteFailed signalcenter.Code = "FAILUREDIAG_SIDECAR_WRITE_FAILED"
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleFailureDiag, CodeSidecarWriteFailed, "the phase's <phase>-failure-diag.json could not be written (temp write or rename); the reason names the step and the error, fields name the path; the phase abort proceeds unchanged and the diagnosis is lost from disk")
+	signalcenter.RegisterCode(signalcenter.ModuleFailureDiag, CodeSidecarWriteFailed, "the phase's <phase>-failure-diag.json failed to write (temp write or rename). The reason names the step and error; fields name the path. The phase abort proceeds unchanged and the diagnosis is lost")
 }
 
 type Sidecar struct {

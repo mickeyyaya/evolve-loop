@@ -20,8 +20,8 @@ const (
 )
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeExplanationCorrectionRung, "a passing audit reviewed the explanation document as NEEDS_CORRECTION, so Build corrects only that document and the audit re-reviews it before ship; fields.round and fields.budget count the rung")
-	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeExplanationCorrectionExhausted, "a passing audit still reviews the explanation document as NEEDS_CORRECTION after the explanation-correction budget is spent, so the verified code ships with the review on record")
+	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeExplanationCorrectionRung, "a passing audit reviewed the explanation document as NEEDS_CORRECTION. Build corrects only that document and audit re-reviews it before ship; fields.round and fields.budget count the rung")
+	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeExplanationCorrectionExhausted, "a passing audit still reviews the explanation document as NEEDS_CORRECTION after the budget is spent. The verified code ships with the review on record")
 }
 
 type explanationReview struct {

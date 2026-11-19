@@ -15,7 +15,7 @@ const (
 )
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeInboxDrainFailed, "the inbox of the running dispatch could not be read at a tick; the envelopes after the read offset stay unread and the next tick tries again; fields dispatch, agent, error")
+	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeInboxDrainFailed, "the inbox of the running dispatch failed a read at a tick. Envelopes after the read offset stay unread until the next tick tries again. Fields: dispatch, agent, error")
 }
 
 type replWaitStep struct {

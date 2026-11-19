@@ -11,7 +11,7 @@ import (
 const CodeLoginRequired signalcenter.Code = "BRIDGE_LOGIN_REQUIRED"
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeLoginRequired, "a paused cycle met a wall in which at least one family needs a login; WARN; reason renders the fact table of the wall (one clause for each family), the evidence, the impact on the claims and the next step; fields.stop_reason=login-required, phase")
+	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeLoginRequired, "a paused cycle met a wall where at least one family needs a login; WARN. Reason renders the wall fact table, evidence, claim impact, and next step. fields.stop_reason=login-required, phase")
 }
 
 func (w Wall) AllLogin() bool {

@@ -12,7 +12,7 @@ import (
 const CodeRebaseReentryAborted signalcenter.Code = "ORCHESTRATOR_REBASE_REENTRY_ABORTED"
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeRebaseReentryAborted, "after a debugger resolved a fleet-rebase conflict, the host could not carry, rebase, pend or route the resolved tree (the reason names which), or the recovery budget was spent; the cycle ended instead of a reship on the base the ship diverged from")
+	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeRebaseReentryAborted, "after a debugger resolved a fleet-rebase conflict, the host failed to carry, rebase, pend, or route the resolved tree (or recovery budget ended). The reason names the fault. The cycle ended instead of reshipping on the old base")
 }
 
 func (o *Orchestrator) resumeFleetRebaseAfterDebugger(ctx context.Context, projectRoot string, cycle int, cs *CycleState, decided Phase, depth, fleetWidth int) (Phase, bool) {

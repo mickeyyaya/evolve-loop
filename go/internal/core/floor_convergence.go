@@ -12,7 +12,7 @@ import (
 const CodeBuildFloorConverging signalcenter.Code = "BUILD_FLOOR_CONVERGING"
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleBuild, CodeBuildFloorConverging, "a build floor rejection after a correction held fewer findings than the one before, or the same number of other findings, so the build got one further correction inside the policy bound retry.floor_convergence_rounds; fields.before and after (the finding counts), round (the further correction in use), bound (the policy limit)")
+	signalcenter.RegisterCode(signalcenter.ModuleBuild, CodeBuildFloorConverging, "a build floor rejection after a correction held fewer findings, or the same count of different findings. Build got one more correction inside retry.floor_convergence_rounds. Fields: fields.before, after, round, bound")
 }
 
 type floorConvergence struct {

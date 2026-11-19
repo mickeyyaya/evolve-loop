@@ -32,8 +32,8 @@ const (
 )
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeCloudLaunched, "a cloud seat started a cloud session: the CLI printed the session line and the view line within the deadline of its manifest; the dispatch outcome is launched and the deliverable is a later pull request of that session; fields cli, session_id, url, title, repo, branch, profile")
-	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeCloudLaunchRefused, "a cloud seat refused a launch before it started a session: the working tree is on no branch, the branch has no upstream or has commits that are not pushed, or the remote is not on a host that the manifest names; the reason names the cause; fields cli, profile, dir")
+	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeCloudLaunched, "a cloud seat started a cloud session. The CLI printed the session line and view line within its manifest deadline. Outcome is launched, and the deliverable is a later pull request. Fields: cli, session_id, url, title, repo, branch, profile")
+	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeCloudLaunchRefused, "a cloud seat refused a launch before starting a session. Causes: detached HEAD, no upstream, unpushed commits, or a remote outside the manifest host list. The reason names the cause. Fields: cli, profile, dir")
 }
 
 type claudeCloudDriver struct{}

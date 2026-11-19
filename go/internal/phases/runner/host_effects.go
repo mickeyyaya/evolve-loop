@@ -11,7 +11,7 @@ import (
 const CodeHostEffectFailed signalcenter.Code = "RUNNER_HOST_EFFECT_FAILED"
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleRunner, CodeHostEffectFailed, "the runner could not perform a declared host effect before judging the phase; the engine and the gate still judge the effect; the reason is the performer's error")
+	signalcenter.RegisterCode(signalcenter.ModuleRunner, CodeHostEffectFailed, "the runner failed to perform a declared host effect before judging the phase. The engine and gate still judge the effect; reason holds the error")
 }
 
 func (b *BaseRunner) HostEffectsWired() bool {

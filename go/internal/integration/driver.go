@@ -36,7 +36,7 @@ const (
 	stepRecord    = "record"
 	stepPanic     = "panic"
 	maxFlushPass  = 1024
-	driverFailDoc = "the integration driver failed a step; fields.step names the step and fields.error the error, and the driver also writes the failure into the wave record, so a lost signal cannot hide it"
+	driverFailDoc = "the integration driver failed a step. fields.step names the step and fields.error the error; failure writes to the wave record too, so lost signals cannot hide it"
 )
 
 func init() {

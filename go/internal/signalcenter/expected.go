@@ -13,7 +13,7 @@ import (
 const CodeExpectedAbsent Code = "SIGNAL_EXPECTED_ABSENT"
 
 func init() {
-	RegisterCode(ModuleSignal, CodeExpectedAbsent, "a stage emitted its start signal and its end signal did not follow before the deadline from policy; fields.pair names the pair, start_kind and end_kind the two kinds, started the start time, deadline_seconds the limit and key the open start; cycle, phase and run_id name the open start in fields and reason when present")
+	RegisterCode(ModuleSignal, CodeExpectedAbsent, "a stage emitted its start signal, and its end signal did not follow before the policy deadline. fields.pair names the pair, start_kind and end_kind the kinds, started the start time, deadline_seconds the limit, and key the start. cycle, phase, and run_id fill fields and reason when present")
 }
 
 type ExpectedPair struct {

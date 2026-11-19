@@ -28,7 +28,7 @@ const (
 )
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleConvergence, CodeConvergenceRung, "the convergence policy decided the next rung of the audit-repair loop after an audit FAIL; fields.stage is shadow (recorded, the repair flow does not change) or enforce (a Stop ends the repair), fields.loop, fields.round, fields.action, fields.rung and fields.blocking_bar give the decision, fields.fresh_context is true when the next fixer starts without the failed context")
+	signalcenter.RegisterCode(signalcenter.ModuleConvergence, CodeConvergenceRung, "the convergence policy chose the next rung of the audit-repair loop after an audit FAIL. fields.stage is shadow (repair flow unchanged) or enforce (Stop ends repair). fields.loop, fields.round, fields.action, fields.rung, and fields.blocking_bar give the decision; fields.fresh_context skips failed context")
 }
 
 func auditRepairJudgments(workspace string, dispatches int, warn io.Writer) []convergence.Judgment {

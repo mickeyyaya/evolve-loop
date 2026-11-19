@@ -10,7 +10,7 @@ const CodeFleetRebaseConflict signalcenter.Code = "ORCHESTRATOR_FLEET_REBASE_CON
 
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeFleetRebaseConflict,
-		"the fleet rebase of the ship recovery hit a merge conflict, and the cycle routes to the debugger (ADR-0143 W1b reads it for a lane that only the optimistic admission rule admitted); not a landing-conflict ship error, so the oversight does not count it again; WARN; fields.paths (the conflicted paths)")
+		"the ship-recovery fleet rebase hit a merge conflict, and the cycle routes to debugger (ADR-0143 W1b reads it for optimistic admission). Not a landing-conflict error, so oversight does not double-count it; WARN. fields.paths (conflicted paths)")
 }
 
 func (o *Orchestrator) emitFleetRebaseConflict(cycle int, cs CycleState) {

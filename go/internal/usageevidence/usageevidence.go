@@ -25,7 +25,7 @@ const (
 )
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeUsageEvidence, "a CLI failed in a way quota could explain (a REPL boot timeout, no response, an escalation, a stall, a failed doctor probe), so the failure path queried the CLI's usage in a fresh session and recorded the verdict for the failing family: exhausted (a family-scoped window is used up: the verified cause, and the family is benched until the reset), healthy (quota ruled out for the family; an exhausted per-model window is named as a note, never as the cause), unavailable (the usage query failed too, which points at auth, install or network) or unknown (no usage window could be read); the reason is the verdict summary; fields driver, cli, family, verdict, trigger (exit N or stall), exit_code, cached, and record_error when the workspace record could not be written")
+	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeUsageEvidence, "a CLI failed with a quota-like symptom, so the failure path queried usage in a fresh session and recorded a family verdict. Verdicts: exhausted (family window used up, benched until reset), healthy (quota ruled out), unavailable (query failed), or unknown. The reason is the verdict summary. Fields: driver, cli, family, verdict, trigger (exit N or stall), exit_code, cached, and record_error on write failure")
 }
 
 type Explain func(ctx context.Context, driver string, since time.Time) usageprobe.Evidence

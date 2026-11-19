@@ -32,7 +32,7 @@ const (
 
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleShip, CodeScanShadowFault, "the scan shadow panicked and recovered; the ship scan and its verdict were not affected, and the shadow records for this scan are incomplete")
-	signalcenter.RegisterCode(signalcenter.ModuleShip, CodeScanShadowEscape, "the scan shadow found a stored green result for the content key of a package, and that package then failed in the real run; the content key misses an input of the test, and the scan cache cannot be enforced until the miss is closed")
+	signalcenter.RegisterCode(signalcenter.ModuleShip, CodeScanShadowEscape, "the scan shadow found a stored green for a package content key that failed in the real run. The content key misses a test input; cache cannot enforce until closed")
 }
 
 type scanShadow struct {

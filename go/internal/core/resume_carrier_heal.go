@@ -16,7 +16,7 @@ import (
 const CodeResumeCarrierPended signalcenter.Code = "ORCHESTRATOR_RESUME_CARRIER_PENDED"
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeResumeCarrierPended, "a resume found this cycle's Evolve-Carrier commit at the lane's HEAD (a crash between the fleet rebase and the pend) and pended it on its fork point before any phase ran, so the resumed cycle sees the change pending and never re-audits an empty diff")
+	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeResumeCarrierPended, "a resume found this cycle's Evolve-Carrier commit at HEAD (crash between rebase and pend) and pended it on its fork point. The resumed cycle sees the pending change instead of an empty diff")
 }
 
 func (o *Orchestrator) healCarrierAtHead(ctx context.Context, projectRoot string, cycle int, cs CycleState, git gitFn) error {

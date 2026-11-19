@@ -51,16 +51,16 @@ func init() {
 		"CONVERGENCE_ACCEPTED_LIMITS": "a component landed with its limits accepted; fields.component is the component and fields.certificate its fail-safe certificate",
 		"CONVERGENCE_STOP":            "the decision stopped the loop; fields.round, open (findings still open) and land_round (the round the policy planned to land)",
 		"CONVERGENCE_DISPUTED":        "findings are disputed; fields.count and critical count them and fields.adjudicator names who decides",
-		"CONVERGENCE_NO_HEADROOM":     "the model tier of a role has no higher tier to raise to; fields.role, family, from (the current tier) and to (the next tier, or none)",
+		"CONVERGENCE_NO_HEADROOM":     "the model tier of a role has no higher tier to raise to. fields.role, family, from (current tier), and to (next tier, or none)",
 	} {
 		RegisterCode(ModuleConvergence, c, doc)
 	}
-	RegisterCode(ModuleLoop, CodeLoopLost, "a reader saw a loop process end without its loop.exit event; a reader makes this record and no log holds it; fields.pid, run_id, exit (crash or unknown) and historical (true when the loop was gone before the reader looked)")
-	RegisterCode(ModuleLatency, CodeLatencyBudgetExceeded, "two waves in a row breached a bound of the wave latency check; fields.waves lists them, fields.reasons names the breached rules and fields.item the inbox item filed")
+	RegisterCode(ModuleLoop, CodeLoopLost, "a reader saw a loop process end without its loop.exit event. A reader makes this record, and no log holds it. Fields: fields.pid, run_id, exit (crash or unknown), historical (true if the loop stopped before the reader looked)")
+	RegisterCode(ModuleLatency, CodeLatencyBudgetExceeded, "two waves in a row breached a bound of the wave latency check. fields.waves lists them, fields.reasons names the breached rules, and fields.item the filed item")
 	RegisterCode(ModuleCI, CodeCIRunRed, "a watched CI run completed with a conclusion other than success; fields.sha, workflow, conclusion, run_id and run_url name the run")
-	RegisterCode(ModuleAudit, CodeAuditCascadeShadow, "at audit_cascade.stage shadow, the audit records whether enforce would escalate this cycle's audit; fields.would_escalate (true or false) and fields.changed_files (the count of changed files)")
-	RegisterCode(ModuleTIA, CodeTIAShadow, "at regression_tia.stage shadow or enforce, the audit records which regression predicates the change would skip; fields.would_skip_count, fields.selected (the count of predicates that run) and fields.write_error when the decision file could not be written (severity WARN then)")
-	RegisterCode(ModuleParallelEval, CodeParallelEvaluateShadow, "at parallel_evaluate.stage shadow, the orchestrator computed the evaluate batch that enforce would run in parallel and dispatched it serially; fields.batch lists the phases in batch order")
+	RegisterCode(ModuleAudit, CodeAuditCascadeShadow, "at audit_cascade.stage shadow, the audit records if enforce escalates this cycle's audit. fields.would_escalate (true or false) and fields.changed_files (changed file count)")
+	RegisterCode(ModuleTIA, CodeTIAShadow, "at regression_tia.stage shadow or enforce, the audit records which regression predicates the change skips. Fields: fields.would_skip_count, fields.selected (predicates that run), and fields.write_error on write failure (WARN)")
+	RegisterCode(ModuleParallelEval, CodeParallelEvaluateShadow, "at parallel_evaluate.stage shadow, the orchestrator computed the parallel evaluate batch of enforce and dispatched it serially. fields.batch lists the phases in batch order")
 }
 
 func RegisterCode(m Module, c Code, doc string) { codes.register(m, c, doc) }

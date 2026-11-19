@@ -10,7 +10,7 @@ import (
 const CodeCapacityParked signalcenter.Code = "GATE_REPO_CAPACITY_PARKED"
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleGateRepo, CodeCapacityParked, "a repo-contract gate hit its deadline twice in a row on the same lane tree, so the orchestrator parked the lane and started no LLM re-audit; fields.code is the ship error code; the lane needs more CPU time or a smaller closure, not a code change")
+	signalcenter.RegisterCode(signalcenter.ModuleGateRepo, CodeCapacityParked, "a repo-contract gate hit its deadline twice in a row on the same lane tree. The orchestrator parked the lane without an LLM re-audit; fields.code is the ship error code. The lane needs more CPU time or a smaller closure, not a code change")
 }
 
 func capacityRepeats(code ShipErrorCode, cs CycleState) bool {

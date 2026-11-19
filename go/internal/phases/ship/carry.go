@@ -16,7 +16,7 @@ import (
 const codeCarryNotReProven signalcenter.Code = "SHIP_CARRY_NOT_REPROVEN"
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleShip, codeCarryNotReProven, "an identical-rebase carry record named the bound audit but ship could not re-prove it; the reason names the failed check (record, ledger chain, ancestry, tree bytes or patch-id) and the change is audited again; fields.carry_cycle")
+	signalcenter.RegisterCode(signalcenter.ModuleShip, codeCarryNotReProven, "an identical-rebase carry record named the bound audit, but ship failed to re-prove it. Reason names the failed check (record, ledger chain, ancestry, tree bytes, or patch-id); change re-audits. fields.carry_cycle")
 }
 
 func carrySatisfied(ctx context.Context, opts *Options, dir, actual string) (bool, string) {

@@ -24,8 +24,8 @@ const (
 )
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleRepair, CodeRepairHandoff, "the fixability check found a hand-off finding before a repair round (ADR-0158); fields.stage is shadow or enforce, fields.decision is none, would_stop (shadow) or stop (enforce: the cycle seals handed-off with no repair round), fields.reason is handoff_blocker on a stop or a would_stop, fields.blockers, fields.handoff and fields.lane list the finding ids, fields.console_items the console items the findings name and fields.salvage the worktree of the cycle")
-	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeHandoffNoRoute, "a cycle sealed handed-off and the console route has no single committed item to name; the reason names the hand-off, the source of the committed set (the lane pin, the triage decision, or neither) and the console steps; the cycle still ends handed-off and no item routes")
+	signalcenter.RegisterCode(signalcenter.ModuleRepair, CodeRepairHandoff, "the fixability check found a hand-off finding before a repair round (ADR-0158). fields.stage is shadow or enforce; fields.decision is none, would_stop, or stop (seals handed-off). fields.reason is handoff_blocker on stop or would_stop. Fields: blockers, handoff, lane, console_items, salvage")
+	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeHandoffNoRoute, "a cycle sealed handed-off, and the console route has no single committed item to name. The reason names the hand-off, committed-set source (lane pin, triage decision, or neither), and console steps. The cycle still ends handed-off with no routed item")
 }
 
 type RepairCheck struct {

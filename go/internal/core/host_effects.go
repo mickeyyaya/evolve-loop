@@ -9,7 +9,7 @@ import (
 const CodeHostEffectFailed signalcenter.Code = "ORCHESTRATOR_HOST_EFFECT_FAILED"
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeHostEffectFailed, "the host could not perform a declared effect before the phase's review; the effects gate still judges it")
+	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeHostEffectFailed, "the host failed to perform a declared effect before the phase's review; the effects gate still judges it")
 }
 
 type HostEffects interface {

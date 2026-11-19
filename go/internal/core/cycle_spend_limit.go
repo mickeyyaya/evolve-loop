@@ -16,7 +16,7 @@ const (
 )
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleCycle, CodeCycleSpendLimit, "the spend of the cycle passed a limit of workflow.cycle_spend at a phase boundary (ADR-0158 decisions 14 to 16); fields.decision is would_stop (shadow, once for each cycle, the flow of today runs), over (enforce, the first boundary over the limit where no stop is legal) or stop (enforce, at the failed audit where the cycle goes to retro and seals handed-off; a passing audit still ships); fields.stage is shadow or enforce, fields.partial is true when the ledger did not load whole, fields.limit names the limit, fields.value and fields.max give the spend and the limit, and fields.phase the boundary")
+	signalcenter.RegisterCode(signalcenter.ModuleCycle, CodeCycleSpendLimit, "cycle spend passed a workflow.cycle_spend limit at a phase boundary (ADR-0158 decisions 14-16). fields.decision is would_stop (shadow), over (enforce, stop illegal), or stop (enforce at failed audit; passing audit still ships). fields.stage is shadow or enforce; fields.partial is true if ledger load was incomplete. Fields: limit, value, max, phase")
 }
 
 func (cr *cycleRun) checkCycleSpend() {

@@ -9,7 +9,7 @@ const CodePlanPhaseGated signalcenter.Code = "ORCHESTRATOR_PLAN_PHASE_GATED"
 
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodePlanPhaseGated,
-		"the phase registry removed a phase the advisor's plan runs, at that phase's turn in the walk: its declared skip_when fired (rule skip-when-gates-plan, e.g. a bugfix phase on a deliverable_kind=document cycle) or its insert_when, its whole admission rule, did not fire (rule insert-when-gates-plan); fields.phase, rule, next_phase; the walk continues and routing-decision-<n>.json keeps the clamp")
+		"the phase registry removed a planned phase at its turn: skip_when fired (rule skip-when-gates-plan, for example bugfix on document cycles). It also fires if insert_when failed (rule insert-when-gates-plan). fields.phase, rule, next_phase. The walk continues and routing-decision-<n>.json keeps the clamp")
 }
 
 func (o *Orchestrator) emitRegistryGatedPhases(cycle int, cs CycleState, dec router.RouterDecision) {

@@ -40,7 +40,7 @@ func RunPhaseObserver(args []string, _ io.Reader, stdout, stderr io.Writer) int 
 const CodePolicyLoadFailed signalcenter.Code = "OBSERVER_POLICY_LOAD_FAILED"
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleObserver, CodePolicyLoadFailed, ".evolve/policy.json exists but could not be read or decoded when `evolve phase-observer` or `evolve phase-watchdog` resolved its settings (absence is silent); the poll, stall, nudge and watchdog thresholds and the --enforce stall chain's artifact extends fall back to the compiled defaults; fields.step=policy, path")
+	signalcenter.RegisterCode(signalcenter.ModuleObserver, CodePolicyLoadFailed, ".evolve/policy.json exists, but `evolve phase-observer` or `evolve phase-watchdog` failed to read or decode it (absence is silent). The poll, stall, nudge, watchdog thresholds, and --enforce stall artifact extends fall back to compiled defaults. fields.step=policy, path")
 }
 
 func observerPolicy(a observerArgs, signals *signalcenter.Center) policy.Policy {
