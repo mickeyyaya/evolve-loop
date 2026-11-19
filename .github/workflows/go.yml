@@ -60,6 +60,8 @@ jobs:
           fi
           echo "cover-changed base: $base"
           make cover-changed COVER_CHANGED_BASE="$base"
+      - name: test the notmux floor build (no tmux)
+        run: make test-notmux
       - name: package wall budget (advisory; job summary)
         run: |
           if [ -s test-integration.json ]; then

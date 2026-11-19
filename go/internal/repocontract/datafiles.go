@@ -303,6 +303,7 @@ var dataFileReads = []DataFileRead{
 		"TestGateSteps_ApicoverBoundHoldsTheEnforcedPackageList",
 	}}},
 	{Path: "go/Makefile", TestSelection: TestSelection{Package: "./internal/ciparity", Tests: []string{
+		"TestEnvExclusive_TheNotmuxMakeTargetRunsTheBridgeTiersUnderTheFloorTags",
 		"TestGoWorkflow_GatesTheSuiteOnAPinnedGovulncheckFromTheMakeTarget",
 		"TestMakeAPICheck_RejectsMissingOrMalformedProfile",
 		"TestMakeAPIEnforce_AcceptsTestOnlyOrEmptyEnrollment",

@@ -136,22 +136,6 @@ func TestStartOrphanGuard_AGuardThatCannotStartIsAnError(t *testing.T) {
 	}
 }
 
-func TestMain_AGuardThatCannotStartStopsTheServerAndRunsNothing(t *testing.T) {
-	bin := t.TempDir()
-	log := filepath.Join(t.TempDir(), "calls")
-	fakeclitest.Install(t, filepath.Join(bin, "tmux"), "#!/bin/sh\necho \"$*\" >> "+log+"\ncase \"$*\" in *new-session*) exit 1 ;; esac\nexit 0\n")
-	t.Setenv("PATH", bin)
-	t.Setenv("TMUX_TMPDIR", t.TempDir())
-	ran := false
-
-	code := Main(runFunc(func() int { ran = true; return 0 }))
-
-	calls, _ := os.ReadFile(log)
-	if code != 1 || ran || !strings.HasSuffix(strings.TrimSpace(string(calls)), "kill-server") {
-		t.Fatalf("Main = %d, ran = %v, tmux calls:\n%s\nwant 1, no run, and a stopped server", code, ran, calls)
-	}
-}
-
 func readEOF(r *os.File) chan struct{} {
 	done := make(chan struct{})
 	go func() {

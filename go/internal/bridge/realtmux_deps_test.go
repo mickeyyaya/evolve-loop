@@ -1,14 +1,8 @@
+//go:build !notmux
+
 package bridge
 
-import (
-	"errors"
-	"syscall"
-	"time"
-)
-
-var errRealTmuxTestSendsNoSignal = errors.New("a real tmux bridge test sends no signal, because kill-session ends its pane")
-
-func refuseTestSignal(int, syscall.Signal) error { return errRealTmuxTestSendsNoSignal }
+import "time"
 
 func itDeps(perTick time.Duration) Deps {
 	d := Deps{

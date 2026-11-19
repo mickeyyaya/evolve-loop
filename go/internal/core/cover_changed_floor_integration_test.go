@@ -27,13 +27,13 @@ func TestScopedCoverProfile_RunsThePackagesUnderTheGivenTags(t *testing.T) {
 
 	module := coverChangedModule(t, "\tif F(1) != 1 {\n\t\tt.Fatal(\"F(1)\")\n\t}\n")
 
-	profile, out, status := scopedCoverProfile(context.Background(), ReviewInput{}, module, []string{"./p"}, []string{"integration"})
+	profile, out, status, _ := scopedCoverProfile(context.Background(), ReviewInput{}, module, []string{"./p"}, []string{"integration"})
 	defer func() { _ = os.RemoveAll(filepath.Dir(profile)) }()
 
 	if branch, hit := fCoverage(t, profile); status != coverStatusOK || !branch || !hit {
 		t.Errorf("status %d out %q branch hit %v; want the integration test to have run the branch that returns 1", status, out, branch)
 	}
-	untagged, _, status := scopedCoverProfile(context.Background(), ReviewInput{}, module, []string{"./p"}, nil)
+	untagged, _, status, _ := scopedCoverProfile(context.Background(), ReviewInput{}, module, []string{"./p"}, nil)
 	defer func() { _ = os.RemoveAll(filepath.Dir(untagged)) }()
 	if _, hit := fCoverage(t, untagged); status != coverStatusOK || hit {
 		t.Errorf("without the tag the integration test must not run: status %d, a statement of F is hit %v", status, hit)
@@ -42,13 +42,13 @@ func TestScopedCoverProfile_RunsThePackagesUnderTheGivenTags(t *testing.T) {
 
 func TestScopedCoverProfile_AFailingTestIsTestsFailedAndAMissingTempDirIsPlumbing(t *testing.T) {
 	module := coverChangedModule(t, "\tt.Fatal(\"red\")\n")
-	profile, out, status := scopedCoverProfile(context.Background(), ReviewInput{}, module, []string{"./p"}, []string{"integration"})
+	profile, out, status, _ := scopedCoverProfile(context.Background(), ReviewInput{}, module, []string{"./p"}, []string{"integration"})
 	defer func() { _ = os.RemoveAll(filepath.Dir(profile)) }()
 	if status != coverStatusTestsFailed || !strings.Contains(out, "red") {
 		t.Errorf("a failing test: status %d out %q, want tests-failed with its output", status, out)
 	}
 	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "missing"))
-	if profile, _, status := scopedCoverProfile(context.Background(), ReviewInput{}, module, []string{"./p"}, nil); status != coverStatusPlumbingError || profile != "" {
+	if profile, _, status, _ := scopedCoverProfile(context.Background(), ReviewInput{}, module, []string{"./p"}, nil); status != coverStatusPlumbingError || profile != "" {
 		t.Errorf("no temp dir: status %d profile %q, want a plumbing error and no profile", status, profile)
 	}
 }
