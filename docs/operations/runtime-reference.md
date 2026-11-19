@@ -866,10 +866,7 @@ The lint checks text against the ASD-STE100 house rules ([the standard](../conve
 
 ## Regression test-impact selection (shadow)
 
-- **The dial:** `.evolve/policy.json` `regression_tia.stage` is `off`, `shadow` or `enforce`. The checked-in file sets `shadow`, by the operator decision of 2026-10-21. The compiled default is `off`.
-- **What shadow does:** the audit writes `acs-tia-shadow.json` into the run directory. It changes no gate result, and the full regression corpus still runs.
-- **The readout:** `evolve acs tia-report` rolls up the shadow decisions of every run directory and names each miss. `--json` prints the summary.
-- **Not yet:** `enforce` skips nothing today. The import graph cannot see the files and processes that the predicates read, so the shadow reports `would_skip=0`. See [ADR-0082](../architecture/adr/0082-regression-test-impact-selection-shadow.md).
+- **Retired on 2026-11-19:** the `regression_tia` stage is gone from the policy, the audit and the stage registry. 0 of 44 regression predicates are pure, which is below the floor of 9. `evolve acs tia-report` still reads old `acs-tia-shadow.json` files. See [ADR-0082](../architecture/adr/0082-regression-test-impact-selection-shadow.md).
 
 ## Phase handoff policy
 

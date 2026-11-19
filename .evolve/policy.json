@@ -200,9 +200,6 @@
     "stage": "shadow",
     "concurrency": 3
   },
-  "regression_tia": {
-    "stage": "shadow"
-  },
   "retrospectives": {
     "stage": "enforce"
   },
