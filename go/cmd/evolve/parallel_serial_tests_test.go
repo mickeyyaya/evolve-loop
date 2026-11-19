@@ -940,4 +940,5 @@ var serialTests = map[string]string{
 	"main.TestUsageBrake_TheBoundaryProceedsWhenTheReadingIsUnderTheLimitTheBrakeIsOffOrTheWindowReset":                    "swaps seams chainBoundaryAheadFn and chainRunningCommitFn",
 	"main.TestUsageBrake_AnUnreadableReadingIsNotUnderTheLimitAndStopsTheLoopNamingTheFile":                                "swaps seams chainBoundaryAheadFn and chainRunningCommitFn",
 	"main.TestUsageBrake_AnUnreadableReadingDoesNotStopTheLoopWhenTheBrakeIsOff":                                           "swaps seams chainBoundaryAheadFn and chainRunningCommitFn",
+	"main.TestGC_ABranchFlaggedWithAndThenWithoutItsWorktreeMintsOneInboxItem":                                             "sets env and swaps gcInjectedReapers and gcInjectedProcessHost through gcWorktreeEnv",
 }

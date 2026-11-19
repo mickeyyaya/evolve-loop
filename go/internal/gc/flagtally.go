@@ -32,7 +32,25 @@ func IsFlag(it WorktreeItem) bool {
 }
 
 func FlagKey(it WorktreeItem) string {
-	return strings.Join([]string{string(it.Action), it.Branch, it.Path}, "|")
+	target := it.Branch
+	if target == "" {
+		target = it.Path
+	}
+	return string(it.Action) + "|" + target
+}
+
+func priorFlagCount(prior map[string]int, it WorktreeItem) int {
+	best := prior[FlagKey(it)]
+	if it.Branch == "" {
+		return max(best, prior[string(it.Action)+"||"+it.Path])
+	}
+	prefix := string(it.Action) + "|" + it.Branch + "|"
+	for k, v := range prior {
+		if strings.HasPrefix(k, prefix) && v > best {
+			best = v
+		}
+	}
+	return best
 }
 
 func CountFlags(evolveDir string, items []WorktreeItem) (map[string]int, error) {
@@ -45,7 +63,7 @@ func CountFlags(evolveDir string, items []WorktreeItem) (map[string]int, error) 
 	for _, it := range items {
 		if IsFlag(it) {
 			key := FlagKey(it)
-			counts[key] = prior[key] + 1
+			counts[key] = priorFlagCount(prior, it) + 1
 		}
 	}
 	if err := atomicwrite.JSON(path, counts); err != nil {

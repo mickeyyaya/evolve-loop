@@ -1,6 +1,7 @@
 package gc
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,11 +36,65 @@ func TestIsFlag(t *testing.T) {
 
 func TestFlagKey_SeparatesActionBranchAndPath(t *testing.T) {
 	a := FlagKey(flagBranchItem)
-	if a != "flag-unmerged|cycle-flaga|" {
+	if a != "flag-unmerged|cycle-flaga" {
 		t.Errorf("key = %q", a)
 	}
 	if FlagKey(WorktreeItem{Branch: "cycle-flaga", Action: WorktreeActionFlagDirty}) == a {
 		t.Error("two actions on one branch share a key")
+	}
+	if FlagKey(WorktreeItem{Branch: "cycle-flaga", Path: "/hub/.evolve/worktrees/cycle-flaga", Action: WorktreeActionFlagUnmerged}) != a {
+		t.Error("a worktree path on a named branch changed the key")
+	}
+	if FlagKey(flagTreeItem) != "flag-dirty|/hub/.evolve/worktrees/Cycle_7" {
+		t.Errorf("path-only key = %q", FlagKey(flagTreeItem))
+	}
+}
+
+func TestCountFlags_KeepsCountAcrossWorktreeLossAndLegacyKeys(t *testing.T) {
+	dir := t.TempDir()
+	withTree := WorktreeItem{Branch: "cycle-flaga", Path: "/hub/.evolve/worktrees/cycle-flaga", Action: WorktreeActionFlagUnmerged, Reason: "unmerged"}
+	withoutTree := WorktreeItem{Branch: "cycle-flaga", Action: WorktreeActionFlagUnmerged, Reason: "unmerged orphan branch"}
+	counts, err := CountFlags(dir, []WorktreeItem{withTree})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if counts[FlagKey(withTree)] != 1 {
+		t.Fatalf("first run = %v, want 1", counts)
+	}
+	counts, err = CountFlags(dir, []WorktreeItem{withoutTree})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if counts[FlagKey(withoutTree)] != 2 {
+		t.Fatalf("second run without worktree = %v, want 2", counts)
+	}
+}
+
+func TestCountFlags_MigratesLegacyTallyKeys(t *testing.T) {
+	dir := t.TempDir()
+	pathOnly := flagTreeItem
+	withTree := WorktreeItem{Branch: "cycle-flaga", Path: "/hub/.evolve/worktrees/cycle-flaga", Action: WorktreeActionFlagUnmerged}
+	withoutTree := WorktreeItem{Branch: "cycle-flagb", Action: WorktreeActionFlagUnmerged}
+	legacy := map[string]int{
+		"flag-unmerged|cycle-flaga|/hub/.evolve/worktrees/cycle-flaga": 1,
+		"flag-unmerged|cycle-flagb|":                                   1,
+		"flag-dirty||" + pathOnly.Path:                                 1,
+	}
+	body, err := json.Marshal(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, FlagTallyFile), body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	counts, err := CountFlags(dir, []WorktreeItem{withTree, withoutTree, pathOnly})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, it := range []WorktreeItem{withTree, withoutTree, pathOnly} {
+		if counts[FlagKey(it)] != 2 {
+			t.Errorf("%s count = %d, want 2", FlagKey(it), counts[FlagKey(it)])
+		}
 	}
 }
 
