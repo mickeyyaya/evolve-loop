@@ -1,6 +1,7 @@
 package incidentkb_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -256,8 +257,12 @@ effectiveness: {}
 	if _, err := incidentkb.Render([]byte(strings.Replace(sampleRecordDoc(), "schema: incident-record/1", "schema: bad", 1))); err == nil {
 		t.Errorf("Render accepted invalid schema")
 	}
+	noBegin := strings.Replace(sampleRecordDoc(), "<!-- GENERATED:actions BEGIN -->", "", 1)
+	if _, err := incidentkb.Render([]byte(noBegin)); !errors.Is(err, incidentkb.ErrMissingMarker) {
+		t.Errorf("Render missing begin marker = %v", err)
+	}
 	noEnd := strings.Replace(sampleRecordDoc(), "<!-- GENERATED:status END -->", "", 1)
-	if _, err := incidentkb.Render([]byte(noEnd)); err == nil || !strings.Contains(err.Error(), "end marker") {
+	if _, err := incidentkb.Render([]byte(noEnd)); !errors.Is(err, incidentkb.ErrMissingMarker) {
 		t.Errorf("Render missing end marker = %v", err)
 	}
 	overlap := `---
@@ -273,7 +278,7 @@ status: open
 <!-- GENERATED:actions END -->
 <!-- GENERATED:effectiveness BEGIN --><!-- GENERATED:effectiveness END -->
 `
-	if _, err := incidentkb.Render([]byte(overlap)); err == nil || !strings.Contains(err.Error(), "overlapping") {
+	if _, err := incidentkb.Render([]byte(overlap)); !errors.Is(err, incidentkb.ErrOverlappingMarkers) {
 		t.Errorf("Render overlap = %v", err)
 	}
 }

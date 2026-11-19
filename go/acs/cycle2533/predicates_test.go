@@ -5,6 +5,7 @@ package cycle2533
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -214,8 +215,10 @@ func TestC2533_004_LegacyAndUnparsableIncidentFilesDoNotBreakTheGraph(t *testing
 
 	broken := t.TempDir()
 	seed(t, map[string]string{incidentkb.RecordPath(broken, recordID): "---\nschema: incident-record/1\nbogus: 1\n---\n\n# broken\n"})
-	if _, err := kbgraph.Build(broken); err == nil || !strings.Contains(err.Error(), recordID) {
-		t.Errorf("Build of a record with an unparsable frontmatter must fail and name %s, got %v", recordID, err)
+	_, err = kbgraph.Build(broken)
+	var parseErr *kbgraph.RecordParseError
+	if !errors.As(err, &parseErr) || filepath.Base(parseErr.Path) != recordID+".md" {
+		t.Errorf("Build of a record with an unparsable frontmatter must fail with a RecordParseError naming %s, got %v", recordID, err)
 	}
 }
 
