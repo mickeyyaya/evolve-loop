@@ -1,1 +1,49 @@
-{"acceptance":["evolve inbox edit --set weight=... without --reason is refused with a nonzero exit","evolve inbox edit --set priority_class=... without --reason is refused","An edit with --reason writes the reason to the ledger","A recurrence escalation moves the rank of the item and does not write its weight","No production code outside the lifecycle writer writes an item weight, and a source-scan test proves it"],"created_at":"2026-10-26T19:30:00Z","deps":["inbox-prioritization-p3-add-time-intake"],"files":["go/cmd/evolve/cmd_inbox_curate.go","go/cmd/evolve/cmd_loop_escalate.go","go/internal/recurrence/apply.go","docs/architecture/packages/internal-recurrence.md"],"fix":"Make evolve inbox edit refuse a change of weight or priority_class without --reason, and record the reason in the ledger. Delete the Reweight option of go/internal/recurrence and its wiring in go/cmd/evolve/cmd_loop_escalate.go, so that recurrence moves the rank only through the recurrence factor. This closes the remaining part of recurrence-reweight-bypasses-the-item-writer.","id":"inbox-prioritization-p5-reason-on-priority-change","kind":"feature","notes":"Plan link: docs/plans/inbox-prioritization-2026-10.md (component P5). Spec link: docs/architecture/adr/0121-inbox-priority-is-a-computed-rank.md and docs/architecture/packages/internal-inboxrank.md. The plan has no owner column, so the route is lane.","priority_class":"correctness","route":"lane","routed_at":"2026-10-26T19:26:39Z","routed_reason":"plan audit 2026-10-27: the plan owner is a lane, or the surface is not a gate file","source":"console, 2026-10-27, plan audit: track unfinished components","summary":"Component P5 of the plan docs/plans/inbox-prioritization-2026-10.md. The spec is docs/architecture/adr/0121-inbox-priority-is-a-computed-rank.md and docs/architecture/packages/internal-inboxrank.md. evolve inbox edit --set weight= or --set priority_class= does not require a reason. The recurrence escalate path still calls opts.Reweight (go/internal/recurrence/apply.go), and cmd_loop_escalate.go wires it. Recurrence is already a rank factor since P1.","title":"Each change of weight or priority_class records a reason, and recurrence stops its weight writes (inbox plan P5)","weight":0.45}
+{
+  "acceptance": [
+    "evolve inbox edit --set weight=... without --reason is refused with a nonzero exit",
+    "evolve inbox edit --set priority_class=... without --reason is refused",
+    "An edit with --reason writes the reason to the ledger",
+    "A recurrence escalation moves the rank of the item and does not write its weight",
+    "No production code outside the lifecycle writer writes an item weight, and a source-scan test proves it"
+  ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2520",
+    "branch": "cycle-cd3ae73e-2520",
+    "snapshot_sha": "dbd5b22953c2011cd0827fa6299ba3d2bf8d7c01",
+    "base_sha": "6312414d5bf51eddb647748bd547bcd3c7ce6d6d",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2520/audit-fail-reason.json",
+    "cycle": 2520
+  },
+  "created_at": "2026-10-26T19:30:00Z",
+  "deps": [
+    "inbox-prioritization-p3-add-time-intake"
+  ],
+  "failure_count": 1,
+  "files": [
+    "go/cmd/evolve/cmd_inbox_curate.go",
+    "go/cmd/evolve/cmd_loop_escalate.go",
+    "go/internal/recurrence/apply.go",
+    "docs/architecture/packages/internal-recurrence.md"
+  ],
+  "fix": "Make evolve inbox edit refuse a change of weight or priority_class without --reason, and record the reason in the ledger. Delete the Reweight option of go/internal/recurrence and its wiring in go/cmd/evolve/cmd_loop_escalate.go, so that recurrence moves the rank only through the recurrence factor. This closes the remaining part of recurrence-reweight-bypasses-the-item-writer.",
+  "id": "inbox-prioritization-p5-reason-on-priority-change",
+  "kind": "feature",
+  "last_failure_class": "capability",
+  "last_failure_cycle": 2520,
+  "last_failure_findings": "review gate: phase \"build\" deliverable rejected after 2 correction(s): build handoff floor: 1 deterministic check failure(s) — fix these exactly before handoff:\n  repo-contract scanner pack RED: github.com/mickeyyaya/evolve-loop/go/internal/repocontract.TestPackages_HoldEveryTestThatReadsTheWholeTree — ship runs these repo-wide suites before it pushes and refuses a red one. Reproduce each from go/ with `go test -count=1 <package>` (for a named test add `-run '^<Test>$'`) and fix the change before handoff:\n=== RUN   TestPackages_HoldEveryTestThatReadsTheWholeTree\n    packages_test.go:25: internal/inboxmover.TestNoProductionCodeWritesAnItemWeightOutsideTheLifecycleWriter reads the whole tree, so a lane that touches neither its package nor an importer can still break it; add it to TreeReadingTests() or put the package in Packages()\n--- FAIL: TestPackages_HoldEveryTestThatReadsTheWholeTree (3.11s)\n",
+  "last_failure_fingerprint": "text:2f1f4231b6a2",
+  "last_failure_reason": "cycle-failure-release",
+  "last_failure_rung": "R3",
+  "notes": "Plan link: docs/plans/inbox-prioritization-2026-10.md (component P5). Spec link: docs/architecture/adr/0121-inbox-priority-is-a-computed-rank.md and docs/architecture/packages/internal-inboxrank.md. The plan has no owner column, so the route is lane.",
+  "priority_class": "correctness",
+  "retry_plan": "fresh-deep-plan",
+  "route": "console-manual",
+  "routed_at": "2026-11-18T23:36:08Z",
+  "routed_by": "operator",
+  "routed_cycle": 2520,
+  "routed_reason": "cycle 2520 FAIL: TestC2520_008/009 require removing ApplyOptions.Reweight, but frozen predicate go/acs/cycle1932/predicates_test.go:88 builds it, so the acs package fails to compile; retiring or amending a frozen predicate is a console decision",
+  "source": "console, 2026-10-27, plan audit: track unfinished components",
+  "summary": "Component P5 of the plan docs/plans/inbox-prioritization-2026-10.md. The spec is docs/architecture/adr/0121-inbox-priority-is-a-computed-rank.md and docs/architecture/packages/internal-inboxrank.md. evolve inbox edit --set weight= or --set priority_class= does not require a reason. The recurrence escalate path still calls opts.Reweight (go/internal/recurrence/apply.go), and cmd_loop_escalate.go wires it. Recurrence is already a rank factor since P1.",
+  "title": "Each change of weight or priority_class records a reason, and recurrence stops its weight writes (inbox plan P5)",
+  "weight": 0.45
+}
