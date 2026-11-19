@@ -1,10 +1,10 @@
 package kbgraph
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
 )
 
@@ -199,8 +199,19 @@ verified_at: ""
 func TestBuild_UnparsableIncidentReturnsErrorNamingFile(t *testing.T) {
 	root := t.TempDir()
 	writeIncidentFile(t, root, "2026-11-19-bad.md", "---\nschema: incident-record/1\nbogus: 1\n---\n\n# bad\n")
-	if _, err := Build(root); err == nil || !strings.Contains(err.Error(), "2026-11-19-bad") {
-		t.Fatalf("expected error naming 2026-11-19-bad for broken incident frontmatter, got %v", err)
+	_, err := Build(root)
+	var parseErr *RecordParseError
+	if !errors.As(err, &parseErr) {
+		t.Fatalf("Build error = %v, want a *RecordParseError", err)
+	}
+	if want := filepath.Join(root, "docs", "incidents", "2026-11-19-bad.md"); parseErr.Path != want {
+		t.Errorf("RecordParseError.Path = %q, want %q", parseErr.Path, want)
+	}
+	if parseErr.Err == nil || errors.Unwrap(parseErr) != parseErr.Err {
+		t.Fatalf("RecordParseError must unwrap to the parse failure %v", parseErr.Err)
+	}
+	if got, want := parseErr.Error(), "kbgraph: parse "+parseErr.Path+": "+parseErr.Err.Error(); got != want {
+		t.Errorf("RecordParseError message = %q, want %q", got, want)
 	}
 }
 
