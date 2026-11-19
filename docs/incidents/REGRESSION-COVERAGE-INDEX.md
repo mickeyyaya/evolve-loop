@@ -17,11 +17,11 @@
 
 | | Count |
 |---|---|
-| Incidents mapped | 66 |
-| Distinct failure modes (coverage-map rows) | 109 |
+| Incidents mapped | 67 |
+| Distinct failure modes (coverage-map rows) | 111 |
 | ✅ covered (a test fails if the bug comes back) | 83 |
 | 🟡 partial (related test, doesn't pin the exact mode) | 11 |
-| ❌ none (no regression test) | 15 |
+| ❌ none (no regression test) | 17 |
 | ⛔ untestable (external infra / live CLI) | 0 |
 
 These counts are tallies of the coverage map's rows, so they move with it: a new
@@ -156,6 +156,8 @@ not the coverage map, which is the hand-maintained per-incident record.
 | [2026-11-19 — cycle 2523 needed three audit rounds and a rebase before it shipped](2026-11-19-cycle-2523-needed-three-audit-rounds-and-a-rebase-before-it-shipped.md) | `Rebaseline` and the tree test refused on the count of added rows, not the set. An equal-count swap and central 0 to N growth passed | `testaudit/tree.go` | ✅ | `testaudit/tree_test.go`, `testaudit/rebaseline_set_test.go`, `acs/cycle2523/predicates_test.go::TestC2523_008` to `::TestC2523_010` |
 | 2026-11-19 — cycle 2523 | a count written by hand in the explanation document (92 for 93) cost one audit round | `docs/explain/builds` | ❌ | **GAP:** none filed; the explanation check cannot compare a count with its command |
 | [2026-11-19 — agent run deleted the reverted patch of two builder seats](2026-11-19-agent-run-deleted-the-reverted-patch-of-two-builder-seats.md) | the fence saved `fence-reverted.patch` in the run workspace, and `evolve agent run` removed the workspace on exit, so the patch that the WARN named did not exist | `cli/agentcmd/run.go` (`removeWorkspace`), `treefence/fence.go` (`savePatch`) | ❌ | inbox item `agent-run-deletes-the-fence-reverted-patch` |
+| [2026-11-19 — the console applied the backlog dispositions with two errors](2026-11-19-the-console-applied-the-backlog-dispositions-with-two-errors.md) | a console zsh loop named a variable `path`, which is tied to `PATH`. Thus 18 `inbox consume` calls ran with a resolution that had no claim and no evidence | console practice (no code) | ❌ | none: a console shell defect; the control is to print the arguments of a state-changing loop first |
+| 2026-11-19 — the console applied the backlog dispositions with two errors | 9 of 31 items routed to lanes on an unchecked first-pass claim were not lane work. `inbox route-lane` does not check a prerequisite that the item names in prose | `inboxmover` (route-lane) | ❌ | none: the adversarial pass before a route batch is the control; corrections wait for the boundary |
 
 ## Prioritized gap backlog (13-agent sweep; agent confidence in parens)
 
