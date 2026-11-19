@@ -66,8 +66,6 @@ func newCycleSourceGitFixture(t *testing.T) cycleSourceGitFixture {
 		"GIT_AUTHOR_NAME":     "ci",
 		"GIT_COMMITTER_EMAIL": "ci@example.com",
 		"GIT_COMMITTER_NAME":  "ci",
-		"GIT_CONFIG_GLOBAL":   os.DevNull,
-		"GIT_CONFIG_NOSYSTEM": "1",
 		"GIT_TERMINAL_PROMPT": "0",
 	} {
 		t.Setenv(key, value)

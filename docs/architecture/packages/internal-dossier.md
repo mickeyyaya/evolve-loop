@@ -71,6 +71,7 @@
 - **`ReadCommitted(root, minCycle <= 0)` reads the whole corpus.** A caller that cannot bound its window must choose that deliberately. Pinned by `TestReadCommitted_WindowedAscendingAndFaultTolerant`.
 - **`build.go` must name `phasecontract` and must not re-type the audit report filename.** `go/acs/cycle1141` reads the source file to check both.
 - **Known limit.** `failure-digest.json` is written only when the dispatch loop routes into retro, so a FAIL reclassified at finalize without a retro dispatch carries reasons only.
+- **Host credentials stay isolated.** `TestMain` calls `gittest.IsolateHostCredentials` before any test runs and calls `restore` after `m.Run`.
 
 ## Findings
 

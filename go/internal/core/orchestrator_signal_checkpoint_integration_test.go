@@ -21,7 +21,7 @@ func TestRunCycle_InterruptPreservesIntegrationBranchForResume(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
 	}
-	for _, entry := range append(gittest.ConfigEnv(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1") {
+	for _, entry := range gittest.ConfigEnv() {
 		key, value, _ := strings.Cut(entry, "=")
 		t.Setenv(key, value)
 	}

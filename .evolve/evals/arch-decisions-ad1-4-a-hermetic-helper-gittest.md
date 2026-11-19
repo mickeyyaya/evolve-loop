@@ -1,24 +1,30 @@
 ---
 score_cap:
-  - criterion: "A real gh in a test sees no login after gittest.IsolateHostCredentials"
-    max_if_missing: 4
+  - criterion: "The named red test of the helper stays green: a gh in a test sees no login"
+    max_if_missing: 5
     evidence: "cd go && go test -count=1 -run '^TestIsolateHostCredentials_ARealGhInATestSeesNoLogin$' ./internal/gittest"
-  - criterion: "The helper sets the hermetic git and gh values, restores them and reports failures"
+  - criterion: "The test binaries of changedpkgs, dossier and core isolate host credentials through TestMain"
+    max_if_missing: 4
+    evidence: "cd go && GH_TOKEN=x GIT_CONFIG_GLOBAL=/host go test -count=1 -run '^TestMain_IsolatesHostCredentialsForEveryTestIn' ./internal/changedpkgs ./internal/dossier"
+  - criterion: "No hand-written GIT_CONFIG line remains in the adopting test files"
+    max_if_missing: 5
+    evidence: "cd go && go test -tags acs -count=1 -run 'TestC2543_005' ./acs/cycle2543"
+  - criterion: "The package notes of the changed packages state the helper in STE"
     max_if_missing: 6
-    evidence: "cd go && go test -count=1 -run '^TestIsolateHostCredentials_' ./internal/gittest"
-  - criterion: "The cmd/evolve TestMain calls the helper so every test of the package is hermetic"
-    max_if_missing: 6
-    evidence: "cd go && go test -count=1 -run '^TestMain_IsolatesHostCredentialsForEveryTestInThePackage$' ./cmd/evolve"
+    evidence: "cd go && go test -tags acs -count=1 -run 'TestC2543_009' ./acs/cycle2543"
 ---
 
-# Eval: gittest.IsolateHostCredentials
+# Eval: Adopt gittest.IsolateHostCredentials in the test binaries (AD1-4)
 
-> Pins the AD1-4 component of the 2026-11-03 architecture decisions plan. One helper in `internal/gittest` sets GH_CONFIG_DIR, GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM, GIT_TERMINAL_PROMPT and GIT_SSH_COMMAND, drops GH_TOKEN and GITHUB_TOKEN, and returns a restore function. The cmd/evolve TestMain uses it. Source: cycle 2138, inbox item arch-decisions-ad1-4-a-hermetic-helper-gittest.
+> Pins the adoption of `gittest.IsolateHostCredentials()` by the test binaries of changedpkgs,
+> dossier, core and cmd/evolve, and the removal of their hand-written `GIT_CONFIG_GLOBAL` lines.
+> Source: docs/plans/architecture-decisions-2026-11.md AD1-4, cycle 2543.
 
 ## Score Cap Rationale
 
 | Pattern | Criterion | max_if_missing | Evidence |
 |---|---|---|---|
-| gh-no-login | A real gh sees no login | 4/10 | `go test -run TestIsolateHostCredentials_ARealGhInATestSeesNoLogin ./internal/gittest` |
-| helper-contract | Values, restore and failure paths | 6/10 | `go test -run TestIsolateHostCredentials_ ./internal/gittest` |
-| testmain-wiring | TestMain reaches the helper | 6/10 | `go test -run TestMain_IsolatesHostCredentialsForEveryTestInThePackage ./cmd/evolve` |
+| helper-green | The named red test stays green | 5/10 | `go test -run TestIsolateHostCredentials_ARealGhInATestSeesNoLogin ./internal/gittest` |
+| testmain-adoption | TestMain isolates credentials | 4/10 | `go test -run TestMain_IsolatesHostCredentialsForEveryTestIn ./internal/...` |
+| no-hand-lines | No hand-written config line | 5/10 | `go test -tags acs -run TestC2543_005 ./acs/cycle2543` |
+| ste-notes | Package notes state the change | 6/10 | `go test -tags acs -run TestC2543_009 ./acs/cycle2543` |

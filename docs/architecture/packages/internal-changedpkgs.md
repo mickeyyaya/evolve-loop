@@ -41,6 +41,7 @@
 - **`GateScope` never runs less than it can prove.** An unreadable diff, an unreadable import graph or a module-root file returns `Full`, and the runner then runs the whole module. A diff with no Go package returns an empty scope, and the runner skips the scoped gates. Pinned by `TestGateScope_UnderivableChangeFallsBackToTheFullSet`, `TestGateScope_ModuleRootChangeFallsBackToTheFullSet` and `TestGateScope_ChangeOutsideGoRunsNothing`. See [composed-gate-scope.md](../composed-gate-scope.md).
 - **`RunShadowTests` scopes to the merge base of the branch.** It computes `git merge-base HEAD <baseRef>`, diffs against that merge base, and runs `go test` on the testable non-`acs` closure. Commits on `main` after the fork stay out of the selection. Non-Go changes skip `go test` and pass. Pinned by `TestRunShadowTests_SelectsChangedPackageAndDirectAndTransitiveImporters` and `TestRunShadowTests_IgnoresMainCommitsAfterFork`.
 - **`acs` packages stay out of the scope.** The ACS gate runs them with tags. Pinned by `TestGateScope_ACSPackagesNeverEnterTheScope`.
+- **Host credentials stay isolated.** `TestMain` calls `gittest.IsolateHostCredentials` before any test runs and calls `restore` after `m.Run`.
 
 ## Findings
 

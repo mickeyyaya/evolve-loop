@@ -13,6 +13,11 @@ import (
 var seatWorkspace string
 
 func TestMain(m *testing.M) {
+	restore, err := gittest.IsolateHostCredentials()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "TestMain: isolate host credentials: %v\n", err)
+		os.Exit(1)
+	}
 	backoffSleep = func(time.Duration) {}
 	if err := gotooltest.LimitProcess(); err != nil {
 		fmt.Fprintf(os.Stderr, "TestMain: %v\n", err)
@@ -30,6 +35,9 @@ func TestMain(m *testing.M) {
 	}
 	if err := gittest.RemoveTemplates(); err != nil {
 		fmt.Fprintln(os.Stderr, "core tests: remove git templates:", err)
+	}
+	if err := restore(); err != nil {
+		fmt.Fprintln(os.Stderr, "core tests: restore host credentials:", err)
 	}
 	os.Exit(code)
 }

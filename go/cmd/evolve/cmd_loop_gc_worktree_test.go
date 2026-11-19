@@ -28,7 +28,6 @@ func gcGit(t *testing.T, dir string, args ...string) string {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(),
-		"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null",
 		"GIT_AUTHOR_NAME=evolve-test", "GIT_AUTHOR_EMAIL=test@evolve.local",
 		"GIT_COMMITTER_NAME=evolve-test", "GIT_COMMITTER_EMAIL=test@evolve.local",
 	)

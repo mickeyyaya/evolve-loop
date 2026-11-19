@@ -1504,7 +1504,7 @@ Rules for these seams:
 - A test reaches each error branch through the real entry point, for example `writeBuildSelfCheckArtifact`, and not through the seam alone.
 - A test that proves concurrent dispatch uses a barrier, not a sleep. In `TestDispatchEvaluateBatch_Concurrent`, each runner waits at a `rendezvous` until all batch members arrive. A serial dispatch fails because a runner stops its wait and records a miss. A sleep with a peak counter failed on a slow CI runner when the second runner started late.
 
-For the related rule on test isolation, see [driver tests must be environment-hermetic](../../conventions/hermetic-driver-tests.md).
+For the related rule on test isolation, see [driver tests must be environment-hermetic](../../conventions/hermetic-driver-tests.md). `TestMain` calls `gittest.IsolateHostCredentials` before any test runs and calls `restore` after `m.Run`.
 
 ## Base-red attribution in the build floor
 

@@ -14,7 +14,6 @@ func stagedPaths(t *testing.T, dir string) []string {
 	t.Helper()
 	cmd := exec.Command("git", "diff", "--cached", "--name-only")
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_SYSTEM="+os.DevNull)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git diff --cached: %v\n%s", err, out)
@@ -29,9 +28,6 @@ func stagedPaths(t *testing.T, dir string) []string {
 }
 
 func TestCommitPairGit_RollsBackStagedOnPermanentFailure(t *testing.T) {
-	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
-	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
-
 	dir := t.TempDir()
 	for _, args := range [][]string{
 		{"init"},
@@ -39,7 +35,6 @@ func TestCommitPairGit_RollsBackStagedOnPermanentFailure(t *testing.T) {
 	} {
 		cmd := exec.Command("git", args...)
 		cmd.Dir = dir
-		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_SYSTEM="+os.DevNull)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}

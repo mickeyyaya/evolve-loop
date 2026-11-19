@@ -272,4 +272,5 @@ var serialRequiredTests = map[string]string{
 	"core.TestCoreFacades_ProjectTheLeaf":                                                           swapsStderr,
 	"core.TestPhaseAdvisor_SeesTheSignalCenterAppliedThroughTheOption":                              swapsStderr,
 	"core.TestLaneStartRef_RealLockOnTheBaseRefIsRetried":                                           swapsWorktreeAddRetrySleep,
+	"core.TestMain_IsolatesHostCredentialsForEveryTestInCore":                                       "test reads process-wide TestMain credential environment",
 }

@@ -14,7 +14,6 @@ func gitInIndex(t *testing.T, dir string, args ...string) {
 	full := append([]string{"-C", dir}, args...)
 	cmd := exec.Command("git", full...)
 	cmd.Env = append(os.Environ(),
-		"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null",
 		"GIT_AUTHOR_NAME=cycle1591", "GIT_AUTHOR_EMAIL=cycle1591@example.invalid",
 		"GIT_COMMITTER_NAME=cycle1591", "GIT_COMMITTER_EMAIL=cycle1591@example.invalid")
 	if out, err := cmd.CombinedOutput(); err != nil {
