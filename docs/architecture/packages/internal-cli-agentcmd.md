@@ -77,3 +77,4 @@
 - `exitCode` returns `exitFenceRevert` (12) for that run. No other outcome uses 12. A dispatch error (21) keeps the priority.
 - `treefence.RestoredMarker` is the one home of the marker text that `agentcmd` matches. A reader seat never gets this exit code.
 - An existing-file revert keeps the envelope verdict PASS. A created-file revert gives FAIL. Both exit 12.
+- `keepFencePatch` moves `fence-reverted.patch` to `.evolve/agent-runs/<label>/fence-reverted.patch` before workspace removal and updates the diagnostic path.

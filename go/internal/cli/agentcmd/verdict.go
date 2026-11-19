@@ -138,6 +138,17 @@ func (out launchOutcome) withFenceVerdict() launchOutcome {
 	return out
 }
 
+func (out launchOutcome) withRevertedPatchPath(oldPath, newPath string) launchOutcome {
+	diags := slices.Clone(out.resp.Diagnostics)
+	for i, d := range diags {
+		if d.Severity == "warning" && strings.Contains(d.Message, treefence.RestoredMarker) {
+			diags[i].Message = strings.ReplaceAll(d.Message, oldPath, newPath)
+		}
+	}
+	out.resp.Diagnostics = diags
+	return out
+}
+
 func (out launchOutcome) fenceReverted() string {
 	if !out.writer {
 		return ""

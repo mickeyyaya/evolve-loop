@@ -36,10 +36,11 @@ import (
 )
 
 const (
-	inputFile   = "agent-input.md"
-	ledgerKind  = "agent_run"
-	ledgerSrc   = "evolve agent run"
-	runsSubpath = "ephemeral/agent-runs"
+	inputFile      = "agent-input.md"
+	ledgerKind     = "agent_run"
+	ledgerSrc      = "evolve agent run"
+	runsSubpath    = "ephemeral/agent-runs"
+	fencePatchName = "fence-reverted.patch"
 
 	keptDeliverables = 20
 )
@@ -214,6 +215,7 @@ func (c command) run(args []string, stdin io.Reader, stdout, stderr io.Writer) i
 	if out.resp.Verdict == core.VerdictFAIL && out.hasReport {
 		keepFailedDeliverable(r, out.report, stderr)
 	}
+	out = keepFencePatch(r, out, stderr)
 	recordPath, recordErr := writeLaunchRecord(r, out, now)
 	recordErr = errors.Join(appendLedger(r, out, now), recordErr)
 	emit(o, r, out, recordPath, errors.Join(out.runErr, recordErr), stdout)
@@ -225,6 +227,32 @@ func keepFailedDeliverable(r standaloneRun, body string, stderr io.Writer) {
 	if err := launchrecord.KeepDeliverable(paths.EvolveDirOf(r.root), r.label, body, keptDeliverables); err != nil {
 		fmt.Fprintf(stderr, "evolve agent run: keep the failing deliverable of %s: %v\n", r.label, err)
 	}
+}
+
+func moveFencePatch(src, dst string) (bool, error) {
+	if _, err := os.Stat(src); errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return false, err
+	}
+	return true, os.Rename(src, dst)
+}
+
+func keepFencePatch(r standaloneRun, out launchOutcome, stderr io.Writer) launchOutcome {
+	src := filepath.Join(r.workspace, fencePatchName)
+	dst := filepath.Join(paths.EvolveDirOf(r.root), launchrecord.Subdir, r.label, fencePatchName)
+	moved, err := moveFencePatch(src, dst)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve agent run: keep the reverted patch of %s: %v\n", r.label, err)
+		return out
+	}
+	if !moved {
+		return out
+	}
+	return out.withRevertedPatchPath(src, dst)
 }
 
 func keepLLMCalls(r standaloneRun, stderr io.Writer) {
