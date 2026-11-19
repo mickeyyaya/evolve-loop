@@ -48,6 +48,6 @@
 ## The pure and I/O split (2026-11-15)
 
 - Operator decision of 2026-11-15: the predicate corpus has two sets. A pure predicate has no escape hatch in its dependency closure. An I/O predicate reaches `os`, `os/exec`, `os/user`, `syscall`, `net` or `net/http`. `Pure` is the one purity predicate. `Split` partitions the corpus with it, and a predicate with no dependency data counts as I/O. `skippableDeps` and `Split` both call `Pure`, so no second copy of the rule exists.
-- TIA skips only pure predicates that lie outside the change scope. An I/O predicate always runs. `Decision.PureCount` and `Decision.IOCount` record the split in `acs-tia-shadow.json` and in the `TIA_SHADOW` signal source.
+- TIA skips only pure predicates that lie outside the change scope. An I/O predicate always runs. `Decision.PureCount` and `Decision.IOCount` record the split in `acs-tia-shadow.json`.
 - **Recorded count: 0 pure predicates of 44** in `go/acs/regression`, measured on 2026-11-15. Each predicate imports `pkg/acsassert`, which imports `os`. `TestRegressionCorpus_CountsThePurePredicates` pins the count through `recordedPurePredicates`. Change the constant and this note together when the corpus changes.
-- The floor is `minPurePredicates` (9). The count is below it, so the `regression_tia` stage must retire. This change does not retire it. The operator decides.
+- The operator rule of 2026-11-15 retires the `regression_tia` stage when fewer than 9 predicates are pure. The count is 0, so the stage retired on 2026-11-19. `Pure` stays, because the scan skip uses it.

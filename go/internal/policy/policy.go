@@ -54,7 +54,6 @@ type Policy struct {
 	ParallelEvaluate   *ParallelEvaluatePolicy   `json:"parallel_evaluate,omitempty"`
 	ContextFill        *ContextFillPolicy        `json:"context_fill,omitempty"`
 	Research           *ResearchPolicy           `json:"research,omitempty"`
-	RegressionTIA      *RegressionTIAPolicy      `json:"regression_tia,omitempty"`
 	Classify           *ClassifyPolicy           `json:"classify,omitempty"`
 	Catalog            *CatalogPolicy            `json:"catalog,omitempty"`
 	Recovery           *RecoveryPolicy           `json:"recovery,omitempty"`

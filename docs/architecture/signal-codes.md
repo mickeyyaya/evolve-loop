@@ -570,12 +570,6 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SIGNALCENTER_UNKNOWN_SEVERITY` | an event carried a severity outside INFO/WARN/INCIDENT; raw value in fields.raw_severity |
 | `SIGNALCENTER_UNREGISTERED_CODE` | an event carried a code its module never registered; raw value in fields.raw_code |
 
-### tia
-
-| Code | Meaning |
-|---|---|
-| `TIA_SHADOW` | at regression_tia.stage shadow or enforce, the audit records which regression predicates the change would skip; fields.would_skip_count, fields.selected (the count of predicates that run) and fields.write_error when the decision file could not be written (severity WARN then) |
-
 ### tokens
 
 | Code | Meaning |
