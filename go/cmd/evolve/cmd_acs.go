@@ -36,13 +36,76 @@ func resolveACSSuiteRoot(evolveDir string, cycle int) string {
 }
 
 func suiteProjectRoot(evolveDir string, cycle int, root string) string {
+	p, err := resolveSuiteProjectRoot(evolveDir, cycle, root)
+	if err != nil {
+		return mainProjectRoot(root)
+	}
+	return p
+}
+
+func resolveSuiteProjectRoot(evolveDir string, cycle int, root string) (string, error) {
+	if cycle <= 0 {
+		return mainProjectRoot(root), nil
+	}
 	if abs, err := evolveDirAbs(evolveDir); err == nil {
-		state := filepath.Join(abs, "runs", fmt.Sprintf("cycle-%d", cycle), "cycle-state.json")
-		if _, serr := os.Stat(state); serr == nil {
-			return filepath.Dir(abs)
+		if hasCycleStateDir(abs, cycle) {
+			return filepath.Dir(abs), nil
 		}
 	}
-	return mainProjectRoot(root)
+	if root == "" {
+		return "", nil
+	}
+	out, err := sysexec.Command(context.Background(), "git", "-C", root, "worktree", "list", "--porcelain").Output()
+	if err != nil {
+		return mainProjectRoot(root), nil
+	}
+	roots := parseNonBareWorktrees(string(out))
+	for _, wt := range roots {
+		if hasCycleStateDir(filepath.Join(wt, ".evolve"), cycle) {
+			return wt, nil
+		}
+	}
+	checked := "(none)"
+	if len(roots) > 0 {
+		checked = strings.Join(roots, ", ")
+	}
+	return "", fmt.Errorf("no worktree holds cycle %d state (.evolve/runs/cycle-%d/cycle-state.json); checked roots: %s", cycle, cycle, checked)
+}
+
+func hasCycleStateDir(evolveDir string, cycle int) bool {
+	state := filepath.Join(evolveDir, "runs", fmt.Sprintf("cycle-%d", cycle), "cycle-state.json")
+	info, err := os.Stat(state)
+	return err == nil && !info.IsDir()
+}
+
+func parseNonBareWorktrees(porcelain string) []string {
+	var roots []string
+	var cur string
+	var skip bool
+	flush := func() {
+		if cur != "" && !skip {
+			roots = append(roots, cur)
+		}
+		cur = ""
+		skip = false
+	}
+	for _, line := range strings.Split(porcelain, "\n") {
+		line = strings.TrimRight(line, "\r")
+		if line == "" {
+			flush()
+			continue
+		}
+		if p, ok := strings.CutPrefix(line, "worktree "); ok {
+			flush()
+			cur = p
+			continue
+		}
+		if line == "bare" || line == "prunable" || strings.HasPrefix(line, "prunable ") {
+			skip = true
+		}
+	}
+	flush()
+	return roots
 }
 
 func mainProjectRoot(dir string) string {
@@ -92,7 +155,12 @@ func runACSSuite(args []string, stdout, stderr io.Writer) int {
 			f.root = resolved
 		}
 	}
-	v, err := acssuite.Run(acssuite.Options{Root: f.root, ProjectRoot: suiteProjectRoot(f.evolveDir, f.cycle, f.root), Cycle: f.cycle})
+	projectRoot, err := resolveSuiteProjectRoot(f.evolveDir, f.cycle, f.root)
+	if err != nil {
+		fmt.Fprintf(stderr, "%s: %v\n", name, err)
+		return 1
+	}
+	v, err := acssuite.Run(acssuite.Options{Root: f.root, ProjectRoot: projectRoot, Cycle: f.cycle})
 	if err != nil {
 		fmt.Fprintf(stderr, "%s: %v\n", name, err)
 		return 1
