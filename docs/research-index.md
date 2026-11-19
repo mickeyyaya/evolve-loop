@@ -893,4 +893,10 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/practice-claude-prompting-guide-2c5f9a4d-202611190048.md](research/practice-claude-prompting-guide-2c5f9a4d-202611190048.md) | Note on Claude prompt guide snapshot `2026-11-15T11:10:47Z` (search shortcut key cap chrome and live guide check) for item `2c5f9a4d`, read as untrusted data. All personas and the claude model notes stay unchanged. |
 
+## 2026-11-19 — Console backlog review
+
+| Document | What it records |
+|---|---|
+| [research/console-backlog-review-2026-11.md](research/console-backlog-review-2026-11.md) | Review of the 280 console-owned inbox items. An adversarial pass refuted 16 of 31 DONE claims. It proposes 18 drops, 19 narrowed items, 6 merged items, 35 lane routes, 49 gc flag items to consume and 7 pipeline fixes. |
+
 <!-- GENERATED:research-index END -->
