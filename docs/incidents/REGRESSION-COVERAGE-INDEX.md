@@ -17,11 +17,11 @@
 
 | | Count |
 |---|---|
-| Incidents mapped | 59 |
-| Distinct failure modes (coverage-map rows) | 97 |
-| ✅ covered (a test fails if the bug comes back) | 81 |
+| Incidents mapped | 60 |
+| Distinct failure modes (coverage-map rows) | 99 |
+| ✅ covered (a test fails if the bug comes back) | 82 |
 | 🟡 partial (related test, doesn't pin the exact mode) | 10 |
-| ❌ none (no regression test) | 6 |
+| ❌ none (no regression test) | 7 |
 | ⛔ untestable (external infra / live CLI) | 0 |
 
 These counts are tallies of the coverage map's rows, so they move with it: a new
@@ -144,6 +144,8 @@ not the coverage map, which is the hand-maintained per-incident record.
 | [2026-11-17 — 38 console PRs stayed open, and two rebuilds broke on the current main](2026-11-17-38-console-prs-stayed-open-and-two-rebuilds-broke-on-main.md) | the curator proposed a reroute before the history consume of the same item, so the apply step moved the item and the consume failed | `inboxcurator/curate.go` (`Curate`) | ✅ | `inboxcurator/history_test.go::TestCurate_AnItemThatMainClosedHasItsConsumeBeforeItsReroute` |
 | [2026-11-17 — 38 console PRs stayed open, and two rebuilds broke on the current main](2026-11-17-38-console-prs-stayed-open-and-two-rebuilds-broke-on-main.md) | the data-file reads of the repo-contract pack were not on the protected surface. The floor fixture lacked the packages of the whole-repository rows, and Go 1.23 fails on that | `guards/integrity_surface.go`, `gateregistry/seed_floors_test.go` (`packStubs`) | ✅ | `acs/regression/protectedsurface::TestEveryGateShapedFileIsProtectedSurface` + `gateregistry/seed_floors_test.go::TestRegistry_FloorEntriesGiveAGreenLaneNoLaneRed` |
 | [2026-11-18 — shadow-batch overlap test depended on sleep timing](2026-11-18-shadow-batch-overlap-test-depends-on-sleep-timing.md) | `overlapRunner.Run` used `time.Sleep(40 * time.Millisecond)` to detect overlap, so a loaded runner missed the window and failed the enforce control | `core/evaluate_batch_shadow_test.go` (`overlapRunner.Run`) | ✅ | `acs/cycle2524/predicates_test.go::TestC2524_001_EnforceControlSurvivesASlowScheduler` + `::TestC2524_002_NoSleepAndRendezvousBoundAtLeastFiveSeconds` + `::TestC2524_003_ConcurrentShadowDispatchStillTurnsTheTestRed` + `::TestC2524_004_StaysGreenRepeatedlyUnderOneAndTwoProcs` |
+| [2026-11-19 — two lanes turned main red with error-text tests](2026-11-19-two-lanes-turned-main-red-with-error-text-tests.md) | cycles 2530 and 2533 added tests that match on `err.Error()` text with no baseline row, so the tree ratchet of main went red | `incidentkb/render.go` (`ErrMissingMarker`, `ErrOverlappingMarkers`), `kbgraph/kbgraph.go` (`RecordParseError`), both from #1572 | ✅ | `testaudit/ratchet_tree_test.go::TestTreeRatchet` + `incidentkb/incidentkb_test.go::TestRender_EmptyAndErrorBranches` + `acs/cycle2533/predicates_test.go::TestC2533_004_LegacyAndUnparsableIncidentFilesDoNotBreakTheGraph` + `kbgraph/kbgraph_test.go::TestBuild_UnparsableIncidentReturnsErrorNamingFile` |
+| [2026-11-19 — two lanes turned main red with error-text tests](2026-11-19-two-lanes-turned-main-red-with-error-text-tests.md) | the lane build floor does not run the test-audit ratchet, so only the CI of main saw the findings | `core/build_floor_reviewer.go` (`StaticBuildFloorChecks`) | ❌ | inbox item `build-floor-runs-the-test-audit-ratchet` |
 
 ## Prioritized gap backlog (13-agent sweep; agent confidence in parens)
 
