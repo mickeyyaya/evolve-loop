@@ -53,7 +53,7 @@ func protectsSelfcheck(p string) bool { return p == selfcheckPath }
 func blockerWorktree(t *testing.T) string {
 	t.Helper()
 	wt := t.TempDir()
-	for _, rel := range []string{selfcheckPath, breakerPath, "go/internal/core/x_test.go"} {
+	for _, rel := range []string{selfcheckPath, breakerPath, "go/internal/core/x_test.go", "docs/x.md"} {
 		writeBlockerFile(t, wt, rel, "package core\n")
 	}
 	writeBlockerFile(t, wt, "go/acs/cycle1950/predicates_test.go", cycle1950Predicates)
@@ -132,11 +132,17 @@ func TestBlockerProver_AClaimThatIsNotRealStillFails(t *testing.T) {
 		"a path that does not exist": {
 			[]string{cycle1946PredicateFailure}, "BLOCKER protected-path go/internal/core/gone.go why", func(c *BlockerCase) { c.Protected = func(string) bool { return true } }, "does not exist",
 		},
-		"a test file": {
-			[]string{cycle1946PredicateFailure}, "BLOCKER protected-path go/internal/core/x_test.go why", func(c *BlockerCase) { c.Protected = func(string) bool { return true } }, "not a non-test Go source file",
+		"a test file that is not protected": {
+			[]string{cycle1946PredicateFailure}, "BLOCKER protected-path go/internal/core/x_test.go why", nil, "go/internal/core/x_test.go is not on the protected-surface manifest, so the lane can edit it",
+		},
+		"a conflict on a test file": {
+			[]string{cycle1950Failure}, conflict(t1, t2, "go/internal/core/x_test.go"), nil, "not a non-test Go source file",
+		},
+		"a protected file that is not Go source": {
+			[]string{cycle1946PredicateFailure}, "BLOCKER protected-path docs/x.md why", func(c *BlockerCase) { c.Protected = func(string) bool { return true } }, "docs/x.md is not a Go source file in the tree",
 		},
 		"a path outside the tree": {
-			[]string{cycle1946PredicateFailure}, "BLOCKER protected-path ../etc/x.go why", nil, "not a non-test Go source file",
+			[]string{cycle1946PredicateFailure}, "BLOCKER protected-path ../etc/x.go why", nil, "is not a Go source file in the tree",
 		},
 		"an unknown kind": {
 			[]string{cycle1946PredicateFailure}, "BLOCKER too-hard " + selfcheckPath + " why", nil, "unknown blocker kind",
@@ -291,6 +297,24 @@ func TestBlockerProver_TheEvidenceMustBeCompleteAndUntouched(t *testing.T) {
 				t.Errorf("proof = %+v; want a refusal that says %q", proof, tc.refusal)
 			}
 		})
+	}
+}
+
+func TestBlockerProver_AProtectedTestFileIsAProvenBlocker(t *testing.T) {
+	t.Parallel()
+	const protectedTest = "go/cmd/evolve/request_channel_test.go"
+	wt := blockerWorktree(t)
+	writeBlockerFile(t, wt, protectedTest, "package main\n")
+	failure := "./acs/cycle2508 (-tags acs): unit tests FAIL\n" +
+		"--- FAIL: TestC2508_006 (0.10s)\n" +
+		"    " + protectedTest + ":178: TestWireOrchestratorDeps_RequestChannelWired has no serial line\n"
+	c := blockerCase(wt, []string{failure}, []string{"BLOCKER protected-path " + protectedTest + ":178 the role guard denies a build edit of this file"})
+	c.Protected = func(p string) bool { return p == protectedTest }
+
+	proof := NewBlockerProver().Prove(c)
+
+	if !proof.Blocked() || len(proof.Proven) != 1 || proof.Proven[0].Path != protectedTest {
+		t.Fatalf("proof = %+v; a protected test file the role guard denies is a proven blocker that ends the cycle", proof)
 	}
 }
 
