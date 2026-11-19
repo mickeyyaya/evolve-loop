@@ -33,12 +33,20 @@ func cycleDir(runsDir string, cycle int) string {
 	return filepath.Join(runsDir, "cycle-"+strconv.Itoa(cycle))
 }
 
-func signalSpan(dir string) (first, last time.Time, ok bool) {
+type LaneRun struct {
+	Elapsed time.Duration
+	Shipped bool
+}
+
+func cycleSignalSpan(dir string) (first, last time.Time, shipped, ok bool) {
 	chunk, err := signalcenter.ReadStream(filepath.Join(dir, signalcenter.StreamFileName), 0)
 	if err != nil {
-		return first, last, false
+		return first, last, false, false
 	}
 	for _, e := range chunk.Events {
+		if e.Kind == signalcenter.KindPhaseOutcome && e.Phase == "ship" && e.Fields["verdict"] == "PASS" {
+			shipped = true
+		}
 		at, _ := time.Parse(time.RFC3339Nano, e.TS)
 		if first.IsZero() || at.Before(first) {
 			first = at
@@ -47,19 +55,36 @@ func signalSpan(dir string) (first, last time.Time, ok bool) {
 			last = at
 		}
 	}
-	return first, last, !first.IsZero()
+	return first, last, shipped, !first.IsZero()
 }
 
-func LaneTimes(runsDir string, last int) ([]time.Duration, error) {
+func signalSpan(dir string) (first, last time.Time, ok bool) {
+	first, last, _, ok = cycleSignalSpan(dir)
+	return first, last, ok
+}
+
+func LaneRuns(runsDir string, last int) ([]LaneRun, error) {
 	cycles, err := cycleDirs(runsDir)
 	if err != nil {
 		return nil, err
 	}
-	var out []time.Duration
+	var out []LaneRun
 	for _, c := range cycles[max(0, len(cycles)-last):] {
-		if first, end, ok := signalSpan(cycleDir(runsDir, c)); ok && end.After(first) {
-			out = append(out, end.Sub(first))
+		if first, end, shipped, ok := cycleSignalSpan(cycleDir(runsDir, c)); ok && end.After(first) {
+			out = append(out, LaneRun{Elapsed: end.Sub(first), Shipped: shipped})
 		}
+	}
+	return out, nil
+}
+
+func LaneTimes(runsDir string, last int) ([]time.Duration, error) {
+	runs, err := LaneRuns(runsDir, last)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]time.Duration, len(runs))
+	for i, r := range runs {
+		out[i] = r.Elapsed
 	}
 	return out, nil
 }

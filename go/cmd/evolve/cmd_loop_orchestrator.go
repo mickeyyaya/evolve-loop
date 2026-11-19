@@ -23,16 +23,23 @@ const laneTimeWindow = 50
 
 func newLaneLeases(projectRoot string, oc policy.OrchestratorConfig, publish orchestrator.Publish, warn io.Writer) (*orchestrator.Leases, orchestrator.LeaseConfig) {
 	runs := laneRunsDir(projectRoot)
-	times, err := orchestrator.LaneTimes(runs, laneTimeWindow)
+	laneRuns, err := orchestrator.LaneRuns(runs, laneTimeWindow)
 	if err != nil {
 		fmt.Fprintf(warn, "[loop] WARN: orchestrator: no lane times (%v); the lease deadline is the %d-minute floor\n", err, oc.DeadlineFloorMinutes)
 	}
+	floor := time.Duration(oc.DeadlineFloorMinutes) * time.Minute
+	deadlineAll := orchestrator.DeadlineByBasis(laneRuns, "all", floor)
+	deadlineShipped := orchestrator.DeadlineByBasis(laneRuns, "shipped", floor)
+	deadline := deadlineAll
+	if oc.DeadlineBasis == "shipped" {
+		deadline = deadlineShipped
+	}
 	cfg := orchestrator.LeaseConfig{
 		Stage:    oc.Stage,
-		Deadline: orchestrator.DeadlineOf(times, time.Duration(oc.DeadlineFloorMinutes)*time.Minute),
+		Deadline: deadline,
 		Stall:    time.Duration(oc.StallMinutes) * time.Minute,
 	}
-	fmt.Fprintf(warn, "[loop] orchestrator: lane lease (stage %s): deadline %s from %d lane time(s), stall %s\n", cfg.Stage, cfg.Deadline, len(times), cfg.Stall)
+	fmt.Fprintf(warn, "[loop] orchestrator: lane lease (stage %s): deadline %s from %d lane time(s), stall %s, deadline_all=%s, deadline_shipped=%s\n", cfg.Stage, cfg.Deadline, len(laneRuns), cfg.Stall, deadlineAll, deadlineShipped)
 	return orchestrator.NewLeases(cfg, orchestrator.SystemClock{}, orchestrator.RunsHeartbeat(runs), publish), cfg
 }
 

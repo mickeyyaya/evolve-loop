@@ -5,6 +5,17 @@ import (
 	"time"
 )
 
+func DeadlineByBasis(runs []LaneRun, basis string, floor time.Duration) time.Duration {
+	var times []time.Duration
+	for _, r := range runs {
+		if basis == "shipped" && !r.Shipped {
+			continue
+		}
+		times = append(times, r.Elapsed)
+	}
+	return DeadlineOf(times, floor)
+}
+
 func DeadlineOf(laneTimes []time.Duration, floor time.Duration) time.Duration {
 	if len(laneTimes) == 0 {
 		return floor

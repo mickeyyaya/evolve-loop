@@ -13,6 +13,7 @@ type FleetOrchestratorPolicy struct {
 	ScanK                int                `json:"scan_k,omitempty"`
 	HubMinImporters      int                `json:"hub_min_importers,omitempty"`
 	DeadlineFloorMinutes int                `json:"deadline_floor_minutes,omitempty"`
+	DeadlineBasis        string             `json:"deadline_basis,omitempty"`
 	StallMinutes         int                `json:"stall_minutes,omitempty"`
 	RunMaxLanes          int                `json:"run_max_lanes,omitempty"`
 	FileCells            []string           `json:"file_cells,omitempty"`
@@ -30,6 +31,7 @@ type OrchestratorConfig struct {
 	ScanK                int
 	HubMinImporters      int
 	DeadlineFloorMinutes int
+	DeadlineBasis        string
 	StallMinutes         int
 	RunMaxLanes          int
 	WindowStart          int
@@ -50,6 +52,7 @@ const (
 	defaultOrchestratorScanK           = 32
 	defaultOrchestratorHubMinImporters = 120
 	defaultOrchestratorDeadlineFloor   = 60
+	defaultOrchestratorDeadlineBasis   = "all"
 	defaultOrchestratorStallMinutes    = 30
 	defaultOrchestratorWindowStart     = 4
 	defaultOrchestratorWindowMin       = 4
@@ -82,6 +85,8 @@ func (o FleetOrchestratorPolicy) validate() error {
 		return errors.New("hub_min_importers must not be negative")
 	case o.DeadlineFloorMinutes < 0:
 		return errors.New("deadline_floor_minutes must not be negative")
+	case o.DeadlineBasis != "" && o.DeadlineBasis != "all" && o.DeadlineBasis != "shipped":
+		return fmt.Errorf("deadline_basis %q is not \"all\" or \"shipped\"", o.DeadlineBasis)
 	case o.StallMinutes < 0:
 		return errors.New("stall_minutes must not be negative")
 	case o.RunMaxLanes < 0:
@@ -109,7 +114,7 @@ func validateFileCells(cells []string) error {
 
 func orchestratorConfig(o *FleetOrchestratorPolicy, count int) OrchestratorConfig {
 	c := OrchestratorConfig{Stage: "shadow", Admission: "shadow", ScanK: defaultOrchestratorScanK, HubMinImporters: defaultOrchestratorHubMinImporters,
-		DeadlineFloorMinutes: defaultOrchestratorDeadlineFloor, StallMinutes: defaultOrchestratorStallMinutes,
+		DeadlineFloorMinutes: defaultOrchestratorDeadlineFloor, DeadlineBasis: defaultOrchestratorDeadlineBasis, StallMinutes: defaultOrchestratorStallMinutes,
 		RunMaxLanes: orchestratorRunLanesPerSlot * count,
 		WindowStart: defaultOrchestratorWindowStart, WindowMin: defaultOrchestratorWindowMin}
 	if o == nil {
@@ -129,6 +134,9 @@ func orchestratorConfig(o *FleetOrchestratorPolicy, count int) OrchestratorConfi
 	}
 	if o.DeadlineFloorMinutes > 0 {
 		c.DeadlineFloorMinutes = o.DeadlineFloorMinutes
+	}
+	if o.DeadlineBasis != "" {
+		c.DeadlineBasis = o.DeadlineBasis
 	}
 	if o.StallMinutes > 0 {
 		c.StallMinutes = o.StallMinutes
