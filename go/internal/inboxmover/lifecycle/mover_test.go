@@ -340,12 +340,13 @@ var codeSteps = map[signalcenter.Code][]string{
 	CodeContinuationManifestUnreadable: {"manifest"},
 	CodeItemRewriteFailed:              {"counter_reset", "failure_bump", "continuation_stamp", "route"},
 	CodeItemRoutedConsole:              {"route"},
+	CodeItemFiledConsole:               {"intake"},
 	CodeRouteNotFound:                  {"locate"},
 }
 
 func TestMover_Codes_RegisteredUnderInbox_DocsNameTheirSteps_NoLedgerDouble(t *testing.T) {
-	if len(codeSteps) != 14 {
-		t.Fatalf("the unit registers 14 codes, the table names %d", len(codeSteps))
+	if len(codeSteps) != 15 {
+		t.Fatalf("the unit registers 15 codes, the table names %d", len(codeSteps))
 	}
 	docs := map[signalcenter.Code]string{}
 	for _, cd := range signalcenter.RegisteredCodes()[signalcenter.ModuleInbox] {

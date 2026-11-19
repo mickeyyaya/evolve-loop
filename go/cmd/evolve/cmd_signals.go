@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	_ "github.com/mickeyyaya/evolve-loop/go/internal/isolation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/skillcheck"
@@ -37,7 +38,7 @@ func runSignals(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "usage: evolve signals codes <generate|check> | "+signalsTailUsage)
 		return 10
 	}
-	docPath := filepath.Join(sourceRoot(), "docs", "architecture", "signal-codes.md")
+	docPath := filepath.Join(signalDocRoot(), "docs", "architecture", "signal-codes.md")
 	switch args[1] {
 	case "generate":
 		return signalCodesRun(docPath, true, stdout, stderr)
@@ -80,6 +81,16 @@ func signalCodesRun(docPath string, write bool, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintf(stdout, "signals: %d codes in sync\n", count)
 	return 0
+}
+
+func signalDocRoot() string {
+	if os.Getenv(ipcenv.WorktreeRootKey) != "" || os.Getenv("EVOLVE_PROJECT_ROOT") != "" {
+		return sourceRoot()
+	}
+	if root, err := resolveRepoRoot(""); err == nil && root != "" {
+		return root
+	}
+	return sourceRoot()
 }
 
 func registeredCodeCount() int {

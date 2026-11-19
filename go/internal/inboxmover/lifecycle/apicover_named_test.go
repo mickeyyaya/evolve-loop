@@ -25,7 +25,7 @@ func TestAPI_EveryExportIsNamed(t *testing.T) {
 	}
 	for _, c := range []signalcenter.Code{CodeClaimNotFound, CodeClaimRefused, CodeClaimMoveFailed, CodePromoteNotFound, CodePromoteUnlandedSHA,
 		CodePromoteMoveFailed, CodeLandedCheckFailed, CodeReleaseDoubleMove, CodeReleaseMoveFailed, CodeQuarantineFailed,
-		CodeContinuationManifestUnreadable, CodeItemRewriteFailed, CodeItemRoutedConsole, CodeRouteNotFound} {
+		CodeContinuationManifestUnreadable, CodeItemRewriteFailed, CodeItemRoutedConsole, CodeItemFiledConsole, CodeRouteNotFound} {
 		if !c.BelongsTo(signalcenter.ModuleInbox) {
 			t.Errorf("%s is not an inbox code", c)
 		}

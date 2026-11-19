@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 const validItem = `{"id":"cli-inbox-show","kind":"feature","priority_class":"debuggability","weight":0.5,` +
@@ -285,4 +286,77 @@ func jsonFilesAndTemps(t *testing.T, dir string) []string {
 		out = append(out, filepath.Join(dir, e.Name()))
 	}
 	return out
+}
+
+func TestMover_File_EmitsFiledConsoleSignalOnlyForConsoleOwnedItems(t *testing.T) {
+	isGuard := func(p string) bool { return p == "go/internal/guards/phase.go" }
+	cases := map[string]struct {
+		body      string
+		wantClass string
+		wantKind  string
+		wantText  string
+	}{
+		"protected surface": {
+			body:      strings.Replace(validItem, `"files":["go/cmd/evolve/cmd_inbox.go"]`, `"files":["go/internal/guards/phase.go"]`, 1),
+			wantClass: "protected",
+			wantKind:  "feature",
+			wantText:  "protected fix surface: go/internal/guards/phase.go",
+		},
+		"console kind": {
+			body:      strings.Replace(validItem, `"kind":"feature"`, `"kind":"pipeline-repair"`, 1),
+			wantClass: "kind",
+			wantKind:  "pipeline-repair",
+			wantText:  "kind:pipeline-repair",
+		},
+		"authored console route": {
+			body:      strings.Replace(validItem, `"source":"console"}`, `"source":"console","route":"console-manual"}`, 1),
+			wantClass: "route",
+			wantKind:  "feature",
+			wantText:  "route:console-manual",
+		},
+		"lane item": {
+			body: validItem,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			rc := newRecordingCenter()
+			m := newFiler(newInbox(t), nil, WithSignals(rc.accessor()), WithProtectedPath(isGuard))
+			res, err := m.File([]byte(tc.body))
+			if err != nil {
+				t.Fatalf("File: %v", err)
+			}
+			if tc.wantClass == "" {
+				if len(rc.events) != 0 {
+					t.Fatalf("lane item emitted %+v, want none", rc.events)
+				}
+				return
+			}
+			if len(rc.events) != 1 {
+				t.Fatalf("got %d signals, want 1: %+v", len(rc.events), rc.events)
+			}
+			e := rc.events[0]
+			if e.Code != CodeItemFiledConsole || e.Module != signalcenter.ModuleInbox || e.Severity != signalcenter.SeverityInfo {
+				t.Errorf("header = (%s, %s, %s), want (INBOX_ITEM_FILED_CONSOLE, inbox, INFO)", e.Code, e.Module, e.Severity)
+			}
+			if e.Fields["class"] != tc.wantClass || e.Fields["kind"] != tc.wantKind || e.Fields["task_id"] != "cli-inbox-show" || e.Fields["path"] != res.Path || e.Fields["step"] != "intake" || !strings.Contains(e.Fields["reason"], tc.wantText) {
+				t.Errorf("fields = %+v, want class=%s kind=%s task_id=cli-inbox-show path=%s step=intake reason~%q", e.Fields, tc.wantClass, tc.wantKind, res.Path, tc.wantText)
+			}
+		})
+	}
+}
+
+func TestMover_File_RefusedDuplicateEmitsNoSecondSignal(t *testing.T) {
+	rc := newRecordingCenter()
+	m := newFiler(newInbox(t), nil, WithSignals(rc.accessor()))
+	body := strings.Replace(validItem, `"kind":"feature"`, `"kind":"pipeline-repair"`, 1)
+	if _, err := m.File([]byte(body)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.File([]byte(body)); !errors.Is(err, ErrAlreadyFiled) {
+		t.Fatalf("duplicate err = %v, want ErrAlreadyFiled", err)
+	}
+	if len(rc.events) != 1 {
+		t.Fatalf("got %d signals after duplicate refusal, want 1: %+v", len(rc.events), rc.events)
+	}
 }

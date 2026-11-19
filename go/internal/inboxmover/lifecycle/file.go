@@ -15,7 +15,14 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
+
+const CodeItemFiledConsole signalcenter.Code = "INBOX_ITEM_FILED_CONSOLE"
+
+func init() {
+	signalcenter.RegisterCode(signalcenter.ModuleInbox, CodeItemFiledConsole, "an item was filed as console-owned (protected fix surface, console kind, or authored console route) and no lane claims it; fields.class = protected | kind | route, task_id, kind, path, reason, step=intake")
+}
 
 var ErrInvalidItem = errors.New("inboxmover: invalid inbox item")
 
@@ -77,7 +84,47 @@ func (m *Mover) File(raw []byte) (FileResult, error) {
 	}
 	m.linef("filed %s: %s", item.ID, filepath.Base(path))
 	m.ledgerLine(ledgerEntry{Action: "file", TaskID: item.ID, To: ".evolve/inbox/" + filepath.Base(path), Reason: "inbox add"})
-	return FileResult{Path: path, ConsoleReason: consoleRoutedReason(path, m.isProtected)}, nil
+	reason := consoleRoutedReason(path, m.isProtected)
+	m.emitFiledConsole(item, path, reason)
+	return FileResult{Path: path, ConsoleReason: reason}, nil
+}
+
+func consoleReasonClass(reason string) string {
+	switch {
+	case strings.HasPrefix(reason, "protected fix surface:"), strings.HasPrefix(reason, "mentions protected path:"):
+		return "protected"
+	case strings.HasPrefix(reason, "kind:"):
+		return "kind"
+	default:
+		return "route"
+	}
+}
+
+func (m *Mover) emitFiledConsole(item inboxbatch.Item, path, reason string) {
+	if reason == "" {
+		return
+	}
+	c := m.center()
+	if c == nil {
+		return
+	}
+	class := consoleReasonClass(reason)
+	c.Emit(signalcenter.Event{
+		Module:   signalcenter.ModuleInbox,
+		Origin:   "Mover.File",
+		Kind:     signalcenter.KindInboxWarning,
+		Code:     CodeItemFiledConsole,
+		Severity: signalcenter.SeverityInfo,
+		Reason:   fmt.Sprintf("filed console-owned %s (%s): %s", item.ID, class, reason),
+		Fields: map[string]string{
+			"task_id": item.ID,
+			"kind":    item.Kind,
+			"class":   class,
+			"path":    path,
+			"reason":  reason,
+			"step":    "intake",
+		},
+	})
 }
 
 func decodeNewItem(raw []byte) (map[string]json.RawMessage, inboxbatch.Item, error) {

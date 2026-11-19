@@ -2,11 +2,14 @@ package inboxcmd
 
 import (
 	"bytes"
-	"github.com/mickeyyaya/evolve-loop/go/internal/inboxtest"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxtest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 const cliInboxItem = `{"id":"cli-inbox-show","kind":"feature","priority_class":"debuggability","weight":0.5,` +
@@ -174,5 +177,38 @@ func TestCmd_InboxAdd_AMalformedPolicyIsAFaultAndFilesNothing(t *testing.T) {
 	}
 	if entries, _ := os.ReadDir(filepath.Join(root, ".evolve", "inbox")); len(entries) != 0 {
 		t.Errorf("a policy fault filed %d entries", len(entries))
+	}
+}
+
+func TestCmd_InboxAdd_WiresSignalCenterForConsoleOwnedItems(t *testing.T) {
+	root := inboxtest.EmptyRoot(t)
+	t.Setenv("EVOLVE_PROJECT_ROOT", root)
+	var events []signalcenter.Event
+	deps := testDeps()
+	deps.NewSignalCenter = func(role, projectRoot, evolveDir string, console io.Writer) (*signalcenter.Center, func()) {
+		c := signalcenter.New()
+		c.Subscribe(func(e signalcenter.Event) { events = append(events, e) })
+		return c, c.Flush
+	}
+	consoleItem := strings.Replace(cliInboxItem, `"kind":"feature"`, `"kind":"pipeline-repair"`, 1)
+	var stdout, stderr bytes.Buffer
+
+	if rc := Run([]string{"add", "--file", "-"}, strings.NewReader(consoleItem), &stdout, &stderr, deps); rc != 0 {
+		t.Fatalf("console filing rc = %d stderr = %q", rc, stderr.String())
+	}
+	if len(events) != 1 || events[0].Code != signalcenter.Code("INBOX_ITEM_FILED_CONSOLE") || events[0].Fields["class"] != "kind" {
+		t.Fatalf("events = %+v, want one INBOX_ITEM_FILED_CONSOLE class=kind", events)
+	}
+
+	events = nil
+	laneItem := `{"id":"cli-inbox-lane","kind":"feature","priority_class":"debuggability","weight":0.5,` +
+		`"title":"lane dispatchable item","files":["go/internal/zebra/zebra.go"],` +
+		`"summary":"Separate lane item.","fix":"Add lane helper.",` +
+		`"acceptance":["lane helper works"]}`
+	if rc := Run([]string{"add", "--file", "-"}, strings.NewReader(laneItem), &stdout, &stderr, deps); rc != 0 {
+		t.Fatalf("lane filing rc = %d stderr = %q", rc, stderr.String())
+	}
+	if len(events) != 0 {
+		t.Errorf("lane filing emitted %+v, want none", events)
 	}
 }

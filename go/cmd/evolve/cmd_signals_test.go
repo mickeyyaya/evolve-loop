@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 func TestSignalsCodes_RepoDocIsInSyncWithTheLinkedRegistry(t *testing.T) {
@@ -118,4 +121,46 @@ func TestSignalsCodes_WriteFailureIsAnError(t *testing.T) {
 	if rc := signalCodesRun(docPath, true, &out, &errb); rc != 1 || !strings.Contains(errb.String(), "write") {
 		t.Errorf("an unwritable doc is a loud error: rc=%d %s", rc, errb.String())
 	}
+}
+
+func assertSignalsCheckInSyncFromDir(t *testing.T, docRoot, workDir string) {
+	t.Helper()
+	docPath := filepath.Join(docRoot, "docs", "architecture", "signal-codes.md")
+	if err := os.MkdirAll(filepath.Dir(docPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := "# Codes\n\n" + signalCodesBegin + "\n\n" + signalcenter.RenderCodes() + signalCodesEnd + "\n"
+	if err := os.WriteFile(docPath, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prev, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+	if err := os.Chdir(workDir); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	if rc := runSignals([]string{"codes", "check"}, nil, &out, &errb); rc != 0 || !strings.Contains(out.String(), "in sync") {
+		t.Fatalf("check from %s (doc root %s) with unset envs: rc=%d out=%q err=%q", workDir, docRoot, rc, out.String(), errb.String())
+	}
+}
+
+func TestRunSignals_FindsRepoDocFromModuleSubdirWhenEnvsUnset(t *testing.T) {
+	t.Setenv("EVOLVE_WORKTREE_ROOT", "")
+	t.Setenv("EVOLVE_PROJECT_ROOT", "")
+	repo := gittest.Fixture(t)
+	subDir := filepath.Join(repo.Dir, "go", "sub")
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	assertSignalsCheckInSyncFromDir(t, repo.Dir, subDir)
+}
+
+func TestRunSignals_FallsBackToCwdWhenOutsideGitAndEnvsUnset(t *testing.T) {
+	t.Setenv("EVOLVE_WORKTREE_ROOT", "")
+	t.Setenv("EVOLVE_PROJECT_ROOT", "")
+	nonGitDir := t.TempDir()
+	assertSignalsCheckInSyncFromDir(t, nonGitDir, nonGitDir)
 }

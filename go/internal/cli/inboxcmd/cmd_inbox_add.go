@@ -40,8 +40,10 @@ func runInboxAdd(root string, args []string, stdin io.Reader, stdout, stderr io.
 		fmt.Fprintf(stderr, "inbox add: %v\n", err)
 		return 2
 	}
+	signals, closeSignals := host().NewSignalCenter("inbox", root, filepath.Join(root, ".evolve"), stderr)
+	defer closeSignals()
 	opts := inboxmover.Options{ProjectRoot: root, Stderr: stderr, IsProtectedPath: host().LaneForbidden(root, stderr),
-		PriorityClasses: pol.InboxPriorityConfig().ClassOrder, Origin: req.origin}
+		Signals: signals, PriorityClasses: pol.InboxPriorityConfig().ClassOrder, Origin: req.origin}
 	if rc := admitInboxItem(raw, req, pol.InboxCuratorConfig(), &opts, stderr); rc != 0 {
 		return rc
 	}
