@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "A test feeds a log with the fence and no open record, and the poll reports the missing record; red before the fix."
+  ],
+  "consumed": {
+    "at": "2026-11-19T20:48:39Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "merged into sandbox-reports-stopped-on-the-host (backlog review D5, PR #1571): same goal and shared files; its acceptance, files and deps now live on sandbox-reports-stopped-on-the-host"
+  },
+  "created_at": "2026-11-17T16:19:26Z",
+  "files": [
+    "go/internal/bridge/read_isolation.go"
+  ],
+  "fix": "Make the read-isolation poll require the open record of the cell before it accepts the fence, or report the missing record as its own failure with a reason.",
+  "id": "contract-row-n16-fence-outruns-the-open-record",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "summary": "Cycle 2191 ship log line 10269 shows the N16 failure after 4.665 s with an empty stderr. In go/internal/bridge/read_isolation.go only a fenced read returns from the poll before the deadline without a warning. This shape differs from the 60 s load flake. Filed by the console from the lost request of cycle 2191.",
+  "title": "Row N16 failed after 4.665 s with no fence warning: the fence was seen but the open record of the cell was not",
+  "weight": 0.5
+}

@@ -1,0 +1,39 @@
+{
+  "acceptance": [
+    "go test -count=1 -run TestEveryTmuxTestPackageUsesTheOrphanGuard ./internal/tmuxtest passes",
+    "go test -count=1 ./internal/faketmux passes",
+    "the main required CI run of the fix commit is green on the tmuxtest package"
+  ],
+  "consumed": {
+    "at": "2026-11-18T23:35:54Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "landed on main in c6c8eaedb (go/internal/faketmux/main_test.go); main required CI green at 6312414 (run 44400630049); console PR #1568 closed as superseded"
+  },
+  "created_at": "2026-11-18T16:57:51Z",
+  "deps": [],
+  "files": [
+    "go/internal/faketmux/main_test.go"
+  ],
+  "fix": "Add go/internal/faketmux/main_test.go in package faketmux with func TestMain(m *testing.M) { os.Exit(tmuxtest.Main(m)) }. tmuxtest does not import faketmux (go list -deps), so there is no import cycle. Change nothing else.",
+  "id": "main-red-faketmux-needs-the-tmux-orphan-guard",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "released_continuations": [
+    {
+      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2513",
+      "branch": "cycle-cd3ae73e-2513",
+      "snapshot_sha": "e8b52519b4a070f8ed475ebcc33127313fae1721",
+      "base_sha": "45b648774476acb79760c7ce99719462e3f5ca7b",
+      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2513/audit-fail-reason.json",
+      "cycle": 2513,
+      "released_at": "2026-11-18T23:35:54Z",
+      "reason": "inbox-consume",
+      "released_by": "operator (evolve inbox consume)"
+    }
+  ],
+  "summary": "Cycle 2509 (test-audit-t4d-faketmux-contract, commit b2486e62b) added go/internal/faketmux/contract_test.go, which starts a real tmux server. The package has no TestMain that calls tmuxtest.Main, so TestEveryTmuxTestPackageUsesTheOrphanGuard (go/internal/tmuxtest/tmux_package_test.go:34) fails on main: 'without a TestMain that calls tmuxtest.Main ... [internal/faketmux]'. Main required CI run 44341646289 is red, and cycle 2510 failed at the ship repo-contract importer backstop on this test (2026-11-18T16:51:55Z).",
+  "title": "main is red: internal/faketmux starts a real tmux server in its tests without tmuxtest.Main",
+  "weight": 1.0
+}

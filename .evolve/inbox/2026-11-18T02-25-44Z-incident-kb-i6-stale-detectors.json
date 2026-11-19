@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "an item that triage routes back two times opens a bounced-item incident; a claim freed by inbox release --stale emits a coded signal"
+  ],
+  "created_at": "2026-11-18T02:25:44Z",
+  "deps": [
+    "incident-kb-i5-levels-and-due"
+  ],
+  "files": [
+    "go/internal/selfheal/",
+    "go/internal/inboxmover/",
+    "go/cmd/evolve/"
+  ],
+  "fix": "Build component I6 (D6). See docs/plans/incident-knowledge-base-2026-11.md (PR #1559). The plan lands in the same batch as C2; the dependency on edit-layout-c2-regenerate-generated-conflicts waits for it.",
+  "id": "incident-kb-i6-stale-detectors",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "summary": "detectors for a stale PR, a bounced inbox item and a stale claim, as self-heal rules (I6)",
+  "title": "detectors for a stale PR, a bounced inbox item and a stale claim, as self-heal rules (I6)",
+  "weight": 0.7
+}

@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "a baseline of 4 and 0 events after the fix gives effective at the last check point; a rare code gives insufficient-data then unverifiable at the cap; wave next --dry-run lists the three steps; LastSeenAt after verified_at gives reopened"
+  ],
+  "created_at": "2026-11-18T02:25:45Z",
+  "deps": [
+    "incident-kb-i4-capture-sweep"
+  ],
+  "files": [
+    "go/internal/incidentcapture/",
+    "go/cmd/evolve/"
+  ],
+  "fix": "Build component I9 (D8, D10, D14). See docs/plans/incident-knowledge-base-2026-11.md (PR #1559). The plan lands in the same batch as C2; the dependency on edit-layout-c2-regenerate-generated-conflicts waits for it.",
+  "id": "incident-kb-i9-verify-and-due",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "summary": "evolve issue verify and due --verify, and the three advisory boundary steps (I9)",
+  "title": "evolve issue verify and due --verify, and the three advisory boundary steps (I9)",
+  "weight": 0.7
+}

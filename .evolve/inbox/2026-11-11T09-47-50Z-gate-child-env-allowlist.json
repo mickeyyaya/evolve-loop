@@ -4,7 +4,9 @@
     "The host integration tests of gaterun still pass at shadow and enforce"
   ],
   "created_at": "2026-11-11T09:47:50Z",
-  "deps": [],
+  "deps": [
+    "gate-contract-g2-hermetic-guard"
+  ],
   "files": [
     "go/internal/gaterun/",
     "docs/architecture/packages/internal-gaterun.md"

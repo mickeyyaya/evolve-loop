@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "the report text of run agent-docs-review-20261117T104723Z-0962 counts 0 HIGH, red before the change",
+    "a report with an open '[HIGH]' finding under Findings still counts 1 HIGH"
+  ],
+  "created_at": "2026-11-17T10:49:24Z",
+  "files": [
+    "go/internal/reportdoc/severity_counts.go",
+    "go/internal/reportdoc/severity_counts_test.go"
+  ],
+  "fix": "Two section-scoped designs failed review (2026-11-19, worktree dev/cl-sevcount, unshipped). Design 1 counted only under Findings or Issues headings; a HIGH under a sibling heading such as Remaining issues was dropped (HIGH, round 1). Design 2 skipped sections headed Fixed, Resolved findings or Round N fixes, checked; an open finding under a nested, bold or setext heading after such a heading was hidden (HIGH, round 2, agent-architecture-reviewer-20261119T124409Z-2531). Any section-scoped skip is fail-open for a safety gate, and the whole-document count of today fails closed. Next design: a line-local status token. A tagged line is skipped only when an explicit token follows the severity, for example '- [HIGH][fixed] ...', and the review personas (agents/evolve-diff-*.md, skills/docs-review) write each checked fix in that form; every other tagged line counts. Run architecture-design before any build, and add a red test with the report text of the original run.",
+  "id": "review-verdict-counts-a-fixed-finding-as-open",
+  "kind": "pipeline-integrity",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "2026-11-17, docs review round 2 of the concurrent-edit plan (run agent-docs-review-20261117T104723Z-0962): the report said 'No HIGH finding' and 'Verdict: PASS', with the line '- HIGH K5 vs C6: fixed.' under 'Round 1 fixes, checked'. reportdoc.CountSeverities (go/internal/reportdoc/severity_counts.go:36) counted that line as one open HIGH, so agentcmd.reportVerdict recorded FAIL (REVIEW_AGENT_RUN_VERDICT_MISMATCH: field PASS, stated PASS, high=1) and commit-gate refused the run. A false verdict is an operating-policy section 1.1 defect.",
+  "title": "A review report that lists a fixed finding as '- HIGH ...: fixed' turns a PASS into a run verdict FAIL",
+  "weight": 0.8
+}

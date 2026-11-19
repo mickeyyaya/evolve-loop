@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "the I2 check run over a fixture record that lacks section 7 fails"
+  ],
+  "created_at": "2026-11-18T02:25:40Z",
+  "deps": [
+    "edit-layout-c2-regenerate-generated-conflicts"
+  ],
+  "files": [
+    "skills/docs-write/references/templates.md",
+    "skills/issue-record/SKILL.md"
+  ],
+  "fix": "Build component I1 (D2). The docs-write skill is protected, so the console builds it. See docs/plans/incident-knowledge-base-2026-11.md (PR #1559). The plan lands in the same batch as C2; the dependency on edit-layout-c2-regenerate-generated-conflicts waits for it.",
+  "id": "incident-kb-i1-template-and-skill",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "route": "console-manual",
+  "summary": "ten-section incident template in docs-write and the issue-record procedure (I1)",
+  "title": "ten-section incident template in docs-write and the issue-record procedure (I1)",
+  "weight": 0.7
+}

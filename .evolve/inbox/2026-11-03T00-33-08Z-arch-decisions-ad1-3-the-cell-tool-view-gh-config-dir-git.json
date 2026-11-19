@@ -5,14 +5,6 @@
     "The spec and package note of the changed package state the change in STE."
   ],
   "campaign": "architecture-decisions-2026-11",
-  "continuation": {
-    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2429",
-    "branch": "cycle-cd3ae73e-2429",
-    "snapshot_sha": "b853f2a4e8ffa6dee4b94b186775acfc6c484663",
-    "base_sha": "fd03a5b3d9f8606984db139911e9c3539b8d9896",
-    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2429/audit-fail-reason.json",
-    "cycle": 2429
-  },
   "created_at": "2026-11-03T00:33:08Z",
   "files": [
     "go/internal/bridge"
@@ -26,6 +18,19 @@
   "kind": "feature",
   "origin": "console",
   "priority_class": "security",
+  "released_continuations": [
+    {
+      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2429",
+      "branch": "cycle-cd3ae73e-2429",
+      "snapshot_sha": "b853f2a4e8ffa6dee4b94b186775acfc6c484663",
+      "base_sha": "fd03a5b3d9f8606984db139911e9c3539b8d9896",
+      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2429/audit-fail-reason.json",
+      "cycle": 2429,
+      "released_at": "2026-11-19T20:51:59Z",
+      "reason": "older than 100 cycles",
+      "released_by": "evolve gc (continuation max age)"
+    }
+  ],
   "route": "console-manual",
   "routed_at": "2026-11-16T14:40:03Z",
   "routed_cycle": 2434,

@@ -1,7 +1,6 @@
 {
   "acceptance": [
     "Red first: a lane diff that adds a package without regenerating go/.darwin-set fails the build floor with a correction that names `evolve ci darwin-set generate`.",
-    "Red first: a lane diff with an errcheck finding fails the floor and names the file and line.",
     "Docs: the derived and core package notes change in STE; 100% coverage on each changed function; zero code comments."
   ],
   "created_at": "2026-11-14T00:28:45Z",

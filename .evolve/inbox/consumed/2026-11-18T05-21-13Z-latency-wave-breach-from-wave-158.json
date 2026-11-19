@@ -1,0 +1,41 @@
+{
+  "acceptance": [
+    "evolve wave latency --check reports the newest wave ok or left out",
+    "The cause has a regression test that fails before the fix and passes after it"
+  ],
+  "consumed": {
+    "at": "2026-11-19T20:43:18Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "OBSOLETE, confirmed by adversarial review 2026-11-19 (backlog review D1, PR #1571): `origin/main:docs/incidents/2026-11-18-a-proven-blocker-still-got-two-repair-rounds.md:30`"
+  },
+  "created_at": "2026-11-18T05:21:13Z",
+  "fix": "Run evolve wave latency --wave 178, find where the live lanes or the host gate time went, and fix the cause at its source.",
+  "id": "latency-wave-breach-from-wave-158",
+  "kind": "fix",
+  "origin": "cycle",
+  "priority": "high",
+  "priority_class": "performance",
+  "released_continuations": [
+    {
+      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2494",
+      "branch": "cycle-cd3ae73e-2494",
+      "snapshot_sha": "063228d025235ae35ddd982c0fd150856b1db8ad",
+      "base_sha": "5db58d6b91d602b28eea4674bfd2dcbb3d18e095",
+      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2494/audit-fail-reason.json",
+      "cycle": 2494,
+      "released_at": "2026-11-19T20:43:18Z",
+      "reason": "inbox-consume",
+      "released_by": "operator (evolve inbox consume)"
+    }
+  ],
+  "route": "console-manual",
+  "routed_at": "2026-11-18T06:32:34Z",
+  "routed_by": "loop",
+  "routed_cycle": 2494,
+  "routed_reason": "cycle 2494 ended by a defer-or-quarantine decision: category intent-malformed, fix_type reintent",
+  "source": "wave-latency-check",
+  "summary": "evolve wave latency --check found waves 158, 159, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178 in breach in a row: host gate share 42.9%, above the ceiling of 25.0%. A wave with a quota pause, a loop stop_reason or an operator brake does not count. The bounds are wave_latency.min_live_share and wave_latency.max_gate_share in policy.json.",
+  "title": "Wave latency budget exceeded in waves 158, 159, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178",
+  "weight": 0.7
+}

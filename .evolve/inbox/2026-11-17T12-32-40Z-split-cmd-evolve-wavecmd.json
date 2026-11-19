@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "TestWaveCmdRun in internal/cli/wavecmd (fails to compile before the move); only shims remain in cmd_wave*"
+  ],
+  "created_at": "2026-11-17T12:32:40Z",
+  "deps": [
+    "split-cmd-evolve-gccmd"
+  ],
+  "files": [
+    "go/cmd/evolve/",
+    "go/internal/cli/wavecmd/"
+  ],
+  "fix": "Step 4 of docs/plans/split-cmd-evolve-2026-11.md (parent plan concurrent-edit-layout-2026-11, C6/D5). Run at a wave boundary with no open lane in the group's files (evolve wave supply). Red test: TestWaveCmdRun in internal/cli/wavecmd (fails to compile before the move); only shims remain in cmd_wave*.go, cmd_boundary*.go, cmd_quality*.go. dependsOn: split-cmd-evolve-gccmd. Note split (C7) follows the same group.",
+  "id": "split-cmd-evolve-wavecmd",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "performance",
+  "summary": "Step 4 of docs/plans/split-cmd-evolve-2026-11.md. Filed by the console from the refused request inbox-add-4 of cycle 2460: the request channel runs only dispatch requests, so the pipeline never filed it.",
+  "title": "Move the wave, boundary and quality verbs (wave: 11 files, 47 outbound symbols, 5 inbound functions) to go/internal/cli/wavecmd behind shims and a Deps value",
+  "weight": 0.6
+}

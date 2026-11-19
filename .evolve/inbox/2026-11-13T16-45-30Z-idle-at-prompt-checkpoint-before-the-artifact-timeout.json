@@ -15,7 +15,9 @@
   "kind": "pipeline-repair",
   "origin": "console",
   "priority_class": "performance",
-  "route": "console-manual",
+  "route": "lane",
+  "routed_at": "2026-11-19T20:47:20Z",
+  "routed_reason": "backlog review D6 (PR #1571): a lane can build it; no protected path in files[] (first-pass LANE claim, F5.2)",
   "summary": "Each stop-review checkpoint waits the full interval cfg.ArtifactTimeoutS (default tmuxArtifactTimeoutS, 1200 s; go/internal/bridge/driver_tmux_wait_state.go newReplWaitState) even when the liveness center already reports the pane idle at its prompt (LIVENESS_PHASE_STALLED '... (idle at its prompt)' after 10 min). Cycles 2200-2355 hold 17 idle nudges; 12 ended with artifact_appeared, mostly 0-1 min after the nudge, so each cost about 20 minutes of lane time with the agent done and waiting. Cycle 2352 audit: report written 11:23Z, first checkpoint 11:42Z.",
   "title": "A pane that is idle at its prompt with no deliverable gets its checkpoint before the full artifact timeout",
   "weight": 0.8
