@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -24,26 +26,50 @@ func TestProductionBuildFloorChecks_ReportsAScopeDeltaThroughTheComposedFloor(t 
 		wt.Write(rel, "changed\n")
 	}
 	projectRoot := t.TempDir()
+	workspace := t.TempDir()
 	writeScopeDeltaLane(t, filepath.Join(projectRoot, ".evolve"), "7", "g", "self", "docs/alpha.md")
 	writeScopeDeltaLane(t, filepath.Join(projectRoot, ".evolve"), "8", "g", "sib", "docs/beta.md")
 	prev := repoContractPack
 	t.Cleanup(func() { repoContractPack = prev })
 	repoContractPack = func(context.Context, string, string, []string) ([]string, string, error) { return nil, "", nil }
 	center := signalcenter.New()
-	classes := map[string]string{}
+	var events []signalcenter.Event
 	center.Subscribe(func(e signalcenter.Event) {
 		if e.Code == core.CodeScopeDelta {
-			classes[e.Fields["path"]] = e.Fields["class"]
+			events = append(events, e)
 		}
 	})
 	var stderr bytes.Buffer
 
 	got := core.BuildHandoffFloor{productionFloorCheck()}.Failures(context.Background(), core.ReviewInput{
-		Phase: string(core.PhaseBuild), Cycle: 7, Worktree: wt.Dir, WorktreeBaseSHA: base, ProjectRoot: projectRoot, Signals: center, Stderr: &stderr,
+		Phase: string(core.PhaseBuild), Cycle: 7, Worktree: wt.Dir, WorktreeBaseSHA: base, ProjectRoot: projectRoot, Workspace: workspace, Signals: center, Stderr: &stderr,
 	})
 
 	if len(got) != 1 || !strings.Contains(got[0], "protected control-plane path changed: .evolve/policy.json") {
 		t.Fatalf("the composed floor still blocks only on the protected surface; the scope delta is a report: %v", got)
+	}
+	if len(events) != 1 {
+		t.Fatalf("the composed floor emits one summary scope-delta signal: got %d (%+v)", len(events), events)
+	}
+	if events[0].Fields["total"] != "3" || events[0].Fields["disposition_carve"] != "2" || events[0].Fields["disposition_refuse"] != "1" {
+		t.Fatalf("summary signal counts 3 paths (2 carve, 1 refuse): %+v", events[0].Fields)
+	}
+	raw, err := os.ReadFile(filepath.Join(workspace, "scope-delta.json"))
+	if err != nil {
+		t.Fatalf("scope-delta.json missing from workspace: %v", err)
+	}
+	var doc struct {
+		Entries []struct {
+			Path  string `json:"path"`
+			Class string `json:"class"`
+		} `json:"entries"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("scope-delta.json invalid: %v\n%s", err, raw)
+	}
+	classes := map[string]string{}
+	for _, e := range doc.Entries {
+		classes[e.Path] = e.Class
 	}
 	want := map[string]string{"docs/beta.md": "cross-lane", "docs/gamma.md": "opportunistic", ".evolve/policy.json": "boundary"}
 	if len(classes) != len(want) {
