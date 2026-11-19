@@ -890,3 +890,4 @@
 ./internal/redact
 ./internal/incidentbundle
 ./internal/evidencex
+./internal/incidentkb
