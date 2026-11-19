@@ -1,7 +1,8 @@
 package policy_test
 
 import (
-	"strings"
+	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -38,15 +39,25 @@ func TestParse_RefusesADeadlineBasisOtherThanAllOrShipped(t *testing.T) {
 		"a padded value":         `" shipped"`,
 		"a list in one string":   `"all,shipped"`,
 		"a legacy synonym":       `"passed"`,
-		"a number":               `5`,
-		"a boolean":              `true`,
 		"a negation of the name": `"unshipped"`,
 	}
 	for name, raw := range cases {
 		t.Run(name, func(t *testing.T) {
 			_, err := policy.Parse([]byte(`{"fleet":{"orchestrator":{"deadline_basis":` + raw + `}}}`))
-			if err == nil || !strings.Contains(err.Error(), "fleet.orchestrator") || !strings.Contains(err.Error(), "deadline_basis") {
-				t.Fatalf("err = %v, want a fleet.orchestrator refusal that names deadline_basis", err)
+			if !errors.Is(err, policy.ErrDeadlineBasis) {
+				t.Fatalf("err = %v, want policy.ErrDeadlineBasis", err)
+			}
+		})
+	}
+}
+
+func TestParse_RefusesADeadlineBasisThatIsNotAString(t *testing.T) {
+	for _, raw := range []string{`5`, `true`} {
+		t.Run(raw, func(t *testing.T) {
+			_, err := policy.Parse([]byte(`{"fleet":{"orchestrator":{"deadline_basis":` + raw + `}}}`))
+			var typeErr *json.UnmarshalTypeError
+			if !errors.As(err, &typeErr) || typeErr.Field != "deadline_basis" {
+				t.Fatalf("err = %v, want a json type error on the field deadline_basis", err)
 			}
 		})
 	}
