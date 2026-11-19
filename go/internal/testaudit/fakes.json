@@ -3,6 +3,7 @@
     {"tool": "git", "real_side": "none", "reason": "no fakecontract suite compares the git fake with the real binary yet"},
     {"tool": "tmux", "real_side": "none", "reason": "no fakecontract suite compares the tmux fake with the real binary yet"},
     {"tool": "gh", "real_side": "none", "reason": "no fakecontract suite compares the gh fake with the real binary yet"},
-    {"tool": "claude", "real_side": "none", "reason": "the claude binary needs an account, so no suite can run it in a test"}
+    {"tool": "claude", "real_side": "none", "reason": "the claude binary needs an account, so no suite can run it in a test"},
+    {"tool": "evolve", "real_side": "none", "reason": "the fake is the child cycle that a launch starts; the launch tests check only the process plumbing of the parent, and the end-to-end cycle tests run the real binary"}
   ]
 }

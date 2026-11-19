@@ -35,8 +35,9 @@ func (cycleStartSeqRunner) SignalSummary() signalcenter.Summary { return signalc
 
 func TestCycleStartTrim_LaunchFnRunsFakeTrimAndGuardsDisk(t *testing.T) {
 	t.Parallel()
-	bin := filepath.Join(t.TempDir(), "evolve")
-	fakeclitest.Install(t, bin, "#!/bin/sh\necho launched\n")
+	binDir := t.TempDir()
+	fakeclitest.Install(t, filepath.Join(binDir, "evolve"), "#!/bin/sh\necho launched\n")
+	bin := filepath.Join(binDir, "evolve")
 
 	const total = uint64(100) << 30
 	pcts := []float64{4, 6}
