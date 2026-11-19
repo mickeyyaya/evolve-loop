@@ -2,14 +2,17 @@ package bridge
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/isolation"
+	evolog "github.com/mickeyyaya/evolve-loop/go/internal/log"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -118,14 +121,130 @@ func TestCellEnv_ShadowKeepsTodaysEnvAndReportsEachDroppedNameWithoutItsValue(t 
 	}
 }
 
+func envRefusedEvents(c *signalcenter.Center) []signalcenter.Event {
+	var out []signalcenter.Event
+	for _, e := range c.Recent() {
+		if e.Code == isolation.CodeEnvRefused {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
 func TestCellEnv_EnforceReportsTheDropAsRefused(t *testing.T) {
 	for k, v := range pollutedEnv {
 		t.Setenv(k, v)
 	}
 	center := signalcenter.New()
 	dispatchEnv(Deps{Signals: center, EnvStage: "enforce"}, seatConfig("codex"))
-	if e, ok := isolationEvents(center)["FOO_LEAK"]; !ok || e.Fields["action"] != "refused" || e.Fields["stage"] != "enforce" {
-		t.Fatalf("enforce must emit the drop with action=refused; got %+v (ok=%v)", e, ok)
+	if len(isolationEvents(center)) != 0 {
+		t.Fatalf("enforce must emit no per-variable violation; got %v", isolationEvents(center))
+	}
+	got := envRefusedEvents(center)
+	if len(got) != 1 {
+		t.Fatalf("enforce must emit one summary event; got %d", len(got))
+	}
+	e := got[0]
+	if e.Kind != signalcenter.KindIsolationEnv || e.Severity != signalcenter.SeverityInfo || e.Module != signalcenter.ModuleIsolation {
+		t.Fatalf("event = %+v", e)
+	}
+	if e.Fields["action"] != "refused" || e.Fields["stage"] != "enforce" || e.Fields["invariant"] != "I2" || e.Fields["rule"] != "env.allowlist" || e.Fields["source"] != "launcher" || e.Fields["family"] != "codex" || e.Fields["cell"] != "build" || e.Cycle != 7 || e.RunID != "run-n1" {
+		t.Fatalf("fields = %v", e.Fields)
+	}
+	if n, err := strconv.Atoi(e.Fields["count"]); err != nil || n < len(launcherLeaks) {
+		t.Fatalf("count %q", e.Fields["count"])
+	}
+	for k, v := range e.Fields {
+		if strings.Contains(v, "secret-value-1") {
+			t.Errorf("field %s carries a value", k)
+		}
+	}
+}
+
+func TestCellEnv_EnforceReportsEachNameSetOncePerProcess(t *testing.T) {
+	for k, v := range pollutedEnv {
+		t.Setenv(k, v)
+	}
+	center := signalcenter.New()
+	deps := Deps{Signals: center, EnvDrops: &EnvDropLog{}, EnvStage: "enforce"}
+	dispatchEnv(deps, seatConfig("codex"))
+	dispatchEnv(deps, seatConfig("codex"))
+	if n := len(envRefusedEvents(center)); n != 1 {
+		t.Fatalf("a second dispatch must stay silent; got %d events", n)
+	}
+}
+
+func TestReportDroppedEnv_EnforceNamesEachVariableInSortedOrder(t *testing.T) {
+	t.Parallel()
+	center := signalcenter.New()
+	Deps{Signals: center}.reportDroppedEnv(seatConfig("codex"), "enforce", []string{"C_LEAK", "A_LEAK", "B_LEAK"})
+	got := envRefusedEvents(center)
+	if len(got) != 1 || got[0].Fields["names"] != "A_LEAK,B_LEAK,C_LEAK" || got[0].Fields["count"] != "3" {
+		t.Fatalf("summary = %+v, want names A_LEAK,B_LEAK,C_LEAK and count 3", got)
+	}
+}
+
+func TestReportDroppedEnv_ShadowKeepsOneWarnForEachVariable(t *testing.T) {
+	t.Parallel()
+	center := signalcenter.New()
+	Deps{Signals: center}.reportDroppedEnv(seatConfig("codex"), "shadow", []string{"A", "B"})
+	if len(isolationEvents(center)) != 2 || len(envRefusedEvents(center)) != 0 {
+		t.Fatalf("shadow = %d warns, %d summaries", len(isolationEvents(center)), len(envRefusedEvents(center)))
+	}
+}
+
+func TestReportDroppedEnv_EnforceCapsTheNamesAndKeepsTheFullCount(t *testing.T) {
+	t.Parallel()
+	var names []string
+	for i := 0; i < 400; i++ {
+		names = append(names, fmt.Sprintf("LEAK_VARIABLE_%04d", i))
+	}
+	center := signalcenter.New()
+	Deps{Signals: center}.reportDroppedEnv(seatConfig("codex"), "enforce", names)
+	got := envRefusedEvents(center)
+	if len(got) != 1 {
+		t.Fatalf("events = %d", len(got))
+	}
+	f := got[0].Fields
+	shown, tail, cut := strings.Cut(f["names"], ",+")
+	hidden, err := strconv.Atoi(strings.TrimSuffix(tail, " more"))
+	if f["count"] != "400" || !cut || err != nil || len(strings.Split(shown, ","))+hidden != 400 {
+		t.Fatalf("count=%s names=%q: shown names plus the hidden number must be 400", f["count"], f["names"])
+	}
+	if len(f["names"]) >= evolog.MaxDiagnosticRunes {
+		t.Fatalf("names length %d reaches the log field limit %d", len(f["names"]), evolog.MaxDiagnosticRunes)
+	}
+	Deps{Signals: center}.reportDroppedEnv(seatConfig("codex"), "enforce", nil)
+	if len(envRefusedEvents(center)) != 1 {
+		t.Fatal("no names must emit nothing")
+	}
+}
+
+func TestCapNames_KeepsANameOfExactlyTheCapWhole(t *testing.T) {
+	t.Parallel()
+	name := strings.Repeat("N", envNamesCap)
+	if got := capNames([]string{name}); got != name {
+		t.Fatalf("a name of exactly the cap was cut: %d bytes, %q", len(got), got[len(got)-12:])
+	}
+}
+
+func TestCapNames_CountsTheSeparatorAgainstTheCap(t *testing.T) {
+	t.Parallel()
+	a, b := strings.Repeat("A", envNamesCap/2), strings.Repeat("B", envNamesCap/2)
+	if got := capNames([]string{b, a}); got != a+",+1 more" {
+		t.Fatalf("capNames = %q, want the first name and ,+1 more", got)
+	}
+}
+
+func TestReportDroppedEnv_CountsOnlyTheNamesNotSeenBefore(t *testing.T) {
+	t.Parallel()
+	center := signalcenter.New()
+	deps := Deps{Signals: center, EnvDrops: &EnvDropLog{}}
+	deps.reportDroppedEnv(seatConfig("codex"), "enforce", []string{"A_LEAK"})
+	deps.reportDroppedEnv(seatConfig("codex"), "enforce", []string{"A_LEAK", "B_LEAK"})
+	got := envRefusedEvents(center)
+	if len(got) != 2 || got[1].Fields["count"] != "1" || got[1].Fields["names"] != "B_LEAK" {
+		t.Fatalf("second summary = %+v, want count 1 and names B_LEAK", got)
 	}
 }
 

@@ -19,8 +19,8 @@ func TestSanitizeField_SharesTheBoundWithDiagnosticFieldAndStripsControls(t *tes
 	}
 	long := strings.Repeat("é", 2000)
 	capped := SanitizeField(long)
-	if utf8.RuneCountInString(capped) != maxDiagnosticRunes || !strings.HasSuffix(capped, "…") {
-		t.Errorf("rune-capped at %d with an ellipsis, got %d runes", maxDiagnosticRunes, utf8.RuneCountInString(capped))
+	if utf8.RuneCountInString(capped) != MaxDiagnosticRunes || !strings.HasSuffix(capped, "…") {
+		t.Errorf("rune-capped at %d with an ellipsis, got %d runes", MaxDiagnosticRunes, utf8.RuneCountInString(capped))
 	}
 	if DiagnosticField(long) != strconv.QuoteToASCII(capped) {
 		t.Error("DiagnosticField and SanitizeField must share the same bound")
