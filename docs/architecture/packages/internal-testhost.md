@@ -9,7 +9,7 @@ Before 2026-10-10, `.github/workflows/go.yml` ran `make test-integration` on `ma
 ## Design
 
 - `Tool(t, name)` finds `name` on `PATH` and returns its path. If `name` is missing, it calls `Unavailable` with "`<name>` not installed".
-- A CI job can declare a tool required: `TESTHOST_REQUIRED_TOOLS` (`RequiredToolsEnv`) holds a comma-separated list. When a declared tool is missing, `Tool` fails on any host. The three Go test jobs of `.github/workflows/go.yml` (ubuntu Go 1.23, ubuntu Go 1.27, macOS) set `TESTHOST_REQUIRED_TOOLS: tmux`. Thus a runner image without tmux turns the real-tmux tier red, and it does not skip in silence.
+- A CI job can declare a tool required: `TESTHOST_REQUIRED_TOOLS` (`RequiredToolsEnv`) holds a comma-separated list. When a declared tool is missing, `Tool` fails on any host. The three Go test jobs of `.github/workflows/go.yml` (ubuntu Go 1.23, ubuntu Go 1.27, macOS) set `TESTHOST_REQUIRED_TOOLS: tmux,git`. Thus a runner image without tmux or git turns those checks red, and they do not skip in silence.
 - `Unavailable(t, reason)` skips with `reason`. If `GOOS` is `darwin` and `CI` is `true`, it fails with "CI requires this capability on macOS, but `<reason>`".
 - `Host` holds the three inputs: `GOOS`, `Getenv` and `LookPath`. The package functions use the process values. A unit test gives its own `Host`.
 - `T` is the part of `testing.TB` that the package uses: `Helper`, `Skip` and `Fatal`.
