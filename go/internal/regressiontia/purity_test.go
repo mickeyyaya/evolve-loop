@@ -65,12 +65,7 @@ func TestRegressionCorpus_CountsThePurePredicates(t *testing.T) {
 	if len(pure) != recordedPurePredicates {
 		t.Errorf("pure predicates = %d, want %d (the count in the package note); update both when the corpus changes: %v", len(pure), recordedPurePredicates, pure)
 	}
-	if len(pure) < minPurePredicates {
-		t.Logf("pure predicates %d are below %d: the regression_tia stage must retire", len(pure), minPurePredicates)
-	}
 }
-
-const minPurePredicates = 9
 
 const recordedPurePredicates = 0
 

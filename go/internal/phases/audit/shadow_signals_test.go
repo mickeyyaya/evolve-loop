@@ -3,14 +3,28 @@ package audit
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
-	"github.com/mickeyyaya/evolve-loop/go/internal/regressiontia"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
+
+func auditFixture(t *testing.T, cycle int) (string, string) {
+	t.Helper()
+	root := t.TempDir()
+	evolveDir := filepath.Join(root, ".evolve")
+	ws := filepath.Join(evolveDir, "runs", "cycle-"+strconv.Itoa(cycle))
+	if err := os.MkdirAll(ws, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return root, ws
+}
 
 func recordedSignals() (shadowEmitter, *[]signalcenter.Event) {
 	c, got := recordingCenter()
@@ -87,80 +101,11 @@ func TestRecordCascadeShadow_OffEmitsNoSignal(t *testing.T) {
 	}
 }
 
-func fixedTIA(t *testing.T) {
-	t.Helper()
-	orig := tiaCompute
-	t.Cleanup(func() { tiaCompute = orig })
-	tiaCompute = func(stage, _, _ string, _ []string) regressiontia.Decision {
-		return regressiontia.Decision{Stage: stage, Selected: []string{"./acs/regression/a", "./acs/regression/b"}, WouldSkip: []string{"./acs/regression/c"}, WouldSkipCount: 1}
-	}
-}
-
-func TestEmitTIADecision_EmitsSignal(t *testing.T) {
-	fixedTIA(t)
-	root, ws := tiaFixture(t, "shadow", 4260)
-	sig, got := recordedSignals()
-
-	err := emitTIADecision(core.PhaseRequest{Worktree: root, ProjectRoot: root, Workspace: ws, Cycle: 4260}, root, sig)
-
-	if err != nil || len(*got) != 1 {
-		t.Fatalf("err = %v, events = %d, want nil and one TIA_SHADOW", err, len(*got))
-	}
-	e := (*got)[0]
-	if e.Code != signalcenter.CodeTIAShadow || e.Severity != signalcenter.SeverityInfo || e.Cycle != 4260 {
-		t.Errorf("event = %+v, want an INFO TIA_SHADOW for cycle 4260", e)
-	}
-	if e.Fields["would_skip_count"] != "1" || e.Fields["selected"] != "2" {
-		t.Errorf("fields = %v, want would_skip_count=1 selected=2", e.Fields)
-	}
-	if _, ok := e.Fields["write_error"]; ok {
-		t.Errorf("a clean write carried write_error: %v", e.Fields)
-	}
-}
-
-func TestEmitTIADecision_WriteErrorIsNotDropped(t *testing.T) {
-	fixedTIA(t)
-	root, _ := tiaFixture(t, "shadow", 4261)
-	blocker := filepath.Join(t.TempDir(), "file")
-	if err := os.WriteFile(blocker, nil, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	sig, got := recordedSignals()
-
-	err := emitTIADecision(core.PhaseRequest{Worktree: root, ProjectRoot: root, Workspace: filepath.Join(blocker, "ws"), Cycle: 4261}, root, sig)
-
-	if err == nil {
-		t.Fatal("a failed decision write returned nil: the error was dropped")
-	}
-	if len(*got) != 1 || (*got)[0].Severity != signalcenter.SeverityWarn || (*got)[0].Fields["write_error"] == "" {
-		t.Errorf("events = %+v, want one WARN TIA_SHADOW that carries write_error", *got)
-	}
-}
-
-func TestEmitTIADecision_OffEmitsNoSignal(t *testing.T) {
-	fixedTIA(t)
-	root, ws := tiaFixture(t, "off", 4262)
-	sig, got := recordedSignals()
-
-	if err := emitTIADecision(core.PhaseRequest{Worktree: root, ProjectRoot: root, Workspace: ws, Cycle: 4262}, root, sig); err != nil || len(*got) != 0 {
-		t.Errorf("off: err = %v, events = %d, want nil and none", err, len(*got))
-	}
-}
-
-func TestEmitTIADecision_NilEmitterIsInert(t *testing.T) {
-	fixedTIA(t)
-	root, ws := tiaFixture(t, "shadow", 4263)
-
-	if err := emitTIADecision(core.PhaseRequest{Worktree: root, ProjectRoot: root, Workspace: ws, Cycle: 4263}, root, nil); err != nil {
-		t.Errorf("a nil emitter must not change the write: %v", err)
-	}
-}
-
 func TestGenerateACSVerdictWith_ASuiteErrorIsReturned(t *testing.T) {
 	t.Parallel()
-	root, ws := tiaFixture(t, "off", 0)
+	root, ws := auditFixture(t, 0)
 
-	err := generateACSVerdictWith(core.PhaseRequest{Worktree: root, ProjectRoot: root, Workspace: ws}, nil)
+	err := generateACSVerdictWith(core.PhaseRequest{Worktree: root, ProjectRoot: root, Workspace: ws})
 
 	if err == nil {
 		t.Fatal("a suite that cannot start must return its error")
@@ -169,13 +114,13 @@ func TestGenerateACSVerdictWith_ASuiteErrorIsReturned(t *testing.T) {
 
 func TestGenerateACSVerdictWith_AVerdictWriteErrorIsReturned(t *testing.T) {
 	t.Parallel()
-	root, _ := tiaFixture(t, "off", 4270)
+	root, _ := auditFixture(t, 4270)
 	blocker := filepath.Join(t.TempDir(), "file")
 	if err := os.WriteFile(blocker, nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	err := generateACSVerdictWith(core.PhaseRequest{ProjectRoot: root, Workspace: filepath.Join(blocker, "a", "b"), Cycle: 4270}, nil)
+	err := generateACSVerdictWith(core.PhaseRequest{ProjectRoot: root, Workspace: filepath.Join(blocker, "a", "b"), Cycle: 4270})
 
 	if err == nil {
 		t.Fatal("an unwritable verdict directory must return its error")

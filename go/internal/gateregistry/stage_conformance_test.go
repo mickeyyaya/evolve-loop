@@ -26,7 +26,7 @@ const (
 	ruleNoEmitSite    = "no-emit-site"
 	ruleNoWouldFields = "no-would-fields"
 	ruleFieldMissing  = "would-field-missing"
-	baselineCeiling   = 85
+	baselineCeiling   = 82
 	moduleRoot        = "../.."
 )
 
@@ -521,7 +521,6 @@ func TestStageSeeds_PinTheDescriptorOfEachPopulatedRow(t *testing.T) {
 		"workflow.retry_ladder.stage": {"LADDER_DECISION", gatecontract.EmitSite{Path: "internal/core/retry_ladder.go", Func: "emitLadderDecision", Ref: "CodeLadderDecision"}, []string{"next", "action", "fingerprint", "tier"}, []string{"internal/retryladder"}},
 		"workflow.cycle_spend.stage":  {"CYCLE_SPEND_SHADOW", gatecontract.EmitSite{}, nil, []string{"internal/cyclespend"}},
 		"parallel_evaluate.stage":     {"PARALLEL_EVALUATE_SHADOW", gatecontract.EmitSite{}, nil, nil},
-		"regression_tia.stage":        {"TIA_SHADOW", gatecontract.EmitSite{}, nil, []string{"internal/regressiontia"}},
 		"held_proposals.stage":        {"SHIP_HOLD_SHADOW", gatecontract.EmitSite{Path: "internal/phases/ship/held_proposal_gate.go", Func: "emitShadow", Ref: "CodeHoldShadow"}, []string{"cycle", "tree", "reasons"}, []string{"internal/heldproposal"}},
 		"audit_cascade.stage":         {"AUDIT_CASCADE_SHADOW", gatecontract.EmitSite{}, nil, []string{"internal/auditcascade"}},
 	}

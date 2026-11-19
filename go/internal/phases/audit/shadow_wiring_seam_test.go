@@ -11,13 +11,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-func TestProductionPath_BothShadowSignalsReachTheCenter(t *testing.T) {
-	fixedTIA(t)
+func TestProductionPath_TheCascadeShadowSignalReachesTheCenter(t *testing.T) {
 	req := productionRunFixture(t, 9)
 	withFakeRunner(t, func(context.Context, string, string, []string, []string, io.Reader, io.Writer, io.Writer) (int, error) {
 		return 0, nil
 	})
-	policyJSON := `{"regression_tia":{"stage":"shadow"},"audit_cascade":{"stage":"shadow","risk_paths":["go/internal/core/"],"max_changed_files":5,"escalate_verdicts":["FAIL","WARN"]}}`
+	policyJSON := `{"audit_cascade":{"stage":"shadow","risk_paths":["go/internal/core/"],"max_changed_files":5,"escalate_verdicts":["FAIL","WARN"]}}`
 	if err := os.WriteFile(filepath.Join(req.ProjectRoot, ".evolve", "policy.json"), []byte(policyJSON), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -34,9 +33,6 @@ func TestProductionPath_BothShadowSignalsReachTheCenter(t *testing.T) {
 	counts := make(map[signalcenter.Code]int)
 	for _, e := range *events {
 		counts[e.Code]++
-	}
-	if counts[signalcenter.CodeTIAShadow] != 1 {
-		t.Errorf("TIA_SHADOW events = %d, want 1: the emitter is lost between WithSignals and generateACSVerdictWith", counts[signalcenter.CodeTIAShadow])
 	}
 	if counts[signalcenter.CodeAuditCascadeShadow] != 1 {
 		t.Errorf("AUDIT_CASCADE_SHADOW events = %d, want 1: the emitter is lost between WithSignals and recordCascadeShadow", counts[signalcenter.CodeAuditCascadeShadow])

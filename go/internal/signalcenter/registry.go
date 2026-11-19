@@ -59,7 +59,6 @@ func init() {
 	RegisterCode(ModuleLatency, CodeLatencyBudgetExceeded, "two waves in a row breached a bound of the wave latency check. fields.waves lists them, fields.reasons names the breached rules, and fields.item the filed item")
 	RegisterCode(ModuleCI, CodeCIRunRed, "a watched CI run completed with a conclusion other than success; fields.sha, workflow, conclusion, run_id and run_url name the run")
 	RegisterCode(ModuleAudit, CodeAuditCascadeShadow, "at audit_cascade.stage shadow, the audit records if enforce escalates this cycle's audit. fields.would_escalate (true or false) and fields.changed_files (changed file count)")
-	RegisterCode(ModuleTIA, CodeTIAShadow, "at regression_tia.stage shadow or enforce, the audit records which regression predicates the change skips. Fields: fields.would_skip_count, fields.selected (predicates that run), and fields.write_error on write failure (WARN)")
 	RegisterCode(ModuleParallelEval, CodeParallelEvaluateShadow, "at parallel_evaluate.stage shadow, the orchestrator computed the parallel evaluate batch of enforce and dispatched it serially. fields.batch lists the phases in batch order")
 }
 
