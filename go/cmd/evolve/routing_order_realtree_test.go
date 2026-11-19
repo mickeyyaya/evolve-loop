@@ -19,19 +19,19 @@ func TestRealTreeRoutingOrder_AnchoredPhasesFollowTheirAnchors(t *testing.T) {
 	}
 	registryPath := filepath.Join(projectRoot, "docs", "architecture", "phase-registry.json")
 	if _, err := os.Stat(registryPath); err != nil {
-		t.Skipf("phase registry not present: %v", err)
+		t.Fatalf("phase registry not present: %v", err)
 	}
 	cfg, _ := config.Load(registryPath)
 	if len(cfg.Order) == 0 {
-		t.Skip("registry produced no order")
+		t.Fatal("registry produced no order")
 	}
 	builtinCat, err := phasespec.Load(registryPath)
 	if err != nil {
-		t.Skipf("builtin catalog load failed: %v", err)
+		t.Fatalf("builtin catalog load failed: %v", err)
 	}
 	userSpecs, _ := discoverUserSpecsClamped(projectRoot, cmdutil.NewPromptsLoader(projectRoot))
 	if len(userSpecs) == 0 {
-		t.Skip("no user specs discovered")
+		t.Fatal("no user specs discovered")
 	}
 	phasespec.ApplyUserRouting(&cfg, userSpecs, builtinCat)
 
@@ -51,7 +51,7 @@ func TestRealTreeRoutingOrder_AnchoredPhasesFollowTheirAnchors(t *testing.T) {
 		}
 	}
 	if checked == 0 {
-		t.Skip("no anchored user specs routed")
+		t.Fatal("no anchored user specs routed")
 	}
 
 	bu := idx("build")

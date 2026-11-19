@@ -592,11 +592,6 @@
     },
     {
       "package": "cmd/evolve",
-      "test": "TestRealTreeRoutingOrder_AnchoredPhasesFollowTheirAnchors",
-      "rule": "skip-hides-error"
-    },
-    {
-      "package": "cmd/evolve",
       "test": "TestRealTreeRoutingOrder_EveryPreBuildPhaseSitsBeforeBuild",
       "rule": "skip-hides-error"
     },

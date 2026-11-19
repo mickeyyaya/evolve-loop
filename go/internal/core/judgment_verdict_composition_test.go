@@ -15,7 +15,7 @@ func TestJudgmentTeachingPhases_CoverEveryPhaseThatCanStateItsOwnVerdict(t *test
 	dir := filepath.Join(root, ".evolve", "phases")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		t.Skipf("phase catalog not present at %s: %v", dir, err)
+		t.Fatalf("phase catalog not present at %s: %v", dir, err)
 	}
 	tracked := trackedPhaseDirsForTest(t, root)
 
@@ -57,7 +57,7 @@ func TestJudgmentTeachingPhases_CoverEveryPhaseThatCanStateItsOwnVerdict(t *test
 		}
 	}
 	if checked == 0 {
-		t.Skip("no phase.json files found — catalog layout moved?")
+		t.Fatal("no phase.json files found — catalog layout moved?")
 	}
 	if declaring == 0 {
 		t.Log("no tracked phase declares classify.verdict_from_sentinel — the judgment-verdict wiring is currently inert (expected only if it was deliberately rolled back)")

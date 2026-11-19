@@ -22,11 +22,6 @@
     },
     {
       "package": "internal/deliverable",
-      "test": "TestHostEffects_TheRegistryDeclaresTriagesDerivation",
-      "rule": "skip-hides-error"
-    },
-    {
-      "package": "internal/deliverable",
       "test": "TestPerform_ReportsAHandoffSignalsWriteFailure",
       "rule": "error-text-match"
     },

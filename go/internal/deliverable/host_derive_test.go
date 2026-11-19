@@ -98,7 +98,7 @@ func TestHostEffects_ADeclinedDerivationIsLoudAndLeavesTheFileAbsent(t *testing.
 func TestHostEffects_TheRegistryDeclaresTriagesDerivation(t *testing.T) {
 	cat, err := phasespec.Load(filepath.Join("..", "..", "..", "docs", "architecture", "phase-registry.json"))
 	if err != nil {
-		t.Skipf("real registry not reachable: %v", err)
+		t.Fatalf("real registry not reachable: %v", err)
 	}
 	spec, ok := cat.Get("triage")
 	if !ok || spec.Outputs.DerivedFrom["triage-decision.json"] != "triage-report.md" {

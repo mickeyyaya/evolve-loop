@@ -482,11 +482,6 @@
     },
     {
       "package": "internal/core",
-      "test": "TestJudgmentTeachingPhases_CoverEveryPhaseThatCanStateItsOwnVerdict",
-      "rule": "skip-hides-error"
-    },
-    {
-      "package": "internal/core",
       "test": "TestKeepOrPrune_ADeleteThatCannotStartIsAnError",
       "rule": "error-text-match"
     },
