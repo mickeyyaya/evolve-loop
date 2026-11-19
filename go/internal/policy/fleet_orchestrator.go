@@ -39,6 +39,8 @@ type OrchestratorConfig struct {
 	fileCells            string
 }
 
+var ErrDeadlineBasis = errors.New(`deadline_basis is not "all" or "shipped"`)
+
 const fileCellsSeparator = "\n"
 
 func (c OrchestratorConfig) FileCells() []string {
@@ -86,7 +88,7 @@ func (o FleetOrchestratorPolicy) validate() error {
 	case o.DeadlineFloorMinutes < 0:
 		return errors.New("deadline_floor_minutes must not be negative")
 	case o.DeadlineBasis != "" && o.DeadlineBasis != "all" && o.DeadlineBasis != "shipped":
-		return fmt.Errorf("deadline_basis %q is not \"all\" or \"shipped\"", o.DeadlineBasis)
+		return fmt.Errorf("%w: %q", ErrDeadlineBasis, o.DeadlineBasis)
 	case o.StallMinutes < 0:
 		return errors.New("stall_minutes must not be negative")
 	case o.RunMaxLanes < 0:
