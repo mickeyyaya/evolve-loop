@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "a package with a fragment is enforced and one without is not, red before the change",
+    "the protected-surface ACS test covers the fragment directory"
+  ],
+  "created_at": "2026-11-17T10:50:59Z",
+  "files": [
+    "go/.apicover-enforce",
+    "go/.cover-strict",
+    "go/internal/guards/integrity_surface.go"
+  ],
+  "fix": "Move each list to one file for each package under a gate directory; the readers (make targets, go.yml steps, apicover) glob the directory. Protect the directory in guards.ProtectedSurfaceManifest, or keep one protected index file if a directory entry does not deny a new file.",
+  "id": "edit-layout-c5-gate-lists-as-fragments",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "performance",
+  "summary": "Plan docs/plans/concurrent-edit-layout-2026-11.md (PR #1545), D1 and D8. go/.apicover-enforce (883 lines, 63 touches) and go/.cover-strict (45 touches) gain one line for each package (research F2.2). They are gate inputs, so the manifest must protect the fragments (answer Q3 first).",
+  "title": "apicover and cover-strict package lists become one fragment for each package (concurrent-edit C5)",
+  "weight": 0.65
+}

@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "a test-fix item with no mutation.json fails phase verify (AgentOwedFiles)",
+    "the auditor re-runs a recorded mutant, and a live mutant makes the verdict FAIL",
+    "a test-fix item whose diff leaves the scope of scope.json is refused"
+  ],
+  "created_at": "2026-11-18T03:36:08Z",
+  "deps": [
+    "test-audit-t1-analyzer"
+  ],
+  "files": [
+    "agents/evolve-auditor.md"
+  ],
+  "fix": "Build T10 (D9, section 1) of docs/plans/test-quality-audit-2026-11.md (PR #1562).",
+  "id": "test-audit-t10-fix-item-checks",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "T10 of the test-quality plan: the admission checks of a test-fix item.",
+  "title": "A test-fix item owes mutation.json and stays in its test scope; the auditor re-runs each recorded mutant (T10)",
+  "weight": 0.75
+}

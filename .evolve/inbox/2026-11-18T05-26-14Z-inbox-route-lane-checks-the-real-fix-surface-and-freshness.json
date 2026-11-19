@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "evolve inbox route-lane refuses an item whose fix text or acceptance names a path under a protected surface (guards.ProtectedSurfaceManifest prefix match), even when its files field names none; the refusal names the path and the rule; red before the change",
+    "evolve inbox route-lane refuses an item whose fix names a package or file absent at HEAD, as stale, with the missing path",
+    "The protected check of route-lane and the protected check of lane triage call one shared function, so the two cannot drift",
+    "docs/plans/console-build-or-route-2026-11.md K4 states the check and links the incident record"
+  ],
+  "created_at": "2026-11-18T05:26:14Z",
+  "files": [
+    "docs/plans/console-build-or-route-2026-11.md"
+  ],
+  "fix": "docs/incidents/2026-11-18-seven-rerouted-items-bounced-back-to-the-console.md, What changed row 2, is open. The K4 reroute read only the declared files of each item; lane triage then bounced 8 items (cycles 2468-2482: protected fix surfaces such as go/internal/phases/ship/landing/intent.go, go/internal/commitgate/history_recorded.go and go/internal/bridge/manifest.go, or stale fixes). The bounces tripped the no-work-handoffs halt (fingerprint no-work-handoffs|cycle|2482) and blocked the start of wave 180. Give route-lane the same fix-surface and freshness check that triage runs. Record the issue through the issue-record skill.",
+  "id": "inbox-route-lane-checks-the-real-fix-surface-and-freshness",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "protected_files": [
+    "go/internal/inboxbatch/consoleroute.go"
+  ],
+  "route": "console-manual",
+  "routed_at": "2026-11-18T05:34:02Z",
+  "routed_by": "loop",
+  "routed_cycle": 2493,
+  "routed_reason": "lane triage (cycle 2493) dropped: protected-surface: go/internal/inboxbatch/consoleroute.go",
+  "summary": "Found 2026-11-18: rerouted console items bounced back from lane triage 8 times and halted the boundary; route-lane checks only declared files.",
+  "title": "inbox route-lane checks only declared files, so rerouted items bounce back from lane triage and halt the loop",
+  "weight": 0.8
+}

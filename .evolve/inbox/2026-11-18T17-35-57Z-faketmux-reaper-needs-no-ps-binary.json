@@ -1,0 +1,32 @@
+{
+  "acceptance": [
+    "go/internal/faketmux has no exec of ps",
+    "go test -count=1 ./internal/faketmux passes inside a lane cell (the build floor of the cycle)",
+    "TestClaimIn_ReapsOnlyTheMarkedRunsWhoseOwnerIsGone still fails when the reaper signals a group that the pane does not lead"
+  ],
+  "created_at": "2026-11-18T17:35:57Z",
+  "deps": [
+    "proctree-reads-processes-without-ps"
+  ],
+  "files": [
+    "go/internal/faketmux/session.go",
+    "go/internal/faketmux/faketmux_test.go",
+    "go/internal/faketmux/runroot_test.go"
+  ],
+  "fix": "Read the process command and group through internal/proctree (faketmux already imports it), not through an exec of ps. Read the real proctree exports first. Keep the reaper's rules: it signals a pane group only while the pane leads it and it is not our own group.",
+  "id": "faketmux-reaper-needs-no-ps-binary",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "protected_files": [
+    "go/internal/proctree/"
+  ],
+  "route": "console-manual",
+  "routed_at": "2026-11-18T18:15:34Z",
+  "routed_by": "loop",
+  "routed_cycle": 2517,
+  "routed_reason": "lane triage (cycle 2517) dropped: protected-surface: go/internal/proctree/",
+  "summary": "Cycle 2513 audit H1: commandOf (go/internal/faketmux/session.go:31-32) execs /bin/ps, and a lane cell denies it ('fork/exec /bin/ps: operation not permitted'). 8 faketmux tests fail in every lane cell with or without a change, so no lane can verify a faketmux change, and an item that asks for the faketmux suite fails audit as infra-systemic. The console host runs ps, so the suite passes there and in CI.",
+  "title": "the faketmux reaper execs /bin/ps, so a lane cell cannot run the faketmux suite",
+  "weight": 0.8
+}

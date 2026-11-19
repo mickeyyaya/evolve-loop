@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Red first: the console narrows files[] of a console item by dropping a protected path with a reason, and the item then routes to lanes",
+    "A lane or curator call cannot drop a protected path; the refusal stays",
+    "The item records each dropped path and the reason"
+  ],
+  "created_at": "2026-11-19T20:50:47Z",
+  "files": [
+    "go/internal/inboxmover/lifecycle/edit.go",
+    "go/cmd/evolve/cmd_inbox.go"
+  ],
+  "fix": "Give the console one sanctioned path: route-lane (or edit) takes the paths to drop together with an operator reason, checks that each dropped path is protected and that the item's open acceptance names none of them, and records the drop in the item. Read the refusals in internal/inboxmover/lifecycle (edit.go checkEditRequest and the route-lane breaker) before the design.",
+  "id": "inbox-console-cannot-drop-a-done-protected-file",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "summary": "Backlog review D6 (PR #1571, F5.1) found two console items, config-single-authority-sweep and docs-drift-sweep-2026-07, whose protected part is on main and whose open work is lane-safe. On 2026-11-19 at the wave 181 boundary, `evolve inbox edit <id> --remove files=<protected path>` refused: the edit would open the item to lanes. `evolve inbox route-lane <id>` refused too: route:lane cannot relax a declared protected path. No verb lets the operator narrow files[] in this case, so both items stay on the console.",
+  "title": "The console cannot drop a protected path from a console item whose protected part is on main, so the item can never go to lanes",
+  "weight": 0.6
+}

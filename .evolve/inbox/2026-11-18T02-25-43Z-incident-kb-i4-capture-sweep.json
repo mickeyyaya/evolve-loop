@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "incidents opened by the detect pass, the live reaction and the main-red stop are staged by one sweep; a failed copy is retried; a 30-source burst is staged in full; two concurrent sweeps emit one INCIDENT_RECORD_DUE; staged evidence survives a gc run"
+  ],
+  "created_at": "2026-11-18T02:25:43Z",
+  "deps": [
+    "incident-kb-i2-record-schema-and-check",
+    "incident-kb-i3-redact-and-bundle",
+    "incident-kb-i12-evidence-extract"
+  ],
+  "files": [
+    "go/internal/incidentcapture/",
+    "go/internal/selfheal/",
+    "go/internal/gc/",
+    "go/cmd/evolve/"
+  ],
+  "fix": "Build component I4 (D4, D18). See docs/plans/incident-knowledge-base-2026-11.md (PR #1559). The plan lands in the same batch as C2; the dependency on edit-layout-c2-regenerate-generated-conflicts waits for it.",
+  "id": "incident-kb-i4-capture-sweep",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "summary": "incidentcapture: source journal, stage index, sweep lock, evolve issue capture and evolve issue open (I4)",
+  "title": "incidentcapture: source journal, stage index, sweep lock, evolve issue capture and evolve issue open (I4)",
+  "weight": 0.7
+}

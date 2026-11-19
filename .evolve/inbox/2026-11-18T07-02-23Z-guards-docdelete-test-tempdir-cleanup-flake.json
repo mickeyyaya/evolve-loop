@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "The cause of the TempDir cleanup failure is measured and named: the process or file that still writes under the fixture git repo when t.TempDir cleanup runs",
+    "A red test or a stress run reproduces it before the fix: go test -count=200 -run '^TestDocDelete_' ./internal/guards/ under load, or a direct proof of the leftover writer",
+    "After the fix the same stress run passes, and the fixture uses internal/gittest",
+    "The change touches only test files of go/internal/guards and, when needed, go/internal/gittest"
+  ],
+  "created_at": "2026-11-18T07:02:23Z",
+  "files": [
+    "go/internal/guards/docdelete_uncommitted_test.go"
+  ],
+  "fix": "Cycle 2494 build round 1 (2026-11-18 05:46 UTC, .evolve/runs/cycle-2494/build-interactions.ndjson kind salvage) failed the repo-contract scanner pack on guards.TestDocDelete_EverythingElseUnderTheDocRootsStaysProtected with 'testing.go:1619: TempDir RemoveAll cleanup: unlinkat <tmp>/TestDocDelete_...'. The test passes on main (go test -count=1, 0.4 s). The fixture laneWithADraft (docdelete_uncommitted_test.go:57) builds a git repo in t.TempDir and the guard runs git in it, so a git child or lock file that outlives the test is the first hypothesis. The flake had a cost: the host proved the cycle's protected-path blocker but refused to end the cycle because this failure was not explained, so the cycle ran two more repair rounds (see repair-fixability-stop-flip-to-enforce-after-cycle-2494). Record the issue through the issue-record skill.",
+  "id": "guards-docdelete-test-tempdir-cleanup-flake",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Found 2026-11-18: a TempDir cleanup failure in a repo-wide floor test blocked a proven blocker route in cycle 2494.",
+  "title": "A TempDir cleanup failure in the docdelete guard test flakes the repo-wide floor",
+  "weight": 0.7
+}

@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "TestLandCmdRun in internal/cli/landcmd for pr and ci classify (fails to compile before the move); only the shims remain in cmd_pr*"
+  ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2532",
+    "branch": "cycle-cd3ae73e-2532",
+    "snapshot_sha": "32078de1b0a05c21c27c29b393a8091e450bbbbb",
+    "base_sha": "234383500cc7a7a113a70a9889b950ed247c6a6b",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2532/audit-fail-reason.json",
+    "cycle": 2532
+  },
+  "created_at": "2026-11-17T12:32:39Z",
+  "deps": [
+    "split-cmd-evolve-inboxcmd"
+  ],
+  "files": [
+    "go/cmd/evolve/",
+    "go/internal/cli/landcmd/"
+  ],
+  "fix": "Step 2 of docs/plans/split-cmd-evolve-2026-11.md (parent plan concurrent-edit-layout-2026-11, C6/D5). Run at a wave boundary with no open lane in the group's files (evolve wave supply). Red test: TestLandCmdRun in internal/cli/landcmd for pr and ci classify (fails to compile before the move); only the shims remain in cmd_pr*.go and cmd_ci*.go. dependsOn: split-cmd-evolve-inboxcmd. Note split (C7) follows the same group.",
+  "id": "split-cmd-evolve-landcmd-pr-ci",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "performance",
+  "summary": "Step 2 of docs/plans/split-cmd-evolve-2026-11.md. Filed by the console from the refused request inbox-add-2 of cycle 2460: the request channel runs only dispatch requests, so the pipeline never filed it.",
+  "title": "Create go/internal/cli/landcmd and move the pr (6 files) and ci (3 files) verbs into it behind shims and a Deps value",
+  "weight": 0.6
+}

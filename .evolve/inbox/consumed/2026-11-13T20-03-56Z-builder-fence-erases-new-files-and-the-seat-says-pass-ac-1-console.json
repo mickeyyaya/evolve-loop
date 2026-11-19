@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "A journey test: a writer seat that creates a file outside its writable list ends with a verdict that is not PASS, and the signal names the path and the next step"
+  ],
+  "consumed": {
+    "at": "2026-11-19T20:43:18Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "DONE, confirmed by adversarial review 2026-11-19 (backlog review D1, PR #1571): `origin/main:go/internal/phases/runner/worktree_fence.go:11-28`, `origin/main:go/internal/phases/runner/verdict/classify.go:23`, `origin/main:docs/incidents/2026-11-14-shipped-work-stayed-open-in-the-inbox.md:43`"
+  },
+  "created_at": "2026-11-13T20:03:56Z",
+  "files": [
+    "go/internal/phases/runner/dispatch.go",
+    "go/internal/phases/runner/verdict/classify.go"
+  ],
+  "fix": "Make the change that AC 1 needs on the protected path(s) go/internal/phases/runner/dispatch.go, go/internal/phases/runner/verdict/classify.go, then prove the criterion with a test.",
+  "id": "builder-fence-erases-new-files-and-the-seat-says-pass-ac-1-console",
+  "kind": "bug",
+  "origin": "cycle",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "cycle 2357, tdd test-report.md AC 1 (console-followup)",
+  "summary": "The TDD phase of cycle 2357 gave AC 1 of builder-fence-erases-new-files-and-the-seat-says-pass the console-followup disposition. A lane builder can never change the paths it needs (go/internal/phases/runner/dispatch.go, go/internal/phases/runner/verdict/classify.go). The lane part ships without it, so the console owns this part.",
+  "title": "Console part of builder-fence-erases-new-files-and-the-seat-says-pass: AC 1, which needs a protected path changed",
+  "weight": 0.8
+}

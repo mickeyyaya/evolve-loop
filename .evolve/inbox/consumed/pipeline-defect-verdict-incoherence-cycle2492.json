@@ -1,0 +1,26 @@
+{
+  "connects_to": [
+    "docs/architecture/adr/0072-system-failure-policy-and-halt.md",
+    ".evolve/pipeline-escalation.json",
+    "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2492"
+  ],
+  "consumed": {
+    "at": "2026-11-18T07:38:38Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Root cause found: evolve acs suite --cycle 2492, run by the auditor from the cycle worktree, fell back to mainProjectRoot (go/cmd/evolve/cmd_acs.go:47), which returns the parent of the git common dir; in the hub layout that is the hub, whose stale .evolve/policy.json fails to parse, so 47 predicates read red while the kernel verdict was PASS/0 red. Fix filed as acs-suite-root-resolves-to-the-hub-not-the-plane (red test of the hub layout). The task item core-shadow-batch-overlap-test-depends-on-sleep-timing is back to ready and needs no change."
+  },
+  "created_at": "2026-11-18T06:59:29Z",
+  "fix": "Root-cause the verdict-surface path (runner clean-exit deliverable-authority, session-lifecycle verdict clobber, or a new variant). Add a regression test that reproduces the incoherence. Do NOT retry the halted task until the pipeline is fixed.",
+  "id": "pipeline-defect-verdict-incoherence-cycle2492",
+  "injected_by": "loop-escalation",
+  "kind": "pipeline-repair",
+  "notes": "Auto-filed by the ADR-0072 halt at 2026-11-18T06:59:29Z. Evidence: orchestrator-classified verdict-incoherence: kernel acs-verdict.json: verdict PASS, red_count 0, ship_eligible true, project_root /Users/danleemh/ai/claude/evolve-loop/runtime; audit FAIL rests on the auditor's own suite run (acs-verdict.candidate.1483416033.json red=47) that read /Users/danleemh/ai/claude/evolve-loop/.evolve/policy.json through mainProjectRoot in go/cmd/evolve/cmd_acs.go:48-58",
+  "origin": "cycle",
+  "priority": "P0",
+  "priority_class": "stability",
+  "root_cause": "The verdict-surface / cycle-finalization path recorded a negative verdict that contradicts the phases' own on-disk artifacts. See internal/coherence and ADR-0072.",
+  "summary": "ADR-0072 system-failure halt at cycle 2492. The pipeline forged a verdict (category=verdict-incoherence): the recorded cycle verdict was negative while the phase artifacts (audit-report.md + acs-verdict.json) are green. This is a PIPELINE defect, not a task failure — retrying the task reproduces it.",
+  "title": "PIPELINE DEFECT (verdict-incoherence): the loop halted — orchestrator-classified verdict-incoherence: kernel acs-verdict.json: verdict PASS, red_count 0, ship_eligible true, project_root /Users/danleemh/ai/claude/evolve-loop/runtime; audit FAIL rests on the auditor's own suite run (acs-verdict.candidate.1483416033.json red=47) that read /Users/danleemh/ai/claude/evolve-loop/.evolve/policy.json through mainProjectRoot in go/cmd/evolve/cmd_acs.go:48-58",
+  "weight": 0.99
+}

@@ -1,6 +1,5 @@
 {
   "acceptance": [
-    "A lane that changes only .github/workflows/required.yml runs go/internal/ciparity in its floor, proven by a test through the real floor entry point that is red without the change",
     "A guard fails when a test package reads a repo data file that no registry row names"
   ],
   "created_at": "2026-11-12T02:00:00Z",

@@ -1,10 +1,6 @@
 {
   "acceptance": [
-    "A refresh with a pin returns the pinned model",
-    "A pin to an absent model makes Refresh return an error",
-    "A pin applies when the prior catalog is reusable",
-    "A changed pin changes the catalog fingerprint",
-    "The strict policy decode refuses an unknown key under catalog.tier_pins"
+    "A pin to an absent model makes Refresh return an error"
   ],
   "created_at": "2026-10-26T19:30:00Z",
   "deps": [],

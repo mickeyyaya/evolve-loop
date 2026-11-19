@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "each code opens an incident of its class at its threshold and not below it"
+  ],
+  "created_at": "2026-11-18T02:26:10Z",
+  "deps": [
+    "incident-kb-i5-levels-and-due"
+  ],
+  "files": [
+    "go/internal/selfheal/"
+  ],
+  "fix": "Build component I11. See docs/plans/incident-knowledge-base-2026-11.md (PR #1559). The plan lands in the same batch as C2; the dependency on edit-layout-c2-regenerate-generated-conflicts waits for it.",
+  "id": "incident-kb-i11-blocked-state-rules",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "summary": "self-heal rules for SHIP_INTEGRATION_EJECTED, LOOP_ORCH_POOL_IDLE, LOOP_ORCH_LANE_STALLED, LOOP_WAVE_ALL_LANES_STALE and SIGNAL_EXPECTED_ABSENT (I11)",
+  "title": "self-heal rules for SHIP_INTEGRATION_EJECTED, LOOP_ORCH_POOL_IDLE, LOOP_ORCH_LANE_STALLED, LOOP_WAVE_ALL_LANES_STALE and SIGNAL_EXPECTED_ABSENT (I11)",
+  "weight": 0.7
+}

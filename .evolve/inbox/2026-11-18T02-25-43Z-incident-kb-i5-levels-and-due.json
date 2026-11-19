@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "a stall over three cycles emits one INCIDENT_RECORD_DUE and gives one record; the staged evidence holds the line of each cycle; with a threshold of 3 distinct cycles, cycles 1 and 2 give no due mark and cycle 3 gives one"
+  ],
+  "created_at": "2026-11-18T02:25:43Z",
+  "deps": [
+    "incident-kb-i4-capture-sweep"
+  ],
+  "files": [
+    "go/internal/policy/",
+    "go/internal/incidentcapture/",
+    "go/cmd/evolve/"
+  ],
+  "fix": "Build component I5 (D5, D10 release step). See docs/plans/incident-knowledge-base-2026-11.md (PR #1559). The plan lands in the same batch as C2; the dependency on edit-layout-c2-regenerate-generated-conflicts waits for it.",
+  "id": "incident-kb-i5-levels-and-due",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "summary": "selfheal.levels policy data, INCIDENT_RECORD_DUE, the watch hint and the release of an unopened due record (I5)",
+  "title": "selfheal.levels policy data, INCIDENT_RECORD_DUE, the watch hint and the release of an unopened due record (I5)",
+  "weight": 0.7
+}

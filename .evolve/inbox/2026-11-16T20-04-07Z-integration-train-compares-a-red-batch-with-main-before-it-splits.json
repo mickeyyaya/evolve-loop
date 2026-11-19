@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "a batch on a main whose CI is red or pending is refused before any compose, red before the change",
+    "a red batch whose only failed tests also fail on main at the base is held, not split",
+    "each bisect step prints its members, its run and its verdict"
+  ],
+  "created_at": "2026-11-16T20:04:07Z",
+  "files": [
+    "go/internal/integration/batchpr.go",
+    "go/internal/integration/train.go",
+    "go/internal/integration/stopgate.go",
+    "go/cmd/evolve/cmd_integration_batch.go"
+  ],
+  "fix": "Before the first compose, wait for the CI of main at the base and refuse to batch on a red or pending main (open the main-red stop). On a red batch, attribute the failed tests: a failure that main also has at the base is main-owned and must not split the batch; hold the batch and open the main-red stop. Use the existing baseattr verdict. Print one line per step: the step, its members, its CI run and its verdict.",
+  "id": "integration-train-compares-a-red-batch-with-main-before-it-splits",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "In boundary 177 the train composed 13 PRs on main 50646266d, whose own CI was red from a flaky test, and whose CI was still running when the batch started. Merger.land (go/internal/integration/batchpr.go:86) splits on every red after one rerun. It does not compare the failed tests with the failures of main at the batch base, so each half failed again on the same main-owned test. Each step cost one CI run plus one rerun (about 45 to 50 minutes); 6 steps ran in 3 h 16 min and landed one PR (#1485). The batch also prints nothing per step, so the console saw only the header for 3 hours.",
+  "title": "The integration train bisects for hours when main itself is red or a test is flaky",
+  "weight": 0.95
+}

@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "A verdict over the shadow record: every REPAIR_HANDOFF would_stop since the stage was wired, each joined to the final verdict and the item outcome of its cycle; a would_stop on a cycle that later shipped through a repair round counts as a false stop. The flip needs 0 false stops and the minimum sample the shadow-evidence rule sets; the verdict is recomputable by one evolve verb",
+    "When the verdict passes, .evolve/policy.json sets workflow.repair.fixability.stage to enforce, and a regression test replays the cycle 2494 failure blocks (audit H1: a proven protected-path blocker on go/internal/acssuite/golane.go) through the production entry point: the cycle seals handed-off after audit round 1, runs no repair round and writes the salvage pointer; red at shadow",
+    "When the verdict does not pass, the item records the false stops and the fixability rule that produced each, and stays open",
+    "An incident record under docs/incidents links cycle 2494, its signals (seq 169 ORCHESTRATOR_BLOCKER_REFUSED, seq 233 and 385 REPAIR_HANDOFF would_stop, seq 536 CYCLE_SPEND_LIMIT would_stop) and this item"
+  ],
+  "created_at": "2026-11-18T07:00:56Z",
+  "deps": [],
+  "files": [
+    ".evolve/policy.json",
+    "go/internal/core/repair_handoff.go",
+    "go/cmd/evolve/cmd_cycle_repair_fixability.go"
+  ],
+  "fix": "Cycle 2494 (wave 180, item latency-wave-breach-from-wave-158) wasted 33.8 of 46.4 LLM minutes. Build round 1 declared a protected-path blocker on go/internal/acssuite/golane.go:43 and the host proved it, but refused to end the cycle because one floor failure (repo-contract scanner pack RED) was not explained by the blocker. Audit round 1 then confirmed the blocker (H1). The fixability check (ADR-0158, go/internal/core/repair_handoff.go:52) answered would_stop after audit rounds 1 and 2, and the cycle spend limit answered would_stop after round 3, but both run in shadow (workflow.repair.fixability.stage absent, so shadow), so decideAfterAuditFail granted two repair rounds that could not fix a protected surface. wire-cost-aware-repair-call-sites wired the components; this item judges the shadow record and flips the stage. Since cycle 2400 the record holds 1 cycle (2494, 2 would_stop, both correct), so gather more before the flip. Record the issue through the issue-record skill.",
+  "id": "repair-fixability-stop-flip-to-enforce-after-cycle-2494",
+  "kind": "hardening",
+  "origin": "console",
+  "priority_class": "performance",
+  "summary": "Found 2026-11-18: cycle 2494 ran two repair rounds after a proven protected-path blocker; the fixability stop said would_stop twice but runs in shadow.",
+  "title": "A proven protected-path blocker still earns two repair rounds, because the fixability stop runs in shadow",
+  "weight": 0.75
+}

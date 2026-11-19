@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "a commit that adds a record with a bad digest is refused by the commit gate"
+  ],
+  "created_at": "2026-11-18T02:26:09Z",
+  "deps": [
+    "incident-kb-i2-record-schema-and-check",
+    "incident-kb-i3-redact-and-bundle"
+  ],
+  "files": [
+    "go/internal/commitgate/",
+    ".github/workflows/"
+  ],
+  "fix": "Build component I10. The gates are protected, so the console builds it. See docs/plans/incident-knowledge-base-2026-11.md (PR #1559). The plan lands in the same batch as C2; the dependency on edit-layout-c2-regenerate-generated-conflicts waits for it.",
+  "id": "incident-kb-i10-gate-wiring",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "route": "console-manual",
+  "summary": "issue check in the commit gate and CI, and the redaction scan (I10)",
+  "title": "issue check in the commit gate and CI, and the redaction scan (I10)",
+  "weight": 0.7
+}

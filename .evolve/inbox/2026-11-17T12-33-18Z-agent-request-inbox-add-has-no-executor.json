@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "a phase workspace with requests/inbox-add-1.json for a valid item files that item, red before the change",
+    "the lineage record of the request names the filed item id",
+    "an invalid inbox-add request is refused with a reason code and the request path in an ERROR signal"
+  ],
+  "created_at": "2026-11-17T12:33:18Z",
+  "deps": [],
+  "files": [
+    "go/internal/agentrequest/channel.go",
+    "go/internal/agentclass/table.go"
+  ],
+  "fix": "Add the inbox-add executor that docs/architecture/llm-isolation.md names (item cli-agent-tool-surface): validate the request, file the item with source set to the request id, and record the item id in the lineage index. Until the executor exists, a refused inbox-add emits an ERROR signal with the request path and the item id, and evolve wave supply or the boundary report lists it, so no item is lost without a trace.",
+  "id": "agent-request-inbox-add-has-no-executor",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "agentclass/table.go:66 gives inbox add the class R with the kind inbox-add, and the CLI tells a phase agent to write requests/inbox-add-<n>.json. agentrequest/channel.go:190 refuses each kind except dispatch (precondition kind, stage shadow). 11 requests in cycles 2191, 2200, 2271 and 2460 were refused and no item was filed. Cycle 2460 lost the 6 move items of docs/plans/split-cmd-evolve-2026-11.md; the console filed them by hand on 2026-11-17. The refusal decision also has no reason code (SIGNALCENTER_MISSING_REASON).",
+  "title": "The request channel refuses each inbox-add request, so items that phase agents file are lost",
+  "weight": 0.8
+}

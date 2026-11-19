@@ -1,0 +1,26 @@
+{
+  "connects_to": [
+    "docs/architecture/adr/0072-system-failure-policy-and-halt.md",
+    ".evolve/pipeline-escalation.json",
+    "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2438"
+  ],
+  "consumed": {
+    "at": "2026-11-16T22:43:59Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Diagnosed: the no-work lanes of waves 175-176 (cycles 2431-2438) drew console-manual K items and handed their claimed items to the console instead of stamping checked facts. Fix: classifier Tier A, PR #1530 (rebuild of #1512, with regression tests), reviewed and recorded on the integration train for the next boundary; not yet on main. Wave 177 proceeds; the guard still counts every hand-off after cycle 2438."
+  },
+  "created_at": "2026-11-16T22:42:40Z",
+  "fix": "Root-cause the pipeline failure described by the recorded evidence: 5 no-work lanes in the recent window handed their items to the console (cycles 2431, 2434, 2436, 2437, 2438; ceiling 4) — a triage that drops work it should commit drains the queue to the console while the other lanes ship; consume this item or run evolve loop --reset --fingerprint no-work-handoffs|cycle|2438 to acknowledge them (rule=no-work-handoffs fingerprint=no-work-handoffs|cycle|2438). Add a regression test that reproduces it. Do NOT retry the halted task until the pipeline is fixed.",
+  "id": "pipeline-defect-no-work-handoff-cycle2438",
+  "injected_by": "loop-escalation",
+  "kind": "pipeline-repair",
+  "notes": "Auto-filed by the ADR-0072 halt at 2026-11-16T22:42:40Z. Evidence: 5 no-work lanes in the recent window handed their items to the console (cycles 2431, 2434, 2436, 2437, 2438; ceiling 4) — a triage that drops work it should commit drains the queue to the console while the other lanes ship; consume this item or run evolve loop --reset --fingerprint no-work-handoffs|cycle|2438 to acknowledge them (rule=no-work-handoffs fingerprint=no-work-handoffs|cycle|2438)",
+  "origin": "cycle",
+  "priority": "P0",
+  "priority_class": "stability",
+  "root_cause": "The system-failure signal reported: 5 no-work lanes in the recent window handed their items to the console (cycles 2431, 2434, 2436, 2437, 2438; ceiling 4) — a triage that drops work it should commit drains the queue to the console while the other lanes ship; consume this item or run evolve loop --reset --fingerprint no-work-handoffs|cycle|2438 to acknowledge them (rule=no-work-handoffs fingerprint=no-work-handoffs|cycle|2438). Preserve this evidence while identifying the pipeline cause.",
+  "summary": "ADR-0072 system-failure halt at cycle 2438 (category=no-work-handoff). Evidence: 5 no-work lanes in the recent window handed their items to the console (cycles 2431, 2434, 2436, 2437, 2438; ceiling 4) — a triage that drops work it should commit drains the queue to the console while the other lanes ship; consume this item or run evolve loop --reset --fingerprint no-work-handoffs|cycle|2438 to acknowledge them (rule=no-work-handoffs fingerprint=no-work-handoffs|cycle|2438). This is a PIPELINE defect, not a task failure — diagnose the reported failure before retrying the task.",
+  "title": "PIPELINE DEFECT (no-work-handoff): the loop halted — 5 no-work lanes in the recent window handed their items to the console (cycles 2431, 2434, 2436, 2437, 2438; ceiling 4) — a triage that drops work it should commit drains the queue to the console while the other lanes ship; consume this item or run evolve loop --reset --fingerprint no-work-handoffs|cycle|2438 to acknowledge them (rule=no-work-handoffs fingerprint=no-work-handoffs|cycle|2438)",
+  "weight": 0.99
+}
