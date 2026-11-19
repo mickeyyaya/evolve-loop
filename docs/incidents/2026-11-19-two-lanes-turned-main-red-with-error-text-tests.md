@@ -5,9 +5,9 @@ Related documents: the test-audit rules are in `go/internal/testaudit/rules.go`,
 ## Summary
 
 - **Impact:** the required CI of main was red from 08:01 UTC in wave 181. Two red runs came from two lane cycles. A red main holds the boundary batch of 3 green console PRs (#1570, #1561, #1564).
-- **Root cause:** cycles 2530 and 2533 each added a test that matches on the text of `err.Error()`. The test-audit rule `error-text-match` refuses such a test when its package has no baseline row. The baseline only shrinks, so a new finding is a red tree ratchet.
+- **Root cause:** cycle 2530 added one test and cycle 2533 added two tests that match on the text of `err.Error()`. The test-audit rule `error-text-match` refuses such a test when its package has no baseline row. The baseline only shrinks, so a new finding is a red tree ratchet.
 - **Escape:** the lane build floor does not run the test-audit ratchet. It runs the tests of the changed packages, and `internal/testaudit` is not one of them. Only the CI of main ran `TestTreeRatchet`.
-- **Fix:** PR #1572 gives `incidentkb` two sentinel errors and `kbgraph` a typed `RecordParseError`. Three tests now check these with `errors.Is` and `errors.As`: the two red tests and one older `kbgraph` test.
+- **Fix:** PR #1572 gives `incidentkb` two sentinel errors and `kbgraph` a typed `RecordParseError`. The three red tests now check these with `errors.Is` and `errors.As`.
 - **Class fix:** the inbox item `build-floor-runs-the-test-audit-ratchet` adds the ratchet to the build floor.
 - **Lesson:** a whole-tree ratchet that only CI runs lets each lane turn main red. The floor must run each such ratchet on the changed packages.
 
@@ -23,7 +23,7 @@ Related documents: the test-audit rules are in `go/internal/testaudit/rules.go`,
 |---|---|---|
 | 06:09 | Main CI on `b32f7063f` is green. | required CI run on `b32f7063f` |
 | 08:01 | Cycle 2530 lands `234383500`. Main CI fails in `internal/testaudit`. | run 44484192548 |
-| 09:39 | Cycle 2533 lands `05937be92`. Main CI fails again, with a second finding. | run 44498432850 |
+| 09:39 | Cycle 2533 lands `05937be92`. Main CI fails again, with two more findings. | run 44498432850 |
 | 10:22 | The console finds the red during the boundary check, and reads the failed steps. | `gh run view --log-failed` |
 | 10:32 | The console files the class-fix item. | `2026-11-19T10-32-23Z-build-floor-runs-the-test-audit-ratchet.json` |
 | 10:38 | PR #1572 ships at `180c8e017`, and the train records it. | `deliverable-pr-1572.json` |
@@ -32,6 +32,8 @@ Key log of run 44498432850 (the two other `FAIL` package lines in the log are fi
 
 ```text
 ratchet_tree_test.go:22: testaudit: acs/cycle2533 TestC2533_004_LegacyAndUnparsableIncidentFilesDoNotBreakTheGraph error-text-match has no baseline row
+    testaudit: internal/incidentkb TestRender_EmptyAndErrorBranches error-text-match has no baseline row
+    testaudit: internal/kbgraph TestBuild_UnparsableIncidentReturnsErrorNamingFile error-text-match has no baseline row
 --- FAIL: TestTreeRatchet (56.83s)
 FAIL	github.com/mickeyyaya/evolve-loop/go/internal/testaudit	56.952s
 ```
@@ -51,8 +53,8 @@ ratchet_tree_test.go:22: testaudit: internal/incidentkb TestRender_EmptyAndError
 **F1.2** `Rebaseline` (`go/internal/testaudit/tree.go:21`) refuses a new row.
 *Implication:* a lane cannot accept the finding, and the console cannot either. The tests must change.
 
-**F1.3** On the fix branch, the tree ratchet also flagged the older test `TestBuild_UnparsableIncidentReturnsErrorNamingFile`, which uses the same text match. The CI of main did not flag it.
-*Implication:* the fix changes that test too. The cause of the difference is open (see Limits).
+**F1.3** Cycle 2533 also added `TestBuild_UnparsableIncidentReturnsErrorNamingFile` in `kbgraph`, with the same text match. The ratchet joins its findings into one error, so only the first finding carries the `ratchet_tree_test.go:22:` prefix. The console first read only the prefixed lines, and missed this finding.
+*Implication:* the fix changes that test too. Read each line of a joined error, not only the prefixed line.
 
 **F2.1** `StaticBuildFloorChecks` and `SuiteBuildFloorChecks` (`go/internal/core/build_floor_reviewer.go:35-51`) have no test-audit check.
 *Implication:* the lane floor passed both cycles. The first check that saw the finding was the CI of main, after the landing.
@@ -70,7 +72,6 @@ ratchet_tree_test.go:22: testaudit: internal/incidentkb TestRender_EmptyAndError
 ## Limits
 
 - PR #1572 is open. It lands at the boundary of wave 181 through `evolve integration batch --main-red-fix`. This record and its index row name `ErrMissingMarker`, `ErrOverlappingMarkers` and `RecordParseError`. These symbols are on main only after #1572 lands. Thus this record lands in the same batch as #1572, or after it.
-- This record does not show why the CI of main did not flag `TestBuild_UnparsableIncidentReturnsErrorNamingFile` (F1.3). The rule has no gate on typed errors, and the test has no baseline row and no guard row.
 - Lanes that land before #1572 can add more findings. The boundary check reruns the tree ratchet on the composed tree.
 - The inbox item is in the runtime inbox, not in git.
 
@@ -79,3 +80,4 @@ ratchet_tree_test.go:22: testaudit: internal/incidentkb TestRender_EmptyAndError
 - A ratchet that only CI runs on the whole tree lets a lane turn main red. Each whole-tree ratchet needs a floor check on the changed packages, as the persona-budget check has.
 - A test checks an error by its identity (`errors.Is`) or its fields (`errors.As`), never by its text.
 - Read the `FAIL` line of a package and the test name above it. Many `FAIL` lines in a CI log are fixture text.
+- A joined error prints its first finding after the file prefix and each other finding on its own indented line. Read all of these lines.
