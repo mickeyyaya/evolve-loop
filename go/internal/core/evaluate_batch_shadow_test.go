@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -67,24 +68,34 @@ type overlapRunner struct {
 	name    string
 	active  *atomic.Int32
 	overlap *atomic.Bool
+	wait    time.Duration
+	once    sync.Once
+	entered chan struct{}
+	peer    *overlapRunner
 }
 
 func (r *overlapRunner) Name() string { return r.name }
-func (r *overlapRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse, error) {
+func (r *overlapRunner) Run(ctx context.Context, req PhaseRequest) (PhaseResponse, error) {
 	if r.active.Add(1) > 1 {
 		r.overlap.Store(true)
 	}
-	time.Sleep(40 * time.Millisecond)
+	r.once.Do(func() { close(r.entered) })
+	select {
+	case <-r.peer.entered:
+	case <-time.After(r.wait):
+	case <-ctx.Done():
+	}
 	r.active.Add(-1)
 	return PhaseResponse{Phase: r.name, Verdict: VerdictPASS, ArtifactsDir: req.Workspace}, nil
 }
 
-func overlapRun(t *testing.T, stage config.Stage) bool {
+func overlapRun(t *testing.T, stage config.Stage, wait time.Duration) bool {
 	t.Helper()
 	var active atomic.Int32
 	var overlap atomic.Bool
-	a := &overlapRunner{name: "check-a", active: &active, overlap: &overlap}
-	b := &overlapRunner{name: "check-b", active: &active, overlap: &overlap}
+	a := &overlapRunner{name: "check-a", active: &active, overlap: &overlap, wait: wait, entered: make(chan struct{})}
+	b := &overlapRunner{name: "check-b", active: &active, overlap: &overlap, wait: wait, entered: make(chan struct{})}
+	a.peer, b.peer = b, a
 	o, _ := evaluateBatchRunCycleE4(t, a, b)
 	o.cfg.ParallelEvaluate = stage
 	if _, err := o.RunCycle(context.Background(), CycleRequest{ProjectRoot: t.TempDir(), GoalHash: "g", DisableWorkspaceGuard: true}); err != nil {
@@ -96,10 +107,10 @@ func overlapRun(t *testing.T, stage config.Stage) bool {
 func TestShadowDispatchesTheBatchSerially(t *testing.T) {
 	t.Parallel()
 
-	if !overlapRun(t, config.StageEnforce) {
+	if !overlapRun(t, config.StageEnforce, 10*time.Second) {
 		t.Fatal("control: enforce must run the batch members concurrently, or the detector proves nothing")
 	}
-	if overlapRun(t, config.StageShadow) {
+	if overlapRun(t, config.StageShadow, 50*time.Millisecond) {
 		t.Error("shadow ran the batch members concurrently: shadow must dispatch serially and decide nothing")
 	}
 }

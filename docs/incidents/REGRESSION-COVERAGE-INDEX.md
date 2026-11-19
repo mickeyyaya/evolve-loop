@@ -17,9 +17,9 @@
 
 | | Count |
 |---|---|
-| Incidents mapped | 58 |
-| Distinct failure modes (coverage-map rows) | 96 |
-| ✅ covered (a test fails if the bug comes back) | 80 |
+| Incidents mapped | 59 |
+| Distinct failure modes (coverage-map rows) | 97 |
+| ✅ covered (a test fails if the bug comes back) | 81 |
 | 🟡 partial (related test, doesn't pin the exact mode) | 10 |
 | ❌ none (no regression test) | 6 |
 | ⛔ untestable (external infra / live CLI) | 0 |
@@ -143,6 +143,7 @@ not the coverage map, which is the hand-maintained per-incident record.
 | [2026-09-30 — cycles 1637 and 1691: a clean fleet rebase returned to Build and chased peer commits](2026-09-30-cycle-1637-1691-rebase-chase.md) | `recoverFromShipError` invalidated the build explanation and routed to Build on every `GIT_FLEET_REBASE_NEEDED` before trying the carry-forward ladder, so cycle 1637 ran five rebuild/re-audit rounds across 21 phases as peers kept moving `main` and sealed FAIL, and cycle 1691 paid a full rebuild + re-audit on a disjoint rebase | `core/ship_recovery.go` (`recoverFromShipError`, `routeRebasedExplanation`, `rebindPendingChange`), `core/identity_carry_forward.go` (`identityCarryForward`), `explanationdocs/contract_state.go` (`RebindIdenticalRebase`) | ✅ | `core/carry_chase_replay_test.go::TestCycle1637Replay_ShipsOnFirstRecovery` + `::TestCycle1637Replay_ByteDivergentRebaseDeclinesCarry` |
 | [2026-11-17 — 38 console PRs stayed open, and two rebuilds broke on the current main](2026-11-17-38-console-prs-stayed-open-and-two-rebuilds-broke-on-main.md) | the curator proposed a reroute before the history consume of the same item, so the apply step moved the item and the consume failed | `inboxcurator/curate.go` (`Curate`) | ✅ | `inboxcurator/history_test.go::TestCurate_AnItemThatMainClosedHasItsConsumeBeforeItsReroute` |
 | [2026-11-17 — 38 console PRs stayed open, and two rebuilds broke on the current main](2026-11-17-38-console-prs-stayed-open-and-two-rebuilds-broke-on-main.md) | the data-file reads of the repo-contract pack were not on the protected surface. The floor fixture lacked the packages of the whole-repository rows, and Go 1.23 fails on that | `guards/integrity_surface.go`, `gateregistry/seed_floors_test.go` (`packStubs`) | ✅ | `acs/regression/protectedsurface::TestEveryGateShapedFileIsProtectedSurface` + `gateregistry/seed_floors_test.go::TestRegistry_FloorEntriesGiveAGreenLaneNoLaneRed` |
+| [2026-11-18 — shadow-batch overlap test depended on sleep timing](2026-11-18-shadow-batch-overlap-test-depends-on-sleep-timing.md) | `overlapRunner.Run` used `time.Sleep(40 * time.Millisecond)` to detect overlap, so a loaded runner missed the window and failed the enforce control | `core/evaluate_batch_shadow_test.go` (`overlapRunner.Run`) | ✅ | `acs/cycle2524/predicates_test.go::TestC2524_001_EnforceControlSurvivesASlowScheduler` + `::TestC2524_002_NoSleepAndRendezvousBoundAtLeastFiveSeconds` + `::TestC2524_003_ConcurrentShadowDispatchStillTurnsTheTestRed` + `::TestC2524_004_StaysGreenRepeatedlyUnderOneAndTwoProcs` |
 
 ## Prioritized gap backlog (13-agent sweep; agent confidence in parens)
 
