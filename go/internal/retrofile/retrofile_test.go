@@ -217,3 +217,69 @@ func readItemWeight(t *testing.T, path string) float64 {
 	}
 	return w
 }
+
+func TestFileActions_UpdatesOpenItemOnHigherRecurrenceAndWritesSummaryAndAcceptance(t *testing.T) {
+	inbox := t.TempDir()
+	first := []PreventiveAction{{
+		ID:            "class-x",
+		Title:         "Stop class-x (1)",
+		Summary:       "cycle 10: phase=build",
+		Acceptance:    []string{"class-x stops"},
+		Recurrence:    1,
+		PriorityClass: "correctness",
+	}}
+	written1, err := FileActions(inbox, 10, first, 0.75, fixedNow)
+	if err != nil || len(written1) != 1 {
+		t.Fatalf("first FileActions: written=%v err=%v", written1, err)
+	}
+
+	second := []PreventiveAction{{
+		ID:            "class-x",
+		Title:         "Stop class-x (2)",
+		Summary:       "cycle 10: phase=build\ncycle 11: phase=build",
+		Acceptance:    []string{"class-x stops"},
+		Recurrence:    2,
+		PriorityClass: "correctness",
+	}}
+	written2, err := FileActions(inbox, 11, second, 0.75, fixedNow.Add(time.Hour))
+	if err != nil || len(written2) != 1 || written2[0] != written1[0] {
+		t.Fatalf("second FileActions: written=%v err=%v, want update of %s", written2, err, written1[0])
+	}
+	raw, err := os.ReadFile(written1[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Title      string   `json:"title"`
+		Summary    string   `json:"summary"`
+		Acceptance []string `json:"acceptance"`
+		Recurrence int      `json:"recurrence"`
+	}
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Title != "Stop class-x (2)" || got.Recurrence != 2 || got.Summary != second[0].Summary || len(got.Acceptance) != 1 || got.Acceptance[0] != "class-x stops" {
+		t.Fatalf("updated item = %+v, want updated fields", got)
+	}
+
+	written3, err := FileActions(inbox, 12, first, 0.75, fixedNow.Add(2*time.Hour))
+	if err != nil || len(written3) != 0 {
+		t.Fatalf("lower-recurrence FileActions: written=%v err=%v, want skip", written3, err)
+	}
+}
+
+func TestFileActions_PrefersOpenItemOverArchivedCopy(t *testing.T) {
+	inbox := t.TempDir()
+	writeInboxItem(t, filepath.Join(inbox, "consumed", "c1.json"), "dup-id")
+	openPath := filepath.Join(inbox, "auto-retro-1-dup-id.json")
+	body, _ := json.Marshal(map[string]any{"id": "dup-id", "recurrence": 1})
+	if err := os.WriteFile(openPath, body, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	written, err := FileActions(inbox, 2, []PreventiveAction{{
+		ID: "dup-id", Title: "updated", Recurrence: 2, PriorityClass: "correctness",
+	}}, 0.75, fixedNow)
+	if err != nil || len(written) != 1 || written[0] != openPath {
+		t.Fatalf("FileActions with archived+open = (%v, %v), want update of %s", written, err, openPath)
+	}
+}

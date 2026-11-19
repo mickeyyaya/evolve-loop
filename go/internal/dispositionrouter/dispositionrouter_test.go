@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -77,7 +78,7 @@ func TestStageIntent_AppendsJSONLAndCreatesDir(t *testing.T) {
 	if err := json.Unmarshal([]byte(lines[0]), &first); err != nil {
 		t.Fatalf("line 0 is not JSON: %v", err)
 	}
-	if first != in {
+	if !reflect.DeepEqual(first, in) {
 		t.Errorf("round-trip = %+v, want %+v", first, in)
 	}
 }

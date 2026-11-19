@@ -1,6 +1,7 @@
 package core
 
 import (
+	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -76,17 +78,19 @@ func recordFailureClass(workspace string, now func() time.Time) (FailureDigest, 
 	}
 	phase, _, _ := strings.Cut(d.Fingerprint, "|")
 	d.ClassFingerprint, d.ClassLayer = failureClassKey{phase: phase, preClass: d.PreClass, layer: disp.RootCause.Layer, checks: d.Checks}.fingerprint(), disp.RootCause.Layer
-	prior, err := priorClassCount(record, d.ClassFingerprint)
+	priors, err := priorClassOccurrences(record, d.ClassFingerprint)
 	if err != nil {
 		return d, err
 	}
-	d.ClassRecurrence, d.ClassRecordedAt = prior+1, now().UTC().Format(time.RFC3339Nano)
+	d.ClassRecurrence, d.ClassRecordedAt = len(priors)+1, now().UTC().Format(time.RFC3339Nano)
 	dec := dispositionrouter.Decide(d.PreClass, d.ClassRecurrence, disp.Routing)
 	d.ClassRoute, d.ClassRouteReason = dec.Route, dec.Reason
 	if err := persistFailureDigest(workspace, d); err != nil {
 		return d, err
 	}
-	return d, stageClassEscalation(filepath.Dir(filepath.Dir(record)), d)
+	occurrences := append(priors, d)
+	slices.SortFunc(occurrences, func(a, b FailureDigest) int { return cmp.Compare(a.Cycle, b.Cycle) })
+	return d, stageClassEscalation(filepath.Dir(filepath.Dir(record)), d, occurrences)
 }
 
 func classItemID(class string) string {
@@ -94,7 +98,7 @@ func classItemID(class string) string {
 	return "failure-class-" + hash
 }
 
-func stageClassEscalation(evolveDir string, d FailureDigest) error {
+func stageClassEscalation(evolveDir string, d FailureDigest, occurrences []FailureDigest) error {
 	if d.ClassRoute != dispositionrouter.RouteConsole {
 		return nil
 	}
@@ -103,12 +107,30 @@ func stageClassEscalation(evolveDir string, d FailureDigest) error {
 		perr = fmt.Errorf("load the policy for the autofile weight: %w", perr)
 	}
 	_, serr := dispositionrouter.StageIntent(filepath.Join(evolveDir, "escalations"), dispositionrouter.Intent{
-		Action: dispositionrouter.ActionAutofile, Route: dispositionrouter.RouteConsole,
-		ItemID:  classItemID(d.ClassFingerprint),
-		Pattern: d.ClassFingerprint, Cycle: d.Cycle, Recurrence: d.ClassRecurrence, Weight: pol.RetroAutofileDefaultWeight(),
-		Reason: d.ClassRouteReason, PriorityClass: inboxbatch.ClassCorrectness,
+		Action:        dispositionrouter.ActionAutofile,
+		Route:         dispositionrouter.RouteConsole,
+		ItemID:        classItemID(d.ClassFingerprint),
+		Title:         fmt.Sprintf("Stop recurring failure class %s (%d occurrences)", d.ClassFingerprint, d.ClassRecurrence),
+		Summary:       classEscalationSummary(occurrences),
+		Acceptance:    []string{fmt.Sprintf("Root cause fixed so failure class %s stops recurring", d.ClassFingerprint)},
+		Pattern:       d.ClassFingerprint,
+		Cycle:         d.Cycle,
+		Recurrence:    d.ClassRecurrence,
+		Weight:        pol.RetroAutofileDefaultWeight(),
+		Reason:        d.ClassRouteReason,
+		PriorityClass: inboxbatch.ClassCorrectness,
 	})
 	return errors.Join(perr, serr)
+}
+
+func classEscalationSummary(occurrences []FailureDigest) string {
+	lines := make([]string, 0, len(occurrences))
+	for _, occ := range occurrences {
+		phase, _, _ := strings.Cut(occ.Fingerprint, "|")
+		lines = append(lines, fmt.Sprintf("cycle %d: phase=%s pre_class=%s layer=%s checks=[%s] fingerprint=%s",
+			occ.Cycle, phase, occ.PreClass, occ.ClassLayer, strings.Join(occ.Checks, ", "), occ.Fingerprint))
+	}
+	return strings.Join(lines, "\n")
 }
 
 func withRecordedClass(workspace string, d FailureDigest) FailureDigest {
@@ -122,17 +144,17 @@ func withRecordedClass(workspace string, d FailureDigest) FailureDigest {
 	return d
 }
 
-func priorClassCount(record, class string) (int, error) {
+func priorClassOccurrences(record, class string) ([]FailureDigest, error) {
 	digestsDir := filepath.Dir(record)
 	resolved, err := loadResolvedFingerprintTimes(filepath.Dir(digestsDir))
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	entries, err := os.ReadDir(digestsDir)
 	if err != nil {
-		return 0, fmt.Errorf("list the digest records: %w", err)
+		return nil, fmt.Errorf("list the digest records: %w", err)
 	}
-	count := 0
+	var priors []FailureDigest
 	for _, e := range entries {
 		path := filepath.Join(digestsDir, e.Name())
 		if path == record || e.IsDir() || filepath.Ext(e.Name()) != ".json" {
@@ -140,13 +162,13 @@ func priorClassCount(record, class string) (int, error) {
 		}
 		var prior FailureDigest
 		if err := readJSONFile(path, &prior); err != nil {
-			return 0, fmt.Errorf("read the digest record %s: %w", e.Name(), err)
+			return nil, fmt.Errorf("read the digest record %s: %w", e.Name(), err)
 		}
 		if prior.ClassFingerprint == class && classRecordedAfter(prior, resolved[class]) {
-			count++
+			priors = append(priors, prior)
 		}
 	}
-	return count, nil
+	return priors, nil
 }
 
 func classRecordedAfter(d FailureDigest, resolvedAt time.Time) bool {

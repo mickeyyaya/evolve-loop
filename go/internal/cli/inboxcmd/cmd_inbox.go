@@ -1,6 +1,7 @@
 package inboxcmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
@@ -260,6 +261,7 @@ func runInboxLint(root string, args []string, stdout, stderr io.Writer) int {
 	}
 	isProtectedBase := protectedBasenameJudge(root, inbox.isProtected, stderr)
 	lintDeadPaths(root, inbox.items, stderr)
+	lintMissingFields(inbox.items, stderr)
 	var undeclared []inboxLintEntry
 	for _, it := range inbox.items {
 		if routed, _ := inboxbatch.ConsoleRouted(it, inbox.isProtected); routed || it.HasDeclaredSurface() {
@@ -290,6 +292,41 @@ func runInboxLint(root string, args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+func lintMissingFields(items []inboxbatch.Item, stderr io.Writer) {
+	for _, it := range items {
+		if strings.TrimSpace(it.Title) == "" {
+			fmt.Fprintf(stderr, "inbox lint: warning: %s: missing title\n", it.ID)
+		}
+		if !hasSummary(it.Summary) {
+			fmt.Fprintf(stderr, "inbox lint: warning: %s: missing summary\n", it.ID)
+		}
+		if !hasAcceptance(it.Acceptance) {
+			fmt.Fprintf(stderr, "inbox lint: warning: %s: missing acceptance\n", it.ID)
+		}
+	}
+}
+
+func hasSummary(raw json.RawMessage) bool {
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) || bytes.Equal(trimmed, []byte("{}")) || bytes.Equal(trimmed, []byte("[]")) {
+		return false
+	}
+	var s string
+	if json.Unmarshal(trimmed, &s) == nil {
+		return strings.TrimSpace(s) != ""
+	}
+	return true
+}
+
+func hasAcceptance(acc []string) bool {
+	for _, a := range acc {
+		if strings.TrimSpace(a) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func lintDeadPaths(root string, items []inboxbatch.Item, stderr io.Writer) {

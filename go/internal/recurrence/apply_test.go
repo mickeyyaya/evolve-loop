@@ -343,3 +343,50 @@ func TestApplyBoundary_ReweightGoesOnlyThroughTheSeam(t *testing.T) {
 		})
 	}
 }
+
+func TestApplyBoundary_UpdatesOpenAutofiledItemOnFurtherCycle(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	escDir := filepath.Join(root, "escalations")
+	if _, err := dispositionrouter.StageIntent(escDir, dispositionrouter.Intent{
+		Cycle: 1062, Pattern: "build|gate-block|class-1", ItemID: "failure-class-1",
+		Title: "Stop class-1 (3)", Summary: "cycle 1060\ncycle 1061\ncycle 1062", Acceptance: []string{"stop build|gate-block|class-1"},
+		Action: dispositionrouter.ActionAutofile, Route: dispositionrouter.RouteConsole, Recurrence: 3, Weight: 0.75, PriorityClass: "correctness",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := recurrence.ApplyBoundary(opts(root, 1062, false)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := dispositionrouter.StageIntent(escDir, dispositionrouter.Intent{
+		Cycle: 1065, Pattern: "build|gate-block|class-1", ItemID: "failure-class-1",
+		Title: "Stop class-1 (4)", Summary: "cycle 1060\ncycle 1061\ncycle 1062\ncycle 1065", Acceptance: []string{"stop build|gate-block|class-1"},
+		Action: dispositionrouter.ActionAutofile, Route: dispositionrouter.RouteConsole, Recurrence: 4, Weight: 0.75, PriorityClass: "correctness",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := recurrence.ApplyBoundary(opts(root, 1065, false))
+	if err != nil {
+		t.Fatalf("ApplyBoundary(1065): %v", err)
+	}
+	if len(res.Filed) != 1 || res.Filed[0] != "failure-class-1" {
+		t.Fatalf("Filed = %v, want [failure-class-1]", res.Filed)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, "inbox", "auto-retro-1062-failure-class-1.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Title      string   `json:"title"`
+		Summary    string   `json:"summary"`
+		Acceptance []string `json:"acceptance"`
+		Recurrence int      `json:"recurrence"`
+	}
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Recurrence != 4 || got.Title != "Stop class-1 (4)" || got.Summary != "cycle 1060\ncycle 1061\ncycle 1062\ncycle 1065" || len(got.Acceptance) != 1 {
+		t.Fatalf("updated item = %+v", got)
+	}
+}

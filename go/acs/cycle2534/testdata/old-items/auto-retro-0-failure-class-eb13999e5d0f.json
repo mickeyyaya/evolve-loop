@@ -1,0 +1,14 @@
+{
+  "action": "recurring failure ship|gate-block|class-eb13999e5d0f (1 occurrences)",
+  "evidence_pointer": "advisory raise: queue -\u003e console",
+  "files": null,
+  "id": "failure-class-eb13999e5d0f",
+  "injected_at": "2026-11-09T18:44:53Z",
+  "injected_by": "retro-preventive-actions-autofiler",
+  "kind": "pipeline-repair",
+  "origin": "retro",
+  "priority": "HIGH",
+  "priority_class": "correctness",
+  "recurrence": 1,
+  "weight": 0.75
+}

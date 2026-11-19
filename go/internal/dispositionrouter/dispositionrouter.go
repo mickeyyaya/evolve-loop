@@ -61,15 +61,18 @@ func Decide(preClass string, recurrence int, llmRoute string) Decision {
 }
 
 type Intent struct {
-	Cycle         int     `json:"cycle"`
-	Pattern       string  `json:"pattern"`
-	ItemID        string  `json:"item_id,omitempty"`
-	Action        string  `json:"action"`
-	Route         string  `json:"route"`
-	Recurrence    int     `json:"recurrence"`
-	Weight        float64 `json:"weight"`
-	Reason        string  `json:"reason,omitempty"`
-	PriorityClass string  `json:"priority_class,omitempty"`
+	Cycle         int      `json:"cycle"`
+	Pattern       string   `json:"pattern"`
+	ItemID        string   `json:"item_id,omitempty"`
+	Title         string   `json:"title,omitempty"`
+	Summary       string   `json:"summary,omitempty"`
+	Acceptance    []string `json:"acceptance,omitempty"`
+	Action        string   `json:"action"`
+	Route         string   `json:"route"`
+	Recurrence    int      `json:"recurrence"`
+	Weight        float64  `json:"weight"`
+	Reason        string   `json:"reason,omitempty"`
+	PriorityClass string   `json:"priority_class,omitempty"`
 }
 
 const (

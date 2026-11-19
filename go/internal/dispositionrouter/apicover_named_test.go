@@ -24,11 +24,14 @@ func TestExportedVocabularyNamed(t *testing.T) {
 	if d.Route != dispositionrouter.RouteConsole || d.Reason == "" || !d.Forced {
 		t.Fatalf("Decision = %+v", d)
 	}
-	raw, err := json.Marshal(dispositionrouter.Intent{Cycle: 1, Pattern: "p", ItemID: "i", Action: dispositionrouter.ActionAutofile, Route: dispositionrouter.RouteQueue, Recurrence: 2, Weight: 0.5, Reason: "r"})
+	raw, err := json.Marshal(dispositionrouter.Intent{
+		Cycle: 1, Pattern: "p", ItemID: "i", Title: "t", Summary: "s", Acceptance: []string{"a"},
+		Action: dispositionrouter.ActionAutofile, Route: dispositionrouter.RouteQueue, Recurrence: 2, Weight: 0.5, Reason: "r",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`"action":"autofile"`, `"route":"queue"`, `"recurrence":2`} {
+	for _, want := range []string{`"action":"autofile"`, `"route":"queue"`, `"recurrence":2`, `"title":"t"`, `"summary":"s"`, `"acceptance":["a"]`} {
 		if !strings.Contains(string(raw), want) {
 			t.Fatalf("Intent wire %s missing %s", raw, want)
 		}

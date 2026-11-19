@@ -95,3 +95,36 @@ func TestLint_ADeadPathDoesNotMaskAnUndeclaredSurface(t *testing.T) {
 		t.Errorf("stderr = %q, want the dead-path warning beside the undeclared failure", stderr.String())
 	}
 }
+
+func TestLint_WarnsOnMissingTitleSummaryOrAcceptanceAndAcceptsCompleteItems(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	contractUnitWrite(t, root, ".evolve/inbox/empty.json", `{"id":"empty","kind":"pipeline-repair","weight":0.75,"priority_class":"correctness"}`)
+	contractUnitWrite(t, root, ".evolve/inbox/blank-values.json", `{"id":"blank-values","kind":"pipeline-repair","weight":0.75,"priority_class":"correctness","title":"has title","summary":null,"acceptance":["  "]}`)
+	contractUnitWrite(t, root, ".evolve/inbox/structured.json", `{"id":"structured","kind":"pipeline-repair","weight":0.75,"priority_class":"correctness","title":"ok","summary":{"note":"details"},"acceptance":["","done"]}`)
+	var stdout, stderr bytes.Buffer
+
+	rc := runInboxLint(root, nil, &stdout, &stderr)
+
+	if rc != 0 {
+		t.Fatalf("rc = %d, want 0 (stdout=%q stderr=%q)", rc, stdout.String(), stderr.String())
+	}
+	errOut := stderr.String()
+	for _, want := range []string{
+		"inbox lint: warning: empty: missing title",
+		"inbox lint: warning: empty: missing summary",
+		"inbox lint: warning: empty: missing acceptance",
+		"inbox lint: warning: blank-values: missing summary",
+		"inbox lint: warning: blank-values: missing acceptance",
+	} {
+		if !strings.Contains(errOut, want) {
+			t.Errorf("stderr missing %q:\n%s", want, errOut)
+		}
+	}
+	if strings.Contains(errOut, "blank-values: missing title") {
+		t.Errorf("stderr falsely flagged blank-values title:\n%s", errOut)
+	}
+	if strings.Contains(errOut, "structured:") {
+		t.Errorf("stderr falsely flagged complete structured item:\n%s", errOut)
+	}
+}

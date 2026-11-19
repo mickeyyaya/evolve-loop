@@ -1,0 +1,14 @@
+{
+  "action": "recurring failure triage|gate-block|class-e5235f340233 (1 occurrences)",
+  "evidence_pointer": "advisory raise: queue -\u003e console",
+  "files": null,
+  "id": "failure-class-e5235f340233",
+  "injected_at": "2026-11-04T17:15:06Z",
+  "injected_by": "retro-preventive-actions-autofiler",
+  "kind": "pipeline-repair",
+  "origin": "retro",
+  "priority": "HIGH",
+  "priority_class": "correctness",
+  "recurrence": 1,
+  "weight": 0.75
+}

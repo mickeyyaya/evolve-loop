@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -59,9 +60,10 @@ func ApplyBoundary(opts ApplyOptions) (ApplyResult, error) {
 		if serr != nil {
 			return serr
 		}
+		priorStamp := maps.Clone(stamp)
 		for _, in := range intents {
 			key := stampKey(in)
-			if prev, ok := stamp[key]; ok && prev == opts.Cycle {
+			if prev, ok := priorStamp[key]; ok && prev == opts.Cycle {
 				continue
 			}
 			applied, aerr := applyIntent(opts, in, &res)
@@ -111,9 +113,15 @@ func applyIntent(opts ApplyOptions, in dispositionrouter.Intent, res *ApplyResul
 
 func autofileIntent(opts ApplyOptions, in dispositionrouter.Intent, res *ApplyResult) (bool, error) {
 	id := intentID(in)
+	title := in.Title
+	if title == "" {
+		title = fmt.Sprintf("recurring failure %s (%d occurrences)", in.Pattern, in.Recurrence)
+	}
 	filed, err := retrofile.FileActions(opts.InboxDir, opts.Cycle, []retrofile.PreventiveAction{{
 		ID:            id,
-		Title:         fmt.Sprintf("recurring failure %s (%d occurrences)", in.Pattern, in.Recurrence),
+		Title:         title,
+		Summary:       in.Summary,
+		Acceptance:    in.Acceptance,
 		WeightHint:    in.Weight,
 		Evidence:      in.Reason,
 		Recurrence:    in.Recurrence,
