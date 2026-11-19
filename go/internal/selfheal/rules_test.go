@@ -240,3 +240,12 @@ func TestFromSignals_ALauncherDropAtEnforceIsTheControlAndACellAttemptAtEnforceI
 		t.Fatalf("only the read that the cell tried at enforce opens a record: %+v", got)
 	}
 }
+
+func TestFromSignals_AnEnvRefusedSummaryRaisesNoHeal(t *testing.T) {
+	t.Parallel()
+	ev := signal(1, signalcenter.KindIsolationEnv, "ISOLATION_ENV_REFUSED", t0, map[string]string{"stage": "enforce", "action": "refused", "source": "launcher", "rule": "env.allowlist"})
+	got, _ := Detect(nil, FromSignals([]signalcenter.Event{ev}), fakeVerifier{}, t0)
+	if len(got) != 0 {
+		t.Fatalf("a refusal is the allowlist working: %+v", got)
+	}
+}

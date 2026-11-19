@@ -171,6 +171,7 @@ const (
 const (
 	KindIsolationRequest         Kind = "isolation.request"
 	KindIsolationRequestDecision Kind = "isolation.request.decision"
+	KindIsolationEnv             Kind = "isolation.env"
 )
 
 var knownKinds = map[Kind]bool{
@@ -179,7 +180,7 @@ var knownKinds = map[Kind]bool{
 	KindQuotaPaused: true, KindLoginRequired: true, KindBridgeWarning: true, KindBridgeTripwire: true, KindPaneLiveness: true,
 	KindLedgerAppended: true, KindOutcomeWarning: true, KindFailureDiagWarning: true, KindCarryoverWarning: true, KindFailureLearningWarning: true, KindConfigWarning: true, KindAdvisorWarning: true, KindRunnerWarning: true, KindInboxWarning: true, KindAuditWarning: true, KindObserverWarning: true, KindCycleSealed: true, KindLoopWave: true, KindLoopHalt: true, KindLoopWarning: true,
 	KindLoopEscalation: true, KindLoopStarted: true, KindLoopExit: true, KindLoopLost: true, KindListenerPanicked: true, KindRegistryDrift: true, KindSinkDropped: true,
-	KindQualityReading: true, KindQualityBreach: true, KindQualityWarning: true, KindIsolationViolation: true, KindIsolationContext: true, KindIsolationRequest: true, KindIsolationRequestDecision: true, KindCLIQueueApplied: true, KindLadderDecision: true, KindSelfhealIncident: true, KindSelfhealDecision: true,
+	KindQualityReading: true, KindQualityBreach: true, KindQualityWarning: true, KindIsolationViolation: true, KindIsolationContext: true, KindIsolationRequest: true, KindIsolationRequestDecision: true, KindIsolationEnv: true, KindCLIQueueApplied: true, KindLadderDecision: true, KindSelfhealIncident: true, KindSelfhealDecision: true,
 	KindControlBypass: true, KindWaveStarted: true, KindWaveEnded: true, KindInboxClaimed: true, KindInboxReleased: true, KindCICompleted: true, KindLoopTick: true, KindExpectedAbsent: true,
 }
 
