@@ -15,6 +15,19 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/incidentkb"
 )
 
+type RecordParseError struct {
+	Path string
+	Err  error
+}
+
+func (e *RecordParseError) Error() string {
+	return fmt.Sprintf("kbgraph: parse %s: %v", e.Path, e.Err)
+}
+
+func (e *RecordParseError) Unwrap() error {
+	return e.Err
+}
+
 const (
 	MaxHops  = 2
 	MaxNodes = 40
@@ -184,7 +197,7 @@ func (g *Graph) addIncidents(projectRoot string) error {
 		}
 		rec, err := incidentkb.Parse(raw)
 		if err != nil {
-			return fmt.Errorf("kbgraph: parse %s: %w", path, err)
+			return &RecordParseError{Path: path, Err: err}
 		}
 		g.addIncidentRecord(rec, e.Name())
 	}
