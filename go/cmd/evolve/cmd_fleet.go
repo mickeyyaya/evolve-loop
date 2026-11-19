@@ -15,6 +15,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -148,14 +149,15 @@ func laneGoalHash(specGoalHash, fallback string) string {
 }
 
 type cycleLaunch struct {
-	Bin      string
-	Simulate bool
-	Root     string
-	GoalHash string
-	GoalText string
-	Stdout   io.Writer
-	Stderr   io.Writer
-	Pool     int
+	Bin        string
+	Simulate   bool
+	Root       string
+	GoalHash   string
+	GoalText   string
+	Stdout     io.Writer
+	Stderr     io.Writer
+	Pool       int
+	startHooks cycleStartHooks
 }
 
 func execCycleLaunch(binPath string, simulate bool, projectRoot, goalHash, goalText string, stdout, stderr io.Writer) fleet.LaunchFn {
@@ -169,6 +171,11 @@ func (l cycleLaunch) LaunchFn() fleet.LaunchFn {
 		ow := &prefixLineWriter{w: l.Stdout, prefix: prefix, mu: &logMu}
 		ew := &prefixLineWriter{w: l.Stderr, prefix: prefix, mu: &logMu}
 		defer func() { ow.Flush(); ew.Flush() }()
+		if !l.Simulate || l.startHooks.trim != nil || l.startHooks.usage != nil {
+			if err := looppreflight.RunCycleStart(ctx, buildCycleStartOptions(l.Root, "", ew, l.startHooks)); err != nil {
+				return -1, err
+			}
+		}
 		lane := l
 		lane.GoalHash = laneGoalHash(spec.GoalHash, l.GoalHash)
 		cmd := sysexec.Command(ctx, l.Bin, cycleRunPoolArgs(lane, spec.OutputContract)...)

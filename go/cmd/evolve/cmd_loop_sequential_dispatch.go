@@ -11,6 +11,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cycleclassify"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
 )
 
 type sequentialCycle struct {
@@ -22,6 +23,13 @@ type sequentialCycle struct {
 }
 
 func (b *loopBatchCoordinator) dispatchSequentialCycle() (sequentialCycle, batchDecision) {
+	if err := looppreflight.RunCycleStart(b.ctx, buildCycleStartOptions(b.cfg.ProjectRoot, b.cfg.EvolveDir, b.stderr, b.startHooks)); err != nil {
+		if b.ctx.Err() != nil {
+			emitSignalStop(b.stdout, b.stderr, b.result, 0)
+			return sequentialCycle{}, batchDecision{flow: batchReturn, exitCode: 130}
+		}
+		return sequentialCycle{}, b.handleCycleError(core.CycleResult{}, err)
+	}
 	lastBefore, _ := readLastCycleNumber(context.Background(), b.deps.Storage)
 	request := core.CycleRequest{
 		ProjectRoot:           b.cfg.ProjectRoot,

@@ -4,6 +4,11 @@ package looppreflight
 
 import "errors"
 
-func defaultDiskFreeBytes(string) (uint64, error) {
-	return 0, errors.New("disk-free probe unsupported on this platform")
+func defaultDiskUsageOf(string) (DiskUsage, error) {
+	return DiskUsage{}, errors.New("disk-free probe unsupported on this platform")
+}
+
+func defaultDiskFreeBytes(path string) (uint64, error) {
+	_, err := defaultDiskUsageOf(path)
+	return 0, err
 }

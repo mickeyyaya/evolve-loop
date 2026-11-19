@@ -38,6 +38,7 @@ type loopBatchCoordinator struct {
 	driverFinishLimit time.Duration
 	driverTick        time.Duration
 	oversightSource   func() (orchestrator.Source, error)
+	startHooks        cycleStartHooks
 }
 
 func (b *loopBatchCoordinator) run() int {
