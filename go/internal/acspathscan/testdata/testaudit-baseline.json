@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/acspathscan",
+      "test": "TestNeeds_ReportsAListingFault",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/acspathscan",
+      "test": "TestNeeds_ReportsAParseFaultAndKeepsTheOtherFiles",
+      "rule": "error-text-match"
+    }
+  ]
+}

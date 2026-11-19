@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/profiles",
+      "test": "TestGet_AnUnexpandableToolPolicyIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/profiles",
+      "test": "TestSmoke_RealProfiles",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

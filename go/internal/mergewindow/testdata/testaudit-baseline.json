@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/mergewindow",
+      "test": "TestParse_FailsClosedOnATableItCannotRead",
+      "rule": "error-text-match"
+    }
+  ]
+}

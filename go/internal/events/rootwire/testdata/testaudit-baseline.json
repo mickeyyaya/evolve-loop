@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/events/rootwire",
+      "test": "TestCloser_ASecondCallFlushesAndClosesAgainButWarnsOnce",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "internal/events/rootwire",
+      "test": "TestCloser_FlushesThenClosesThePublisherWithTheDeadline",
+      "rule": "mock-call-order"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "rows": [
+    {
+      "package": "internal/repocontract",
+      "test": "TestClimbsOutOfItsPackage",
+      "rule": "single-file-ast-pin"
+    },
+    {
+      "package": "internal/repocontract",
+      "test": "TestReadingTestsOf_CreditsTheTestsThatReachARead",
+      "rule": "single-file-ast-pin"
+    },
+    {
+      "package": "internal/repocontract",
+      "test": "TestStreamParse_AParseErrorNamesTheFileAndStopsTheWalk",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/repocontract",
+      "test": "TestWalksUpToGoMod",
+      "rule": "single-file-ast-pin"
+    }
+  ]
+}

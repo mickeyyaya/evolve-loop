@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/marketplacepoll",
+      "test": "TestRun_MissingMarketplaceDir",
+      "rule": "error-text-match"
+    }
+  ]
+}

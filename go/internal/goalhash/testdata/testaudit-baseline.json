@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/goalhash",
+      "test": "TestCompute_MatchesBash",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

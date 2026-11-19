@@ -1,0 +1,19 @@
+{
+  "rows": [
+    {
+      "package": "internal/modelcatalog",
+      "test": "TestWriteCatalogFileCoverfix_MarshalFailureLeavesNoFile",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/modelcatalog",
+      "test": "TestWriteCatalogFileCoverfix_MkdirFailureIsReported",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/modelcatalog",
+      "test": "TestWrite_RetainedCopyDoesNotFollowSymlink",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

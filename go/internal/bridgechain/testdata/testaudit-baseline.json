@@ -1,0 +1,59 @@
+{
+  "rows": [
+    {
+      "package": "internal/bridgechain",
+      "test": "TestUnlaunched_AnEmptyWalkWithNoErrorStillNamesTheCause",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridgechain",
+      "test": "TestWalking_ARoutingRefusalFailsTheLaunchInsteadOfFallingBack",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridgechain",
+      "test": "TestWalking_AWalkThatLaunchesNothingSurfacesTheError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridgechain",
+      "test": "TestWalking_AWallThenARealFailureSurfacesTheFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridgechain",
+      "test": "TestWalking_AWorktreeLaunchWithNoToolCapableCLIFailsLoudlyAndLaunchesNothing",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridgechain",
+      "test": "TestWalking_AnExhaustedWalkThatMetAWallSurfacesTheWall",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridgechain",
+      "test": "TestWallKeeper_ABootTimeoutOnALostSessionAfterTheWallIsASystemFaultNotAQuotaPause",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridgechain",
+      "test": "TestWallKeeper_ANonStartAfterTheWallStillSurfacesTheWall",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridgechain",
+      "test": "TestWallKeeper_APlainBootTimeoutAfterTheWallStillSurfacesTheWall",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridgechain",
+      "test": "TestWallKeeper_AStallWithNoExhaustionEvidenceBeforeTheWallIsNotAQuotaPause",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridgechain",
+      "test": "TestWallKeeper_SurfacesTheWallOfAWalledWalkNamingEveryRung",
+      "rule": "error-text-match"
+    }
+  ]
+}

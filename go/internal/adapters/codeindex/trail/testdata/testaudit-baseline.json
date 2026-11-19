@@ -1,0 +1,29 @@
+{
+  "rows": [
+    {
+      "package": "internal/adapters/codeindex/trail",
+      "test": "TestTrailBackend_AMissingBinaryIsAbsentAndNamesTheBinaryAndTheIndex",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/codeindex/trail",
+      "test": "TestTrailBackend_AnAbsentIndexNamesTheIndexDir",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/codeindex/trail",
+      "test": "TestTrailBackend_AnUnknownExitWithNoMessageStillCarriesTheCode",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/codeindex/trail",
+      "test": "TestTrailBackend_AnUnknownNonZeroExitCarriesTheCodeAndTheFirstMessageLine",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/codeindex/trail",
+      "test": "TestTrailBackend_RefreshMapsFailuresToTheSameErrorsAsQueries",
+      "rule": "error-text-match"
+    }
+  ]
+}

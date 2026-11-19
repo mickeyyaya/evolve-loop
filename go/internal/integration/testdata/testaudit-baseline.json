@@ -1,0 +1,354 @@
+{
+  "rows": [
+    {
+      "package": "internal/integration",
+      "test": "TestAdopter_EachGitFailureOfTheAdoptionIsReported",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestBatchTest_APredicateRunErrorReachesTheLaneBrief",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestBatchTest_ARedPackageKeepsItsOutputInTheEjection",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestChainedBinding_ACommitWithNoRecordIsRefusedByName",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestCheckBatchInputs_RejectsDuplicateRecord",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestClassBindingBindsTheClaimToTheChangeAndItsRule",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestCompose_AConflictExitWithoutConflictedPathsIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestCompose_APortErrorEjectsWithTheCauseConflictAndNamesTheError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestCompose_ARedGateEjectsAndKeepsTheBranch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestCompose_ATextualConflictEjectsWithNoGateRun",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestCompose_ATipThatIsNotAnObjectIDNeverReachesMergeTree",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestCompose_NeverPassesAMergeTreeOutputThatIsNotAnObjectIDToCommitTree",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestConsoleTrainExportsAreNamedByAnExecutedAssertion",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestDriver_AFailedWriteIsKeptInFailuresAndTheNextWriteCarriesIt",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestDriver_AFlushFailureIsRecordedAndTheWaveDoesNotEnd",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestDriver_ALastCycleFailureIsRecordedOnAnEndedRecord",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestDriver_AMemberThatNeverLeavesPendingStopsTheWaveEndLoop",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestDriver_AReadFailureOfTheRecordIsAReadStep",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestDriver_AResumeFailureIsAResumeStepAndTheNextTickResumesAgain",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestDriver_AStageReadFailureIsAStageStep",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestDriver_AWaveEndFailureIsAWaveEndStepAndTheWaveDoesNotEnd",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestDriver_AnEpochReadFailureIsAnEpochStepAndTheDriverGoesOn",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestDriver_EnforceHasNoActorSoTheDriverRefusesToStart",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestDriver_StartupFailuresAndAMissingBaseAreRecorded",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestEnforceActor_WaveEndPendingRaisesFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestEpochHolder_ReportsAWriteThatCannotBeMade",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestGhHostSettleReadsRefuseTheirFailureModes",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestL2Pack_AFailedStepIsRedByItsNameAndKeepsItsOutput",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestLaneRecordStillValidatesAsBefore",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestPatchID_RefusesAnythingButAFullObjectID",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestReadIntegrationRecord_NamesTheSchemaItRefuses",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestReadRecordErrors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestReadRecordRefusesARecordOfTheContextWidthSchema",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestReadRecordRefusesARecordThatDoesNotValidate",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestReadWaveRecord_RefusesAWrongSchemaABadFileAndAFileOfAnotherPool",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestRun_FinishReturnsTheErrorOfTheWaveEndTick",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestSettleFailsWhenTheCommitsOfABatchPRCannotBeListed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestSettleFailsWhenTheOpenBatchPRsCannotBeListed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestSettleFailsWhenTheRecordOfAClosedPRCannotBeSpent",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestSettleReportsABatchPRThatCannotBeRead",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestSettleReportsEachFailureAndKeepsTheRecordsItCouldNotSettle",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestShadowActor_WaveEndRecordsARefreshFailureAndAFailedDelete",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestSyncToOrigin_ErrorBranches",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestSysGit_AFailureCarriesTheExitCodeAndTheOutput",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestSysGit_ReportsAFailedCommandWithItsStderr",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestTrainCompleteReportsARecordThatIsAlreadyGone",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestTrainComposeReportsABaseItCannotRead",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestTrainComposeReportsALandedCheckItCannotRun",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestTrainL2_ABatchBranchThatMovedDuringTheTestIsAnErrorAndOpensNoBatchPR",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestTrainLandKeepsTheRecordWhenTheInboxFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestTrainLandRefusesInboxIDsItCannotClose",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestTrainLandReportsAFailedCloseAndAFailedBrief",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestTrainLandStopsOnAMergerError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestTrainMovedHeadsNamesTheCommitsThatDidNotLand",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestTrainPlanFailsLoudlyWhenAPRHeadIsMissing",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestTrainPlanRefusesAPRWhoseHeadMovedAfterItsRecord",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestTrainPlanRefusesAPRWithoutAReviewBinding",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestTrainPlanRefusesAnUnsoundBinding",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestTrainPlanReportsAHeadItCannotRead",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestTrainPlanStopsWhenTheHeadOfMainIsUnreadable",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestTrainPlanStopsWhenTheLandedCheckFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestTrainPlanSurfacesAComposeErrorThatIsNotAnEjection",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestTrainRecordFailsLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestTrainRecordReportsAFailedPathListing",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestTrainRecordReportsEachGitStepThatFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestValidateNamesTheMissingField",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestWaveRecord_ValidateNamesEachBrokenField",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestWriteRecordReportsAStagingFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestWriteRecordReportsAnEncodeFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/integration",
+      "test": "TestWriteRecordWith_WriteOnceLinkFailure",
+      "rule": "error-text-match"
+    }
+  ]
+}

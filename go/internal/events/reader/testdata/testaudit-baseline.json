@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/events/reader",
+      "test": "TestReader_ACatalogNameThatIsNotAChannelNameIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/events/reader",
+      "test": "TestReader_AWildcardRootThatBecomesAFileAfterTheArmIsAnError",
+      "rule": "error-text-match"
+    }
+  ]
+}

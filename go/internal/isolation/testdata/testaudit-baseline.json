@@ -1,0 +1,24 @@
+{
+  "rows": [
+    {
+      "package": "internal/isolation",
+      "test": "TestJudge_AGreenRowMustPass",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/isolation",
+      "test": "TestJudge_AnOpenRowThatFailsForAnotherReasonIsInconclusive",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/isolation",
+      "test": "TestJudge_AnOpenRowThatPassesFailsTheTestSoTheFixIsNeverMissed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/isolation",
+      "test": "TestJudge_AnUnknownRowFails",
+      "rule": "error-text-match"
+    }
+  ]
+}

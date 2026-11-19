@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/cycleoutcome",
+      "test": "TestApplyFailure_DrainFailureIsWrappedWithTheCycle",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cycleoutcome",
+      "test": "TestApplyNoWork_EachLifecycleFaultIsReturnedAndTheRestStillRuns",
+      "rule": "error-text-match"
+    }
+  ]
+}

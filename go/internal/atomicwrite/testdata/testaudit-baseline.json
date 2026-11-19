@@ -1,0 +1,49 @@
+{
+  "rows": [
+    {
+      "package": "internal/atomicwrite",
+      "test": "TestBytes_ChmodError_CleansUpTemp",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/atomicwrite",
+      "test": "TestBytes_CloseError_CleansUpTemp",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/atomicwrite",
+      "test": "TestBytes_CreateTempError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/atomicwrite",
+      "test": "TestBytes_MkdirError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/atomicwrite",
+      "test": "TestBytes_RenameError_CleansUpTemp",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/atomicwrite",
+      "test": "TestBytes_WriteError_CleansUpTemp",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/atomicwrite",
+      "test": "TestDurable_DirectorySyncFaults",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/atomicwrite",
+      "test": "TestDurable_SyncError_CleansUpTemp",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/atomicwrite",
+      "test": "TestJSON_MarshalError",
+      "rule": "error-text-match"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/interaction",
+      "test": "TestEnforceRule_CorpusRotBlocksFlip",
+      "rule": "error-text-match"
+    }
+  ]
+}

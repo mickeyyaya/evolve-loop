@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "pkg/naminguard",
+      "test": "TestParseGrepOutput_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "pkg/naminguard",
+      "test": "TestValidate_InvalidForbidden",
+      "rule": "error-text-match"
+    }
+  ]
+}

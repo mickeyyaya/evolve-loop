@@ -1,0 +1,19 @@
+{
+  "rows": [
+    {
+      "package": "internal/bridge/inbox",
+      "test": "TestAppendMkdirError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge/inbox",
+      "test": "TestAppendOpenFileErrorPropagates",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge/inbox",
+      "test": "TestWriteLine_ASurfacedWriteErrorIsWrappedNotSwallowed",
+      "rule": "error-text-match"
+    }
+  ]
+}

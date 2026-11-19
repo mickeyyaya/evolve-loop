@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/verdictcache",
+      "test": "TestWrite_MkdirError_ReturnsError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/verdictcache",
+      "test": "TestWrite_WriteError_ReturnsError",
+      "rule": "error-text-match"
+    }
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "rows": [
+    {
+      "package": "internal/deliverable",
+      "test": "TestCheckInboxClaim_UnreadableInboxFailsLoudWithTheItemID",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/deliverable",
+      "test": "TestHostEffects_ADeclinedDerivationIsLoudAndLeavesTheFileAbsent",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/deliverable",
+      "test": "TestHostEffects_DeclinesWhenTheDecisionIsPresentButUnreadable",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/deliverable",
+      "test": "TestHostEffects_DerivesOnlyFromTheDeclaredPrimary",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/deliverable",
+      "test": "TestHostEffects_TheRegistryDeclaresTriagesDerivation",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/deliverable",
+      "test": "TestPerform_ReportsAHandoffSignalsWriteFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/deliverable",
+      "test": "TestRouteEffect_ACycleOfZeroIsRefusedBeforeAnyRoute",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/deliverable",
+      "test": "TestRouteEffect_ARecordFailureIsALoudErrorAndLeavesTheCardInTopN",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/deliverable",
+      "test": "TestRouteEffect_ARecordFailureOnATopNOnlyRouteIsALoudError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/deliverable",
+      "test": "TestRouteEffect_ARelativeEvolveDirIsRefusedAndReadsNoInboxFromTheWorkingDirectory",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/deliverable",
+      "test": "TestRouteEffect_AnUnroutedPinStillRejectsANoneReport",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/deliverable",
+      "test": "TestRouteEffect_TheRecordIsWrittenBeforeTheDecisionIsEdited",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/deliverable",
+      "test": "TestThresholdsFor_DefaultsWithoutAnEvolveDirAndPolicyErrorsWithOne",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/deliverable",
+      "test": "TestVerifyPrimary_UnreadableDispatchedArtifactIsInfraNotAViolation",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/deliverable",
+      "test": "TestVerify_AMalformedPolicyIsTheGatesOwnFaultNeverTheAgents",
+      "rule": "error-text-match"
+    }
+  ]
+}

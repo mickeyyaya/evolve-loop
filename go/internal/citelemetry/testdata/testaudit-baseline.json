@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/citelemetry",
+      "test": "TestBuild_RejectsAnInputThatHasNoJobsOrNamesAnUnknownJob",
+      "rule": "error-text-match"
+    }
+  ]
+}

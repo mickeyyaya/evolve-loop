@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/inboxrank",
+      "test": "TestFactors_AreThePolicysFactorNamesInItsOwnOrder",
+      "rule": "error-text-match"
+    }
+  ]
+}

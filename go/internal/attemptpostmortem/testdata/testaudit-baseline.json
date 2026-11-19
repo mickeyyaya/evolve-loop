@@ -1,0 +1,54 @@
+{
+  "rows": [
+    {
+      "package": "internal/attemptpostmortem",
+      "test": "TestClaudeTranscript_AnUnreadableFileIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/attemptpostmortem",
+      "test": "TestCollect_ANilTranscriptFallsBackToThePaneTail",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/attemptpostmortem",
+      "test": "TestCollect_AnAgyAttemptWithNoPaneCaptureNamesTheSourceNone",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/attemptpostmortem",
+      "test": "TestCollect_RefusesAPaneThatCannotBeStattedOrOpened",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/attemptpostmortem",
+      "test": "TestConfigValidate_RefusesEachCapThatIsNotPositive",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/attemptpostmortem",
+      "test": "TestCreate_RefusesAnExistingRecordAndReplaceOverwritesIt",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/attemptpostmortem",
+      "test": "TestReadAll_SkipsOnlyTheBadRecordAndNamesItsPath",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/attemptpostmortem",
+      "test": "TestRecordValidate_RefusesEachBrokenField",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/attemptpostmortem",
+      "test": "TestTranscriptFor_TheManifestFormatPicksTheAdapterAndAPathIsNeeded",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/attemptpostmortem",
+      "test": "TestValidPhaseAndRecordValidate_RefuseAPhaseThatIsNotABareName",
+      "rule": "error-text-match"
+    }
+  ]
+}

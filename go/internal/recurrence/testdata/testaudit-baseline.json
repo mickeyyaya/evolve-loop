@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/recurrence",
+      "test": "TestReadSnapshot_AMalformedOrUnreadableLedgerIsAnError",
+      "rule": "error-text-match"
+    }
+  ]
+}

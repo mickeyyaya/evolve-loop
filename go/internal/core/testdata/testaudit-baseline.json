@@ -1,0 +1,1299 @@
+{
+  "rows": [
+    {
+      "package": "internal/core",
+      "test": "TestAdoptContinuationAfterTriage_EachPostSeedFailureIsReturnedWithTheSeededIdentityKept",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestAdoptContinuationForConsole_ABadBaseOnAConflictingSnapshotIsNotReportedAsAConflict",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestAdoptContinuationForConsole_AFailedBaseAdvanceIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestAdoptContinuationForConsole_AWorktreeAddFailureLeavesNoFindings",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestAdoptContinuationForConsole_AnAlreadyLandedSnapshotIsNotAConflict",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestAdoptContinuationForConsole_AnUnwritableFindingsFileIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestAdoptContinuationForConsole_RefusesABaseThatIsNotAnAncestor",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestAdoptContinuationForConsole_RefusesAConflictingSnapshotWithItsFiles",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestAdoptContinuationForConsole_RefusesAnInvalidBinding",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestAdvanceContinuationBase_UnresolvableMain",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestAdvisorLaunch_DepthGuardRefusesBeforeLaunch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestAllocateCycleNumber_ExhaustedPersistedLeaseFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestAllocateCycleNumber_ReturnsTheStateUpdateFault",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestApplyPostReviewGuards_ABudgetedWriterPastItsBudgetEndsTheCycleNotTheBatch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestApplyPostReviewGuards_AGuardThatCannotReSnapshotAfterTheDiscardAbortsUnchecked",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestApplyPostReviewGuards_ALeakedPathUnderAConsoleLeaseContinuesButSaysItIsNotClean",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestApplyPostReviewGuards_AnExecutableOutsideTheMainTreeOrUnknownLeavesNoRelativeBinary",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestApplyPostReviewGuards_BindingMismatchStillAbortsAsBatchFatal",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestArchitectureSeams_FoundationsExist",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestArchivePollutedWorkspace_AnOccupiedArchiveNameKeepsTheWorkspace",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestAssembleFailureDigest_AnUnwritableHarnessRecordIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestAssembleFailureDigest_EachPersistenceFailureReturnsTheBuiltDigest",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestAuditRepairReasonPrefix_IsSingleSourced",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestAutosealStaleMarker_ASealRefusalIsReturned",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestAutosealStaleMarker_EveryMarkerItCannotProveDeadIsLeftAlone",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestBenchQuotaFamilies_AStoreThatCannotBeWrittenIsAnErrorThatNamesTheFamily",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestBuildBlockerExit_ASealFailureAbortsBeforeAnyDispatch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestBuildExplanationReviewer_RequiresExplanationForMaterialChange",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestBuildFloor_AGreenStageARunsTheTestsAfterEveryStaticCheck",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestBuildFloor_TheRejectedBuildOfAReroutePassesThePostReviewGuards",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestBuildHandoffFloor_FailuresRunsEveryCheckInOrderAndNamesThem",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestBuildHandoffProbe_Input_BindsThePersistedCycleOrSaysWhyNot",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestBuildTagVisiblePackagesDropsACSPackages",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestCarriedAudit_ARowNamingNoBaseNeverCarriesEvenOnAnEmptyBase",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestCarrierHealGit_AFailureIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestCarryResolvedTree_EachFailingStepStopsTheCarryBeforeTheReset",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestCarryforward_GitFailureModes",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestChangedStrictResults_JudgesOnlyListedChangedPackagesAndFailsLoudOnBadInput",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestCheckedOutBranches_AGitThatCannotStartIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestCompositionPatchID_MissingGitIsAWrappedError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestCompositionPatchID_NonDiffInputHasNoIdentity",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestCoreCoverageBatch_ParseHunkHeader",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestCoreCoverageBatch_ParseUnifiedDiffToHunksErrors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestCorrectionLoop_DisabledIsImmediateAbort",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestCorrectionLoop_ExhaustsThenAborts",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestCorrectionLoop_NonCanonicalVerdictAborts",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestCoverfixS2_AuthoritativeResumeIdentityRejectsMalformedFleetWorkspaceNames",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestCoverfixS2_UnresolvablePathsSurfaceAsRefusalNotSuccess",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestDecisionGuardSeesEveryShapeAndAlias",
+      "rule": "single-file-ast-pin"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestDecodeFailureAdvice_RefusesAnEmptyJustification",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestDefaultBuildFloorChecks_IncludesPersonaBudgetCheck",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestDefaultBuildFloorChecks_SeesCommittedBuilderWork",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestDefaultGitDirtyPaths_RenameEmitsBothSides",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestDefaultMainAhead_CountsTheCommitsOfOriginMainPastTheBase",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestDiscardGitignore",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestDiscardGitignore",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestDispatchEvaluateBatch_ACycleStateWriteFailureAbortsAfterRecordingTheMembers",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestDispatch_ANonCanonicalVerdictAtTheRetryCapDegradesOnlyANonFloorPhase",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestDispositionGate_CrossChecksFingerprintAgainstDigest",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestDispositionGate_RejectsInvalidEnums",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestDispositionGate_SalvagePointerRequiredWhenValue",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestEnsureCleanWorktree_QuarantineFailures",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestErrArtifactTimeout_KeepsTheWireMessage",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestFailureAdvisor_EmptyCause_NonFatalSignal",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestFailureAdvisor_RefusesAnEmptyWorkspaceBeforeAnyLaunch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestFailureClass_AMarshalErrorIsReturned",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestFailureClass_ErrorsAreReturned",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestFailureClass_EscalationFaultsAreReturned",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestFloorVerdictError_JoinsErrorSeverityDiagnostics",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestGitWorktreeCreateFrom_PersistentFailureStillFailsLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestGitWorktreeCreate_PersistentFailureStillFailsLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestGitWorktree_ConcurrentSiblingsNoBranchCollision",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestGitWorktree_CreateReusedWorktreeFailures",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestGitWorktree_CreateUsesNamedBranch",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestGitWorktree_GuardStateIsRunScoped",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestGuardAbortsCompanionPayloadUnderRegisteredMint",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestGuardAbortsForgedRegistryEntryWithUnclampedSpec",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestGuardCatchesDeliverableRenameSmuggle_WorktreePhase",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestGuardCatchesInsertedPhaseLeak",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestGuardChargesThisLanesOwnEvalWhileItsOwnLeaseIsLive",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestGuardExemptsConcurrentLaneMintedPhaseConfig",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestGuardIgnoresLegitimateWorkspaceWrite",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestGuardIgnoresOrchestratorSelfWrite_WorktreePhase",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestGuardQuarantinesCorruptRegistryAndStaysArmed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestGuardRecoversCatalogWritesSourcePhaseLeak",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestGuardStillAbortsExpiredMintPhaseConfigLeak",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestGuardStillAbortsNonSourcePhaseLeak",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestGuardStillAbortsNonSourcePhaseLeak",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestGuardStillAbortsUnregisteredPhaseConfigLeak",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestGuardStillChargesAnEvalNoLiveSiblingHolds",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestGuard_APathALiveSiblingDeclaresDoesNotAbortThisLanesPhase",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestInsertedPhaseMainTreeLeakRecovers",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestInsertedPhaseWorktreeWriteIsClean",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestIntegrationHead_ChoosesBaseByRelationOfLocalBranchToRemote",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestIsGitCheckout_AnUnreadableLaneIsAnErrorNotASkip",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestJudgmentLesson_WiredInLockstepWithFloorRecorder",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestJudgmentTeachingPhases_CoverEveryPhaseThatCanStateItsOwnVerdict",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestKeepOrPrune_ADeleteThatCannotStartIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLadder_BudgetsExhaust_CycleAbortsAsToday",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLadder_ZeroCorrections_SalvageFails_LegacyAbortMessage",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLaneDeclaredFiles_AnUnreadableClaimFileRefusesThePartialScope",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLaneStartRef_IntegrationHeadAuthority",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLaneStartRef_PersistentContentionFailsAfterTheBound",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLedgerEntrySetCycle_EachJSONShapeOfTheCycleField",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLintFloor_AFindingRefusesTheHandoffAndNamesFileAndLine",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestListAtBase_AListOutsideTheWorktreeIsAnErrorNotAnAbsentList",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLoadReauditState_RefusesUnusableState",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLoadResolvedFingerprintTimes_AMalformedTimeIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLoadResumeBootstrap_ACarrierThatCannotBePendedFailsTheResume",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLoadResumeBootstrap_CorruptActivationMarkerFailsTheRecovery",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLoadResumeBootstrap_CycleStateDisagreeingWithTheCheckpointIsRejected",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLoadResumeBootstrap_FleetCheckpointForAnotherWorkspaceIsRejected",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLoadResumeBootstrap_ReadCycleStateFailureIsWrapped",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLoadResumeBootstrap_RecoveredBaseThatCannotBePersistedIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLoadResumeStateFrom_AStateThatCannotBeReadOrParsedIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLoadResumeStateFrom_UnreadableStatePath",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLoadResumeState_ACheckpointWithoutAGoalHashIsStaleAfterAnyLaterShip",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLoadResumeState_ANonResumableReasonIsNamed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLoadResumeState_AResetArchiveIsNotConsideredAgain",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLoadResumeState_OnlySealedRunsLeaveNothingToConsider",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLoadResumeState_RefusesACheckpointBehindALaterSealedCycleAndNamesTheStoppedLanes",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLoadResumeState_RefusesACheckpointOlderThanTheConfiguredAge",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestLoadResumeState_WorktreeMissing",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestMandatoryExplanationReviewer_AnExplanationGapCarriesEveryComposedFloorFailureInOneRejection",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestMaybeRemediate_TheGateReRunsOwnLeakIsRecovered",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestNewBlockerEnd_CarriesItsOutcomeAndItsDiagnosticThroughAWrap",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestNewCycleRun_ACSPackageInventoryErrorStopsBeforeAllocation",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestNewCycleRun_ModuleLookupErrorStopsBeforeAllocation",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestNewCycleRun_ProvisionedModuleLookupErrorPreservesWorktree",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestNewCycleRun_RejectsRootCycleOccupiedInFetchedWorktree",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestNewCycleRun_UnresolvableSnapshotBaseFailsProvisioning",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestNewPhaseAdvisor_NilBridgeYieldsTheLegacyError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestNoPerRunCandidates_TheErrorNamesEachRefusedCycle",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestOpenMainRedStop_AStopOrAnInboxThatCannotBeWrittenIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestOrchestratorAllocateCycle_ExhaustedACSPackageFloorFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestOrchestrator_AuditLeakRecover",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestOrchestrator_AuditLeakRecover",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestOrchestrator_ReviewerRejects_CycleAborts",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestOrchestrator_TriageLeakRecover",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestPauseForQuota_AMixedWallReadsAsTheFactsOfEachFamily",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestPhaseAdvisor_LiteralGetsTheBrainOnce",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestPhaseOutcome_TreeGuardAbort_RecordsBuildOutcome",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestPhaseOutcome_TreeGuardAbort_RecordsBuildOutcome",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestPorcelainDirty_AnUnlaunchableGitIsAnErrorAndTheSetReadsClean",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestPorcelainPaths_NotARepositoryIsAWrappedStatusError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestPrepareAdoptedTree_AnArchiveFailureStopsAdoptionWithItsStage",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestProtectedSurfaceFloorChecks_RefusesTheCycle1689Shape",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestProtectedSurfaceFloorChecks_SeesARenameOutOfTheSurface",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestProvisionedWorktree_ItsTrackedInboxCopyRefusesTheMover",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestPruneSupersededOrphans_EachGitFailureAbortsWithItsStage",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestPruneToolOutputOnPass_ARemoveFailureIsReturnedWithThePath",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestQuarantineDirtyTree_StashFailureCarriesGitOutput",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestQuarantineDirtyTree_StatusFailureIsReturned",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestReadLaneScope_ReturnsEachStateOfTheFile",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestReadMainTreeStatus_AnUnlaunchableGitReturnsItsError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestReadRunCycleState_PrefersTheWorkspaceMirrorAndNamesAnUnreadableFile",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestReauditCycle_LedgerAppendFailureIsInfra",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestReauditCycle_UnresolvableMainIsInfraAndAuditsNothing",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestReauditError_ErrorNamesTheKindAndConflicts",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRecordAndBranch_ADebuggerBranchTheStateMachineForbidsAborts",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRecordAndBranch_ARetroBranchTheStateMachineForbidsAborts",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRecordAndBranch_AnAuditRepairBranchTheStateMachineForbidsAbortsBeforeItIsScheduled",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRecordAndBranch_BuildGraduationGuardAborts",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRecoverBeforeReview_AKeyedPathNoLiveLaneHoldsFailsRecovery",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRecoverBeforeReview_APostPhaseGitFailureFailsRecovery",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRecoverBeforeReview_AnExpiredSiblingLeaseDoesNotHoldItsEval",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRecoverBeforeReview_AnUnheldPathAfterAHeldOneStillFailsRecovery",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRecoveryFailsAPhaseThatLeftAnEvalNoLiveLaneHolds",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRefuseUnprovenAhead_AnUnreadableRangeRefusesTooWithItsCause",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRegenerateDerivedArtifact_UnregisteredPath_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRepoContractFloor_ARedPackCorrectsTheBuildAndNeverReachesTheAudit",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRepoPhaseCatalog_CatalogWordIsKnown",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRepoPhaseCatalog_MenuPhasesResolveAPersona",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRequireResumeExplanationIdentity_Branches",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRequireResumeExplanationIdentity_RejectsAZeroVersionAgainstAnActiveHost",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRequireResumeExplanationIdentity_RejectsClearedSealedFields",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRequireResumeExplanationIdentity_RejectsLegacyDowngradeAgainstAuthoritativeCycle",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRestoreResumeGoal_LegacyIdentityPrecedesCallerGoal",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestResumeExecution_ABuildResumedWithoutASealedWorktreeContextIsRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestResumeExecution_ACycleThatCannotBeFinalizedReturnsTheFinalizeError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestResumeExecution_AFinishedCycleWhoseTerminalStateCannotBeWrittenReportsIt",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestResumeExecution_ANonCanonicalVerdictStopsTheResumeAndIsRecordedAsAFailedPhase",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestResumeExecution_APhaseWhoseCompletionCannotBePersistedStopsTheResume",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestResumeExecution_ARepairBranchTheStateMachineForbidsAbortsTheResume",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestResumeExecution_ARetroBranchTheStateMachineForbidsAbortsTheResume",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestResumeExecution_AVerdictWithNoSuccessorStopsTheResumeNamingTheCursor",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestResumeLifecycle_IterationExhaustionIsExplicitFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestResumeLifecycle_NonCanonicalVerdictAborts",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestResumeLifecycle_NonCanonicalVerdictFromDispatchAbortsAndRecords",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestResumePostDispatchExits_RecordTheirOutcome",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestResumedBuild_ASealFailureAtTheBuildEntryAbortsBeforeAnyDispatch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestResumedCycleIDs_ABadStampIsAFailureNotAMembership",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestResumedCycleIDs_AnUnreadableStreamAndABadLineAreFailures",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestReviewResumedDeliverable_ALeakWrittenByTheCorrectionStopsBeforeTheReReview",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestReviewResumedDeliverable_LeakRecoveryFailureStopsBeforeReview",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestReviewResumedDeliverable_StillAbortsOutsideTheDegrade",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestReviewWithCorrections_ALeakAfterACorrectionAbortsBeforeTheReReview",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestReviewWithCorrections_ALiveFixRungSpendsItsBudgetWithoutRedispatching",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestReviewWithCorrections_APhaseOutsideTheOptionalEvaluateClassStillAborts",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestReviewWithCorrections_ARejectionAfterTheFurtherCorrectionCountsIt",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestReviewWithCorrections_OneCorrectionIsCountedInTheAbortMessage",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycleFromPhase_ADotGitRemovedBetweenResumedPhasesDoesNotTurnTheGuardOff",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycleFromPhase_ALeakDuringTheResumedPhaseIsStillRelocated",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycleFromPhase_APrePhaseSnapshotThatKeepsFailingStopsBeforeThePhaseRuns",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycleFromPhase_AResumedRejectionAfterTheFurtherCorrectionCountsIt",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycleFromPhase_AShipFailureThatIsNotAShipErrorEndsTheCycle",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycleFromPhase_AnEditToAnUnownedCommittedEvalFailsTheResume",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycleFromPhase_AnUnsafeConfigOrAHeldLockRefusesBeforeAnyPhase",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycleFromPhase_GlobalCheckpointUsesHostLastCycleIdentity",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycleFromPhase_InsertedPhaseInRunnersAccepted",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycleFromPhase_InsertedPhaseTransitionsViaPlan",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycleFromPhase_MissingPlanDegradesNotInvalidPhase",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycleFromPhase_RejectsCheckpointIdentityMismatch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycleFromPhase_RejectsCycleAndVersionRewriteThatHidesHostActivation",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycleFromPhase_ResumedBuildWithTheSameFindingTwiceEndsAndIsLearnedFrom",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycleFromPhase_TransitionCycleGuard_RecordsChokepointEscape",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycle_ABenchThatFailsAtTheRouterWallStillPausesAndNamesTheFamily",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycle_ABlockedActivationDirectoryStopsTheCycleBeforeAnyPhase",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycle_ABuildCannotStartWithoutASealedWorktreeContext",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycle_ADeferralThatCannotBeRecordedFailsLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycle_AFailingBatchMemberAbortsTheCycleNamingThePhaseAndNeverReachesAudit",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycle_AFleetLaneWithoutAWorktreeDefersBeforeAnyDispatch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycle_AGuardReCheckFailureAfterTheBinaryDiscardAbortsThePhase",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycle_APostPhaseGuardReadFailureAbortsThePhase",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycle_APrePhaseSnapshotThatKeepsFailingStopsBeforeThePhaseRuns",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycle_AllFamilies85_CheckpointsAndDefers",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycle_ContinuationAdvanceFailureStopsBeforeBuild",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycle_InterruptPreservesIntegrationBranchForResume",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycle_MixedExitCodes_NoDefer",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycle_UnregisteredMandatoryPhase_StillFatal",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunCycle_WalledRemediationRerun_DefersLikeAFirstDispatch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestRunLeaseHeartbeat_RefreshesOnTick",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestSealBuildExplanationContext_FailsClosedWithoutWorktreeOrBase",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestSealCycle_ConcurrentUpdateStateNoLostUpdate",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestSealCycle_RefusesWorkspaceOutsideRoots",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestSentinels_MessagesArePresent",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestShipErrorAndWrapCoverage",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestShipStageConsts_PostShipAndVerifySelfSHA",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestSizeBudget_ComposedLargeCycleExtendsCorrectionLadder",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestSnapshotPreservedWorktree_GitStepFailures",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestSpineGate_EnforceBlocksOnCleanAbsence",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestStageEntryWith_ASpawnFailureIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestSteAddedKeep_EachGitOrReadFailureIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestTDDLeakRecover",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestTakeResumeLease_AFreshLeaseRefusesWithAnErrorThatNamesTheHolder",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestTakeResumeLease_AFreshUnreadableLeaseRefusesTheResumeWithTheCause",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestUndoConsoleWorktree_NamesEachStepThatFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestUnnamedPackExit_NamesThePackWallTimeAndTheFloorDeadline",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestUnwindDecline_AGitFaultIsAnErrorNotADecline",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestValidateContinuation_Rejections",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestVerifyDisposition_AMissingHarnessRecordIsUnverified",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestVerifyDisposition_ARetroThatRewritesTheWorkspaceDigestStillFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestVerifyResumeIdentityAndHealCarrier_ACheckpointForAnotherWorktreeIsRejectedBeforeAnyHeal",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestWorktreeGit_CarriesGitsOwnErrorInsteadOfPrintingIt",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestWorktreeMutators_RefuseTheProjectRoot",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestWorktreePathsSince_AFailedDiffIsAnErrorAndKeepsTheUntrackedPaths",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestWorktreeReuseBase_UnresolvableSnapshotAncestorFailsLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestWriteCycleDossier_ABatchedDossierWithNoSinkFailsLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core",
+      "test": "TestWriteCycleDossier_ASinkRefusalFailsLoudly",
+      "rule": "error-text-match"
+    }
+  ]
+}

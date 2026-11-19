@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/signalcenter",
+      "test": "TestReadLines_AMissingFileKeepsTheCursorAndNamesThePath",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/signalcenter",
+      "test": "TestSignalsTailReadStreamSplitsMissingFromIOFaults",
+      "rule": "error-text-match"
+    }
+  ]
+}

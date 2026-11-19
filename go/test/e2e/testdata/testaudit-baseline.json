@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "test/e2e",
+      "test": "TestE2E_VersionSubcommandRuns",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

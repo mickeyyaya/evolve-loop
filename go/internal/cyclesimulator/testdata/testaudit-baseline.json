@@ -1,0 +1,29 @@
+{
+  "rows": [
+    {
+      "package": "internal/cyclesimulator",
+      "test": "TestAppendLedgerLine_AWriteFailureClosesTheFileAndReturnsTheCause",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cyclesimulator",
+      "test": "TestRunGit_SuccessInRealRepo",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/cyclesimulator",
+      "test": "TestRun_DefaultShipFn_ExitZero",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/cyclesimulator",
+      "test": "TestRun_DefaultShipFn_NonZero",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/cyclesimulator",
+      "test": "TestRun_DefaultVerifyFn_Success",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

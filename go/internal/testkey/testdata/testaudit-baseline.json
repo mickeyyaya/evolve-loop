@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/testkey",
+      "test": "TestKey_AShuffleNeedsAFixedSeed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/testkey",
+      "test": "TestKey_RefusesInputsItCannotKey",
+      "rule": "error-text-match"
+    }
+  ]
+}

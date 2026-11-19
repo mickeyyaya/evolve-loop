@@ -1,0 +1,44 @@
+{
+  "rows": [
+    {
+      "package": "internal/codeindex",
+      "test": "TestBackends_ForReturnsUnsupportedWhenNoBackendServesTheQuery",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/codeindex",
+      "test": "TestBackends_RefreshKeepsGoingAfterAFailureAndNamesTheFailedBackend",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/codeindex",
+      "test": "TestDispatch_AnUnknownQueryIsUnsupported",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/codeindex",
+      "test": "TestNew_ADuplicateNameFailsLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/codeindex",
+      "test": "TestNew_AFactoryErrorIsWrappedWithTheBackendName",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/codeindex",
+      "test": "TestNew_AnUnknownNameFailsLoudlyAndListsTheKnownNames",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/codeindex",
+      "test": "TestNew_NoNamesFailsLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/codeindex",
+      "test": "TestParseDirection_TheErrorNamesTheValueAndTheChoices",
+      "rule": "error-text-match"
+    }
+  ]
+}

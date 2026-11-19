@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/retrofile",
+      "test": "TestFileActions_FaultsAreNamedAndEarlierWritesAreStillReported",
+      "rule": "error-text-match"
+    }
+  ]
+}

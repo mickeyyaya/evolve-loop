@@ -1,0 +1,24 @@
+{
+  "rows": [
+    {
+      "package": "internal/logfilter",
+      "test": "TestProcess_CompressionRatioOnRealFixture",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/logfilter",
+      "test": "TestProcess_FilterErrorCleansUp",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/logfilter",
+      "test": "TestProcess_OpenRawNonNotExistError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/logfilter",
+      "test": "TestProcess_RenameErrorWhenCleanPathIsDirectory",
+      "rule": "error-text-match"
+    }
+  ]
+}

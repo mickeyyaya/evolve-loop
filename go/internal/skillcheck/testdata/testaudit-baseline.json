@@ -1,0 +1,49 @@
+{
+  "rows": [
+    {
+      "package": "internal/skillcheck",
+      "test": "TestCheck_AnUnlistableSkillsDirectoryIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/skillcheck",
+      "test": "TestCodexManifestDiffsFor_ARendererFailureNamesTheManifestAndStopsTheProjection",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/skillcheck",
+      "test": "TestCodexManifestDiffs_AnUnusableClaudeManifestIsAnErrorNotAnAbsence",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/skillcheck",
+      "test": "TestCommandDiffs_AMissingSkillsDirectoryIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/skillcheck",
+      "test": "TestInstructionDiffs_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/skillcheck",
+      "test": "TestManifestProblems_UnreadableSkillsDirIsInfraError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/skillcheck",
+      "test": "TestProjectCommandDiffs_EachWriteModeFailureStopsAtOnceAndCheckModeOnlyReports",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/skillcheck",
+      "test": "TestProjectSurfaces_EachStageFailureIsReturnedAndNothingLaterRuns",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/skillcheck",
+      "test": "TestWriteGenerated_WritesAndReportsOrNamesThePathItCouldNotWrite",
+      "rule": "error-text-match"
+    }
+  ]
+}

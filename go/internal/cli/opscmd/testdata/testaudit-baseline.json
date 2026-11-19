@@ -1,0 +1,29 @@
+{
+  "rows": [
+    {
+      "package": "internal/cli/opscmd",
+      "test": "TestHubLeasePath_ResolvesThePrimaryAndLinkedCheckoutsAndReportsABrokenLinkF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cli/opscmd",
+      "test": "TestRunChangelogGen_DryRunAgainstRealGit",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/cli/opscmd",
+      "test": "TestRunChangelogGen_DryRunRealRepo",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/cli/opscmd",
+      "test": "TestRunChangelogGen_InvalidRefSurfaces",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/cli/opscmd",
+      "test": "TestWriteConsoleLease_AFailedWriteIsReportedAndLeavesNoLeaseOrTempFileF2",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

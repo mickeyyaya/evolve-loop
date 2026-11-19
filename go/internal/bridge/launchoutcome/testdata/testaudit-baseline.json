@@ -1,0 +1,29 @@
+{
+  "rows": [
+    {
+      "package": "internal/bridge/launchoutcome",
+      "test": "TestClassify_81_PrefersTheMarkerSummaryOverTheFirstBridgeLine",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge/launchoutcome",
+      "test": "TestClassify_81_WrapsErrArtifactTimeout_NotTransient",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge/launchoutcome",
+      "test": "TestClassify_EscalationPatternRidesTheCause",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge/launchoutcome",
+      "test": "TestClassify_Non81_CauseIsTheFirstDiagnosticLine",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge/launchoutcome",
+      "test": "TestClassify_UnknownExit_IsDriverError",
+      "rule": "error-text-match"
+    }
+  ]
+}

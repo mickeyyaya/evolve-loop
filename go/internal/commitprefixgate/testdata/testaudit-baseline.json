@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/commitprefixgate",
+      "test": "TestDefaultGetDiffPaths_RefModeRequiresDiffRef",
+      "rule": "error-text-match"
+    }
+  ]
+}

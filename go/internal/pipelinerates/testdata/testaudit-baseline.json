@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/pipelinerates",
+      "test": "TestPackagesPerShip_AnUnresolvableCommitIsReportedAndTheRestStillRead",
+      "rule": "error-text-match"
+    }
+  ]
+}

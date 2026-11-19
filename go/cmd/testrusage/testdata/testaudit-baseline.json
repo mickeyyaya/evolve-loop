@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "cmd/testrusage",
+      "test": "TestRun_SignaledChild_ExitsWith128PlusSignal",
+      "rule": "sleep-sync"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/bedrock",
+      "test": "TestEmit_ParityWithBash",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

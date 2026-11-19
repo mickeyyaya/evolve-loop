@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/releasetargets",
+      "test": "TestConfig_AssetNameErrors",
+      "rule": "error-text-match"
+    }
+  ]
+}

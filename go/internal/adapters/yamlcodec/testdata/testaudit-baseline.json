@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/adapters/yamlcodec",
+      "test": "TestUnmarshalStrict_RefusesAnUnknownField",
+      "rule": "error-text-match"
+    }
+  ]
+}

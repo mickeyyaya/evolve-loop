@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/backfill",
+      "test": "TestTryExtract_WriteErrorReturnsWrappedError",
+      "rule": "error-text-match"
+    }
+  ]
+}

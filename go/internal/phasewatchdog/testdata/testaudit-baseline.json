@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/phasewatchdog",
+      "test": "TestDefaultKillPgrp_Signal0Succeeds",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/phasewatchdog",
+      "test": "TestRun_PhaseTransitionResetsBaseline",
+      "rule": "sleep-sync"
+    }
+  ]
+}

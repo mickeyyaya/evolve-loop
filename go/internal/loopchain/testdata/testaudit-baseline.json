@@ -1,0 +1,49 @@
+{
+  "rows": [
+    {
+      "package": "internal/loopchain",
+      "test": "TestDriver_StopLineHasOneProducer",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "internal/loopchain",
+      "test": "TestFleetLaneActive_DeadOwnerIsNotASibling",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/loopchain",
+      "test": "TestFleetLaneActive_ExcludesOwnPIDLease",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/loopchain",
+      "test": "TestGitAhead_ResolvesTheShortStampBeforeComparingAndRejectsNonAncestors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/loopchain",
+      "test": "TestInboxPendingCount_SkipsDirsNonJSONAndNamesInvalidFiles",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/loopchain",
+      "test": "TestLiveSiblingRun_ADiscoveryErrorIsReturned",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/loopchain",
+      "test": "TestLiveSiblingRun_TheCallersOwnAndASealedLaneDoNotBlock",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/loopchain",
+      "test": "TestRebuiltBinary_MissingDirNonExecutable",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/loopchain",
+      "test": "TestTakeHandoff_AnAbsentOrCorruptMarkerStartsAtZeroAndAnUnwritableOneIsNotHonoured",
+      "rule": "error-text-match"
+    }
+  ]
+}

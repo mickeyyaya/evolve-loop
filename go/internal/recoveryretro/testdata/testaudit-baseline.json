@@ -1,0 +1,24 @@
+{
+  "rows": [
+    {
+      "package": "internal/recoveryretro",
+      "test": "TestWriteShadow_ACorruptCurrentDossierIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/recoveryretro",
+      "test": "TestWriteShadow_AWriteFailureIsReturned",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/recoveryretro",
+      "test": "TestWriteShadow_AnUnreadableCurrentDossierIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/recoveryretro",
+      "test": "TestWriteShadow_TwoItemsWithOneNameWriteOnePairAndReportTheCollision",
+      "rule": "error-text-match"
+    }
+  ]
+}

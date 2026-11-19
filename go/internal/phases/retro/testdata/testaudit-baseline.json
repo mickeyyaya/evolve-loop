@@ -1,0 +1,39 @@
+{
+  "rows": [
+    {
+      "package": "internal/phases/retro",
+      "test": "TestLessonPathIsSingleSourcedWithThePersona",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/phases/retro",
+      "test": "TestRun_MissingBridge_ReturnsError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/retro",
+      "test": "TestRun_MissingPrompts_ReturnsError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/retro",
+      "test": "TestValidateExplanationReview_DuplicateSectionIsAdvisoryButFailsTheFloor",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/retro",
+      "test": "TestValidateExplanationReview_HostDefectKeepsTheFindingsMadeBeforeIt",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/retro",
+      "test": "TestValidateExplanationReview_NeedsCorrectionTodoRulesAreAdvisoryAndHostDefectsAreLoud",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/retro",
+      "test": "TestValidateExplanationReview_RejectsTokenEvidence",
+      "rule": "error-text-match"
+    }
+  ]
+}

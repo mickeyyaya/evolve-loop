@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/usageevidence",
+      "test": "TestAppendLine_EachFailureStageIsWrappedAndLeavesNoPartialRecord",
+      "rule": "error-text-match"
+    }
+  ]
+}

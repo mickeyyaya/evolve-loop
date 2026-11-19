@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/auditfixports",
+      "test": "TestFixer_ErrorsAreLoud",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/auditfixports",
+      "test": "TestWorktree_RestoreFailsWhenAnAddedFileCannotBeRemoved",
+      "rule": "error-text-match"
+    }
+  ]
+}

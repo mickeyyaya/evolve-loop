@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/campaign",
+      "test": "TestVerify_Errors",
+      "rule": "error-text-match"
+    }
+  ]
+}

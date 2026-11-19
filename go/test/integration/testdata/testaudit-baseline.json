@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "test/integration",
+      "test": "TestGitWorkspace_WithGitInitProducesValidWorkTree",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/acsrunner",
+      "test": "TestWriteVerdict_UnwritableVerdictDirFailsAtTempFileAndLeavesNoVerdict",
+      "rule": "error-text-match"
+    }
+  ]
+}

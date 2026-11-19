@@ -1,0 +1,64 @@
+{
+  "rows": [
+    {
+      "package": "internal/events/channel",
+      "test": "TestAppend_ALockPastItsDeadlineWritesNothing",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/events/channel",
+      "test": "TestAppend_AMessageRecordHasItsOwnLineLimit",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/events/channel",
+      "test": "TestAppend_ATailThatCannotOpenFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/events/channel",
+      "test": "TestAppend_AnEncodeErrorWritesNothing",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/events/channel",
+      "test": "TestAppend_AnUncreatableChannelDirectoryFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/events/channel",
+      "test": "TestAppend_AnUnlistableChannelDirectoryFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/events/channel",
+      "test": "TestAppend_OneLockCallWaitsForEachChannelAndProcess",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/events/channel",
+      "test": "TestAppend_RefusesARecordLongerThanTheLimit",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/events/channel",
+      "test": "TestAppend_RefusesARecordThatReadWouldReject",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/events/channel",
+      "test": "TestAppend_ReportsEachWriteStepFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/events/channel",
+      "test": "TestNew_RefusesANameOutsideTheTokenRule",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/events/channel",
+      "test": "TestRead_AnUnreadableSegmentFailsTheRead",
+      "rule": "error-text-match"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "rows": [
+    {
+      "package": "internal/auditchain",
+      "test": "TestParseChainBlock_AbsenceIsNamed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/auditchain",
+      "test": "TestParseChainBlock_RejectsUnclosedAndEmptyBlocks",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/auditchain",
+      "test": "TestPersona_InstructsExactlyTheShapeTheParserReads",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/auditchain",
+      "test": "TestValidate_ChainMustCiteMoreThanOneStage",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/auditchain",
+      "test": "TestValidate_EveryLinkMustCiteSomethingCheckable",
+      "rule": "error-text-match"
+    }
+  ]
+}

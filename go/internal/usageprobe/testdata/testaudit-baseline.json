@@ -1,0 +1,44 @@
+{
+  "rows": [
+    {
+      "package": "internal/usageprobe",
+      "test": "TestAppendHistoryReportsAHistoryPathItCannotOpen",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/usageprobe",
+      "test": "TestAppendHistoryReportsAWindowThatCannotBeEncoded",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/usageprobe",
+      "test": "TestLoadObservations_EveryShapeOfTheFileOnDisk",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/usageprobe",
+      "test": "TestProber_Run_AbandonmentCountsOnlyProbesStillRunning",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/usageprobe",
+      "test": "TestProber_Run_ReturnsPromptlyOnCancelEvenWhenAProbeIgnoresIt",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/usageprobe",
+      "test": "TestProber_Run_WaitsForAJudgementThatStartedBeforeTheBound",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/usageprobe",
+      "test": "TestRecordObservation_FailuresLeaveTheRecordUntouched",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/usageprobe",
+      "test": "TestWeekUsed_AnUnreadableFileIsAnError",
+      "rule": "error-text-match"
+    }
+  ]
+}

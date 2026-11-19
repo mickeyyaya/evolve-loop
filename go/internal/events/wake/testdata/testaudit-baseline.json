@@ -1,0 +1,19 @@
+{
+  "rows": [
+    {
+      "package": "internal/events/wake",
+      "test": "TestNewWaiter_RefusesASystemWithoutABackend",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/events/wake",
+      "test": "TestWaiter_AWakeAtTheCancelInstantWaitsForTheTriggerBeforeItReturns",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "internal/events/wake",
+      "test": "TestWaiter_RefusesANetworkFilesystem",
+      "rule": "error-text-match"
+    }
+  ]
+}

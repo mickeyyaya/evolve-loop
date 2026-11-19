@@ -1,0 +1,24 @@
+{
+  "rows": [
+    {
+      "package": "internal/coverstrict",
+      "test": "TestCheck_RefusesASourceWhoseInfoCannotBeRead",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/coverstrict",
+      "test": "TestCheck_RefusesAnyModuleInputNewerThanTheProfile",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/coverstrict",
+      "test": "TestCheck_RefusesEveryInputItCannotTrust",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/coverstrict",
+      "test": "TestParseFloors_RefusesEveryInvalidLine",
+      "rule": "error-text-match"
+    }
+  ]
+}

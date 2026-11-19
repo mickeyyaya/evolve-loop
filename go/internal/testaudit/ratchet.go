@@ -50,11 +50,15 @@ func CheckShard(dir string, cfg Config) error {
 	if err != nil {
 		return err
 	}
-	have := map[Finding]bool{}
+	return diffFindings(found, baseline)
+}
+
+func diffFindings(found, baseline []Finding) error {
+	have := make(map[Finding]bool, len(found))
 	for _, f := range found {
 		have[f] = true
 	}
-	want := map[Finding]bool{}
+	want := make(map[Finding]bool, len(baseline))
 	for _, f := range baseline {
 		want[f] = true
 	}
@@ -73,16 +77,21 @@ func CheckShard(dir string, cfg Config) error {
 }
 
 func readShard(dir string) ([]Finding, error) {
-	raw, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(shardRelPath)))
+	rows, _, err := readShardFile(filepath.Join(dir, filepath.FromSlash(shardRelPath)))
+	return rows, err
+}
+
+func readShardFile(path string) ([]Finding, bool, error) {
+	raw, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
+		return nil, false, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	var s shard
 	if err := json.Unmarshal(raw, &s); err != nil {
-		return nil, fmt.Errorf("testaudit: %s: %w", shardRelPath, err)
+		return nil, true, fmt.Errorf("testaudit: %s: %w", shardRelPath, err)
 	}
-	return s.Rows, nil
+	return s.Rows, true, nil
 }

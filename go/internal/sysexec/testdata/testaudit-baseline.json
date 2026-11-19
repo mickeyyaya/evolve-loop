@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/sysexec",
+      "test": "TestOutput_NonZeroExit_IsError",
+      "rule": "error-text-match"
+    }
+  ]
+}

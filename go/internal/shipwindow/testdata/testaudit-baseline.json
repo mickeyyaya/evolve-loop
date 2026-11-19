@@ -1,0 +1,49 @@
+{
+  "rows": [
+    {
+      "package": "internal/shipwindow",
+      "test": "TestAcquire_QueueDirCreateFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/shipwindow",
+      "test": "TestShipWindowLease_FIFOFairness",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/shipwindow",
+      "test": "TestShipWindowLease_SiblingWaitsInsteadOfReaudit",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/shipwindow",
+      "test": "TestTryAcquire_ALinkRaceWaitsAndALinkFailureIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/shipwindow",
+      "test": "TestTryAcquire_AMarshalFailureIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/shipwindow",
+      "test": "TestTryAcquire_AMissingOwnTicketIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/shipwindow",
+      "test": "TestTryAcquire_AStaleLeaseThatCannotBeRenamedIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/shipwindow",
+      "test": "TestTryAcquire_AnUnreadableLeaseIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/shipwindow",
+      "test": "TestTryAcquire_StageWriteFailure",
+      "rule": "error-text-match"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "rows": [
+    {
+      "package": "internal/loopwave",
+      "test": "TestAdmit_APanickingShadowNeverFailsTheLaunch",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "internal/loopwave",
+      "test": "TestAdmit_ASlowShadowNeverDelaysTheLaunch",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "internal/loopwave",
+      "test": "TestAdmit_ShadowRecordsTheWaitAndChangesNothing",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "internal/loopwave",
+      "test": "TestDispatchAndForceOneLane_ShareOneBody",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "internal/loopwave",
+      "test": "TestPreflight_RefusesANonGitRoot",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/loopwave",
+      "test": "TestSeedWavePlanFromInbox_ClampsAndRefuses",
+      "rule": "error-text-match"
+    }
+  ]
+}

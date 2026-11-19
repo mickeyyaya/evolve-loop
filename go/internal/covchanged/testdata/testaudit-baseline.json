@@ -1,0 +1,34 @@
+{
+  "rows": [
+    {
+      "package": "internal/covchanged",
+      "test": "TestModulePath_ReadsTheModuleLineAndRefusesAMissingOrEmptyGoMod",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/covchanged",
+      "test": "TestParsePackageSet_RefusesALineThatNamesNoSinglePackageAndAnEmptySet",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/covchanged",
+      "test": "TestWorkspaceCheck_AnUntrackedListingItCannotReadFailsLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/covchanged",
+      "test": "TestWorkspaceCheck_FailsLoudlyOnEveryInputItCannotRead",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/covchanged",
+      "test": "TestWorkspaceCheck_MeasuresFromTheMergeBaseSoABaseThatMovedOnAddsNothing",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/covchanged",
+      "test": "TestWorkspaceCheck_RefusesAProfileOlderThanAChangedFile",
+      "rule": "error-text-match"
+    }
+  ]
+}

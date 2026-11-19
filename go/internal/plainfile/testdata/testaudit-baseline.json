@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/plainfile",
+      "test": "TestRead_AHardLinkedFileIsRefused",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

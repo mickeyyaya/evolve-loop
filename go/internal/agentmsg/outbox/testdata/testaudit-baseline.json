@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/agentmsg/outbox",
+      "test": "TestOutbox_AKernelWakeIngestsADraft",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

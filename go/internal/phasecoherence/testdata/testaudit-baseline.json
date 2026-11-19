@@ -1,0 +1,29 @@
+{
+  "rows": [
+    {
+      "package": "internal/phasecoherence",
+      "test": "TestCheckProvenance_LedgerReadFailuresAreErrors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phasecoherence",
+      "test": "TestCheckProvenance_UnopenableLedgerFailsTheCheck",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phasecoherence",
+      "test": "TestScanLedger_UnopenableLedgerIsAWrappedError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phasecoherence",
+      "test": "TestTrackedProfiles_ErrorCarriesGitStderr",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phasecoherence",
+      "test": "TestTrackedProfiles_RealTreePlantedDecoyNotBound",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

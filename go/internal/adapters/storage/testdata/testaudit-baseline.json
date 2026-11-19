@@ -1,0 +1,49 @@
+{
+  "rows": [
+    {
+      "package": "internal/adapters/storage",
+      "test": "TestAcquireLock_ConcurrentExclusive",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/adapters/storage",
+      "test": "TestAcquireLock_FlockOtherError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/storage",
+      "test": "TestCoverfixUpdateStateLockFailureIsReported",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/storage",
+      "test": "TestCoverfixUpdateStateMarshalFailuresDoNotWrite",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/storage",
+      "test": "TestCoverfixUpdateStateRefusesUnreadableOrCorruptState",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/storage",
+      "test": "TestCoverfixUpdateStateWriteFailureIsReported",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/storage",
+      "test": "TestReleaseLock_CloseError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/storage",
+      "test": "TestWriteCycleState_MirrorFailureSurfaces",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/storage",
+      "test": "TestWriteJSONAtomic_MarshalError",
+      "rule": "error-text-match"
+    }
+  ]
+}

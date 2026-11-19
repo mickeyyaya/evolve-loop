@@ -1,0 +1,174 @@
+{
+  "rows": [
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestCheckRecentAudit_SameCommitFail_StillBlocks",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestDefaultGateTestRunner_ARedSuiteCarriesItsOutput",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestDefaultGitClean_ReportsCleanDirtyAndUnusableTrees",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestDefaultNameGuard_InvalidManifestIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestDefaultNameGuard_StatErrorsOtherThanNotExistFail",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestDefaultSimulationRunner",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestDefaultSimulationRunner_GoBinDefault",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestDefaultWIPCommits_UnbornHeadIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestGoTestRunners_ScrubTheLaneIPCEnvironment",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRequireRunAfterPreviousTag_RefusesWhenGitCannotDateTheTag",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_AFailingCIProbeIsACheckFailureNamingTheCause",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_AdvisorySimulationDefaultRunner",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_CurrentVersionNotSemver",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_DetachedHEAD",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_DirtyTree",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_Downgrade",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_DryRun_SemverBumpStillEnforced",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_ExtractVersionError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_FirstFailingStepWins",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_GateTestFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_MinorBumpWithoutRecordIsRefusedAndNamesTheRecordPath",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_NamingGuardBlocks",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_NamingGuardErrorFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_NoOpBump",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_PluginJSONMissing",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_RefusesTagOnRedReleaseCommitCI",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_RefusesWIPCommitsAndNamesEachOne",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_RequireCIFailsClosedOnlyOnAnUnavailableVerdict",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_StaleAudit",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_Step1GitError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_Step2BranchError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_WIPScanErrorFailsClosed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestRun_WarnVerdict_Strict",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepreflight",
+      "test": "TestVerifyContentReview_RefusesEachDefectOfTheRecordOrItsRun",
+      "rule": "error-text-match"
+    }
+  ]
+}

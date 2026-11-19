@@ -1,0 +1,29 @@
+{
+  "rows": [
+    {
+      "package": "internal/faillearn",
+      "test": "TestPreserveDiagnosis_UnwritableWorkspaceJoinsBothErrors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/faillearn",
+      "test": "TestWriteArtifacts_InboxRejectsPathEscapingID",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/faillearn",
+      "test": "TestWriteArtifacts_LessonWriteFailureIsWrappedWithTheLessonID",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/faillearn",
+      "test": "TestWriteInboxItems_UnencodableItemFailsLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/faillearn",
+      "test": "TestWriteInboxItems_WriterRefusalNamesTheItem",
+      "rule": "error-text-match"
+    }
+  ]
+}

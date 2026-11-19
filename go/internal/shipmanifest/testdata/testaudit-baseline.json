@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/shipmanifest",
+      "test": "TestSelect_AFailedIgnoreProbeKeepsEverySelectedPath",
+      "rule": "error-text-match"
+    }
+  ]
+}

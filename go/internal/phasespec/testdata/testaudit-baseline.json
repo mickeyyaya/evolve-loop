@@ -1,0 +1,34 @@
+{
+  "rows": [
+    {
+      "package": "internal/phasespec",
+      "test": "TestDescriptorSchema_StageEnumIsTheClosedSet",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/phasespec",
+      "test": "TestLoad_ARegistrySpecWithAnUnknownStageIsAHardError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phasespec",
+      "test": "TestLoad_ARegistrySpecWithAnUnpartitionedOutputIsAHardError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phasespec",
+      "test": "TestLoad_RejectsMalformedActivatingFields",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phasespec",
+      "test": "TestRepoPhaseCatalog_EveryTrackedStageIsInTheClosedSet",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/phasespec",
+      "test": "TestRepoPhaseCatalog_ThePreBuildEvaluatePhasesDeclareTheirStage",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

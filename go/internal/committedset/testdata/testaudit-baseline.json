@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/committedset",
+      "test": "TestReadLaneDoc_NamesTheFileInEachFailure",
+      "rule": "error-text-match"
+    }
+  ]
+}

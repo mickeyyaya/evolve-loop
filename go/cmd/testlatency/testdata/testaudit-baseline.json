@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "cmd/testlatency",
+      "test": "TestLoadRusage_SumsAPackageAndRejectsABrokenLine",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/testlatency",
+      "test": "TestParseCharacterization_ScanErrorIsWrapped",
+      "rule": "error-text-match"
+    }
+  ]
+}

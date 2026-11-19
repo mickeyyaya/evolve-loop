@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/dispositionrouter",
+      "test": "TestStageIntent_EachStagingFaultIsNamedAndNothingIsStaged",
+      "rule": "error-text-match"
+    }
+  ]
+}

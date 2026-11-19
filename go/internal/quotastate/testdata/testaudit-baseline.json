@@ -1,0 +1,24 @@
+{
+  "rows": [
+    {
+      "package": "internal/quotastate",
+      "test": "TestCompileLabels_NoLabelsIsRefusedBeforeAnyPatternIsBuilt",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/quotastate",
+      "test": "TestWindowSpec_ValidateNamesTheBrokenFieldAndReadWindowsReadsNothingWithIt",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/quotastate",
+      "test": "TestWindowSpec_ValidateRejectsAModelMatchRegexThatDoesNotCompile",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/quotastate",
+      "test": "TestWindowSpec_ValidateRejectsAnEmptyModelMatchRegex",
+      "rule": "error-text-match"
+    }
+  ]
+}

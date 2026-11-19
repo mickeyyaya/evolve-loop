@@ -1,0 +1,49 @@
+{
+  "rows": [
+    {
+      "package": "internal/adapters/codeindex/gotypes",
+      "test": "TestBuild_AnIndexThatCannotBeEncodedIsAnErrorAndWritesNothing",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/codeindex/gotypes",
+      "test": "TestBuild_FailsLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/codeindex/gotypes",
+      "test": "TestBuild_FailsLoudlyOnABadGoListAnswer",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/codeindex/gotypes",
+      "test": "TestGotypesBackend_ACorruptIndexIsAPlainErrorThatNamesThePath",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/codeindex/gotypes",
+      "test": "TestGotypesBackend_ADefinitionWithNoCallerIsNotFound",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/codeindex/gotypes",
+      "test": "TestGotypesBackend_AnAbsentIndexIsErrAbsentAndNamesThePath",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/codeindex/gotypes",
+      "test": "TestGotypesBackend_AnIndexOfAnotherVersionIsErrAbsent",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/codeindex/gotypes",
+      "test": "TestGotypesBackend_AnUnknownSymbolIsNotFoundAndNamesTheSymbol",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/codeindex/gotypes",
+      "test": "TestGotypesBackend_AnUnreadableIndexIsAPlainErrorThatNamesThePath",
+      "rule": "error-text-match"
+    }
+  ]
+}

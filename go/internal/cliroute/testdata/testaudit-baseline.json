@@ -1,0 +1,69 @@
+{
+  "rows": [
+    {
+      "package": "internal/cliroute",
+      "test": "TestBuild_ABypassTableThatCannotListTheProfilesIsRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cliroute",
+      "test": "TestBuild_RefusesAnErrorFindingAndReturnsEveryFinding",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cliroute",
+      "test": "TestCeilingError_NamesTheRuleTheTiersTheChainAndTheCeiling",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cliroute",
+      "test": "TestCompile_AnUnknownKeyInTheBlockIsRefusedAtLoad",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cliroute",
+      "test": "TestNew_RefusesATableWithAnErrorFinding",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cliroute",
+      "test": "TestResolveRole_ADeclaredRefusalIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cliroute",
+      "test": "TestResolve_ADeclaredProfileThatFailsToLoadIsRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cliroute",
+      "test": "TestResolve_APerRunTierTheCeilingEmptiesIsATypedCeilingError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cliroute",
+      "test": "TestResolve_ARuleThatLeavesNothingIsATypedRuleError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cliroute",
+      "test": "TestResolve_AWorktreeChainLeftWithNoToolCapableCLIFailsLoudlyNamingTheDroppedOnes",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cliroute",
+      "test": "TestResolve_EnvOverrideOutsideAllowedFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cliroute",
+      "test": "TestRouter_ARecompileWithAnErrorFindingKeepsTheRoutingTable",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cliroute",
+      "test": "TestRuleError_NamesTheRuleTheKindAndTheSets",
+      "rule": "error-text-match"
+    }
+  ]
+}

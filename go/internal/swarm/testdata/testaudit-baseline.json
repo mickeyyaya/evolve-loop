@@ -1,0 +1,74 @@
+{
+  "rows": [
+    {
+      "package": "internal/swarm",
+      "test": "TestAddWorktree_RelativeBaseRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/swarm",
+      "test": "TestExecKillServer_ReportsASocketPathItCannotRemove",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/swarm",
+      "test": "TestExecTmuxKill_EmptySessionRefusedBeforeExec",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/swarm",
+      "test": "TestGitWorkerProvisioner_ConcurrentSiblingsNoCollision",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/swarm",
+      "test": "TestLaunchWorker_RegisterFailure_AbortsBeforeLaunch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/swarm",
+      "test": "TestMergeWith_Conflict_AbortsAndWrapsErr",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/swarm",
+      "test": "TestParsePlan_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/swarm",
+      "test": "TestPersistLocked_UnwritableDir",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/swarm",
+      "test": "TestSwarmCreateWorker_PersistentFailureStillFailsLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/swarm",
+      "test": "TestSwarm_CoverageDispatchProvisioningErrors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/swarm",
+      "test": "TestSwarm_CoverageGitProvisionerEdges",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/swarm",
+      "test": "TestSwarm_CoverageManifestErrorBranches",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/swarm",
+      "test": "TestSwarm_CoverageMoreBehavior",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/swarm",
+      "test": "TestTopoOrder",
+      "rule": "error-text-match"
+    }
+  ]
+}

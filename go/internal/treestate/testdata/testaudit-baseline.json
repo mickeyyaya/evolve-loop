@@ -1,0 +1,19 @@
+{
+  "rows": [
+    {
+      "package": "internal/treestate",
+      "test": "TestBetween_AFailedRunNamesTheGitMessage",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/treestate",
+      "test": "TestSHA_AFailedRunNamesHEAD",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/treestate",
+      "test": "TestSHA_RealGitParity",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

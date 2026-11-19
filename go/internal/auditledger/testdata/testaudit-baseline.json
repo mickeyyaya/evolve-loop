@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/auditledger",
+      "test": "TestBindRun",
+      "rule": "error-text-match"
+    }
+  ]
+}

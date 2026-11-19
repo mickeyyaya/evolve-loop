@@ -1,0 +1,24 @@
+{
+  "rows": [
+    {
+      "package": "internal/repostate",
+      "test": "TestTrackedFiles_NonRepoErrorCarriesGitStderr",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/repostate",
+      "test": "TestTrackedTree_MissingGitIsWrappedWithoutStderr",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/repostate",
+      "test": "TestTrackedTree_NotARepositoryCarriesGitsReason",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/repostate",
+      "test": "TestTrackedTree_SilentGitFailureIsWrappedWithoutStderr",
+      "rule": "error-text-match"
+    }
+  ]
+}

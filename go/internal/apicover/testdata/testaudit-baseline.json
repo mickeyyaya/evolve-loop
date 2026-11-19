@@ -1,0 +1,24 @@
+{
+  "rows": [
+    {
+      "package": "internal/apicover",
+      "test": "TestEnumerate_UnreadableGoFileIsError",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/apicover",
+      "test": "TestExportedSymbols_MalformedDirectivesKeepFirstError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/apicover",
+      "test": "TestExportedSymbols_MalformedDirectivesKeepFirstError",
+      "rule": "single-file-ast-pin"
+    },
+    {
+      "package": "internal/apicover",
+      "test": "TestRun_MeasurementFailuresReturnCodeTwoWithTheCause",
+      "rule": "error-text-match"
+    }
+  ]
+}

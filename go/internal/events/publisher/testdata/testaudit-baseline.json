@@ -1,0 +1,19 @@
+{
+  "rows": [
+    {
+      "package": "internal/events/publisher",
+      "test": "TestNew_RefusesABadConfig",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/events/publisher",
+      "test": "TestPublisher_ABlockedPutReturnsAtClose",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/events/publisher",
+      "test": "TestPublisher_EveryBlockedPutReturnsAtClose",
+      "rule": "sleep-sync"
+    }
+  ]
+}

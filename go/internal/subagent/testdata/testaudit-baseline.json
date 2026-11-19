@@ -1,0 +1,304 @@
+{
+  "rows": [
+    {
+      "package": "internal/subagent",
+      "test": "TestCheckCtxAdvisory_MissingProfileReturnsError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestConformance_AllRoles_BridgeOnly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestConformance_AllRoles_DepthCapEnforced",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestDefaultGitState_HeadOKDiffFails",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestDispatchParallel_CachePrefixErrorAborts",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestDispatchParallel_EmptySubtasksRejected",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestDispatchParallel_GenTokenErrorAborts",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestDispatchParallel_LedgerWriteErrorPropagates",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestDispatchParallel_MissingParallelEligibleFieldRejected",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestDispatchParallel_MissingWorkspace",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestDispatchParallel_NegativeCycle",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestDispatchParallel_NotParallelEligible",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestDispatchParallel_ProfileNotFound",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestDispatchParallel_SilentCLIIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestDispatchParallel_UnknownAgent",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestExecAdapterDepsWith_CarriesTheCenter",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestExecAdapter_TheRetiredBareNameGeminiLaunchesNothing",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestHostFacades_ProjectTheLeaf",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestNew_RequiredDeps",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestRenderCachePrefix_WriteError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestResolveModelTier_MissingDefaultTier",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestResolveModelTier_ProfileReadError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestRun_AdapterExecErrorReturnsAfterLedger",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestRun_AdapterMissing",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestRun_CLIUnresolvedFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestRun_CapabilityInspectErrorFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestRun_LedgerWriteErrorMasksTheExecError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestRun_LedgerWriteErrorPropagates",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestRun_MissingWorkspaceDir",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestRun_NegativeCycle",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestRun_NilPromptReaderFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestRun_ProfileMissing",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestRun_ProfileNoArtifact",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestRun_ProfileNotFound",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestRun_ProfileReadErrorTextDropsItsCause",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestRun_PromptReadErrorFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestRun_RequestValidation",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestRun_ResolveModelTierErrorPropagates",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestRun_TokenGenerateErrorAborts",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestRun_UnknownAgent",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestRun_VerdictWiringPerRung",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestValidateProfile_AdapterExecNonZeroExitFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestValidateProfile_AdapterExecRuntimeErrorFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestValidateProfile_AdapterMissing",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestValidateProfile_CapabilityInspectError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestValidateProfile_DispatchPlanLogWriteError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestValidateProfile_InvalidJSON",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestValidateProfile_MissingAdaptersDir",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestValidateProfile_MissingAgentName",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestValidateProfile_MissingProfilesDir",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestValidateProfile_NilOptionsWireDefaults",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestValidateProfile_ProfileNotFound",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestValidateProfile_UnresolvedCLI",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestWriteCachePrefix_CreateError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestWriteCachePrefix_MkdirError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestWriteFanoutLedgerEntry_ADirectoryAtTheTipFailsTheChainLink",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestWriteFanoutLedgerEntry_AWorkersEncodeFailureWritesNoLine",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestWriteFanoutLedgerEntry_ChainLinkError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestWriteFanoutLedgerEntry_OpenLedgerError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent",
+      "test": "TestWriteFanoutLedgerEntry_TipWriteError",
+      "rule": "error-text-match"
+    }
+  ]
+}

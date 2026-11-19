@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/shipjournal",
+      "test": "TestRead_AMalformedLineIsKeptApartWithItsLineNumberAndTheGoodLinesStillRead",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/shipjournal",
+      "test": "TestRead_AnAbsentJournalIsEmptyAndAnUnreadableOneIsAnError",
+      "rule": "error-text-match"
+    }
+  ]
+}

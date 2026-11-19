@@ -1,0 +1,509 @@
+{
+  "rows": [
+    {
+      "package": "internal/bridge",
+      "test": "TestAgyTmuxLaunchBackfillF1_ATargetWithoutAManifestFailsBeforeAnyPaneWork",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestArtifactLocate_RejectsSymlinkedCandidates",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestAwaitCellEnvConsumed_ReturnsWhenThePaneRemovesTheDirAndFailsAtTheDeadline",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestCaptureModelPicker_AnEphemeralSessionThatCannotStartIsReaped",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestCellEnv_BuilderCommitGetsTheHostIdentityAndARepoLocalIdentityWins",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestCellEnv_GitFindsNoCredentialHelperInTheCell",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestCellEnv_ReadsTheHostIdentityOncePerLaunch",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestClaudeCloudDriver_AManifestThatDoesNotLoadRefusesTheLaunch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestCodexTmuxPreflight_PretrustFailureIsReturnedBeforeTheUpdateNag",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestController_Do_ACaptureFailureNamesTheFamilyAndTheEvent",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestDeps_HostGitConfigNilResolvesToTheRealReader",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestDispatchSweep_AnUntaggedBusyLoopOrphanedInTheWorktreeStopsWhenTheDispatchEnds",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestDoctorSource_HasNoLLMArgvLiteral",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestDriverFor_TheBareNameGeminiIsAnErrorThatNamesTheAgyDrivers",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestEngineLaunch_ExitClassificationTable",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestEngineLaunch_LaunchErrorPersistFailure_IsABridgeWarning",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestEngineLaunch_NonTimeoutExit_CauseUnchanged",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestEngineLaunch_ReviewerReasonCannotForgeArtifactTimeoutMarker",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestEngineSourceKeepsTheACSTokens",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestExecTmuxCapture_AMissingSessionIsACapturePaneError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestExecTmuxPanePIDs_AMissingSessionIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestExecTmux_Real",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestGoReport_ValidateRejectsAReportThatDoesNotProveItsExitStatus",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestHumanInput_NeedsAReasonAndAnAuditSink",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestItDeps_APaneThatOutlivesKillSessionIsReapedOnlyThroughTheInjectedSender",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestLaunchCloud_ARepositoryReadErrorThatIsNoRefusalIsABadFlag",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestLaunchCloud_AnArtifactThatCannotBeClearedStopsTheLaunchBeforeTmux",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestLaunchCloud_FailsOnAPromptOrAnArtifactItCannotWrite",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestLaunchCloud_FailsWhenTheSessionOrTheWorkspaceCannotBeMade",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestLaunchCloud_RefusesAPromptOverTheArgumentLimit",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestLaunchErrorIncludesCapturedStderrCause",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestLaunchFailurePersistsLaunchErrorFile",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestLaunchProfilePolicyWithFixtureChild",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestLaunchSwept_ABadHolderRefusesAClaudeSeatWithThePinnedTextAndNeverFallsBack",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestLaunchSwept_ATokenSeatRefusesWhenConfinementIsOffOrTheEnvStageIsOff",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestLiveCLI_BootMarkerDetected",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestLiveCLI_BootMarkerDetected",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestLiveCLI_FullRoundtrip",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestLoadProfile_AToolPolicySentinelWithoutThePolicyFileFailsTheLoad",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestLoadProfile_RefusesAToolInBothLists",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestLoadProfile_RefusesTheRetiredEffortFields",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestManifestBase_AMalformedTargetIsStillReportedAsInvalidJSON",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestManifestBase_RefusesABaseThatCannotBeResolved",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestModelQueryRunner_ReturnsTheCombinedOutputAndFailsOnANonZeroExit",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestNativeDecisionProfileOwnedCWD",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestNativeRetrospectiveLessonBoundary",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestNativeRoleEvalAuthoringBoundary",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestNewSessionEnv_APaneThatNeverReadsItsFileFailsTheStartRemovesTheFileAndKillsOnlyItsOwnSessionID",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestOllamaTmux_RealCLI_BootMarkerDetected",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestParityTarget_HostEvidenceNeedsEveryNamedTestToPass",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestParseManifest_ASeatLoginOutsideTheClosedSetIsRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestParseManifest_DefaultEnvRefusesANonIdentifierKey",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestParseManifest_DefaultEnvRefusesControlBytesInAValue",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestParseManifest_DefaultEnvRefusesTheLoopsBridgesAndCredentialVariables",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestParseManifest_EnvPassthroughRefusesNonIdentifiersAndReservedNames",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestParseManifest_InstallRootsMustBeAbsoluteOrUnderHome",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestParseManifest_RefusesABadCloudLaunch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestParseManifest_RefusesABrokenUsageWindowSpec",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestParseManifest_RefusesALaunchModelRuleItCannotRun",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestParseManifest_RefusesANegativeProbeBootRetryCount",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestParseManifest_RefusesAWindowsAwaitWithoutAWindowSpec",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestParseManifest_RefusesAnUnknownFormatIDKindCapabilityOrHomeRead",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestParseManifest_RejectsABrokenPaneVocabularyPattern",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestParseManifest_RejectsAnUnsafeMCPConfigEntry",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestPrepareTmuxREPL_AnUnwritableSystemPromptIsABadFlagBeforeAnySession",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestPretrustCodexProjects_TempAndRenameFailuresAreReported",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestPretrustCodexProjects_UnreadableConfigIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestPretrustCodexProjects_UnresolvableHomeIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestRealTmux_AgentTmuxProbeCannotKillTheRunServer",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestRealTmux_BracketedMultilinePromptPreservesBytes",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestRealTmux_NewSessionInBindsPaneCwd",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestRecipeBoot_ACursorThatNeverMovesFailsOnTheLoopGuard",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestRecipeDriver_EnsureSession_APaneShellThatCannotBePrimedNeverLaunches",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestRecipeEnsureSession_AtEnforceAReusedSessionWithAnotherEnvIsRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestRelocateFileBackfillF1_ASourceThatCannotBeReadAfterTheRenameFailsIsReported",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestRelocateFileBackfillF1_CopyFallbackFailuresNameTheirStepAndLeaveNoTemp",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestRelocateFile_DoesNotWriteThroughAPredictableTempName",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestRequiresIntegrationTag_ReadsOnlyTheHeader",
+      "rule": "single-file-ast-pin"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestResolveSandboxWriteGrants",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestResolveSandboxWriteGrants_RefusesABaseItCannotResolve",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestResolveSandboxWriteGrants_TheRunDirCheckNeedsAResolvableRoot",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestResolveSeat_AnEmptySeamFallsToTheRealResolverAndNeverToAStoredLoginOnAFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestResolveSeat_AnUnprovisionableDirRefusesWithTheProvisionText",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestResolve_AnUnknownFamilyIsATypedErrorAndNoGuessedDriver",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestReusedSession_AtEnforceOnlyASessionBornWithThisCellEnvIsReused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestRunCmdBounded_HonorsParentCancellation",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestRunRecipe_ARecipeWithoutAWorktreeIsNotRefusedByAnIsolatedSeat",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestRunRecipe_AWorktreeRecipeIsUnchangedWithNoHolder",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestRunRecipe_AWorktreeRecipeRefusesWhenTheSeatIsIsolated",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestRunRecipe_UnsupportedCLI",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestRunTmuxREPL_AFailedDeliveryIsReportedAndClosesTheSessionAsToday",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestRunTmuxREPL_CutsOverInboxBeforeOpeningLiveChannel",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestRunTmuxREPL_FailedLaunchSendDoesNotClaimDispatch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestSeatJourney_ABadHolderEndsTheLaunchAsSeatTokenRefusedWithNoStoredFallback",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestSeatLoginSeam_AnExplicitSeamWins",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestTmuxBoot_AtEnforceAControllerWithoutAnEnvStartRefusesTheLaunch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestTmuxPromptTransportErrorStopsDelivery",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestUnboundedLaunchWaits_FindsOnlyADirectUnboundedContextInAnIntegrationFile",
+      "rule": "single-file-ast-pin"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestValidateCloudLaunch_RefusesASpecTheDriverCannotRun",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestWithTmuxOutput_WrapsOnlyAFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/bridge",
+      "test": "TestWorktreeEvidenceDetectorBackfillF1_AnUnrelocatableFallbackSurfacesTheErrorInsteadOfCompleting",
+      "rule": "error-text-match"
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "rows": [
+    {
+      "package": "internal/orchestrator",
+      "test": "TestLease_ADuplicateKeyFailsTheSecondLaneLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/orchestrator",
+      "test": "TestLease_AGiveWithNoLeaseIsAnErrorNotAPanic",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/orchestrator",
+      "test": "TestOrchestratorGuard_FindsAPlantedPollAndKill",
+      "rule": "single-file-ast-pin"
+    },
+    {
+      "package": "internal/orchestrator",
+      "test": "TestOrchestratorGuard_FindsASecondTimerAndAnLLMDispatchImport",
+      "rule": "single-file-ast-pin"
+    },
+    {
+      "package": "internal/orchestrator",
+      "test": "TestOversight_RunReturnsTheErrorOfItsEventSource",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/orchestrator",
+      "test": "TestSupplyRecord_AFailedLockAndAFailedWriteAreErrorsThatNameTheRecord",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/orchestrator",
+      "test": "TestSupplyRecord_AnAppendHoldsTheFileLockAcrossItsReadModifyWrite",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/orchestrator",
+      "test": "TestSupply_AFailedRecordIsReportedAfterTheEventsWerePublished",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/orchestrator",
+      "test": "TestSupply_RecordsTheCauseOfEachRefusal",
+      "rule": "mock-call-order"
+    }
+  ]
+}

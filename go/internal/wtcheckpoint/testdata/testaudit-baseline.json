@@ -1,0 +1,89 @@
+{
+  "rows": [
+    {
+      "package": "internal/wtcheckpoint",
+      "test": "TestApplyCheckpointBackfillF1",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/wtcheckpoint",
+      "test": "TestDescribeBackfillF1_EachGitStepFailureIsReturnedAndNamed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/wtcheckpoint",
+      "test": "TestHasLandedBackfillF1",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/wtcheckpoint",
+      "test": "TestHub_WorktreeRefusesATargetThatIsNotALinkedWorktree",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/wtcheckpoint",
+      "test": "TestPinHead_RefusesAWorktreeNameThatCannotNameARef",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/wtcheckpoint",
+      "test": "TestPrepareTargetBackfillF1",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/wtcheckpoint",
+      "test": "TestPruneBackfillF1",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/wtcheckpoint",
+      "test": "TestPush_FailsLoudlyWithoutAnOrigin",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/wtcheckpoint",
+      "test": "TestPush_SendsOnlyTheNamedCheckpointRefsAndSaveNeverPushes",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/wtcheckpoint",
+      "test": "TestReadyExistingBackfillF1",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/wtcheckpoint",
+      "test": "TestResolveCheckpointBackfillF1",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/wtcheckpoint",
+      "test": "TestRestoreBackfillF1_AnApplyFailureNamesTheCheckpointAndTheTarget",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/wtcheckpoint",
+      "test": "TestRestore_NeverOverwritesAnIgnoredFileInTheTarget",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/wtcheckpoint",
+      "test": "TestRestore_RefusesADirtyTargetAndLeavesItsWorkAlone",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/wtcheckpoint",
+      "test": "TestRestore_RefusesAPathThatIsNotALinkedWorktreeAndAnUnknownRef",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/wtcheckpoint",
+      "test": "TestSave_RefusesAWorktreeNameThatCannotNameARef",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/wtcheckpoint",
+      "test": "TestSumNumstatBackfillF1",
+      "rule": "error-text-match"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "rows": [
+    {
+      "package": "internal/failurelog",
+      "test": "TestCarryoverOps_ReadAndParseFailuresAreErrors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/failurelog",
+      "test": "TestCarryoverOps_WriteFailureIsWrappedAndReportsZero",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/failurelog",
+      "test": "TestPreviewExpired_MissingAndUnreadableState",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/failurelog",
+      "test": "TestPruneExpiredCarryoverTodos_MalformedStateIsReportedNotPruned",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/failurelog",
+      "test": "TestPruneExpired_NoRemovalSkipsWrite",
+      "rule": "sleep-sync"
+    }
+  ]
+}

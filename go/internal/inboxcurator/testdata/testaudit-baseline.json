@@ -1,0 +1,39 @@
+{
+  "rows": [
+    {
+      "package": "internal/inboxcurator",
+      "test": "TestAdmit_RefusesAnItemWhoseProbesAlreadyPass",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxcurator",
+      "test": "TestCheckIntake_RefusesAProbeOfAnUnknownKindOrNoArgumentOrAPathOutsideTheRepository",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxcurator",
+      "test": "TestCheckIntake_RefusesAnUnknownOriginKindOrSurface",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxcurator",
+      "test": "TestClosedHistory_AFaultOnTheLogIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxcurator",
+      "test": "TestCommit_AFaultReadingTheMergedBranchIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxcurator",
+      "test": "TestCommit_AFaultReadingTheTestsOfTheCommitIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxcurator",
+      "test": "TestOverlapError_NamesTheOpenItemsAndTheThreshold",
+      "rule": "error-text-match"
+    }
+  ]
+}

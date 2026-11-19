@@ -1,0 +1,69 @@
+{
+  "rows": [
+    {
+      "package": "internal/treefence",
+      "test": "TestBegin_ADispatchThatEndsDuringTheWaitDoesNotRetake",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/treefence",
+      "test": "TestBegin_AMalformedIndexListingIsATakeError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/treefence",
+      "test": "TestBegin_ASecondSnapshotFailureNamesBothAttempts",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/treefence",
+      "test": "TestBegin_ATransientSnapshotFailureIsRetakenOnce",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/treefence",
+      "test": "TestBegin_AnIndexListingThatCannotBeReadIsATakeError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/treefence",
+      "test": "TestEnd_ADriftLeftAfterTheResetFailsVerification",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/treefence",
+      "test": "TestEnd_ALockedIndexFailsTheRestoreLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/treefence",
+      "test": "TestEnd_AnIndexListingThatFailsAfterDispatchIsLoud",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/treefence",
+      "test": "TestIndexCopyTree_UnusableTempDirIsReported",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/treefence",
+      "test": "TestRestore_EntriesThatCannotBeUndoneAreReportedByNameWhileTheRestIsStillRestored",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/treefence",
+      "test": "TestSnapshotDiffFailure_IsReturnedByRestoreDifferingAndVerify",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/treefence",
+      "test": "TestVerify_AnIndexListingThatFailsIsReturned",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/treefence",
+      "test": "TestWriteTree_WriteTreeCommandFailureIsReturned",
+      "rule": "error-text-match"
+    }
+  ]
+}

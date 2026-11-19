@@ -1,0 +1,19 @@
+{
+  "rows": [
+    {
+      "package": "internal/clihealth",
+      "test": "TestStoreWriteMkdirFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/clihealth",
+      "test": "TestStoreWriteRenameFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/clihealth",
+      "test": "TestStoreWriteTempFileFailure",
+      "rule": "error-text-match"
+    }
+  ]
+}

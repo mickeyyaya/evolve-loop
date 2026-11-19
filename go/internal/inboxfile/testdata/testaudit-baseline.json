@@ -1,0 +1,54 @@
+{
+  "rows": [
+    {
+      "package": "internal/inboxfile",
+      "test": "TestCheckFieldRules_JudgedAndSanitizedFields",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxfile",
+      "test": "TestFile_EmptyClassesReturnsError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxfile",
+      "test": "TestFile_UnreadableInboxOrWriteFaultReturnsError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxfile",
+      "test": "TestMint_AuthoredNonConsoleRouteIsRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxfile",
+      "test": "TestMint_DecodeItemTypeError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxfile",
+      "test": "TestMint_DepsValidation",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxfile",
+      "test": "TestMint_UnwritableInboxDirReturnsError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxfile",
+      "test": "TestMint_WaitsForTheBumpLockBeforeFiling",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/inboxfile",
+      "test": "TestPublishNewItem_EncodeWriteAndLinkErrors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxfile",
+      "test": "TestPublish_UnacquirableLockReturnsError",
+      "rule": "error-text-match"
+    }
+  ]
+}

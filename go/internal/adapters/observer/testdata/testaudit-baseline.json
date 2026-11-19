@@ -1,0 +1,59 @@
+{
+  "rows": [
+    {
+      "package": "internal/adapters/observer",
+      "test": "TestCoreAdapter_ADeadWritersSnapshotFallsBackToStdout",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/adapters/observer",
+      "test": "TestCoreAdapter_NoProducer_WhenChannelOff",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/adapters/observer",
+      "test": "TestCoreAdapter_PaneStallIsALivenessSignal",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/adapters/observer",
+      "test": "TestCoreAdapter_SpawnsProducer_WhenChannelOn",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/adapters/observer",
+      "test": "TestCoreAdapter_Start_CreatesEventsFile",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/adapters/observer",
+      "test": "TestCoreAdapter_Start_EmitsStallEventWhenFileNeverGrows",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/adapters/observer",
+      "test": "TestCoreAdapter_Start_StopsCleanlyOnCancel",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/adapters/observer",
+      "test": "TestCoreAdapter_StdoutStallIsAnObserverWarningSignal",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/adapters/observer",
+      "test": "TestCoreAdapter_UsesTheLayoutProjection",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/adapters/observer",
+      "test": "TestObserver_EventsFileMatchesGolden",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/adapters/observer",
+      "test": "TestStop_StopsBeforeStallFires",
+      "rule": "sleep-sync"
+    }
+  ]
+}

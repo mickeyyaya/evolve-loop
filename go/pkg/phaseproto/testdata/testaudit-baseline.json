@@ -1,0 +1,39 @@
+{
+  "rows": [
+    {
+      "package": "pkg/phaseproto",
+      "test": "TestEncodeRequest_MarshalError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "pkg/phaseproto",
+      "test": "TestHelperProcess",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "pkg/phaseproto",
+      "test": "TestServeStdio_EncodeResponseFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "pkg/phaseproto",
+      "test": "TestServeStdio_RejectsBadVersion",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "pkg/phaseproto",
+      "test": "TestServeStdio_WriteFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "pkg/phaseproto",
+      "test": "TestSubprocessRunner_EncodeRequestFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "pkg/phaseproto",
+      "test": "TestWireError_IsError",
+      "rule": "error-text-match"
+    }
+  ]
+}

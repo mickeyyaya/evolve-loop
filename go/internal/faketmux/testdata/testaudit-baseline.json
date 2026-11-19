@@ -1,0 +1,19 @@
+{
+  "rows": [
+    {
+      "package": "internal/faketmux",
+      "test": "TestContract",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/faketmux",
+      "test": "TestRun_APaneWhoseProgramExitedIsNoLongerASession",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/faketmux",
+      "test": "TestRun_DisplayMessageNamesTheForegroundProgramOfThePane",
+      "rule": "sleep-sync"
+    }
+  ]
+}

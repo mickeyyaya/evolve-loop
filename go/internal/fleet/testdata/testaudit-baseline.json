@@ -1,0 +1,24 @@
+{
+  "rows": [
+    {
+      "package": "internal/fleet",
+      "test": "TestBuildStarvationItem_IsStabilityClassedAndValidateRequiresAClass",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/fleet",
+      "test": "TestPartitionGraph_PackageSetFailure_WrapsItsCauseAndReturnsNothing",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/fleet",
+      "test": "TestPreflightControlPlane_UntrackedControlPlaneAdditionRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/fleet",
+      "test": "TestRunPool_AClosedKickChannelIsIgnoredAndNeverSpinsTheFill",
+      "rule": "sleep-sync"
+    }
+  ]
+}

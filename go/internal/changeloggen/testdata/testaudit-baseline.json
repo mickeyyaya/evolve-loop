@@ -1,0 +1,19 @@
+{
+  "rows": [
+    {
+      "package": "internal/changeloggen",
+      "test": "TestVerifyRef_InvalidRefError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/changeloggen",
+      "test": "TestWriteEntry_FreshCreateError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/changeloggen",
+      "test": "TestWriteEntry_WriteTmpError",
+      "rule": "error-text-match"
+    }
+  ]
+}

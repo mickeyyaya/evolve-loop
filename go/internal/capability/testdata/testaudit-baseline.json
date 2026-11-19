@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/capability",
+      "test": "TestQualityTier_GoldenParityWithBashManifests",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

@@ -1,0 +1,139 @@
+{
+  "rows": [
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestDefaultRebuildBinary_FailuresNameTheirCause",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestDefaultRebuildBinary_NonDryRun_BadSourceDir",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestDefaultRebuildBinary_NonDryRun_BadSourceDir",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestDefaultRebuildBinary_NonDryRun_GoNotOnPath",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestDefaultRebuildBinary_NonDryRun_RealRepo",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestDefaultReleaseVerify_ACommitWithoutTheBinaryIsTheV1850Defect",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestDefaultReleaseVerify_DiskBinaryMustMatchCommittedBlob",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestDefaultReleaseVerify_FailingVersionRunIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestDefaultReleaseVerify_MissingBinaryOnDisk",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestDefaultReleaseVerify_RelativeRepoRoot",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestDefaultReleaseVerify_Success",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestDefaultReleaseVerify_TagCreationFailureIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestDefaultReleaseVerify_VersionStampMustNameTarget",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestDefaultShip_BinaryNotFound",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestDefaultShip_FailuresAreReturnedWithoutAHead",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestOptions_SkipContentReviewFailsWhenTheJournalCannotRecordTheBypass",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestReleaseRunComplete",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestReleaseRunShip_CommitSHAJournalFailureIsAPostPublishFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestReleaseRunShip_DryRunJournalFailureIsAPrePublishFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestRunChangelogGenLib_EmptyRefs_ReturnsError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestRunChangelogGenLib_InvalidSemver",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestRunMarketplacePollLib_EmptyDir_NoPanic",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestRun_JournalInitFails_UnwritableDir",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestRun_JournalWriteError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestRun_ReleaseVerifyFails_RollsBack",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestRun_RollbackFailureCaptured",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/releasepipeline",
+      "test": "TestRun_StepFailureWithBrokenJournalKeepsBothErrors",
+      "rule": "error-text-match"
+    }
+  ]
+}

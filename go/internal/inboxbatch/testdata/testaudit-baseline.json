@@ -1,0 +1,39 @@
+{
+  "rows": [
+    {
+      "package": "internal/inboxbatch",
+      "test": "TestCallsLoadDirAnywhere_SeesEveryFormOfTheCall",
+      "rule": "single-file-ast-pin"
+    },
+    {
+      "package": "internal/inboxbatch",
+      "test": "TestCheckPriorityClass_AdmitsOnlyAClassTheOrderNames",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxbatch",
+      "test": "TestCheckPriorityClass_QuotesAClassThatCarriesControlCharacters",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxbatch",
+      "test": "TestLoadFile_APriorityOfAnotherTypeIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxbatch",
+      "test": "TestScanDir_ADirectoryItCannotListIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxbatch",
+      "test": "TestStampFieldConstants_NameEveryStampAndNothingElse",
+      "rule": "single-file-ast-pin"
+    },
+    {
+      "package": "internal/inboxbatch",
+      "test": "TestUnifiedCommitmentValidate_RejectsEachDefectWithItsOwnMessage",
+      "rule": "error-text-match"
+    }
+  ]
+}

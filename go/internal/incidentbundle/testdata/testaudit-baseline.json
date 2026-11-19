@@ -1,0 +1,24 @@
+{
+  "rows": [
+    {
+      "package": "internal/incidentbundle",
+      "test": "TestAdd_FailsOnACorruptManifest",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/incidentbundle",
+      "test": "TestAdd_FailsOnAMissingSource",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/incidentbundle",
+      "test": "TestAdd_FailsWhenAnEvictedCopyCannotBeRemoved",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/incidentbundle",
+      "test": "TestCheckAll_SkipsFilesAndWrapsABundleError",
+      "rule": "error-text-match"
+    }
+  ]
+}

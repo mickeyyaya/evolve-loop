@@ -1,0 +1,34 @@
+{
+  "rows": [
+    {
+      "package": "internal/checkpoint",
+      "test": "TestCarriedAttempts_OnlyAnAbsentBlockIsZeroAndAnUnreadableBlockIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/checkpoint",
+      "test": "TestComposeChecked_TheRefusalNamesEachValidReason",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/checkpoint",
+      "test": "TestPhaseBoundaryCheckpointer_AMalformedStateFileIsAnErrorNotAClobber",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/checkpoint",
+      "test": "TestQuotaBoundaryCheckpointer_AnUnreadableBudgetSpendsItLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/checkpoint",
+      "test": "TestReasonMainRed_IsValidAndIsNamedInTheRefusal",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/checkpoint",
+      "test": "TestResumeReady_AnUnreadableResetTimeIsReadyWithAWarning",
+      "rule": "error-text-match"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/recovery",
+      "test": "TestPromoteAdvice_OutOfVocabularyCauseRejected",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/recovery",
+      "test": "TestStripFile_ImportsOnlyStrings",
+      "rule": "single-file-ast-pin"
+    }
+  ]
+}

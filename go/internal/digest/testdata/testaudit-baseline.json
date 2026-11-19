@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/digest",
+      "test": "TestProjectDigest_AnOpeningTagWithNoTerminatorIsAHardError",
+      "rule": "error-text-match"
+    }
+  ]
+}

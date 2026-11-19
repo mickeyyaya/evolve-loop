@@ -1,0 +1,534 @@
+{
+  "rows": [
+    {
+      "package": "internal/phases/ship",
+      "test": "TestAbandonPrepared_ReturnsTheCauseAndEveryRefFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestAdoptIntentConsumption_AcceptsOnlyWholeInboxPairs",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestAppendQuarantineManifestCoverfix_AnEncodingFailureLeavesNoManifest",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestAtomicShip_DetachedHEAD_Refuses",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestAtomicShip_EmptyBranch_DetachedHEAD_Refuses",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestAtomicShip_TypedWorktreeRejectsTamperedRunMirror",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestBinaryStagingGuard_RejectsLargeExecutableOutsideAllowlist",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestCancelKillsTheProcessGroup_CancelReapsTheGrandchildToo",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestCaptureGitOutput_RunnerError_Propagates",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestClassifiedPack_ANamedRedStillRedAloneIsTheLanesRED",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestClassifiedPack_AnAmbiguousAloneRunKeepsTheNamedRed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestClassifiedPack_WithoutAnAloneRunnerANamedRedIsTheLanesRED",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestContractRed_NamesEverySuiteOfTheOnePackList",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestDeliver_EnforceFailsLoudlyWhenTheRecordCannotBeWritten",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestDetectColliders_ADanglingSymlinkInsideAnIncomingDirectoryIsNotACollider",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestEnterShipWindow_AWaiterOutlastsAHealthyHolderWithoutAWarn",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestExecRunner_NonZeroExit",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestExecRunner_Success",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestExplanationViewSHA_AnAbsentContractIsNoViewAndACorruptOneIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestIntegrityError_Error",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestInternalAuditBoundTreeSHA_AuditGoStillAssignsIt",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestLand_AnIntentThatCannotBePreparedIsAbandonedBeforeMain",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestLaneTreeBeforeConsumption_FailsLoudlyOnEveryScratchStep",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestNativeRun_EnforcesExplanationGateWithoutPhaseWrapper",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestNewIntent_AnUnreadableRunIdentityPreparesNothing",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestPhaseRunNative_NewlyAddedFailingTestPreventsRun",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestPhaseRun_MissingRequiredExplanationBlocksBeforeNativeShip",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestPhaseRun_NilRunner_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestPhaseRun_UnreadableActiveMarkerCannotBypassExplanationGate",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestPushOnly_AFailedFetchOfMainRefusesWithNoPush",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestPushOnly_AMovedOriginBranchDoesNotExcludeACommit",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestPushOnly_AMovedOriginMainDoesNotExcludeACommit",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestPushOnly_AnUnjournaledCommitBesideAMainMergeStillRefuses",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestPushOnly_RefusesUnprovenancedAheadCommit",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestPushOnly_StagedChangesRefuseAndNothingToPushIsClean",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestReconcileManifest_CommitsOnTheCycleBranchJoinTheChangedSet",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestReconcileManifest_EnforceBlocksCrossLaneLeak",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRefuseWeakenedGates_ACycleDiffThatSkipsAGuardTestIsRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRefuseWeakenedGates_AFailedUntrackedListingIsReturned",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRefuseWeakenedGates_TheShippingCycleMayChangeItsOwnPredicates",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestReleaseMainRedStop_AFixItemThatCannotMoveMakesTheReleaseAWarning",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRepoContractGateRoot_UnresolvableTypedWorktreeFailsClosed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRepoContractGate_ADeadlineKillOnTheImporterBackstopIsACapacityFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRepoContractGate_AddedTestSelectionIgnoresModifiedAndNonTestFiles",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRepoContractGate_DiscoveryFailureIsInfra",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRepoContractGate_ImporterOfAChangedPackageBlocksShip",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRepoContractGate_NewlyAddedFailingTestBlocksShip",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRepoContractGate_NewlyAddedTaggedFailingTestIsNotSilentlyGreen",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRepoContractGate_RedErrorMessageNamesFailingTests",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRepoContractGate_RedMessagesDistinguishFixedPackFromAddedTests",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRepoContractGate_StderrGetsOneSummaryLineWhileTheScanLogGetsTheNotesAndTheRawStream",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRepoContractGate_UntrackedAddedRedTestBlocksShip",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestResumeLanding_DeclinesToResumeWithoutAHostWorktreeBranchOrLock",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRunAddedTestBackstop_AnUnreadableAddedTestIsAnInfraError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRunGoTestJSON_AStdoutPipeFailureNeverStartsTheProcess",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRunImporterBackstop_DiscoveryThatFailsTwiceIsAnInfraError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRunNative_AddedSkippedTestDoesNotBlockShip",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRunNative_GateTestsTheLaneWorktreeNotTheProjectRoot",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRunNative_RepoContractGateReceivesRunWorkspace",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRunPushOnly_AnUnreadableBranchOrOriginStopsBeforeAnyPush",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRunRepoContractGate_AnUnresolvableLandingTreeStopsTheGate",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRunRepoContractPack_NamesRedsOnlyForTheGatesRealRed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRunRepoContractTestsAlone_KeepsTheUnprovenAndTheStillRed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRun_EmptyProjectRoot_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRun_InvalidClass_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRun_MissingCommitMessage_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestRun_MissingRunner_ReturnsError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestScanShadow_ATreeOverTheBudgetDegradesTheScanWithTheReason",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestScanShadow_AnExpiredBudgetStopsTheSnapshotInsteadOfStallingTheShip",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestShipDirect_BuildDiffFooterNameStatusError_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestShipDirect_CommitPrefixGateRejects_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestShipDirect_DryRunFooterFailureStopsBeforeTheCommit",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestShipDirect_GitAddFails_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestShipDirect_GitCommitFails_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestShipDirect_GitPushFails_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestShipDirect_RefusesAnUnsatisfiedBinding",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestShipFromWorktree_ADivergedMainFailsBeforeThePush",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestShipFromWorktree_AFailedTrackedEditAddFailsTheShipBeforeAnyCommit",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestShipFromWorktree_ARebindIsRefusedBeforeThePush",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestShipFromWorktree_BuildDiffFooterFails_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestShipFromWorktree_CommitPrefixGateRejects_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestShipFromWorktree_DiffCachedQuietFails_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestShipFromWorktree_GitAddFails_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestShipFromWorktree_GitCommitFails_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestShipFromWorktree_PushFails_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestShipFromWorktree_TamperedItemIsNotSanctioned",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestShipFromWorktree_UnsanctionedDriftStillRefuses",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestShipStop_ANonFixParksAtEnforceAndLandsAtShadow",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestShipStop_TheRepoContractGateRefusesBeforeTheStopCheck",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestVerifyAuditBinding_UnreadableArtifact_SHA256Error",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestVerifyClass_Invalid_ReturnsError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestVerifyManualConfirm_DiffCachedQuietRunnerError_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestVerifyManualConfirm_DiffRunnerError_Propagates",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestVerifyManualConfirm_DiffStatRunnerError_Propagates",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestVerifyManualConfirm_GitAddAFails_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestVerifyNativeExplanation_IncompleteTypedIdentityCannotHideActiveMarker",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestVerifyNoControlPlaneEdits_RejectsARenameOutOfTheSurface",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestVerifySelfSHA_BinaryUnreadable_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestVerifySelfSHA_RepinWriteStateFails_Errors",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestVerifySelfSHA_StateMapReadError_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestVerifySelfSHA_UnreadableBinary_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestVerifySelfSHA_UnreadableBinary_Errors",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestWriteShipBinding_GoldenBytesAndAtomicity",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestWriteShipBinding_NoCycleID_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestWriteStateMap_MarshalError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship",
+      "test": "TestWriteStateMap_RenameError",
+      "rule": "error-text-match"
+    }
+  ]
+}

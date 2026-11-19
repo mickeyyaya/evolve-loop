@@ -1,0 +1,29 @@
+{
+  "rows": [
+    {
+      "package": "internal/verifyeval",
+      "test": "TestDefaultRunner_DefaultBuild",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/verifyeval",
+      "test": "TestDefaultRunner_NonZeroExit",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/verifyeval",
+      "test": "TestDefaultRunner_Success",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/verifyeval",
+      "test": "TestParseEval_ScannerError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/verifyeval",
+      "test": "TestVerify_NoScripts_Error",
+      "rule": "error-text-match"
+    }
+  ]
+}

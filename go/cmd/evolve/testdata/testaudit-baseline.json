@@ -1,0 +1,964 @@
+{
+  "rows": [
+    {
+      "package": "cmd/evolve",
+      "test": "TestAdmissionShadow_ReportsAGraphFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestAgyClaudeRouting_OnlyARunnableRuleOnTheResolvedTargetCounts",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestApplyCarryoverDecisions_AMalformedStateIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestApplyCarryoverDecisions_AnAbsentStateFileIsAPathError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestApplySandboxOff_NoReasonKeepsTheSandboxAndACellOrABrokenLedgerRefuses",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestAssertGeminiPayloadPresentDep",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestAuditRootPassesTheCenter",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestAuditRoot_PassesTheSignalCenter",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestBinaryAnswersSubcommandDep_AMissingBinaryIsALaunchError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestBinaryAnswersSubcommandDep_OnlyAnUnknownCommandIsARefusal",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestBlockWithout",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestBootCLIUpdate_ASmokeFailureWhileTheFamilyIsDrainedWarnsAndDoesNotHalt",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestBootCLIUpdate_ASmokeFailureWithOnlyArgonDrainedStillHaltsAndNamesTheWindow",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestBridgeLaunchDeps_AHumanInputIsRecordedInTheProjectLedgerAndRefusedInACell",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestBridgePromptDispatcher_ALaunchFailureNamesTheDriver",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestBridgePromptDispatcher_AnUnclearableArtifactFailsBeforeLaunching",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestBuildCLIRouter_AMalformedPolicyRefusesWithoutARouter",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestBuildCodeBackends_ABadPolicyFileFailsLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestBuildCodeBackends_ARefusedConfigFailsLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestBuildCodeBackends_ARelativePathOutsideAHubFailsNamingTheRoot",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestBuildCodeBackends_AnUnknownBackendNameFailsLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestBuildCodeBackends_GotypesServesCallersFromTheIndexBesideTheIndexDirAndTrailServesFind",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestBuildCodeIndex_AnUnknownBackendFailsBeforeAnyProbe",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestBuildScopeDeltaReport_EachUnreadableInputIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestBuilderSelfCheck_TheStageIsStrictInTheLoadedPolicy",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestCampaignLoadVerifiedPlanPropagatesVerifyError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestCampaignRun_FiniteConcurrency",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestCenterlessConfigLoadSitesArePinned",
+      "rule": "asserts-own-setup"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestChainEngines_OneConstructionSite",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestChangedPaths",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestClassifierDrivers_ATableWithNoDefaultRefusesTheClassifier",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestCmdBridgeWatch_FollowFlagParsed",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestCmdCycle_NoHandWrittenConfigWarnLineAndLaddersLiveInTheSeam",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestCmdLoopWave_ACSTokensHoldByCode",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestCmdLoopWindow_NoHandWrittenWaveDispatchFailedLine",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestContextFillCoverfixWriteReportStatErrorIsWrapped",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestCountOpenPRs_CountsTheListAndReportsEachFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestCycleReauditAuditRunner_DefaultWiresTheAuditPhase",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestCycleRunJourney_AFleetLaneWithAQuotaFamilyAndALoggedOutFamilyReleasesItsClaimAndNamesBoth",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestCycleSpend_EachKeyIsStrictInTheLoadedPolicy",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestDecidePRWindow_AFileNameThatIsNotJSONIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestDecidePRWindow_EachUnreadableInputIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestDeclaredFiles_AnItemThatIsGoneOrDoesNotDecodeIsAnErrorThatNamesIt",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestDefaultBoundaryPlane_ReadsThePoolOfTheLastRecordedWave",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestDefaultChainRebuild_SucceedsQuietlyOrCarriesTheBuildOutput",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestDefaultCodeIndexHost_Gotypes_BuildsThroughTheRealGotypesBuild",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestDefaultLoopDetachCommand",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestDerivedRegen_AFailedStepReturnsTheErrorAndLeavesNoWorktree",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestDerivedRegen_ALeftoverMarkerIsAnErrorAndLeavesNoWorktree",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestDevWorktreeGCOptions_AnUnreadableCallerDirectoryFailsClosed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestE2ECLIFallbackChain",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestE2ECycleTmuxMatrix",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestE2ELiveAdvisorCLIMatrix",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestE2ELiveModelTierMatrix",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestE2E_M4LedgerEntryShapeMatch",
+      "rule": "no-assertion"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestE2E_M4PipelineAgainstLiveLedger",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestEnsurePullRequest_StopsWhenTheLookupFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestEventCatalog_ARouteThatDoesNotParseIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestExecCycleLaunch_CancelTerminatesTheChild",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestExistingEvolveDir",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestExistingEvolveDir_AnUnresolvablePathNamesTheFlag",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestExtractUntracked_FailsOnEachBrokenLayer",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestFailureAdvisorRoot_WiresTheSignalCenter",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestFetchSyncBranch_ARepositoryWithoutOriginFailsWithTheGitDetail",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestFindOpenPullRequest_RejectsAFailingOrMalformedList",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestFindSessionTranscript_NamesEveryRootWhenTheSessionIsAbsent",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestGhIn_RunsInTheRootAndReturnsStdout",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestGhOpenPRUpdates",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestGhOutput_ReportsEachFailureShape",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestGitDiffCapture_ReturnsTheDiffOrAWrappedFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestGitWaveAdapters_ReadTheHeadAndTheMergedPRs",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestGoModulePath_Cases",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestGraphLoaderOver_ReportsAGoListFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestHandoffCoverage_APairWithoutARequestIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestInboxItemFiles_ReadsTheDeclaredFilesAndReportsEachLostClaim",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestInstallClaudeDep_AnUnwritableHomeIsAnInstallError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestIntegrationClassBinderKnowsOnlyTheClosedList",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestIntegrationTrainIsBuiltOnlyBehindTheStopGate",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestJourneyLaneHelper",
+      "rule": "no-assertion"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestLand_ExtractUntrackedRefusesEscapesAndOverwrites",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestLaneTally_ProjectsToTheLeaf",
+      "rule": "single-file-ast-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestLatestAuditEntry_RunScoped_RefusesForeignRun",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestLiveCheck_ABareREPLBootTimeoutIsABootTimeoutWithItsPaneAndAWallIsNot",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestLiveCheck_ProbesTheFamilysTmuxDriverAndNamesAFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestLiveRefreshRoots_AnUnresolvableWorkingDirectoryIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestLiveRefresh_ARefusedRoutingTableFailsBeforeProbing",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestLiveRefresh_AnUncreatableScratchDirIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestLiveRefresh_NoReadyCLIIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestLoadCycleModelRows_UnreadableLedgerIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestLoadFailedApproaches_DecodesOrRefusesTheState",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestLoadLaneTimes_AMalformedFileIsAnErrorThatNamesIt",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestLoopDetachHelperProcess",
+      "rule": "no-assertion"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestMainCIAtWaveBoundary_RedCheckRunHalts",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestMakeCatalogRefresher_AStaleCatalogWithNoReadyCLIReturnsTheDetectErrorAndLeavesTheCatalog",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestMinWidthRepair_ForceDispatchErrorSurfacesAndFallsBack",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestMoveLegacyLoopLog_AnUnmakeableLegacyDirKeepsTheLog",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestMoveLegacyLoopLog_AnUnremovableLegacyLogIsAnErrorAfterTheCopy",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestMoveProfileEfforts_AKeyStripFailureNamesTheProfile",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestMsgCallerFromEnv_ReadsTheDispatchTheTokenAndTheCycle",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestNamedGoalItems_ReportsAnUnreadableInbox",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestNewPRMerger_AnUnreadableWindowStageFailsAndTheOpenGateIsRead",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestNewPRMerger_RefusesAnInvalidPolicy",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestNilSignalCenterRootsPin_UsesTheASTCount",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestNullWaveEngine_EveryConstructionCarriesBothRootsOrNone",
+      "rule": "single-file-ast-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestNullWaveEngine_EveryConstructionCarriesBothRootsOrNone",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestParseBoundaryArgs_Refusals",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestParseCIWatchArgs",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestPhaseAdvisorRoot_WiresTheSignalCenter",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestPlanAndRunPool_TheResupplyPlansTheSameWaveDeeperByTheHeldTodos",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestPollSignals_AWriteFailureIsReturnedAndPollPassesItOn",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestPrepareBoundaryLog_ALiveRunKeepsTheLegacyLogInPlace",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestPrepareBoundaryLog_AnUnswitchableCurrentLinkIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestProbeDossierPublishLock_ProbesOnlyAnExistingLockFile",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestProductionBuildFloorChecks_RefusesAProtectedFileThroughTheRealManifest",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestProductionDriver_NeedsAnEpochAndHoldsTheWiredPorts",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestProductionUsagePanes_AWorkspaceThatCannotBeMadeFailsEveryProbe",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestProjectTargetDryRunDep",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestReadCompositionSnapshot_RefusesFailBeforeAnyGitWork",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRealTreeRoutingOrder_AnchoredPhasesFollowTheirAnchors",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRealTreeRoutingOrder_EveryPreBuildPhaseSitsBeforeBuild",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRealTreeRoutingOrder_ThePinReadsTheStageFieldNotPhaseNames",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRecordAbsorbedFail_MissingStateIsSoftWarn",
+      "rule": "no-assertion"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRegisterPerAgentOverrides_ParsesAndRefusesPairs",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRegularFile_ResolvesOnlyRegularFiles",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRemoteOpenPR_GhFailureIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRemoveTopLevelKeys_RefusesWhatIsNotAJSONObject",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestReplaceSymlink_EachFailedStepNamesItsPath",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRequireReusableAudit_ForeignPhaseSentinelRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRequireReusableAudit_RefusesFAIL",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestResolveLandInput_Table",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestResolveRebuildProjectRoot_GetwdError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestResolveRouterDispatchHealthy_ATierNoCandidatePermitsIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRestoreEntry_ACopyFailureIsReturnedAndTheFileIsClosed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRestoreEntry_RefusesWhatItCannotPlace",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRoutingCandidate",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRoutingPlanInput_RefusesBrokenRecordedState",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRoutingProjectRoot_AnUnreadableWorkingDirectoryIsAnErrorNotAnEmptyRoot",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRunBatch_ARedMainNeverTouchesTheMainRedStop",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRunBridgeWatchFollow_SkipsMalformedAndEmptyLines",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRunBridgeWatchFollow_TailsNewLines",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRunCycleRun_TheLaneRecordsItsResumeThroughRecordLaneResume",
+      "rule": "single-file-ast-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRunGC_TerminatesAnOrphanLeftRunningInAClosedOutCycleTree",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRunLoopBatch_SetsBoundaryRefreshOnWaveBoundaryReExecStop",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRunLoopChain_SetsBoundaryRefreshOnReExecStop",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRunLoop_BoundaryRefreshNeverCalledInsideDispatchHelpers",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRunLoop_CallsMaybeRefreshChainBoundaryAtWaveBoundary",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRunLoop_ResumeFailVerdict",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRunLoop_ResumeFullProtocol",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRunLoop_ResumePhaseRunnerError",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRunPreliminaryStudy_AnUnresolvableWorkspaceIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestRunPreliminaryStudy_Failures",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestSalvageLeafDir_LooksAtThePathThenTheOperatorSalvageDir",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestScopeDeltaCycle_ResolvesFlagOrPositionalAndRejectsTheRest",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestScopeHold_AdoptableByRefusesAProtectedSurfaceItem",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestScopeHold_AdoptableByTakesAPendingItemAndHeldByDoesNot",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestScopeToAddedLines_ADiffTheParserRefusesIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestScopeToAddedLines_AnUnknownBaseIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestShipIntegrationOf_AWrongStageFailsTheLane",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestShipPrBranch_FailsOutsideAGitRepository",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestSignalsTailWaveFollowJoinsLiveLanesAndEndsWhenEverySeals",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestSignalsTail_ChannelFollowPrintsLaterRecordsUntilCancelled",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestStartDetachedLoop_EachLaunchFailureIsNamed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestStopJourney_TheTrainOfTheCommandPutsTheStopGateOnMainAndOnCI",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestSubagentRunRoot_PassesTheRootSignalCenterAndKeepsTheRawWarns",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestSubagentRun_NoInProcessFallbackSignal",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestSyncMain_AFailedReplayCommitExitsOneAndNamesTheReplay",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestSyncMain_AQuarantineMoveThatCannotBeRecordedRefusesBeforeTheMerge",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestSyncMain_RefusesToMergeWhenTheStampsCannotLand",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestTriageProfile_AllowlistsGoInboxMover",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestTryDossierPublishLock_AnUncreatableLockDirIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestTryDossierPublishLock_HoldsTheShipLockUntilReleased",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestUnsetRoutingKey_ClearsEachTopLevelKeyAndEachScopedEntry",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestVerifyDossierFile_AnUnreadableFileIsNamed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestWaveSeed_JSONAndErrorAreByteIdenticalToTheGolden",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestWireCLIRouter_AnOverrideCheckFaultIsReported",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestWireOrchestratorDeps_ARefusedOverrideIsARoutingErrorBeforeAnyDispatch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestWireOrchestratorDeps_ARefusedSandboxBypassStopsTheWiring",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestWireOrchestratorDeps_AWrongIntegrationStageStopsAFleetLaneBeforeAnyDispatch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestWireOrchestratorDeps_AnAdvisorWithoutARouteRefusesTheWiring",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestWireOrchestratorDeps_AnErrorFindingRefusesBeforeAnyDispatch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestWireOrchestratorDeps_EveryConsumerGetsTheChainWalkingBridge",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestWireOrchestratorDeps_PassesTheForbiddenPredicateToTheHostEffects",
+      "rule": "single-file-ast-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestWireOrchestratorDeps_ShipPhaseCarriesTheRootSignalCenter",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestWireOrchestratorDeps_TheObserverAndTheBridgeShareOneUsageEvidence",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestWireRouterAdvisor_ANoRouteTableIsAWrappedError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestWireRoutingPlanAdvisor_ARefusedTableIsAnErrorAndTheCatalogDefectsReachTheConsole",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestWireRoutingPlanAdvisor_WiresAnAdvisorForAProjectRoot",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestWireSimulateOrchestrator_BridgeExitWarningRenders",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestWriteClassifyReport_AMarshalFailureIsReturned",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestWriteCompositionVerdict_TheLedgerWriterRefusesARedGate",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestWriteProfileRewrites_AnUnwritableProfileIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "cmd/evolve",
+      "test": "TestWriteReportAtomicRefusesASymlink",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

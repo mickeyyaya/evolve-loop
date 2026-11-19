@@ -1,0 +1,89 @@
+{
+  "rows": [
+    {
+      "package": "internal/inboxmover",
+      "test": "TestApplyCycleOutcome_FailPathSurfacesClaimAndDrainErrors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover",
+      "test": "TestApplyCycleOutcome_PassPathJoinsEveryFailureNotOnlyTheFirst",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover",
+      "test": "TestApplyCycleOutcome_PassPathReportsEachFailingStageAndStillDrains",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover",
+      "test": "TestClaimDispatchable_RefusesAnItemWaitingOnAnUnlandedDependency",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover",
+      "test": "TestConsumeFixItem_AFailureNamesTheFixItem",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover",
+      "test": "TestCycleWorktreeRefusal_ARelativeStateLinkResolvesThePlane",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover",
+      "test": "TestFacades_KeepEverySpelling",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover",
+      "test": "TestFindConsumedRecord_TwoRecordsOneIDNamesBothPaths",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover",
+      "test": "TestMutators_RefuseACycleWorktreeInboxCopyAndNameThePlane",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover",
+      "test": "TestOriginMainHead_UnrunnableGitIsWrappedWithTheRef",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover",
+      "test": "TestReconcileSuperseded_SkipsABlankIDAndStopsAtTheFirstFailedPromote",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover",
+      "test": "TestReleaseContinuationBinding_TheBranchesBesideTheRefusal",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover",
+      "test": "TestShaLandedOnMain_ReportsWhatGitCannotAnswer_PromoteFailsOpenLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover",
+      "test": "TestShedDeclinedContinuation_ARewriteFaultIsReturned",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover",
+      "test": "TestShedDeclinedContinuation_AnUnreadableClaimOrItemIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover",
+      "test": "TestSurveyAndReleaseStaleClaims_ReportAFaultAndKeepTheClaim",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover",
+      "test": "TestWithdraw_RefusesAnItemAContinuationBinds",
+      "rule": "error-text-match"
+    }
+  ]
+}

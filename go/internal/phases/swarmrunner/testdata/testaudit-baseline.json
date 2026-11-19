@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/phases/swarmrunner",
+      "test": "TestDecorator_WriterLiveModesRefusedBeforeDispatch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/swarmrunner",
+      "test": "TestSwarmRunner_CoverageBridgeLauncherError",
+      "rule": "error-text-match"
+    }
+  ]
+}

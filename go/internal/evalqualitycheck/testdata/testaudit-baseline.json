@@ -1,0 +1,44 @@
+{
+  "rows": [
+    {
+      "package": "internal/evalqualitycheck",
+      "test": "TestCheckDiversity_ADanglingEvalLinkStopsTheScoreWithTheCause",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/evalqualitycheck",
+      "test": "TestCheck_TemplateExampleRoundTripsThroughScanner",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/evalqualitycheck",
+      "test": "TestFailureReporterCall_OnlyAFailureReportingCallStatementQualifies",
+      "rule": "single-file-ast-pin"
+    },
+    {
+      "package": "internal/evalqualitycheck",
+      "test": "TestFingerprintEval_UnopenableAndOverlongFilesAreErrorsNotSilentSkips",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/evalqualitycheck",
+      "test": "TestLintFlaky_DirWithNoGoFiles_Error",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/evalqualitycheck",
+      "test": "TestLintUnsatisfiablePredicates_FlagsTheLiveCycle1488PredicateOnceUnrepaired",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "internal/evalqualitycheck",
+      "test": "TestLintUnsatisfiablePredicates_RefusesAMissingPathAndAnEmptyDirectory",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/evalqualitycheck",
+      "test": "TestPredicateSourcePaths_Shapes",
+      "rule": "error-text-match"
+    }
+  ]
+}

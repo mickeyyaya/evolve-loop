@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/builddiff",
+      "test": "TestDerive_EachFailedStepFailsAndAnUntrackedFileCountsItsLastLine",
+      "rule": "error-text-match"
+    }
+  ]
+}

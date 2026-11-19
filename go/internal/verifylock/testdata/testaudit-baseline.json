@@ -1,0 +1,19 @@
+{
+  "rows": [
+    {
+      "package": "internal/verifylock",
+      "test": "TestAcquireWithin_AWaiterBehindAHeldLockGivesUpAtTheBoundAndSaysSo",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/verifylock",
+      "test": "TestAcquireWithin_TheCallersOwnDeadlineIsNotReportedAsTheBound",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/verifylock",
+      "test": "TestAcquire_SerializesAcrossHolders",
+      "rule": "sleep-sync"
+    }
+  ]
+}

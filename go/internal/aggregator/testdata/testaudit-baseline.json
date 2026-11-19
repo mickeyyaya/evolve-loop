@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/aggregator",
+      "test": "TestAmplifiedAggregate_ReadFileSeamCoversEveryWorkerInOrder",
+      "rule": "mock-call-order"
+    }
+  ]
+}

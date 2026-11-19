@@ -1,0 +1,129 @@
+{
+  "rows": [
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestListClaims_ReportsAnUnreadableInboxOrClaimDir",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMoverAbsorbRootCopies_ReportsEachFileSystemFault",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMoverReleaseClaimKeeping_KeepClaimRefusesAnOccupiedParkPath",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMoverReleaseClaimKeeping_KeepRootRefusesAClaimThatIsNotAFieldSubset",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMoverReleaseClaimKeeping_KeepRootRefusesACopyThatIsNotAJSONObject",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMoverReleaseClaimKeeping_RefusesAnUnknownKeepValue",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMoverReleaseClaimKeeping_ReportsEachFileSystemFault",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMoverReleaseClaimKeeping_ReturnsAnInboxScanFault",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMoverReleaseClaim_ReportsEachFileSystemFault",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMover_Edit_NeverOpensAConsoleOwnedItemToLanes",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMover_Edit_RefusesAResultInboxAddWouldRefuse",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMover_Edit_RefusesAnItemItsReadersCannotLoad",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMover_Edit_StampsTheIDOfAnIDlessItemNamedByItsPath",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMover_File_ADependencyMustNameAnItem",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMover_File_AnUnreadableInboxIsAScanFault",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMover_File_RefusesAPriorityClassTheOrderDoesNotName",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMover_File_RefusesAnInvalidItem",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMover_File_StampsTheIntakeRecordAndRefusesAnAuthoredOne",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMover_File_WithNoClassOrderWiredIsAFaultNotAnInvalidItem",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMover_Release_DirArmsAndMoveFailed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMover_RouteLane_LeavesAClaimedOrMissingItemAlone",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMover_RouteLane_RefusesWhatALaneMayNotTake",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMover_Withdraw_AFailedRecordKeepsTheItem",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMover_Withdraw_RefusesAnItemAContinuationBinds",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxmover/lifecycle",
+      "test": "TestMover_Withdraw_RefusesAnItemAPendingItemDependsOn",
+      "rule": "error-text-match"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "rows": [
+    {
+      "package": "internal/tmuxtest",
+      "test": "TestStartOrphanGuard_AGuardThatCannotStartIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/tmuxtest",
+      "test": "TestStartOrphanGuard_StopsServerWhenSocketDirectoryRemoved",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/tmuxtest",
+      "test": "TestStartOrphanGuard_TheServersOfTheOwnerStopSoonAfterItDies",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/tmuxtest",
+      "test": "TestStartServer_RefusesAnEmptySocketBeforeItStartsAnything",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/tmuxtest",
+      "test": "TestStopServer_RefusesAnEmptySocketSoItNeverKillsTheDefaultServer",
+      "rule": "error-text-match"
+    }
+  ]
+}

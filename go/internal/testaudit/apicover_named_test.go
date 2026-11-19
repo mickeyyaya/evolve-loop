@@ -37,6 +37,23 @@ func TestAPICover_NamesEveryExportedSymbol(t *testing.T) {
 	if err := CheckShard(dir, cfg); err != nil {
 		t.Errorf("CheckShard on a fresh shard: %v", err)
 	}
+	treeRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(treeRoot, "pkg", "x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(treeRoot, "pkg", "x", "x_test.go"), []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	treeFound, err := AnalyzeTree(treeRoot, cfg)
+	if err != nil || len(treeFound) != 1 || treeFound[0].Package != "pkg/x" {
+		t.Fatalf("AnalyzeTree = %v, %v; want one finding in pkg/x", treeFound, err)
+	}
+	if err := Rebaseline(treeRoot, "pkg/x", cfg); err != nil {
+		t.Fatalf("Rebaseline: %v", err)
+	}
+	if err := CheckTree(treeRoot, cfg); err != nil {
+		t.Errorf("CheckTree after Rebaseline: %v", err)
+	}
 }
 
 func TestWriteShard_NoFindingsRemovesTheShard(t *testing.T) {

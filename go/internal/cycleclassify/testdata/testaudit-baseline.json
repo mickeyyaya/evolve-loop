@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/cycleclassify",
+      "test": "TestGitLogFn_ErrorPath",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/cycleclassify",
+      "test": "TestGitLogFn_ProductionPath",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

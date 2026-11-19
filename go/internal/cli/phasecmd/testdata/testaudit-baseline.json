@@ -1,0 +1,49 @@
+{
+  "rows": [
+    {
+      "package": "internal/cli/phasecmd",
+      "test": "TestCollectProvenance_ALedgerThatCannotBeScannedFailsTheCheckF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cli/phasecmd",
+      "test": "TestCollectProvenance_AnArtifactThatCannotBeReadIsAnErrorNamingItF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cli/phasecmd",
+      "test": "TestRequestForCycle_AnUnreadableCatalogFailsInsteadOfGuessingTheFence",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cli/phasecmd",
+      "test": "TestRequestForCycle_ExitCodeSeparatesUsageFromRefusal",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cli/phasecmd",
+      "test": "TestRequestForCycle_RefusesACycleHeldByALiveRun",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cli/phasecmd",
+      "test": "TestRequestForCycle_StdinReadFailureIsRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cli/phasecmd",
+      "test": "TestRequestForCycle_UnparseableStateIsRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cli/phasecmd",
+      "test": "TestRequestForCycle_WorktreeProblemsAreRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cli/phasecmd",
+      "test": "TestRunPhaseObserver_RendersObserverCodesOnStderr",
+      "rule": "sleep-sync"
+    }
+  ]
+}

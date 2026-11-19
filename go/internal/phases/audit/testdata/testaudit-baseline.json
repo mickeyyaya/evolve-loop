@@ -1,0 +1,164 @@
+{
+  "rows": [
+    {
+      "package": "internal/phases/audit",
+      "test": "TestBeginPredicateEvidence_AmplificationTestDeclaredInItsReportIsNotUndeclared",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestBeginPredicateEvidence_UnstagedInputsRefuseAudit",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestBindExplanationResult_MissingRequiredHandoffBecomesEGPSRed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestCIParityFacades_ReadThePackageVarSeamsPerCall",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestDefectLedgerSeam_NullFacadeKeepsTheRegistryFallback",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestDefectLedgerSeam_ProductionSitesUseTheWiredLedger",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestGenerateACSVerdict_SuiteRunError_Propagates",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestGenerateACSVerdict_WriteVerdictError_Propagates",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestGeneratorBuilds_AnUnreadableTreeIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestGeneratorBuilds_BuildOneAtATimeSoEachBuildReusesTheLastOnesCache",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestIntegrationTier_RedThenGreen_FlakeAbsorbedToWarn",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestIntegrationTier_RetakeUsesAFreshBudget",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestIntegrationTier_RetakeUsesAFreshBudget",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestPredicateTreeFor_AnUndeclaredUntrackedInputIsRefusedByName",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestPredicateTreeFor_EachCaptureFailureNamesItsStage",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestPrepareEvidence_HostPredicateFaultsFailTheAuditWithTheCause",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestQuarantineAuditProbes_PreserveFailureStopsAndKeepsTheProbe",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestRun_MissingBridge_ReturnsError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestRun_MissingPrompts_ReturnsError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestSealPredicateEvidence_RefusesAChangedTreeAndAMissingVerdict",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestSkillsDriftGate_ARealRunnerTimeoutCannotGradeAndSaysSo",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestValidateExplanationReview_DuplicateSectionIsAdvisoryButFailsTheFloor",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestValidateExplanationReview_InvalidPostBuildStateRequiresFail",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestValidateExplanationReview_MissingDeliveryReviewedAsFailIsCleanAndHostDefectsAreLoud",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestValidateExplanationReview_RejectsTokenEvidenceAndAcceptsNegativeJudgment",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestWholeRepoGates_UnderivableChangeSet_WarnsNotSilentSkip",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestWorktreeSkillsDrift_ATimeoutCannotGradeAndSaysSo",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestWorktreeSkillsDrift_ContextCancellationStopsRun",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestWorktreeSkillsDrift_DeadlineWithoutADriftReportStaysUngraded",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestWorktreeSkillsDrift_MissingGoBinaryWarns",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestWorktreeSkillsDrift_Outcomes",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit",
+      "test": "TestWorktreeSkillsDrift_RunsTheWorktreeGeneratorCheck",
+      "rule": "error-text-match"
+    }
+  ]
+}

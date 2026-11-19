@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/agentmsg/broker",
+      "test": "TestNew_NamesTheFirstMissingFieldEveryTime",
+      "rule": "error-text-match"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/gotooltest",
+      "test": "TestApplyLimits_SetsOnlyTheTwoLimitsAndReportsASetFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gotooltest",
+      "test": "TestCacheBuild_ABuildFailureReachesEveryCallerWithoutARetry",
+      "rule": "error-text-match"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/paralleltest",
+      "test": "TestSources_FailsLoudly",
+      "rule": "error-text-match"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/log",
+      "test": "TestEmitAbnormal_AppendFailureNamesThePath",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/log",
+      "test": "TestSelectionHandler_SkipsDisabledAndReturnsFirstError",
+      "rule": "error-text-match"
+    }
+  ]
+}

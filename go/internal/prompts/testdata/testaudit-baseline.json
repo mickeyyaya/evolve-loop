@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/prompts",
+      "test": "TestSmoke_RealAgentFiles",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

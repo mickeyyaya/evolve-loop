@@ -1,0 +1,2314 @@
+{
+  "packages": [
+    "acs/cycle1152",
+    "acs/cycle1191",
+    "acs/cycle1225",
+    "acs/cycle1226",
+    "acs/cycle1633",
+    "acs/cycle1648",
+    "acs/cycle1684",
+    "acs/cycle1693",
+    "acs/cycle1698",
+    "acs/cycle1706",
+    "acs/cycle1726",
+    "acs/cycle1756",
+    "acs/cycle1786",
+    "acs/cycle1795",
+    "acs/cycle1834",
+    "acs/cycle1864",
+    "acs/cycle1920",
+    "acs/cycle1932",
+    "acs/cycle1995",
+    "acs/cycle2035",
+    "acs/cycle2039",
+    "acs/cycle2067",
+    "acs/cycle2091",
+    "acs/cycle2105",
+    "acs/cycle2187",
+    "acs/cycle2239",
+    "acs/cycle2248",
+    "acs/cycle2293",
+    "acs/cycle2296",
+    "acs/cycle2364",
+    "acs/cycle2390",
+    "acs/cycle2418",
+    "acs/cycle2475",
+    "acs/cycle2489",
+    "acs/cycle2507",
+    "acs/cycle270",
+    "acs/cycle333",
+    "acs/cycle38",
+    "acs/cycle43",
+    "acs/cycle6",
+    "acs/redteam",
+    "acs/regression/buildselfcheck",
+    "acs/regression/cycle100",
+    "acs/regression/cycle103",
+    "acs/regression/cycle42",
+    "acs/regression/cycle49",
+    "acs/regression/cycle62",
+    "acs/regression/cycle65",
+    "acs/regression/cycle83",
+    "acs/regression/cycle85",
+    "acs/regression/cycle87",
+    "acs/regression/cycle88",
+    "acs/regression/cycle89",
+    "acs/regression/cycle90",
+    "acs/regression/cycle91",
+    "acs/regression/cycle94",
+    "acs/regression/cycle97",
+    "acs/regression/cycle98",
+    "internal/acssuite",
+    "internal/adapters/bridge",
+    "internal/adapters/ledger",
+    "internal/agentrequest",
+    "internal/baseattr",
+    "internal/binaryguard",
+    "internal/codereview",
+    "internal/commentaudit",
+    "internal/commitgate",
+    "internal/core/defectledger",
+    "internal/derived",
+    "internal/dispatchcred",
+    "internal/explanationdocs",
+    "internal/gateclass",
+    "internal/guards",
+    "internal/guidance",
+    "internal/heldproposal",
+    "internal/inputindex",
+    "internal/launchrecord",
+    "internal/mainstop",
+    "internal/overlap",
+    "internal/phaseintegrity",
+    "internal/phases/audit/ciparitygate",
+    "internal/phases/runner/verdict",
+    "internal/phases/ship/landing",
+    "internal/phases/ship/shiptest",
+    "internal/policy",
+    "internal/proctree",
+    "internal/rawgitratchet",
+    "internal/reportdoc",
+    "internal/selfheal",
+    "internal/sizeratchet",
+    "internal/subagent/subagentrun",
+    "internal/testdup",
+    "internal/triagedecision"
+  ],
+  "rows": [
+    {
+      "package": "acs/cycle1152",
+      "test": "TestC1152_005_repo_builds",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/cycle1191",
+      "test": "TestC1191_005_live_ledger_no_1740_wolf_cry",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle1191",
+      "test": "TestC1191_005_live_ledger_no_1740_wolf_cry",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/cycle1225",
+      "test": "TestC1225_002_ReachabilityProbeFlagsCycle644Shape",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle1226",
+      "test": "TestC1226_002_BuildImportGraphWrapsToolchainFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle1633",
+      "test": "TestC1633_002_UnifiedCommitmentRejectsMissingEvidence",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle1633",
+      "test": "TestC1633_003_UnifiedCommitmentRejectsUnknownMember",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle1633",
+      "test": "TestC1633_004_UnifiedCommitmentRejectsDuplicateMember",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle1648",
+      "test": "TestC1648_009_RealCorpusProducesInterpretableReport",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/cycle1684",
+      "test": "TestC1684_006_AuthorityHelperRefusesInProcessCallers",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle1693",
+      "test": "TestC1693_004_ScopeConfinedToIterationTopFiles",
+      "rule": "asserts-own-setup"
+    },
+    {
+      "package": "acs/cycle1698",
+      "test": "TestC1698_002_NoBindableAuditorRowIsTheTypedSentinel",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle1706",
+      "test": "TestC1706_006_RetryExhaustionNamesTheHoldingProcess",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/cycle1726",
+      "test": "TestC1726_004_WalkMeasuresEveryNonTestFunctionUnderTheRoot",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle1756",
+      "test": "TestC1756_001_StaleAnchorRebaselineRefusesAndWritesNothing",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle1786",
+      "test": "TestC1786_022_WaitPrintsTheLiveRunAndItsPhaseWhenTheyChange",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "acs/cycle1795",
+      "test": "TestC1795_002_RedRepoContractSuiteFailsPreflight",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle1834",
+      "test": "TestC1834_002_CaptureWithEBADFRetryReturnsAPersistentEBADFAfterExactlyOneRetry",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle1864",
+      "test": "TestC1864_005_AlwaysNilDetectorFlagsAnInvariantNilError",
+      "rule": "single-file-ast-pin"
+    },
+    {
+      "package": "acs/cycle1920",
+      "test": "TestC1920_004_VertexAIAddsNoCodeIdentifierOutsideSnapshot",
+      "rule": "asserts-own-setup"
+    },
+    {
+      "package": "acs/cycle1932",
+      "test": "TestC1932_005_RecurrenceDelegatesTheItemWriteToTheInjectedReweightSeam",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "acs/cycle1995",
+      "test": "TestC1995_004_ThePolicyAdmissionStageDefaultsToShadowAndRefusesAnUnknownWord",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle2035",
+      "test": "TestC2035_016_CIRedDegradedPathIsUnchangedWhenTheInboxIsUnwritable",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle2039",
+      "test": "TestC2039_012_AnUnknownStageWordRefusesTheLoadAndNamesTheKey",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle2067",
+      "test": "TestC2067_014_ARunnerFailureIsReturnedNotSwallowed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle2091",
+      "test": "TestC2091_005_PolicyLoadReadsPathsAndRefusesAMalformedGlob",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle2105",
+      "test": "TestC2105_009_TheSupersedeStageIsStrict",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle2187",
+      "test": "TestC2187_001_TwoConsumedRecordsWithOneIDGiveAnErrorNamingBothPaths",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle2187",
+      "test": "TestC2187_002_ADuplicateAcrossTheFlatDirAndACycleDirIsRefusedToo",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle2239",
+      "test": "TestC2239_003_ACompletedRunWithAnEmptyConclusionIsStillRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle2248",
+      "test": "TestC2248_011_APolicyWithoutALogCompressionBlockIsRefusedNotDefaulted",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle2293",
+      "test": "TestC2293_004_TheTestsOfCoreAndInboxmoverAreUnchanged",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/cycle2296",
+      "test": "TestC2296_004_AFailedBundleVerifyKeepsTheRemoteBranch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle2364",
+      "test": "TestC2364_005_WarnSignalFiresBeforeTheFloorIsBreached",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/cycle2364",
+      "test": "TestC2364_006_NoSignalWhileFreeDiskIsAboveFloorAndWarn",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/cycle2390",
+      "test": "TestC2390_001_AFifoTestFileDoesNotHangTheTDDBuildRequest",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/cycle2418",
+      "test": "TestC2418_008_OnlyTheVerbAndItsRegistrationMentionTheVerbInProductionSource",
+      "rule": "asserts-own-setup"
+    },
+    {
+      "package": "acs/cycle2475",
+      "test": "TestC2475_005_TheStatusVerbOfACellNeverStartsGh",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle2489",
+      "test": "TestC2489_007_RatchetFailsOnAFindingMissingFromTheBaseline",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle2489",
+      "test": "TestC2489_008_RatchetFailsOnABaselineRowThatNoLongerExists",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle2489",
+      "test": "TestC2489_010_FakecontractSuiteNamesItsTool",
+      "rule": "asserts-own-setup"
+    },
+    {
+      "package": "acs/cycle2507",
+      "test": "TestC2507_005_SentinelsAndTechnicalTokensSurviveTheRewrite",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle270",
+      "test": "TestC270_004_DefaultTmuxSessionsTested",
+      "rule": "no-assertion"
+    },
+    {
+      "package": "acs/cycle333",
+      "test": "TestC333_003_DispatchParallelExtractsBoolField",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "acs/cycle38",
+      "test": "TestC38_GC_005_GCPolicyHasModeField",
+      "rule": "asserts-own-setup"
+    },
+    {
+      "package": "acs/cycle43",
+      "test": "TestC43_005_BridgeDepsHas4TypedIntFields",
+      "rule": "asserts-own-setup"
+    },
+    {
+      "package": "acs/cycle6",
+      "test": "TestC6_007_DossierCLISubcommandRegistered",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/redteam",
+      "test": "TestCycleDossier_SkipsInProgress",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/buildselfcheck",
+      "test": "TestChangedPackagesToolchainGreen",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle100",
+      "test": "TestC100_001_ObserverEnforceDefaultOn",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle100",
+      "test": "TestC100_004_PhaseObserverDocMigrationNote",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle103",
+      "test": "TestC103_001_BuildPlannerPersonaExists",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle103",
+      "test": "TestC103_002_BuildPlannerProfileValid",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle103",
+      "test": "TestC103_003_PhaseRegistryIncludesBuildPlanner",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle103",
+      "test": "TestC103_004_ListPhaseOrderIncludesBuildPlanner",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle103",
+      "test": "TestC103_005_SubagentRunAllowlistIncludesBuildPlanner",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle103",
+      "test": "TestC103_006_PhaseGatePreconditionRecognizesBuildPlanner",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle103",
+      "test": "TestC103_007_GateFunctionsPresent",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle103",
+      "test": "TestC103_008_ShadowCycleDoesNotProduceBuildPlan",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle103",
+      "test": "TestC103_009_Adr0019ExistsAndComplete",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle42",
+      "test": "TestC42_006_PNew17Exists",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle49",
+      "test": "TestC49_001_TaskFingerprintExists",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle49",
+      "test": "TestC49_002_FingerprintDeterminism",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle49",
+      "test": "TestC49_003_ResearchCacheExists",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle49",
+      "test": "TestC49_004_PromoteResearchCacheExists",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle49",
+      "test": "TestC49_005_ScoutProfileTools",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle49",
+      "test": "TestC49_006_ClaudeMdSchema",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle62",
+      "test": "TestC62_052_ScoutFindingsGrounded",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle62",
+      "test": "TestC62_053_AuditCitationsInDiff",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle62",
+      "test": "TestC62_055_MemoNoShellRedirectTools",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle65",
+      "test": "TestC65_001_OrchestratorTrim",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle65",
+      "test": "TestC65_002_SharedConstraintsAgentsMd",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle65",
+      "test": "TestC65_003_AnchorValidation",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle83",
+      "test": "TestC83_003_SubagentRunGatedAndNotLedger",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle83",
+      "test": "TestC83_004_DocsUpdated",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle85",
+      "test": "TestC85_BuilderWorktreeIsolationHardError",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle85",
+      "test": "TestC85_CycleStatePhaseValidation",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle85",
+      "test": "TestC85_MemoProfileHasMemoMdWrite",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle85",
+      "test": "TestC85_OrchestratorClosureModeCheck",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle85",
+      "test": "TestC85_SubagentCostAttribution",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle85",
+      "test": "TestC85_TriageOperatorQueuePriorityFloor",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle87",
+      "test": "TestC87_KbSearchFixture",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle87",
+      "test": "TestC87_KbSearchGrepFallback",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle87",
+      "test": "TestC87_ProfilesJsonValidate",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle87",
+      "test": "TestC87_ResearchQuotaConcurrentNoLoss",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle87",
+      "test": "TestC87_ResearchQuotaDeepFlag",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle87",
+      "test": "TestC87_ResearchQuotaGateArithmetic",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle87",
+      "test": "TestC87_ResearchQuotaHookDisabled",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle88",
+      "test": "TestC88_OrchestratorPhase1Purged",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle88",
+      "test": "TestC88_PhaseGateDispatchLegacyError",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle88",
+      "test": "TestC88_PhaseGateFunctionsMigrated",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle88",
+      "test": "TestC88_PhaseRegistryIntentToDiscover",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle88",
+      "test": "TestC88_ScoutPersonaInlineResearch",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle88",
+      "test": "TestC88_ScoutReportSchemaStable",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle89",
+      "test": "TestC89_ClaudeMdResearchEnvVars",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle89",
+      "test": "TestC89_PersonaKbFirstPointer",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle89",
+      "test": "TestC89_ResearchToolAdrExists",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle90",
+      "test": "TestC90_001_ExpectedShipShaRefreshed",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle90",
+      "test": "TestC90_002_OrphanWorktreesPruned",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle90",
+      "test": "TestC90_003_ReleaseTagsBackfilled",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle90",
+      "test": "TestC90_005_DocDeletionGuardHook",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle91",
+      "test": "TestC91_002_BuilderPreHandoffInstruction",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle91",
+      "test": "TestC91_003_TddEngineerOneToOneContract",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle91",
+      "test": "TestC91_004_TriageMediumMinRubric",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle91",
+      "test": "TestC91_005_PriorRegressionPredicatesStillPass",
+      "rule": "no-assertion"
+    },
+    {
+      "package": "acs/regression/cycle94",
+      "test": "TestC94_002_FastFailCounterLogic",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle94",
+      "test": "TestC94_003_OrchestratorFastFailStopCriterion",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle94",
+      "test": "TestC94_005_TrustKernelRegressionGuard",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle97",
+      "test": "TestC97_001_OrchestratorProfileHasContextModeDigest",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle97",
+      "test": "TestC97_005_TriageExtractionNoDuplication",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle98",
+      "test": "TestC98_001_TriageSchemaDocumentsPhaseSkip",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle98",
+      "test": "TestC98_002_OrchestratorHonorsPhaseSkipWithPrecedence",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle98",
+      "test": "TestC98_003_PhaseGateAcceptsForwardSkipUnderFlag",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle98",
+      "test": "TestC98_004_PhaseSkippedImpliesNoRoleExecution",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "acs/regression/cycle98",
+      "test": "TestC98_005_DefaultOffNoPhaseSkippedBaseline",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/acssuite",
+      "test": "TestDeclaredPredicateTests_GoListFailureNamesThePattern",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/acssuite",
+      "test": "TestDeclaredPredicateTests_MalformedGoListStreamIsADecodeError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/acssuite",
+      "test": "TestDeclaredPredicateTests_MissingTestFileIsAParseError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/acssuite",
+      "test": "TestDeclaredPredicateTests_ScopeWithOnlyHarnessFunctionsIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/acssuite",
+      "test": "TestDeclaredPredicateTests_UnparseableTestFileIsAParseError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/acssuite",
+      "test": "TestResolveOptions_AbsFailureNamesTheOffendingRootAndStopsAtFirst",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/acssuite",
+      "test": "TestWriteVerdict_CloseError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/acssuite",
+      "test": "TestWriteVerdict_CreateTempError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/acssuite",
+      "test": "TestWriteVerdict_MarshalFailureIsWrappedAndLeavesNoTempFile",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/acssuite",
+      "test": "TestWriteVerdict_RenameError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/acssuite",
+      "test": "TestWriteVerdict_WriteFileError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/bridge",
+      "test": "TestLaunch_RejectsUnknownExplicitDeliverableContract",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/bridge",
+      "test": "TestLaunch_RequiredFieldValidation",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/bridge",
+      "test": "TestProductionEngineDeps_ResolverReadsTheAgyConversationStoreUnderHome",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/adapters/bridge",
+      "test": "TestSetModelCatalogDirFn",
+      "rule": "no-assertion"
+    },
+    {
+      "package": "internal/adapters/bridge",
+      "test": "TestValidate_ProjectsTheHostRule",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestAnchor_CloseError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestAnchor_CreateTempError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestAnchor_CreateTempParentFileError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestAnchor_GatherError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestAnchor_LineSHANegatives",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestAnchor_RejectsAmbiguousSeq",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestAnchor_RenameError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestAnchor_WriteError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestAppendChainedFromTail_RefusesWithoutAReadableNonEmptyChainAndAValidTipF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestAppendLineAndReplaceTip_ATipRenameFailureIsNamedAndLeavesNoTmp",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestAppendLineAndReplaceTip_AnUncreatableLedgerDirIsNamed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestCheckCompositionLedgerPath_OnlyALedgerJSONLIsAcceptedF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestEvidenceSlotProves_AcceptsOnlyADiffThatReDerivesItsPatchIDAndDigestF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestHelperLedgerAppender",
+      "rule": "no-assertion"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestPatchID_MissingGitIsAWrappedError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestPatchID_NonDiffInputHasNoIdentity",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestReadChain_ReportsALiveLedgerItCannotReadAndTreatsAnAbsentOneAsEmptyF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestReadChain_ReportsASegmentPathItCannotMakeRelativeF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestRebaseline_ASealThatLandsButDoesNotVerifyForwardIsReportedAndKeptF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestRebaseline_AnAppendThatFailsAfterTheDryRunWritesNothingF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestRebaseline_RefusesBeforeWritingWhenTheChainOrTipCannotBeReadF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestRebaseline_RefusesWithoutWritingOnEmptyLiveTailOrUnmarshalableSeal",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestRestoreCompositionEvidence_RefusesALedgerWhoseAnchorLineIsGone",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestRewriteLive_CreateTempError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestSealAndAnchor_ReturnsNoAnchorWhenTheLedgerLockCannotBeTakenF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestSealLocked_ResidueRewriteLiveCreateTempError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestSeal_ALockItCannotTakeIsReportedAndLeavesTheLedgerAloneF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestSeal_AnchorAppendError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestSealedPredecessor_ReportsEachSegmentFailureAndSkipsASegmentStillLiveF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestValidateCompositionInput_AcceptsAnHonestInputAndRejectsTheEmptyAndTheMismatchedF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestValidateCompositionInput_NamesTheDiffThatIsNotAPatchF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestVerifyCompositionLine_BreaksTheChainForEachUnreadableOrNonPatchLineF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestVerifyDeep_ASegmentWhoseBytesDifferFromItsAnchorIsAChainBreakEvenWhenItsLinesChainF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestVerifyScope_ReadFailuresAndEmptyFilesAreNotChainBreaksF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestVerify_ACompositionLineWhoseStoredDiffIsNotAPatchIsAChainBreakF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestVerify_CompositionVerdictKind_KernelRecompute",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestVerify_FailsLoudlyWhenTheChainLockCannotBeOpened",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestWalkChain_AReplayedLineIsADuplicatePrevHashNotAForkSiblingF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestWalkCompositionEvidence_ReportsAnUnreadableLedgerF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestWithSignals_AppendFailureIsAWarnAndTheErrorStillReturns",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestWriteCompositionVerdict_RefusesALedgerPathThatIsALinkToAnotherLedger",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestWriteSegmentVia_ReportsAGzipFailureAndWritesNoFileF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestWriteSegment_CreateTempError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestWriteSegment_FailsWhenTheSegmentCannotBeStoredAndLeavesNoFileF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/ledger",
+      "test": "TestWriteSegment_MkdirError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/agentrequest",
+      "test": "TestHandoff_AnUnreadableRequestStoreOrRecordFailsLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/agentrequest",
+      "test": "TestHandoff_AnUnwritableRecordStoreFailsLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/baseattr",
+      "test": "TestAttribute_AFailedCheckoutIsAnErrorAndRemovesTheWorktree",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/baseattr",
+      "test": "TestAttribute_ATimeoutIsAnErrorThatNamesTheDeadline",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/baseattr",
+      "test": "TestGoTestRunner_ErrorsInsteadOfAnEmptyResult",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/baseattr",
+      "test": "TestRunAt_ARunErrorNamesTheRevisionAndTheLimit",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/baseattr",
+      "test": "TestRunIn_ARunErrorNamesTheTreeAndTheLimit",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/binaryguard",
+      "test": "TestOffender_RecordsPathAndSize",
+      "rule": "asserts-own-setup"
+    },
+    {
+      "package": "internal/binaryguard",
+      "test": "TestScan_AFileThatYieldsNoBytesIsAReadErrorNotAPass",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/binaryguard",
+      "test": "TestScan_ARealReadErrorIsReturnedNotSkipped",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/binaryguard",
+      "test": "TestScan_AStatFailureOtherThanMissingIsReturned",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/codereview",
+      "test": "TestRecord_FaultsAreReportedNeverRaised",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/commentaudit",
+      "test": "TestAcrossDiff_ReturnsTheReadErrorNamingTheFileForEachRuleF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/commentaudit",
+      "test": "TestEquivalent_ReportsWhichSideDoesNotParseF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/commentaudit",
+      "test": "TestExecGit_ChangedFilesRejectsAnUnknownBaseF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/commentaudit",
+      "test": "TestExecGit_ChangedFilesReportsAFailingUntrackedListingF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/commentaudit",
+      "test": "TestRank_ReturnsAWalkOrReadFailureF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/commentaudit",
+      "test": "TestRefuseRecordedLabel_ReportsAnUnreadablePageAndSkipsAMissingOneF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/commentaudit",
+      "test": "TestReplaceFile_ReportsAFailedWriteRemovesTheTempAndKeepsTheTargetF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/commentaudit",
+      "test": "TestRewrittenHistoryPages_AnUnreadablePageIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/commentaudit",
+      "test": "TestStripComments_RefusesAChangeThatWouldMoveAMarker",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/commentaudit",
+      "test": "TestStripComments_RefusesWhenTheStrippedSourceDoesNotFormatF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/commentaudit",
+      "test": "TestUnrecordedHistory_AnUnreadablePageIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/commentaudit",
+      "test": "TestWriteHistoryArchive_FailuresLeaveNothingHalfRecordedF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/commentaudit",
+      "test": "TestWriteHistoryIndex_ReportsEachFailureOfItsDirF2",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/commitgate",
+      "test": "TestAttestationMarshalWith_ReturnsTheFailingFieldAndNoBytes",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/commitgate",
+      "test": "TestGolden_GoPipelineWritesByteExactAttestation",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/commitgate",
+      "test": "TestLintPackages_APastBudgetRunIsALockWait",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/commitgate",
+      "test": "TestLintPackages_AToolFailureIsAnErrorWithItsOutput",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core/defectledger",
+      "test": "TestRead_AbsentUnreadableMalformed_AndWrite_GoldenBytes",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/derived",
+      "test": "TestRegen_AGitErrorFromTheLeftoverCheckIsARefusal",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/derived",
+      "test": "TestRegen_EachFailedStepIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/derived",
+      "test": "TestRegen_RefusesALeftoverConflictMarker",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/derived",
+      "test": "TestResolveGoInputs_AWorktreeWithoutAModuleIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dispatchcred",
+      "test": "TestDefault_IsUnderThePasswdHomeAndIgnoresHOME",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/dispatchcred",
+      "test": "TestDefault_TheBuildRootWinsAndALookupFailureIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dispatchcred",
+      "test": "TestStore_ARandomSourceFailureLeavesNoCredential",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dispatchcred",
+      "test": "TestStore_EnsureFailsLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dispatchcred",
+      "test": "TestStore_HoldRefusesACredentialThatItCannotCreate",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestActivate_RejectsSymlinkedHostDirectory",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestActivationForCycle_RefusesEveryMarkerShapeThatIsNotAHostRecord",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestArchivePredicatePackage_EachBlockedStepFailsWithoutMovingThePackage",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestArchivePredicatePackage_RefusesASymlinkedSource",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestArchiveSupersededPredicatePackages_ASameDayCollisionFailsLoudlyAndMovesNothing",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestArchiveSupersededPredicatePackages_EveryFailureIsReturned",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestArchiveUnpublishedContinuationRecords_EachRefusalIsALoudError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestChangedSince_GitFailuresAreWrappedWithTheirOutput",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestChangedSince_RejectsAMissingOrNonCommitBase",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestCheckBuildV1_EachPrerequisiteFailureIsAFaultNotAContentFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestCheckNotApplicable_OnlyAWellFormedDeclarationBecomesAManifest",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestCheckResolved_DispatchesOnTheContractVersion",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestCrossCheckActivation_AnUnsealedHostBindsNoWorktreeAndNoBase",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestCrossCheckActivation_Matrix",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestCurrentDiffState_RacesAndResolutionFailuresAreErrors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestCurrentDiffState_RefusesWhatItCannotDigestSafely",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestDiffSHA256_RejectsOversizeUntrackedContent",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestExistsAtBase_InvalidPathOrBaseIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestIsAncestor_GitFailuresAreErrorsNotAnswers",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestLineageHolds_ANonAncestorOrUnknownAuthoredCommitNeverHolds",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestLineageHolds_PeerDiffFailureIsAWrappedError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestNonMaterialDiff_ARecordAddedAfterTheCheckDoesNotVerify",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestReadRegularWithinOps_EveryGuardRefusesWithItsOwnMessage",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestReadRegularWithin_AFileReachedThroughADirectorySymlinkEscapesTheRoot",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestReadRegularWithin_AFileReachedThroughADirectorySymlinkEscapesTheRoot",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestReadRegularWithin_AnUnreadableRegularFileFailsTheNoFollowOpen",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestRecoverRebaseSplit_RefusesEverySplitItCannotProve",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestRefreshResult_AMissingDocumentIsExplanationContent",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestRefreshResult_AnOversizedDocumentIsExplanationContent",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestRefreshResult_StaleCitationAfterPostBuildWriterIsAContentFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestRequireLandedCommit_DemandsTheProjectHeadExactly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestRevalidateResult_WithoutAnActiveCheckTheWorkspaceHandoffIsStillHeldToTheHostContract",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestValidateRequired_EveryDefectIsReportedAndOnlyAGitFaultIsAFault",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestValidateReviewedHandoff_HostDefectsStayLoud",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestVerifyLanded_APartialWorktreeAddLeavesNoVerificationDirectory",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestVerifyLanded_PlumbingFailuresAreActiveErrorsAndLeaveNoWorktree",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestVerifyLanded_RefusesALandedCommitThatIsNotHead",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestVerifyResolvedV1_AWorktreeThatIsNotARepositoryCannotDeriveTheDiff",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestVerifyResolvedV1_TheViewMustCarryTheActiveSchemaContractCycleAndBase",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestVerifyResolved_AnUnsupportedContractVersionIsAnActiveFault",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestVerify_ADiffTooLargeToDigestIsRefusedAfterTheSeal",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestVerify_AnAuthoredBaseThatIsNotAnAncestorIsRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestVerify_EachBrokenLinkOfASealedHandoffIsRefusedWithItsOwnReason",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestVerify_NotApplicableRejectsPostSealHistoryMutation",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestVerify_RejectsPostBuildTampering",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/explanationdocs",
+      "test": "TestVerify_RejectsSamePathContentMutationAfterSeal",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gateclass",
+      "test": "TestRead_ReturnsEachGitFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/guards",
+      "test": "TestGoTestTimeouts_FlagEveryDeadlineButTheSharedBudget",
+      "rule": "single-file-ast-pin"
+    },
+    {
+      "package": "internal/guidance",
+      "test": "TestParseRule_RefusesAnUnknownFieldAndNamesTheFile",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/guidance",
+      "test": "TestParseRule_RefusesEachInvalidField",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/heldproposal",
+      "test": "TestReadRecords_AnUnreadableDirectoryIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/heldproposal",
+      "test": "TestReads_AnAbsentFileIsNotFoundAndABrokenOneIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/heldproposal",
+      "test": "TestSharedRuleHasOnePredicate",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "internal/heldproposal",
+      "test": "TestWrites_RefuseAnIncompleteRecordOrApprovalAndReportAFailedWrite",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inputindex",
+      "test": "TestRead_RefusesAMissingAMalformedOrAForeignIndex",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inputindex",
+      "test": "TestRecordAccess_FailsLoudlyAndReadAccessSkipsABadLine",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/launchrecord",
+      "test": "TestList_FailsOnABadRecordOrAnUnreadableDirectory",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/launchrecord",
+      "test": "TestRead_ARecordOfAnotherRunIDFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/launchrecord",
+      "test": "TestRead_ARecordThatIsNotJSONFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/mainstop",
+      "test": "TestRead_AMissingRecordIsNoStopAndABrokenRecordIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/mainstop",
+      "test": "TestRead_RefusesARecordOfAnotherSchema",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/mainstop",
+      "test": "TestUpdate_AFailedWriteIsAnErrorAndGivesTheStopOnDisk",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/overlap",
+      "test": "TestLoadModule_FailsLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phaseintegrity",
+      "test": "TestNamePublicAPI_Repin",
+      "rule": "asserts-own-setup"
+    },
+    {
+      "package": "internal/phaseintegrity",
+      "test": "TestNamePublicAPI_RepinIfDrifted",
+      "rule": "no-assertion"
+    },
+    {
+      "package": "internal/phaseintegrity",
+      "test": "TestSource_ImplementsDigestSource",
+      "rule": "no-assertion"
+    },
+    {
+      "package": "internal/phaseintegrity",
+      "test": "TestSource_TreeSHA_RealGitWorktree",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/phases/audit/ciparitygate",
+      "test": "TestApicoverNamed_EveryExportIsNamedAndExercised",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/audit/ciparitygate",
+      "test": "TestIntegrationTier_EndToEndThroughFakes",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/phases/audit/ciparitygate",
+      "test": "TestSignals_NullObjectLiveAccessorAndStreamGolden",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/runner/verdict",
+      "test": "TestDispatch_HasExactlyTheDeclaredFields",
+      "rule": "asserts-own-setup"
+    },
+    {
+      "package": "internal/phases/runner/verdict",
+      "test": "TestJudge_SubstantiveBridgeError_FailsWithoutTheDeliverableOrTheStream",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship/landing",
+      "test": "TestPush_TheOperatorStderrStillReceivesThePushOutput",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship/shiptest",
+      "test": "TestJoinFailures_NoFailureIsNoError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship/shiptest",
+      "test": "TestNative_L_InvalidClass_Rejected",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship/shiptest",
+      "test": "TestRun_APolicyRefusalWhoseUnwoundIntentCannotBeWrittenReportsBoth",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/ship/shiptest",
+      "test": "TestShipFromWorktree_EmptyCycleBranch_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestAgentRule_UnmarshalJSONRefusesAScalarOrAMalformedArray",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestAttemptPostmortemPolicy_RefusesAnUnknownKeyAndANonPositiveCap",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestAuditFixConfig_ReadsItsOwnStrictStage",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestCIWatchPolicy_KnobsFromPolicyJSON",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestCLIRoutingTiers_RefuseAnUnknownFieldAndNull",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestCheckpointPolicy_UnmarshalJSONRefusesANonPositiveRetention",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestCheckpointPolicy_UnmarshalJSONRefusesAnUnknownKey",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestCodeIndexConfig_RefusesWhatCannotRun",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestCodeIndexPolicy_DecodesStrictly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestContinuationConfig_RefusesAnAgeOutOfRangeOrAnUnknownKeyByName",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestConvergenceConfig_ValidateRefusesAnUnresolvedConfigUnderItsKey",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestConvergencePolicy_AnOutOfRangeNumberIsRefusedUnderItsKey",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestConvergencePolicy_AnUnknownKeyIsRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestDocsFloorPolicy_DecodesStrictly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestExpectedSignalParse_RejectsBadValues",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestFleetIntegrationStage_DefaultsShadowAndRejectsUnknownWords",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestHandoffPolicy_AnUnknownKeyInsideAPairRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestHandoffPolicy_AnUnknownPairErrorNamesThePairAndTheKnownOnes",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestHandoffPolicy_InvalidStageRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestHandoffPolicy_UnknownPairRefusedAtDecode",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestHealingLiveReactionPolicy_RefusesAStageOutsideTheRange",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestHeldProposalsPolicy_UnmarshalJSONRefusesAnUnknownKeyAndABadStage",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestHeldProposalsStageFor_ABadPolicyFailsClosedToEnforce",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestInboxCuratorPolicy_RefusesAnInvalidValueNamingTheBlock",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestInboxTrailerStage_RefusesAStageThatIsNotShadowOrEnforce",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestLoad_ANullCLIRoutingBlockOrAgentRuleIsRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestLoad_AnUnknownFieldFailsTheLoadAndNamesTheFile",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestLoad_CLIRoutingRejectsAnUnknownKey",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestLoad_CLIRoutingRejectsAnUnknownKeyInsideAnAgentRule",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestLoad_InboxPriorityRefusesAFactorsBlockNamingNeitherFreshnessNorAge",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestLoad_InboxPriorityRefusesAFactorsBlockThatOmitsAFactor",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestLoad_InboxPriorityRefusesAnInvalidValue",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestLoad_InboxPriorityRefusesAnUnknownKey",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestLoad_KeysOutsideTheCLIRoutingBlockAreStrictToo",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestLoad_ReadErrorNotMissing",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestLoad_RefusesAnEmptyModelInTierPins",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestLoad_RefusesAnUnknownEffortLevelWrittenByHand",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestLoad_RefusesAnUnknownTierInTierPins",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestLogCompressionConfig_AnAbsentBlockIsRefusedWithoutADefault",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestLogCompressionConfig_EachInvalidValueIsRefusedByName",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestLogCompressionConfig_EachRequiredNumberIsRefusedWhenMissing",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestLogCompressionPolicy_AnUnknownKeyIsRefusedByTheDecoder",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestMustRoutingDefaults_AMalformedDataFileStopsTheBinary",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestPREarlyBoundaryAfter_DefaultsToOneHourAndRefusesANonPositiveBound",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestPRMergeMethod_DefaultsAndRejects",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestPRMergeWindowStage_DefaultsOffUntilTheOperatorEnablesIt",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestParse_EachCycleSpendKeyRefusesAValueOutsideItsRange",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestParse_RefusesABadFileCellsKey",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestParse_RefusesABadOrchestratorBlock",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestParse_RefusesAContextBlockThatNoReaderCanApply",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestParse_RefusesADispatchRequestsBlockThatNoReaderCanApply",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestParse_RefusesAWindowStartAboveTheFleetCount",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestParse_RefusesAnInboxRequestsBlockThatNoReaderCanApply",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestParse_RefusesAnUnknownAdmissionStage",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestParse_TheBuilderSelfCheckRefusesAnUnknownStageOrKey",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestParse_TheSupersedeBlockRefusesAnUnknownStageOrKey",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestPatchBlocks_AMalformedFileIsNeverClobbered",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestPatchBlocks_EncodingFailuresAreNamedAndNeverClobber",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestPolicyParse_AValueOfTheWrongShapeFailsInItsOwnDecoderNotAsAnUnknownKey",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestPolicyParse_MatchesTheKeyCaseExactly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestPolicyParse_NamesTheFullPathOfANestedUnknownKey",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestPolicyParse_RefusesABadHealingDetectorBlock",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestPolicyParse_RefusesABadHealingOrchestratorBlock",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestPolicyParse_RefusesABadHealingValidatorBlock",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestPolicyParse_RefusesANearMissOfAMetadataKeyAndANestedMetadataKey",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestPolicyParse_RefusesAnUnknownKey",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestPolicyParse_TheUnknownKeyErrorSaysWhatToDo",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestPracticeWatchConfig_RefusesATimeoutOverTheCap",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestPracticeWatchConfig_RefusesWhatCannotRun",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestPracticeWatchPolicy_DecodesStrictlyAtTheBlockAndAtEverySource",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestQualityIndexThresholdsFor_ReadsTheProjectPolicyAndNeverSwallowsALoadError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestQualityPolicy_StrictDecodeRefusesEachMistake",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestRegressionTIAPolicy_TheBlockIsStrictDecoded",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestResumeConfig_UnmarshalJSONRefusesAnUnknownKeyAndANonPositiveAge",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestRetryLadderConfig_AuditFixBoundsHaveDefaultsAndOverrides",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestRetryLadderPolicy_RefusesABadValue",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestSandboxPolicy_SandboxModeIsAutoOrOnAndNeverOff",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestTierRule_AChainWithANonStringIsRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestTierRule_AShareWithoutAChainDoesNotMarshal",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/policy",
+      "test": "TestValidateEffort_AcceptsTheLevelsAndRefusesTheRest",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/proctree",
+      "test": "TestExecCwdLister_FindsThisTestProcess",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/proctree",
+      "test": "TestLoadTree_ACorruptTreeIsADecodeError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/proctree",
+      "test": "TestLoadTree_ATreeOfAnotherDispatchIsRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/proctree",
+      "test": "TestLoadTree_AnUnreadableTreeIsAReadError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/proctree",
+      "test": "TestNewLister_APSExitNamesTheCodeAndTheStderr",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/proctree",
+      "test": "TestNewLister_AnUnrunnablePSIsAnErrorThatNamesPS",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/proctree",
+      "test": "TestRemoveTree_AnUnremovableTreeIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/proctree",
+      "test": "TestSaveTree_ACreateFailureIsAWriteErrorAndLeavesNoTree",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/proctree",
+      "test": "TestSaveTree_ADirUnderAFileIsAMakeDirError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/proctree",
+      "test": "TestSaveTree_AStartTimeJSONCannotHoldIsAnEncodeErrorAndWritesNothing",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/proctree",
+      "test": "TestWriteTemp_AFailedWriteRemovesTheTempFile",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/rawgitratchet",
+      "test": "TestBoundTestFiles_NoTestFilesIsAnErrorNotAnEmptyPass",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/rawgitratchet",
+      "test": "TestBoundTestFiles_OutsideGitBindsEveryFile",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/rawgitratchet",
+      "test": "TestCheck_TheBaselineIsACeiling",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/rawgitratchet",
+      "test": "TestLoadBaseline_ReadsCountsAndRejectsBadLists",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/rawgitratchet",
+      "test": "TestOnDiskTestFiles_WalkFailuresAreWrappedWithTheRoot",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/rawgitratchet",
+      "test": "TestScan_BindsFilesSitesAndBaselineFromOneRoot",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/rawgitratchet",
+      "test": "TestScan_StageFailuresReturnTheNoteAndTheCause",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/rawgitratchet",
+      "test": "TestSites_UnparsableFileFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/rawgitratchet",
+      "test": "TestTightenModule_EachStageFailureIsReturned",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/reportdoc",
+      "test": "TestFields_EvidenceIsListValued_Cycle1604",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/reportdoc",
+      "test": "TestFields_RejectsDuplicateRecognizedField",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/reportdoc",
+      "test": "TestFields_SingleValuedKeysStillRejectDuplicates",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/reportdoc",
+      "test": "TestReadBaseReference_RefusesWhatTheBaseCannotVouchFor",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/reportdoc",
+      "test": "TestReadCurrentReference_ConcurrentChangesAreRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/reportdoc",
+      "test": "TestReadCurrentReference_RefusesUnsafeOrUnreadableTargets",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/reportdoc",
+      "test": "TestReasonedReview_AbsenceIsNeverLaxerThanThinness",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/reportdoc",
+      "test": "TestReasonedReview_GarbledBoilerplateWithoutEvidenceFailsTheFloor",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/reportdoc",
+      "test": "TestRequirePathLineEvidenceAt_AcceptsDeletedPathLineFromBase",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/reportdoc",
+      "test": "TestRequireReasoning_TokenEvidenceFailsAProseSentencePasses",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/reportdoc",
+      "test": "TestSection_RejectsDuplicateVisibleHeading",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/selfheal",
+      "test": "TestAppendDecisions_Faults",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/selfheal",
+      "test": "TestLoadIncidents_ACorruptRecordFailsLoudlyWithItsPath",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/selfheal",
+      "test": "TestLoadIncidents_TwoRecordsOfOneFingerprintFailLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/selfheal",
+      "test": "TestLoadLandings_ReadsTheLoopLandingsOfTheWindow",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/selfheal",
+      "test": "TestLoadShipped_AMalformedLineOrAnUnreadableJournalFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/selfheal",
+      "test": "TestStopBound_AnIncidentThatCannotBeWrittenLeavesTheStopForTheNextCheck",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/selfheal",
+      "test": "TestStopHold_AdmitsOnlyABatchThatTurnsAKeyOfTheStopGreen",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/selfheal",
+      "test": "TestStopHold_AdmitsOnlyABatchThatTurnsAKeyOfTheStopGreen",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "internal/selfheal",
+      "test": "TestStopHold_TheHoldNamesTheCommitOfTheStopWhenMainMovedOn",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/selfheal",
+      "test": "TestStopHold_TheRefusalNamesTheLandingTheKeysAndTheRemedy",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/sizeratchet",
+      "test": "TestCheck_OnlyGrowthOrANewOffenderFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/sizeratchet",
+      "test": "TestEncode_CarriesTheEncodersError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/sizeratchet",
+      "test": "TestFuncKey_NamesReceiversByTheirBaseType",
+      "rule": "single-file-ast-pin"
+    },
+    {
+      "package": "internal/sizeratchet",
+      "test": "TestParseOffenders_NamesTheListInEachRefusal",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/sizeratchet",
+      "test": "TestReadSpans_ReadsEachMeasuredPathAndSkipsOneAbsentOnThatSide",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/sizeratchet",
+      "test": "TestScan_MissingWalkRootAndMissingOffenderListAreErrors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/sizeratchet",
+      "test": "TestScan_RunsWalkOffendersAndCheckFromOneRoot",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/sizeratchet",
+      "test": "TestTightenModule_CarriesTheWalkListAndEncoderFailures",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/sizeratchet",
+      "test": "TestWalk_ErrorsNameTheRootAndTheCause",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent/subagentrun",
+      "test": "TestDispatch_StepOrderIsAdmitResolvePrepareStageExecVerifyRecord",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent/subagentrun",
+      "test": "TestLedger_EveryOpFailureIsBareTextWithTheOpInFields",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent/subagentrun",
+      "test": "TestMintToken_LengthRandErrPartialReadAndOverride",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent/subagentrun",
+      "test": "TestPrepare_MkdirErrorIsPrepareFailed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent/subagentrun",
+      "test": "TestPrepare_PromptReadError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent/subagentrun",
+      "test": "TestRecord_ExecErrorWritesTheLedgerThenReturnsWithOneOutcomeSignal",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent/subagentrun",
+      "test": "TestRecord_LedgerWriteErrorMasksExecErrorAndNamesTheOp",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent/subagentrun",
+      "test": "TestResolve_CapabilityDirDefaultsAndInspectError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent/subagentrun",
+      "test": "TestResolve_ProfileErrorKeepsTextAndCarriesCause",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent/subagentrun",
+      "test": "TestResolve_TierRequestProjectionAndError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent/subagentrun",
+      "test": "TestResolve_UnresolvedCLIAndDriverMissingKeepTheirTexts",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent/subagentrun",
+      "test": "TestStage_TempfileFailuresNameTheOpAndTheDefaultStagerCleansUp",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/subagent/subagentrun",
+      "test": "TestTipChainLink_EveryMalformedTipShapeFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/testdup",
+      "test": "TestAPICover_NamesEveryExportedSymbol",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/testdup",
+      "test": "TestCheck_FailsWhenTheBaselineIsAboveTheCountSoALoweredCountLowersIt",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/testdup",
+      "test": "TestCheck_FailsWhenTheCopiesAreAboveTheBaseline",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/triagedecision",
+      "test": "TestApplyRoutes_FailsLoudOnAnUnreadableDecision",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/triagedecision",
+      "test": "TestApplyRoutes_ThePlanSeesWhatTheEditFoundAndCanRefuse",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/triagedecision",
+      "test": "TestDeriveRouted_ABulletWithNoSlugIDIsNotAnEmptyCommitment",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/triagedecision",
+      "test": "TestDerive_AnUnreadableDroppedSectionFailsTheStrictReadingButNotTheLenientOne",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/triagedecision",
+      "test": "TestDerive_DeclinesWhenAPinnedItemIsNotCommitted",
+      "rule": "error-text-match"
+    }
+  ]
+}

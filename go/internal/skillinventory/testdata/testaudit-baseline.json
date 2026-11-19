@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/skillinventory",
+      "test": "TestBuild_OutputPathIsDir_WriteError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/skillinventory",
+      "test": "TestBuild_SkillsPathIsFile_ScanError",
+      "rule": "error-text-match"
+    }
+  ]
+}

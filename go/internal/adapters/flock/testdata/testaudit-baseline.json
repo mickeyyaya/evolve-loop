@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/adapters/flock",
+      "test": "TestLockWithin_ReturnsAtTheDeadlineWhileAnotherHolderKeepsTheLock",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/adapters/flock",
+      "test": "TestTryLock_AParentThatIsAFileFailsAtTheMkdir",
+      "rule": "error-text-match"
+    }
+  ]
+}

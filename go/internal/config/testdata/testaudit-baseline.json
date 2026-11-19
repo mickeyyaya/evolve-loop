@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/config",
+      "test": "TestLoadDomain_ReadErrorOtherThanAbsenceIsReturned",
+      "rule": "error-text-match"
+    }
+  ]
+}

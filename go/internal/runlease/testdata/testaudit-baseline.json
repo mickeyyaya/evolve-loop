@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/runlease",
+      "test": "TestPIDAlive_OwnProcessAliveExitedProcessDeadNonPositiveNeverProbed",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

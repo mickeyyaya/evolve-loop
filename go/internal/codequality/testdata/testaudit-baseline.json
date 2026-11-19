@@ -1,0 +1,24 @@
+{
+  "rows": [
+    {
+      "package": "internal/codequality",
+      "test": "TestFormatGoFiles_ACleanListingNeverInvokesTheRewrite",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/codequality",
+      "test": "TestFormatGoFiles_GofmtVanishingBeforeTheRewriteIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/codequality",
+      "test": "TestFormatGoFiles_GofmtVanishingBeforeTheRewriteIsAnError",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/codequality",
+      "test": "TestUnformattedGoFiles_AnUnreadableFileIsAnErrorNotAnOffender",
+      "rule": "error-text-match"
+    }
+  ]
+}

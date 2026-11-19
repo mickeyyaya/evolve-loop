@@ -1,0 +1,134 @@
+{
+  "rows": [
+    {
+      "package": "internal/ciwatch",
+      "test": "TestFileBaseRedItems_ARefusedItemDoesNotStopTheOthers",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestFileBaseRedItems_AnUnreadableOrUnwritableInboxIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestFileBaseRedItems_AnUnreadableProcessingDirIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestFileBaseRedItems_MarshalFailureReturnsError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestFileEscalation_FailingDependenciesReturnWrappedErrors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestGHClassifySourceBackfillF1_EachPullRequestStepFailureIsReturnedWithThePartialChange",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestGHClassifySourceBackfillF1_GhErrorsCarryTheStderrOfAFailedProcess",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestGHClassifySourceBackfillF1_GhJSONRejectsAReplyThatIsNotJSONAndPropagatesGhFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestGHClassifySourceBackfillF1_LatestRunOnAndListRunsFailuresStayQueuedOrPropagate",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestGHClassifySourceBackfillF1_MainBaseHandlesCommitsAlreadyOnMain",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestGHClassifySourceBackfillF1_RerunFailed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestGHClassifySourceBackfillF1_ResolveFailuresAndUnknownKinds",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestLatestRequiredRunOnBranch_NamesTheFailingJobsOfTheBranchRun",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestLatestRunBackfillF1_ReplyHandling",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestNewGHClassifySource_ResolvesARunAgainstItsFirstParent",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestResolveCommitAndPRHead",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestWatchBackfillF1_AVerdictThatCannotBeRecordedStopsBeforeEscalating",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestWatchBackfillF1_AnEscalationThatCannotBeFiledReturnsTheRecordAndTheError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestWatchBackfillF1_RefusesIncompleteOptionsBeforeFetching",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestWatch_NeverSleepsPastTheDeadline",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestWatch_NonTimeoutFetchErrorIsWrappedNotATimeout",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestWatch_TimesOutWhenFetchHangs",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestWatch_TimesOutWhenFetchHangsAfterInProgress",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestWithFailures_ANoTempDirIsReported",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestWithFailures_AnUnreadableArtifactIsReported",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/ciwatch",
+      "test": "TestWithFailures_ArtifactFailuresPropagate",
+      "rule": "error-text-match"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/llmcalls",
+      "test": "TestImportProcessHelper",
+      "rule": "sleep-sync"
+    }
+  ]
+}

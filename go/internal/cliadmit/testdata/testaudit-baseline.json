@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/cliadmit",
+      "test": "TestAcquireAmplify_MaxTwoThirdBlocking",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/cliadmit",
+      "test": "TestAcquire_MutualExclusion",
+      "rule": "sleep-sync"
+    }
+  ]
+}

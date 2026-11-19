@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/bridge/clicontrol",
+      "test": "TestQueryUsage_ANilControllerIsAnErrorThatKeepsTheFamily",
+      "rule": "error-text-match"
+    }
+  ]
+}

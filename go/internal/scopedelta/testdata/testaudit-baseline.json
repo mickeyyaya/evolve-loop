@@ -1,0 +1,24 @@
+{
+  "rows": [
+    {
+      "package": "internal/scopedelta",
+      "test": "TestAccount_AnInScopeClaimTheScopeDoesNotNameIsInvalid",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/scopedelta",
+      "test": "TestAccount_ErrorsNameTheOffendingPath",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/scopedelta",
+      "test": "TestAccount_ProtectedPathIsBoundaryWhateverTheLabel",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/scopedelta",
+      "test": "TestAdmissible_FailsWithoutNeedsTheCommandThatWasRun",
+      "rule": "error-text-match"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "rows": [
+    {
+      "package": "internal/phasestream",
+      "test": "TestGroupKiller_NegatesPgidForSender",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phasestream",
+      "test": "TestProduce_StatNonNotExistError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phasestream",
+      "test": "TestWriteEnvelope_MarshalErrorPropagates",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phasestream",
+      "test": "TestWriteEventsFile_InnerWriteErrorCleansTemp",
+      "rule": "error-text-match"
+    }
+  ]
+}

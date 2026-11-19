@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/posteditvalidate",
+      "test": "TestDefaultValidatePy_FallsBackToPython2Name",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/posteditvalidate",
+      "test": "TestDefaultValidatePy_FallsBackToPython2Name",
+      "rule": "unverified-fake"
+    }
+  ]
+}

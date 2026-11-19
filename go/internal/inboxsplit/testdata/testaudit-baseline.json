@@ -1,0 +1,34 @@
+{
+  "rows": [
+    {
+      "package": "internal/inboxsplit",
+      "test": "TestAccept_ARollbackThatFailsIsReportedWithTheCause",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxsplit",
+      "test": "TestAccept_FilesBothPartsRoutesTheLanePartThenRetiresTheOriginal",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "internal/inboxsplit",
+      "test": "TestInboxSplit_AnItemWhoseConsolePartWouldHaveNoCriterionGetsNoSplit",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxsplit",
+      "test": "TestInboxSplit_AnItemWhoseLanePartWouldHaveNoCriterionGetsNoSplit",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxsplit",
+      "test": "TestInboxSplit_AnItemWhoseTextNamesAConsoleFileByItsBasenameGetsNoSplit",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxsplit",
+      "test": "TestInboxSplit_AnItemWhoseTextNamesAProtectedPathGetsNoSplit",
+      "rule": "error-text-match"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/coherence",
+      "test": "TestCrossArtifactInvariants_EscapingReferencedPathIsViolatedNotResolved",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

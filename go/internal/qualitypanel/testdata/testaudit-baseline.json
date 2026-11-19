@@ -1,0 +1,19 @@
+{
+  "rows": [
+    {
+      "package": "internal/qualitypanel",
+      "test": "TestAmpRevertSensitivity_ARunnerErrorIsWrappedAndKeepsTheCause",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/qualitypanel",
+      "test": "TestRevertSensitivity_ARunnerErrorFailsTheMeasurementLoudly",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/qualitypanel",
+      "test": "TestRevertSensitivity_AnOutcomeOutsideTheThreeKnownOnesIsAnError",
+      "rule": "error-text-match"
+    }
+  ]
+}

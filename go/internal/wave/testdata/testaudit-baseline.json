@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/wave",
+      "test": "TestReadRunRange_ADeniedRunsDirectoryReachesTheFailuresEvenWhenAFileUnderItIsNamed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/wave",
+      "test": "TestShipsIn_ABrokenShipSourceIsAFailureAndNotAMissingShip",
+      "rule": "error-text-match"
+    }
+  ]
+}

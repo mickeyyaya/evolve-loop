@@ -1,0 +1,274 @@
+{
+  "rows": [
+    {
+      "package": "internal/gc",
+      "test": "TestAddTarEntryBackfillF1",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestAddTarEntryBackfillF1",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApplyBackfillF1_ADeleteThatTheFilesystemRefusesIsReportedAndTheRestStillRuns",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApplyDevWorktrees_ACheckpointSaveFailureRefusesTheArchive",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApplyDevWorktrees_ACheckpointThatCannotBeWrittenKeepsTheTree",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApplyDevWorktrees_AManifestWriteFailureStillReportsTheRecord",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApplyDevWorktrees_APathThatIsNotADevTreeIsRefusedAndKeepItemsAreIgnored",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApplyDevWorktrees_ATreeEditedWhileItsCheckpointIsSavedIsKeptNotArchived",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApplyDevWorktrees_ATreeThatBecameActiveSinceThePlanIsRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApplyDevWorktrees_ATreeWhoseHeadMovedSinceThePlanIsRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApplyDevWorktrees_AnArchiveWhoseBundleStepFailsKeepsTheTreeAndTheBranch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApplyDevWorktrees_AnUnavailableGhNeverSkipsThePullRequestRuleOnApply",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApplyDevWorktrees_DetachedTreeIsRefusedOnApplyWhenItsHeadMovedSincePlan",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApplyDevWorktrees_TheRaceCheckFailuresRefuse",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApplyWorktreesBackfillF1_AFailedPruneAfterARealRemovalIsReported",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApplyWorktreesBackfillF1_ARemovalGitRefusesIsReportedAndSkipsThePrune",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApplyWorktreesBackfillF1_AShipLockThatCannotBeTakenStopsBeforeAnyGitCall",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApplyWorktreesBackfillF1_ATargetWhoseStatusCannotBeRecheckedIsRefusedUntouched",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApplyWorktreesBackfillF1_RefusesToApplyWithoutAnExecSeam",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApplyWorktrees_AFailedSalvageKeepsTheTree",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApplyWorktrees_ASalvageTargetThatTurnedLiveIsRefusedUntouched",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApplyWorktrees_ASalvageWhoseBundleStepFailsKeepsTheTreeAndTheBranch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApplyWorktrees_ATreeThatTurnsLiveDuringItsSalvageIsKept",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApplyWorktrees_DeleteBranchOnlyItemIsRecheckedForLiveness",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApply_ARotateThatCannotMoveTheLogIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApply_ArchiveMkdirFailureReportsError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApply_ParentLeaseRefusesSubtree",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApply_RefusesCurrentWorkspaceAfterPlan",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApply_RefusesUnreadableRunState",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestApply_UnknownActionReportsError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestArchiveUntrackedBackfillF1",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestBranchSweep_ApplyKeepsTheHistoricalDeleteOfASquashLandedBranch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestCountFlags_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestDeleteBranch_RefusalsAndFailures",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestFileRepeatedFlags_ReportsFilingError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestLaneHoldsFailsOnUnreadableSources",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestListSalvage_LeaflessDirectories",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestListSalvage_ReadsEveryLeafAndNamesEachUnreadableOne",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestPlanAndApplyWorktrees_RealGit_MergedWorktreeIsSweptEndToEnd",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestPlanDevWorktrees_SetupFailuresSurface",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestPlanWorktreesBackfillF1_EachGitStepFailureAbortsThePlanWithThatStep",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestPlanWorktreesBackfillF1_RefusesToPlanWithoutAnExecSeam",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestPlanWorktreesFailsWhenALaneHoldSourceIsUnreadable",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestPlan_RequiresAbsoluteEvolveDir",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestReadDevArchive_AMissingManifestIsEmptyAndABadLineNamesItsNumber",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestReadSalvageLeafBackfillF1_EachUnreadablePartFailsTheLeafWithItsOwnReason",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestRemoteSweepApply_ADeleteFailureIsReportedAndLaterItemsStillRun",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestRemoteSweepApply_EachFailureKeepsTheBranchAndNamesIt",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestRemoteSweepGh_PullRequestsFailureModes",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestRemoteSweepGh_RulesetProtectsWhenTheRuleListIsNotEmpty",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestRotateItem_AMissingLogIsARenameError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestSalvageBundleVerified_EachStepFailureNamesItsCause",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestSalvageWorktreeBackfillF1_EachStepFailureAbortsWithItsOwnReason",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gc",
+      "test": "TestScanWorktrees_StatusFailureAbortsTheWholeScan",
+      "rule": "error-text-match"
+    }
+  ]
+}

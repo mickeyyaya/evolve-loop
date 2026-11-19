@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/phaseconfig",
+      "test": "TestLoad_MalformedJSONIsError",
+      "rule": "error-text-match"
+    }
+  ]
+}

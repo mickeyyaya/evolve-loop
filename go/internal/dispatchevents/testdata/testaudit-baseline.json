@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/dispatchevents",
+      "test": "TestEmit_MarshalError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dispatchevents",
+      "test": "TestEmit_WriteError",
+      "rule": "error-text-match"
+    }
+  ]
+}

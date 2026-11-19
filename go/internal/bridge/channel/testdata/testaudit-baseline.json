@@ -1,0 +1,39 @@
+{
+  "rows": [
+    {
+      "package": "internal/bridge/channel",
+      "test": "TestProducer_ExplicitSourcePaths",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/bridge/channel",
+      "test": "TestProducer_NoWarnWhenSourceExists",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/bridge/channel",
+      "test": "TestProducer_RunWritesFeed",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/bridge/channel",
+      "test": "TestProducer_WarnsWhenSourceNeverAppears",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/bridge/channel",
+      "test": "TestProducer_WritesContentAndCorrelation",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/bridge/channel",
+      "test": "TestSupervisor_Ask_ReturnsAnswerSpan",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/bridge/channel",
+      "test": "TestSupervisor_Ask_SpanWithInt64Seq",
+      "rule": "sleep-sync"
+    }
+  ]
+}

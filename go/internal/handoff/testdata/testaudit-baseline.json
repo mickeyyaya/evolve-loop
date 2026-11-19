@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/handoff",
+      "test": "TestValidate_RefusalTable",
+      "rule": "error-text-match"
+    }
+  ]
+}

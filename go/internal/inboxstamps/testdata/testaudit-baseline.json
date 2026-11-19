@@ -1,0 +1,59 @@
+{
+  "rows": [
+    {
+      "package": "internal/inboxstamps",
+      "test": "TestClassifyAndPlan_NameTheGitCommandThatFailed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxstamps",
+      "test": "TestClassify_ACaptureErrorIsReported",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxstamps",
+      "test": "TestClassify_AHeadItemItCannotReadFailsTheClassification",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxstamps",
+      "test": "TestClassify_NamesTheRevParseAndTheShowFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxstamps",
+      "test": "TestCommitMoves_NamesTheGitCommandThatFailed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxstamps",
+      "test": "TestHoldKept_WrapsASinkRefusal",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxstamps",
+      "test": "TestPlanAgainst_AFailingRemoteDiffEndsThePlanBeforeTheMergeBase",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxstamps",
+      "test": "TestPlanAgainst_AMalformedOriginCopyIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxstamps",
+      "test": "TestPlan_RestoreAppliesEveryStampAndNamesEachItCouldNot",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxstamps",
+      "test": "TestQuarantineMove_NamesAHeadItemItCannotReadAndIgnoresAMissingOne",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/inboxstamps",
+      "test": "TestRemoteSideItemAt_ReadsTheRemoteCopyThenTheMergeBaseCopy",
+      "rule": "error-text-match"
+    }
+  ]
+}

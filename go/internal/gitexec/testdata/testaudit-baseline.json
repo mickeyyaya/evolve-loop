@@ -1,0 +1,29 @@
+{
+  "rows": [
+    {
+      "package": "internal/gitexec",
+      "test": "TestClassifyHead_EachFailingGitStepIsReportedWithItsCommand",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gitexec",
+      "test": "TestDirtyPaths_RunnerFailureIsWrapped",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gitexec",
+      "test": "TestPatchApplied_EachFailingGitStepIsReportedAndExitCodesMapToTheAnswer",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gitexec",
+      "test": "TestPatchApplied_UnusableTempDirIsReported",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gitexec",
+      "test": "TestTreeOfIndexCopy_ScratchAndIndexCopyFailuresStopBeforeAnyGitWrite",
+      "rule": "error-text-match"
+    }
+  ]
+}

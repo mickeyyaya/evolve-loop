@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/fakecontract",
+      "test": "TestAPICover_NamesEveryExportedSymbol",
+      "rule": "literal-field-count"
+    }
+  ]
+}

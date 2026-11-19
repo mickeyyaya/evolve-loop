@@ -1,0 +1,64 @@
+{
+  "rows": [
+    {
+      "package": "internal/phases/runner",
+      "test": "TestDispatchPhaseAttempts_AWalkThatLaunchesNothingIsALoudSystemFail",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/runner",
+      "test": "TestResolveRouting_AdvisorOverlayPreservesFamilyTransport",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "internal/phases/runner",
+      "test": "TestRun_ARetakenSnapshotNamesTheFirstFailure",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/phases/runner",
+      "test": "TestRun_ARunnerWithoutABridgeFailsBeforeAnyDispatchWithAnEmptyResponse",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/runner",
+      "test": "TestRun_AWallThenARealFailureSurfacesTheFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/runner",
+      "test": "TestRun_AgentLoadFails_ReturnsError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/runner",
+      "test": "TestRun_AnExhaustedWalkThatMetAWallSurfacesTheWall",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/runner",
+      "test": "TestRun_AnUndeliveredPromptIsNoWallThatTheWalkSurfaces",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/runner",
+      "test": "TestRun_ChainExhausted_LastErrorSurfaces",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/runner",
+      "test": "TestRun_MissingDeps_ReturnsErrors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/runner",
+      "test": "TestRun_TheErrorCarriesTheCauseOfTheLastAttempt",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/runner",
+      "test": "TestRunnerMissingProfileDiagnostic",
+      "rule": "error-text-match"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "rows": [
+    {
+      "package": "internal/versionbump",
+      "test": "TestBumpJSONVersion_InvalidJSON",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/versionbump",
+      "test": "TestBumpReadmeCurrent_ReadErrorNonNotExist",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/versionbump",
+      "test": "TestBumpReadmeHistory_ReadErrorNonNotExist",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/versionbump",
+      "test": "TestBumpSkillHeading_ReadErrorNonNotExist",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/versionbump",
+      "test": "TestRun_BadSemverErrors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/versionbump",
+      "test": "TestRun_PropagatesBumpErrors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/versionbump",
+      "test": "TestRun_UnstatableCodexMirrorStopsTheBumpLoudly",
+      "rule": "error-text-match"
+    }
+  ]
+}

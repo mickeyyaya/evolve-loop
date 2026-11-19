@@ -1,0 +1,29 @@
+{
+  "rows": [
+    {
+      "package": "internal/researchindex",
+      "test": "TestCheck_AHandEditInsideTheRegionIsStale",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/researchindex",
+      "test": "TestCheck_NamesAnEntryWithNoIndexLineAndPassesAfterGenerate",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/researchindex",
+      "test": "TestEntries_ABadGlobPatternIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/researchindex",
+      "test": "TestEntries_AnUnreadableEntryIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/researchindex",
+      "test": "TestEntries_RefusesAnEntryWithNoHeadingAndAnUnreadableTree",
+      "rule": "error-text-match"
+    }
+  ]
+}

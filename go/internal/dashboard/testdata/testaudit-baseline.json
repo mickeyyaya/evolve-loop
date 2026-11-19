@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/dashboard",
+      "test": "TestListArtifacts_ListsOnlyRegularAllowedFilesSorted",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/dashboard",
+      "test": "TestReadArtifact_RejectsSymlink",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

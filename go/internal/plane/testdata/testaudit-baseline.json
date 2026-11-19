@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/plane",
+      "test": "TestResolveHub_ALinkedWorktreeWhoseGitDirHasNoCommondirIsRefusedWithTheCause",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/plane",
+      "test": "TestResolveHub_RefusesAPrimaryCheckoutAndANonRepository",
+      "rule": "error-text-match"
+    }
+  ]
+}

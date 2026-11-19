@@ -1,0 +1,54 @@
+{
+  "rows": [
+    {
+      "package": "internal/looppreflight",
+      "test": "TestCLIVersion_ANonZeroExitIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/looppreflight",
+      "test": "TestCLIVersion_ReadsTheFirstVersionToken",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/looppreflight",
+      "test": "TestCompileRouting_ToleratesOnlyAMissingProfilesDirectory",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/looppreflight",
+      "test": "TestDefaultLatestRelease_RefusesABinaryWithNoReleaseSource",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/looppreflight",
+      "test": "TestDefaultPinnedLister_FailuresAreAmbiguityErrors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/looppreflight",
+      "test": "TestDefaultSelfUpdateEvidence_UnreadableClaudeSettingsAreAmbiguityNotAbsence",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/looppreflight",
+      "test": "TestDefaultSelfUpdateEvidence_UnresolvableHomeIsAmbiguityForRegisteredUpdaters",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/looppreflight",
+      "test": "TestIntegration_BridgeBoot_ClaudeTmux",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/looppreflight",
+      "test": "TestLatestReleaseFromRegistry_RefusesWhatTheRegistryCannotAnswer",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/looppreflight",
+      "test": "TestManifestMCPConfigSources_MergesTheFilesOfOneBinaryAndReportsALoadError",
+      "rule": "error-text-match"
+    }
+  ]
+}

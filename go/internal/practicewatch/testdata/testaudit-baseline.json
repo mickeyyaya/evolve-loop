@@ -1,0 +1,19 @@
+{
+  "rows": [
+    {
+      "package": "internal/practicewatch",
+      "test": "TestIdFiled_ReportsAnInboxThatCannotBeWalked",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/practicewatch",
+      "test": "TestResolve_RefusesASourceThatCannotRun",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/practicewatch",
+      "test": "TestSaveSnapshot_RefusesAnIDThatIsNotAFileName",
+      "rule": "error-text-match"
+    }
+  ]
+}

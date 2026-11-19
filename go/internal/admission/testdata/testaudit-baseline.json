@@ -1,0 +1,19 @@
+{
+  "rows": [
+    {
+      "package": "internal/admission",
+      "test": "TestLoadModuleGraph_ReportsAGoListFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/admission",
+      "test": "TestLoadModuleGraph_RunsOneGoListInTheModuleDir",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "internal/admission",
+      "test": "TestNewModuleGraph_RefusesALineWithoutTheSeparator",
+      "rule": "error-text-match"
+    }
+  ]
+}

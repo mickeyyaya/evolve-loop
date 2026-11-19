@@ -1,0 +1,34 @@
+{
+  "rows": [
+    {
+      "package": "internal/llmroute",
+      "test": "TestDispatchTiered_ANoCandidatePlanFailsWithoutLaunchingAnything",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/llmroute",
+      "test": "TestDispatch_AllCandidatesFailReturnsLastError",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "internal/llmroute",
+      "test": "TestDispatch_AllDefaultTriggerCodesAdvanceChain",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "internal/llmroute",
+      "test": "TestDispatch_FallsBackOnTriggerExit",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "internal/llmroute",
+      "test": "TestDispatch_LongChainWalksEveryCandidateInOrder",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "internal/llmroute",
+      "test": "TestDispatch_SuccessOnFirstCandidate",
+      "rule": "mock-call-order"
+    }
+  ]
+}

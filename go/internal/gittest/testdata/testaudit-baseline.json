@@ -1,0 +1,34 @@
+{
+  "rows": [
+    {
+      "package": "internal/gittest",
+      "test": "TestFromTemplate_ABuilderThatStopsItsGoroutineFailsEveryLaterCaller",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gittest",
+      "test": "TestFromTemplate_BuilderErrorReachesEveryCaller",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gittest",
+      "test": "TestGitFaultValidate",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/gittest",
+      "test": "TestHolders_LsofExitStatusIsJudgedByItsOutput",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/gittest",
+      "test": "TestIsolateHostCredentials_ARealGhInATestSeesNoLogin",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/gittest",
+      "test": "TestRemoveWithRetry_OutlastsATransientHold",
+      "rule": "sleep-sync"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/panewatch",
+      "test": "TestReadAll_ReportsEveryUnreadableSnapshotAndStillReturnsTheGoodOnes",
+      "rule": "error-text-match"
+    }
+  ]
+}

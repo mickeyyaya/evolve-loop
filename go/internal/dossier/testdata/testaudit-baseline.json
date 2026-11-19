@@ -1,0 +1,104 @@
+{
+  "rows": [
+    {
+      "package": "internal/dossier",
+      "test": "TestCommitFailure_RendersTheSpawnErrorOrTheExitAndTrimmedStderr",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestCommitIntoCorpus_ACorpusThatCannotBeCreatedFailsBeforeAnyWrite",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestCommitPairGit_AFailingDiffProbeOrCommitSpawnIsReportedWithoutRetry",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestCorpusHoldsPair_EveryCombinationOfWhatTheCorpusHolds",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestListPending_AnAbsentDirIsEmptyAndAnUnlistableOneIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestMarkdownWriteWouldRender_EachRefusalAndTheRenderedMarkdown",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestPublishPending_AFailedCommitKeepsThePairPendingAndTheCorpusClean",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestPublishPending_AnUnlistablePendingDirIsReturnedAndNothingIsPublished",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestPublishPending_NeverOverwritesARecordTheCorpusAlreadyHolds",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestPublishPending_RefusesAPendingHalfThatIsNotARegularFile",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestReadPendingFile_AnUnreadableRegularFileIsAReadError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestReadPendingFile_ReadsARegularFileAndNamesTheFailureOtherwise",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestSweepOrphans_WrapsEnumerateFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestValidate_DefectAndCarryoverWellFormed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestValidate_Errors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestValidate_FailMustCarryExperience",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestValidate_FailWithCarryoverButNoDefects",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestValidate_FailWithDefectsButNoCarryover",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestWrite_EachFailingStepReturnsItsWrappedError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/dossier",
+      "test": "TestWrite_MarkdownRenderFailureStopsBeforeTheMarkdownFile",
+      "rule": "error-text-match"
+    }
+  ]
+}

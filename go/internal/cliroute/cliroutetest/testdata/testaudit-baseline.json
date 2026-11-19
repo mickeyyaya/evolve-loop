@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/cliroute/cliroutetest",
+      "test": "TestRecords_CarryThePlanOrTheError",
+      "rule": "error-text-match"
+    }
+  ]
+}

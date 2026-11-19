@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/retryladder",
+      "test": "TestParseFixSpec_NamesTheOffendingLine",
+      "rule": "error-text-match"
+    }
+  ]
+}

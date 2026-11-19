@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/phaseblock",
+      "test": "TestNamePublicAPI",
+      "rule": "error-text-match"
+    }
+  ]
+}

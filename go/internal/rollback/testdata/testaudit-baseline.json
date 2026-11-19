@@ -1,0 +1,69 @@
+{
+  "rows": [
+    {
+      "package": "internal/rollback",
+      "test": "TestAppendLedger_MkdirFailure_ReturnsError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/rollback",
+      "test": "TestDefaultDeleteRemoteTag_TagPresent_PushFails",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/rollback",
+      "test": "TestDefaultDeleteRemoteTag_TagPresent_PushSucceeds",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/rollback",
+      "test": "TestDefaultGhDeleteRelease_FakeGhFails_GenericError",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/rollback",
+      "test": "TestDefaultGhDeleteRelease_FakeGhFails_NotFoundMessage",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/rollback",
+      "test": "TestDefaultGhDeleteRelease_FakeGhSucceeds",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/rollback",
+      "test": "TestDefaultGhDeleteRelease_ViewSucceeds_DeleteFails",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/rollback",
+      "test": "TestDefaultGhDeleteRelease_ViewSucceeds_DeleteSucceeds",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/rollback",
+      "test": "TestDefaultRevertAndShip_RevertSucceeds_NoBin_LocalOnly",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/rollback",
+      "test": "TestReadJournal_MissingBranch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/rollback",
+      "test": "TestReadJournal_MissingCommitSHA",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/rollback",
+      "test": "TestReadJournal_MissingVersion",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/rollback",
+      "test": "TestRun_MissingTag",
+      "rule": "error-text-match"
+    }
+  ]
+}

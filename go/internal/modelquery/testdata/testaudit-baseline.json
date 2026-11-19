@@ -1,0 +1,44 @@
+{
+  "rows": [
+    {
+      "package": "internal/modelquery",
+      "test": "TestCLIClassifierClassify_AllObjectsFailToMap",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/modelquery",
+      "test": "TestCLIClassifierClassify_DispatcherErrorPropagates",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/modelquery",
+      "test": "TestChainClassifier_ExhaustedChainNamesEveryFailure",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/modelquery",
+      "test": "TestGuard_ClassifierHasNoDirectModelExec",
+      "rule": "single-file-ast-pin"
+    },
+    {
+      "package": "internal/modelquery",
+      "test": "TestLive_CodexStillHidesItsLadderFromHelp",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/modelquery",
+      "test": "TestLive_DiscoveredLadderReachesTheCatalog",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/modelquery",
+      "test": "TestLive_HelpEffortLadders",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/modelquery",
+      "test": "TestOllamaLister_FailureCarriesTheCommandOutput",
+      "rule": "error-text-match"
+    }
+  ]
+}

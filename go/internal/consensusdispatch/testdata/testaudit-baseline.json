@@ -1,0 +1,24 @@
+{
+  "rows": [
+    {
+      "package": "internal/consensusdispatch",
+      "test": "TestRun_AggregatorFailPropagates",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/consensusdispatch",
+      "test": "TestRun_AggregatorResolutionFailureIsRuntimeError",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/consensusdispatch",
+      "test": "TestRun_E2E_WithFakeBash",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/consensusdispatch",
+      "test": "TestRun_NoArtifactsProducedFails",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

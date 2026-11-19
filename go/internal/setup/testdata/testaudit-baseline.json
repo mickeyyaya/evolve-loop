@@ -1,0 +1,34 @@
+{
+  "rows": [
+    {
+      "package": "internal/setup",
+      "test": "TestApply_ADeclaredTableRefusesEveryPreset",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/setup",
+      "test": "TestApply_FloorBreachingPinRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/setup",
+      "test": "TestApply_MalformedExisting_Refuses",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/setup",
+      "test": "TestApply_MalformedPinsBlockRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/setup",
+      "test": "TestCompleteMkdirFails",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/setup",
+      "test": "TestComplete_EachWriteStageFailureIsNamedAndLeavesNoStateFile",
+      "rule": "error-text-match"
+    }
+  ]
+}

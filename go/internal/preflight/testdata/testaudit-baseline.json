@@ -1,0 +1,19 @@
+{
+  "rows": [
+    {
+      "package": "internal/preflight",
+      "test": "TestUnameR_FailureIsUnknown",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/preflight",
+      "test": "TestUnameR_KeepsInnerWhitespaceAndStripsOnlyTrailingNewlines",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/preflight",
+      "test": "TestUnameR_ReportsTheKernelReleaseWithoutItsNewline",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

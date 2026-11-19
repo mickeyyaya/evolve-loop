@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/phases/scout",
+      "test": "TestRun_MissingBridge_ReturnsError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/scout",
+      "test": "TestRun_MissingPrompts_ReturnsError",
+      "rule": "error-text-match"
+    }
+  ]
+}

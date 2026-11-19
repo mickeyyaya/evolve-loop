@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "cmd/evolve-fake-cli",
+      "test": "TestWriteArtifacts_UnwritableDestination_Errors",
+      "rule": "error-text-match"
+    }
+  ]
+}

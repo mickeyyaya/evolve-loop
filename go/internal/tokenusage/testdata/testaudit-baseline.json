@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/tokenusage",
+      "test": "TestSQLiteCLI_ReadsAStoreReadOnly",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

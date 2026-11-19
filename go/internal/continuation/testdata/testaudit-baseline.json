@@ -1,0 +1,24 @@
+{
+  "rows": [
+    {
+      "package": "internal/continuation",
+      "test": "TestAppendReleased",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/continuation",
+      "test": "TestReadManifest_AnUnreadableManifestIsAnErrorNotAFreshStart",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/continuation",
+      "test": "TestRedactHostPaths",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/continuation",
+      "test": "TestRequireOperatorAuthority",
+      "rule": "error-text-match"
+    }
+  ]
+}

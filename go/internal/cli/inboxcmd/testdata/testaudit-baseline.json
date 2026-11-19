@@ -1,0 +1,19 @@
+{
+  "rows": [
+    {
+      "package": "internal/cli/inboxcmd",
+      "test": "TestAckItemFingerprint_ReportsEachUnreadableStageAndIsIdempotent",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cli/inboxcmd",
+      "test": "TestReadInboxItemObject_Table",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cli/inboxcmd",
+      "test": "TestWriteConsumedStamp_FailuresAreReturned",
+      "rule": "error-text-match"
+    }
+  ]
+}

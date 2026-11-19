@@ -1,0 +1,39 @@
+{
+  "rows": [
+    {
+      "package": "internal/phasecontract",
+      "test": "TestFlowDecision_ClearRemovesTheFileAndFailsClosed",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phasecontract",
+      "test": "TestFlowDecision_ReadRejectsAFileThatFailsTheSchema",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phasecontract",
+      "test": "TestFlowDecision_ValidateRejectsAnUnknownFieldAndAMissingField",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phasecontract",
+      "test": "TestFlowDecision_ValidateRejectsProseAndTheWrongShape",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phasecontract",
+      "test": "TestParseDiagnosis_EachEvidenceIDMustExistInTheIndex",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phasecontract",
+      "test": "TestParseDiagnosis_Refusals",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phasecontract",
+      "test": "TestParseDiagnosis_RefusesAnActionOutsideTheCatalog",
+      "rule": "error-text-match"
+    }
+  ]
+}

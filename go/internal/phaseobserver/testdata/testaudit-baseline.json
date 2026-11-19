@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/phaseobserver",
+      "test": "TestObserverEngine_OneConstructionSite",
+      "rule": "single-file-source-pin"
+    }
+  ]
+}

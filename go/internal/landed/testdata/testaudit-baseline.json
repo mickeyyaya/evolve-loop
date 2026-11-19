@@ -1,0 +1,54 @@
+{
+  "rows": [
+    {
+      "package": "internal/landed",
+      "test": "TestChanges_AFailingGitStepIsAnErrorNeverALandedVerdict",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/landed",
+      "test": "TestChanges_AWorktreePathThatCannotBeInspectedIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/landed",
+      "test": "TestListChanges_RefusesWhatItCannotCompare",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/landed",
+      "test": "TestListUntracked_ARealFileWithANewlineInItsNameIsRefused",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/landed",
+      "test": "TestListUntracked_ARealFileWithANewlineInItsNameIsRefused",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/landed",
+      "test": "TestListUntracked_EachFailureAndTheEmptyCase",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/landed",
+      "test": "TestMergeKeepsMain_EachOutcomeOfTheThreeWayMerge",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/landed",
+      "test": "TestReadBlobsAndMainModes_ReportAFailingGitStep",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/landed",
+      "test": "TestUntracked_AFailingOrShortAnswerIsAnErrorNotAVerdict",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/landed",
+      "test": "TestWorktreeContent_ClassifiesWhatTheTreeHoldsAtAPath",
+      "rule": "skip-hides-error"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "rows": [
+    {
+      "package": "pkg/acsassert",
+      "test": "TestCountInGoFunc_MissingFileHintsAtRelocation",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "pkg/acsassert",
+      "test": "TestFuncCoverage_RefusesAnOutputThatDoesNotAnswer",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "pkg/acsassert",
+      "test": "TestModuleDir_RefusesAStartWithNoGoModAboveIt",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "pkg/acsassert",
+      "test": "TestModuleDir_ReportsAFailureToMakeTheStartAbsolute",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "pkg/acsassert",
+      "test": "TestSubprocessOutput_AnUnlaunchableBinaryIsANonExitError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "pkg/acsassert",
+      "test": "TestWalkModule_RefusesARootItCannotWalk",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "pkg/acsassert",
+      "test": "TestWalkModule_ReportsADirectoryItCannotRead",
+      "rule": "error-text-match"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/routingeval",
+      "test": "TestLoadCase_MissingCaseJSONIsLoudError",
+      "rule": "error-text-match"
+    }
+  ]
+}

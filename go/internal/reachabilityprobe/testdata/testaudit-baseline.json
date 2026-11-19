@@ -1,0 +1,19 @@
+{
+  "rows": [
+    {
+      "package": "internal/reachabilityprobe",
+      "test": "TestCheckCallSite",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/reachabilityprobe",
+      "test": "TestCheckFrozenPins_AliasedImportResolved",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/reachabilityprobe",
+      "test": "TestExportedSymbols_Named",
+      "rule": "error-text-match"
+    }
+  ]
+}

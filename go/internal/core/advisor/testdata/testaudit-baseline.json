@@ -1,0 +1,49 @@
+{
+  "rows": [
+    {
+      "package": "internal/core/advisor",
+      "test": "TestAdvisor_ADecisionFileThatCannotBeClearedRefusesTheLaunch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core/advisor",
+      "test": "TestAdvisor_EnforceStageNeverReadsStdout",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core/advisor",
+      "test": "TestLaunch_DepthGuardRefusesBeforeLaunch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core/advisor",
+      "test": "TestLaunch_FleetModeRefusesAnEmptyOrBlankActiveWorktreeBeforeAnyLaunch",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core/advisor",
+      "test": "TestLaunch_WalksItsRouteAndReportsExhaustion",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core/advisor",
+      "test": "TestPropose_FailuresAreVisibleForTheFirstTime",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core/advisor",
+      "test": "TestReplayPlanFromResponse_EqualsParsePlusClampAndDropsAreSilent",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/core/advisor",
+      "test": "TestSanitizeTier_KeepsExactlyTheFourCanonicalTiers",
+      "rule": "single-file-source-pin"
+    },
+    {
+      "package": "internal/core/advisor",
+      "test": "TestSpanBytesAndStdoutSpan_TakeTheLastBalancedSpanAndDecodersRefuseNil",
+      "rule": "error-text-match"
+    }
+  ]
+}

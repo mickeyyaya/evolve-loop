@@ -1,0 +1,39 @@
+{
+  "rows": [
+    {
+      "package": "internal/cliupdate",
+      "test": "TestExec_ALaunchFailureIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cliupdate",
+      "test": "TestExec_ALongUpdaterOutputKeepsOnlyItsTail",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cliupdate",
+      "test": "TestExec_ANonZeroExitIsAnErrorCarryingTheUpdatersOutput",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cliupdate",
+      "test": "TestUpdate_ARaisedVersionRecordsBothVersionsAndRunsTheSmoke",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "internal/cliupdate",
+      "test": "TestUpdate_AnIneligibleOrWalledFamilyIsNeverUpdated",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "internal/cliupdate",
+      "test": "TestUpdate_AnUnreadableVersionBeforeTheUpdateIsSmokedAndRunsNoUpdater",
+      "rule": "mock-call-order"
+    },
+    {
+      "package": "internal/cliupdate",
+      "test": "TestUpdate_AnUnrecordedVersionChangeIsSmokeBootedBeforeTheUpdaterRuns",
+      "rule": "mock-call-order"
+    }
+  ]
+}

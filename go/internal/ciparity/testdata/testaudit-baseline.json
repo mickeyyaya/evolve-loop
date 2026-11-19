@@ -1,0 +1,34 @@
+{
+  "rows": [
+    {
+      "package": "internal/ciparity",
+      "test": "TestCoverageTestArgs_TagGatedFixtureMeasuresTaggedCoverage",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/ciparity",
+      "test": "TestMakeCoverStrict_RejectsInvalidFloorOrEvaluator",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/ciparity",
+      "test": "TestMakeCoverageGates_RejectToolFailure",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/ciparity",
+      "test": "TestMakeIntegrationDarwin_GivesTheSlowerHostItsOwnTimeout",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/ciparity",
+      "test": "TestMakeIntegration_PassesTheTestTimeout",
+      "rule": "unverified-fake"
+    },
+    {
+      "package": "internal/ciparity",
+      "test": "TestMakeIntegration_RoutesTestBinariesThroughTheRusageWrapperOnlyWhenAsked",
+      "rule": "unverified-fake"
+    }
+  ]
+}

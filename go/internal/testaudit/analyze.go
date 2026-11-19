@@ -38,8 +38,16 @@ func Analyze(root string, cfg Config) ([]Finding, error) {
 	return analyze(root, cfg, true)
 }
 
+func AnalyzeTree(root string, cfg Config) ([]Finding, error) {
+	base := cleanPath(root)
+	return analyzeWithBase(base, base, cfg, true)
+}
+
 func analyze(root string, cfg Config, recursive bool) ([]Finding, error) {
-	root = cleanPath(root)
+	return analyzeWithBase("", cleanPath(root), cfg, recursive)
+}
+
+func analyzeWithBase(base, root string, cfg Config, recursive bool) ([]Finding, error) {
 	dirs, err := testDirs(root, recursive)
 	if err != nil {
 		return nil, err
@@ -50,14 +58,25 @@ func analyze(root string, cfg Config, recursive bool) ([]Finding, error) {
 		if err != nil {
 			return nil, err
 		}
+		if base != "" {
+			pkg.dir = relSlash(base, dir)
+		}
 		found = append(found, auditPackage(pkg, cfg)...)
 	}
-	rows, err := fakeRowFindings(root, recursive, cfg)
+	rows, err := fakeRowFindingsWithBase(base, root, recursive, cfg)
 	if err != nil {
 		return nil, err
 	}
 	found = append(found, rows...)
 	return finish(found, cfg), nil
+}
+
+func relSlash(base, target string) string {
+	rel, err := filepath.Rel(base, target)
+	if err != nil {
+		return cleanPath(target)
+	}
+	return filepath.ToSlash(rel)
 }
 
 func finish(found []Finding, cfg Config) []Finding {
@@ -260,22 +279,26 @@ func isTestingType(e ast.Expr, names ...string) bool {
 	return false
 }
 
-func fakeRowFindings(root string, recursive bool, cfg Config) ([]Finding, error) {
+func fakeRowFindingsWithBase(base, root string, recursive bool, cfg Config) ([]Finding, error) {
 	var found []Finding
 	for _, row := range cfg.Fakes {
 		if row.SuiteDir == "" {
 			continue
 		}
-		dir := cleanPath(row.SuiteDir)
-		if !within(root, dir, recursive) {
+		suiteDir := cleanPath(row.SuiteDir)
+		target := suiteDir
+		if base != "" && !filepath.IsAbs(suiteDir) {
+			target = filepath.Join(base, filepath.FromSlash(suiteDir))
+		}
+		if !within(root, target, recursive) {
 			continue
 		}
-		has, err := suiteDeclared(dir, row.Tool)
+		has, err := suiteDeclared(target, row.Tool)
 		if err != nil {
 			return nil, err
 		}
 		if !has {
-			found = append(found, Finding{Package: dir, Test: "fakes:" + row.Tool, Rule: ruleUnverifiedFake})
+			found = append(found, Finding{Package: suiteDir, Test: "fakes:" + row.Tool, Rule: ruleUnverifiedFake})
 		}
 	}
 	return found, nil
@@ -300,6 +323,10 @@ func suiteDeclared(dir, tool string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	return suiteDeclaredPkg(pkg, tool), nil
+}
+
+func suiteDeclaredPkg(pkg *pkgInfo, tool string) bool {
 	ctx := &testCtx{pkg: pkg}
 	has := false
 	for _, file := range pkg.files {
@@ -322,7 +349,7 @@ func suiteDeclared(dir, tool string) (bool, error) {
 			return true
 		})
 	}
-	return has, nil
+	return has
 }
 
 func isSuiteType(e ast.Expr) bool {

@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/triagecap",
+      "test": "TestAutoFileDemotionDefect_ReportsAFailedWrite",
+      "rule": "error-text-match"
+    }
+  ]
+}

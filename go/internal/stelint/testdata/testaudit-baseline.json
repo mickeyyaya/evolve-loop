@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/stelint",
+      "test": "TestLintFile_AGoParseErrorNamesTheFile",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/stelint",
+      "test": "TestParseWordTable_RefusesAStandardWithoutTheTable",
+      "rule": "error-text-match"
+    }
+  ]
+}

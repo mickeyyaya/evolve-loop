@@ -1,0 +1,29 @@
+{
+  "rows": [
+    {
+      "package": "test/structure",
+      "test": "TestCheckLimits_PreservesDirectoryScope",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "test/structure",
+      "test": "TestCheckLimits_ReadAndParseErrors",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "test/structure",
+      "test": "TestNesting_ControlFlowDepth",
+      "rule": "single-file-ast-pin"
+    },
+    {
+      "package": "test/structure",
+      "test": "TestParallelLanesAddingOnePackageFailTheGuardInBothMergeOrders",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "test/structure",
+      "test": "TestRepeatedPackageRefusesSamePackageWithAnotherValueAndNamesLineAndFix",
+      "rule": "error-text-match"
+    }
+  ]
+}

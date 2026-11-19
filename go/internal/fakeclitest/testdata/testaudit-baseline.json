@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/fakeclitest",
+      "test": "TestInstall_AnInstalledFakeThatCannotBeGuardedIsReported",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/fakeclitest",
+      "test": "TestInstall_ReportsWhatItCouldNotDo",
+      "rule": "error-text-match"
+    }
+  ]
+}

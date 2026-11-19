@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/testaudit",
+      "test": "TestCheckShard_NamesBothKindsOfDrift",
+      "rule": "error-text-match"
+    }
+  ]
+}

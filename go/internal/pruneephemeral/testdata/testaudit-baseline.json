@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/pruneephemeral",
+      "test": "TestRun_DanglingLogSymlinkSkipped",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/pruneephemeral",
+      "test": "TestRun_EmptyProjectRoot",
+      "rule": "error-text-match"
+    }
+  ]
+}

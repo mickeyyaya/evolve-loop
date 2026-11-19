@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/convergence",
+      "test": "TestValidate_RefusesMalformedRoundsUnderTheirCause",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/convergence",
+      "test": "TestValidate_RefusesRoundsWithoutHunksOrRolesWhenTheConfigIsUnresolved",
+      "rule": "error-text-match"
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "rows": [
+    {
+      "package": "internal/phases/triage",
+      "test": "TestCarryforwardCandidatesSection_RespectsExpiredContext",
+      "rule": "sleep-sync"
+    },
+    {
+      "package": "internal/phases/triage",
+      "test": "TestProcessUnifiedCommitment_PlanThatCannotBeWrittenIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/triage",
+      "test": "TestProcessUnifiedCommitment_ProjectionThatCannotBeWrittenIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/triage",
+      "test": "TestProcessUnifiedCommitment_RejectionWithAnUnremovablePlanIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/triage",
+      "test": "TestProcessUnifiedCommitment_SpoofedProjectionThatCannotBeClearedIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/triage",
+      "test": "TestProcessUnifiedCommitment_StalePlanThatCannotBeRemovedIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/triage",
+      "test": "TestProcessUnifiedCommitment_UnreadableClaimedInboxIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/triage",
+      "test": "TestProcessUnifiedCommitment_UnreadableInboxIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/triage",
+      "test": "TestRouteProtectedCards_MalformedArraysAreNamedAndLeaveTheDecisionUntouched",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/triage",
+      "test": "TestRouteProtectedCards_UnwritableDecisionDirectoryIsReported",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/triage",
+      "test": "TestRun_MissingBridge_ReturnsError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/phases/triage",
+      "test": "TestRun_MissingPrompts_ReturnsError",
+      "rule": "error-text-match"
+    }
+  ]
+}

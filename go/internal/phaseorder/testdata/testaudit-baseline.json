@@ -1,0 +1,9 @@
+{
+  "rows": [
+    {
+      "package": "internal/phaseorder",
+      "test": "TestList_StatOKButReadFails",
+      "rule": "error-text-match"
+    }
+  ]
+}

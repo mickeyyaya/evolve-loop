@@ -1,0 +1,19 @@
+{
+  "rows": [
+    {
+      "package": "internal/handoff/request",
+      "test": "TestTDDBuild_FifoTestFileDoesNotHang",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/handoff/request",
+      "test": "TestTDDBuild_HardLinkedTestFileContributesNothing",
+      "rule": "skip-hides-error"
+    },
+    {
+      "package": "internal/handoff/request",
+      "test": "TestTriageTDD_RefusesARequestItCannotBuildWhole",
+      "rule": "error-text-match"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "rows": [
+    {
+      "package": "internal/coversplit",
+      "test": "TestDetect_FailsLoudlyOnAModuleItCannotRead",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/coversplit",
+      "test": "TestParse_ReadsEachSplitAndRefusesEveryMalformedLine",
+      "rule": "error-text-match"
+    }
+  ]
+}
