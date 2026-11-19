@@ -5,6 +5,7 @@ package cycle2540
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -151,10 +152,17 @@ func TestC2540_005_TheDeadlineBasisDefaultsToAllAndAcceptsShipped(t *testing.T) 
 }
 
 func TestC2540_006_TheDeadlineBasisRefusesAnyOtherValue(t *testing.T) {
-	for _, raw := range []string{`"p99"`, `"Shipped"`, `" all"`, `"all,shipped"`, `"unshipped"`, `5`, `true`} {
+	for _, raw := range []string{`"p99"`, `"Shipped"`, `" all"`, `"all,shipped"`, `"unshipped"`} {
 		_, err := policy.Parse([]byte(policyPrefix + raw + `}}}`))
-		if err == nil || !strings.Contains(err.Error(), "deadline_basis") {
-			t.Errorf("deadline_basis %s: err = %v, want a refusal that names deadline_basis", raw, err)
+		if !errors.Is(err, policy.ErrDeadlineBasis) {
+			t.Errorf("deadline_basis %s: err = %v, want policy.ErrDeadlineBasis", raw, err)
+		}
+	}
+	for _, raw := range []string{`5`, `true`} {
+		_, err := policy.Parse([]byte(policyPrefix + raw + `}}}`))
+		var typeErr *json.UnmarshalTypeError
+		if !errors.As(err, &typeErr) || typeErr.Field != "deadline_basis" {
+			t.Errorf("deadline_basis %s: err = %v, want a json type error on the field deadline_basis", raw, err)
 		}
 	}
 }
