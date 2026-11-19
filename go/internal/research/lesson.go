@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/yamlcodec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/incidentkb"
 )
 
 type Lesson struct {
@@ -50,6 +51,9 @@ type lessonYAML struct {
 }
 
 func parseLessonFile(path string) ([]Lesson, error) {
+	if strings.HasSuffix(path, ".md") {
+		return parseIncidentLessonFile(path)
+	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -78,6 +82,52 @@ func parseLessonFile(path string) ([]Lesson, error) {
 	return out, nil
 }
 
+func parseIncidentLessonFile(path string) ([]Lesson, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	if incidentkb.IsSkipped(path) || incidentkb.IsLegacy(path, raw) {
+		return nil, nil
+	}
+	rec, err := incidentkb.Parse(raw)
+	if err != nil {
+		return nil, err
+	}
+	if rec.Schema != incidentkb.Schema || rec.ID == "" {
+		return nil, nil
+	}
+	return []Lesson{{
+		ID:               rec.ID,
+		Pattern:          rec.Fingerprint,
+		Description:      rec.Title,
+		Source:           path,
+		Type:             "incident-record",
+		PreventiveAction: extractSection(rec.Body, "Lessons"),
+		ErrorCategory:    rec.Effectiveness.Metric.Code,
+		Path:             path,
+	}}, nil
+}
+
+func extractSection(body, heading string) string {
+	lines := strings.Split(strings.ReplaceAll(body, "\r\n", "\n"), "\n")
+	var out []string
+	inSection := false
+	for _, line := range lines {
+		if !inSection {
+			if strings.HasPrefix(line, "## ") && strings.TrimSpace(line[3:]) == heading {
+				inSection = true
+			}
+			continue
+		}
+		if strings.HasPrefix(line, "## ") {
+			break
+		}
+		out = append(out, line)
+	}
+	return strings.TrimSpace(strings.Join(out, "\n"))
+}
+
 func firstSentence(s string) string {
 	s = strings.TrimSpace(s)
 	if i := strings.IndexAny(s, ".\n"); i > 0 {
@@ -96,8 +146,13 @@ func listLessonFiles(root string) []string {
 		if e.IsDir() {
 			continue
 		}
-		if strings.HasSuffix(e.Name(), ".yaml") || strings.HasSuffix(e.Name(), ".yml") {
-			files = append(files, filepath.Join(root, e.Name()))
+		name := e.Name()
+		if strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".yml") {
+			files = append(files, filepath.Join(root, name))
+			continue
+		}
+		if strings.HasSuffix(name, ".md") && !incidentkb.IsSkipped(name) {
+			files = append(files, filepath.Join(root, name))
 		}
 	}
 	return files

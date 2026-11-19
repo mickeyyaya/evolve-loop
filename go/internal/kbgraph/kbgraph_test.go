@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -104,5 +105,126 @@ func TestBuild_InboxReadFailuresAreErrorsAndNonItemsAreSkipped(t *testing.T) {
 	g, err := Build(root)
 	if err != nil || len(g.nodes) != 0 {
 		t.Errorf("a note and a subdirectory are not items: nodes=%v err=%v", g.nodes, err)
+	}
+}
+
+func writeIncidentFile(t *testing.T, root, name, body string) {
+	t.Helper()
+	dir := filepath.Join(root, "docs", "incidents")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBuild_IncidentsAddEdgesAndSkipLegacy(t *testing.T) {
+	root := t.TempDir()
+	cyclesDir := filepath.Join(root, "knowledge-base", "cycles")
+	if err := os.MkdirAll(cyclesDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cyclesDir, "cycle-120.json"), []byte(`{"cycle":120,"final_verdict":"PASS"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeInbox(t, root, "fix.json", `{"id":"fix-item","title":"fix item","connects_to":["root-dep"],"deps":["root-dep"]}`)
+	writeIncidentFile(t, root, "2026-08-09-old.md", "# old legacy\n\nNo frontmatter.\n")
+	writeIncidentFile(t, root, "REGRESSION-COVERAGE-INDEX.md", "# index\n")
+	writeIncidentFile(t, root, "2026-11-19-no-id.md", "---\nschema: incident-record/1\ntitle: fallback id\nlevel: record\nstatus: open\n---\n\n# fallback\n")
+	writeIncidentFile(t, root, "2026-11-19-sample.md", `---
+schema: incident-record/1
+id: 2026-11-19-sample
+title: sample incident
+level: record
+status: fixed
+fingerprint: sample:fp
+signals: ["cycle:120:4", "cycle:120:9", "cycle:bad:1", "channel:errors:77"]
+prs: [301, 302]
+items: [fix-item]
+actions: []
+effectiveness:
+  metric: {code: SAMPLE_ERR, filters: [], unit: wave, since: abc123}
+  baseline: {value: 2, units: 1}
+  target: 0
+  checks: 2
+  results: []
+verified_at: ""
+---
+
+# sample incident
+`)
+
+	g, err := Build(root)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if _, err := g.Neighbors("incident:2026-08-09-old", 1); err == nil {
+		t.Error("legacy file must not produce an incident node")
+	}
+	if _, err := g.Neighbors("incident:2026-11-19-no-id", 1); err != nil {
+		t.Errorf("record without id must fall back to filename: %v", err)
+	}
+	sub, err := g.Neighbors("incident:2026-11-19-sample", 2)
+	if err != nil {
+		t.Fatalf("Neighbors: %v", err)
+	}
+	if slices.ContainsFunc(sub.Nodes, func(n Node) bool { return n.ID == "cycle:77" }) {
+		t.Errorf("non-cycle signal created cycle:77: %v", sub.Nodes)
+	}
+	wantEdges := []Edge{
+		{From: "incident:2026-11-19-sample", To: "cycle:120", Kind: KindAffected},
+		{From: "incident:2026-11-19-sample", To: "fingerprint:sample:fp", Kind: KindRecursAs},
+		{From: "incident:2026-11-19-sample", To: "pr:301", Kind: KindFixedBy},
+		{From: "incident:2026-11-19-sample", To: "pr:302", Kind: KindFixedBy},
+		{From: "incident:2026-11-19-sample", To: "item:fix-item", Kind: KindTrackedBy},
+		{From: "item:fix-item", To: "item:root-dep", Kind: KindDependsOn},
+	}
+	for _, want := range wantEdges {
+		if !slices.Contains(sub.Edges, want) {
+			t.Errorf("missing edge %+v in %+v", want, sub.Edges)
+		}
+	}
+	affectedCount := 0
+	for _, e := range sub.Edges {
+		if e.From == "incident:2026-11-19-sample" && e.To == "cycle:120" && e.Kind == KindAffected {
+			affectedCount++
+		}
+	}
+	if affectedCount != 1 {
+		t.Errorf("duplicate affected edges for repeated cycle signals: got %d, want 1", affectedCount)
+	}
+}
+
+func TestBuild_UnparsableIncidentReturnsErrorNamingFile(t *testing.T) {
+	root := t.TempDir()
+	writeIncidentFile(t, root, "2026-11-19-bad.md", "---\nschema: incident-record/1\nbogus: 1\n---\n\n# bad\n")
+	if _, err := Build(root); err == nil || !strings.Contains(err.Error(), "2026-11-19-bad") {
+		t.Fatalf("expected error naming 2026-11-19-bad for broken incident frontmatter, got %v", err)
+	}
+}
+
+func TestBuild_IncidentReadErrors(t *testing.T) {
+	notADir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(notADir, "docs"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(notADir, "docs", "incidents"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Build(notADir); err == nil {
+		t.Error("docs/incidents that is not a directory must fail Build")
+	}
+
+	root := t.TempDir()
+	dir := filepath.Join(root, "docs", "incidents")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(root, "gone"), filepath.Join(dir, "2026-11-19-dangling.md")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Build(root); err == nil {
+		t.Error("unreadable incident symlink must fail Build")
 	}
 }

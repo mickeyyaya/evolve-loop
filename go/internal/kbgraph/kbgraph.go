@@ -7,9 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
+	"github.com/mickeyyaya/evolve-loop/go/internal/incidentkb"
 )
 
 const (
@@ -21,6 +24,9 @@ const (
 	KindYielded    = "yielded"
 	KindConnectsTo = "connects-to"
 	KindDependsOn  = "depends-on"
+	KindAffected   = "affected"
+	KindFixedBy    = "fixed-by"
+	KindTrackedBy  = "tracked-by"
 )
 
 type Node struct {
@@ -61,6 +67,9 @@ func Build(projectRoot string) (*Graph, error) {
 		g.addDossier(d)
 	}
 	if err := g.addInbox(filepath.Join(projectRoot, ".evolve", "inbox")); err != nil {
+		return nil, err
+	}
+	if err := g.addIncidents(projectRoot); err != nil {
 		return nil, err
 	}
 	for id := range g.adj {
@@ -150,6 +159,85 @@ func (g *Graph) addInbox(dir string) error {
 		}
 	}
 	return nil
+}
+
+func (g *Graph) addIncidents(projectRoot string) error {
+	dir := incidentkb.Dir(projectRoot)
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("kbgraph: read incidents %s: %w", dir, err)
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") || incidentkb.IsSkipped(e.Name()) {
+			continue
+		}
+		path := filepath.Join(dir, e.Name())
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("kbgraph: read %s: %w", path, err)
+		}
+		if incidentkb.IsLegacy(e.Name(), raw) {
+			continue
+		}
+		rec, err := incidentkb.Parse(raw)
+		if err != nil {
+			return fmt.Errorf("kbgraph: parse %s: %w", path, err)
+		}
+		g.addIncidentRecord(rec, e.Name())
+	}
+	return nil
+}
+
+func (g *Graph) addIncidentRecord(rec incidentkb.Record, fileName string) {
+	id := rec.ID
+	if id == "" {
+		id = strings.TrimSuffix(fileName, ".md")
+	}
+	from := "incident:" + id
+	g.addNode(from, "incident", rec.Title)
+	seen := map[Edge]bool{}
+	connect := func(to, kind, nodeKind string) {
+		g.addNode(to, nodeKind, "")
+		e := Edge{From: from, To: to, Kind: kind}
+		if seen[e] {
+			return
+		}
+		seen[e] = true
+		g.addEdge(from, to, kind)
+	}
+	if rec.Fingerprint != "" {
+		connect("fingerprint:"+rec.Fingerprint, KindRecursAs, "fingerprint")
+	}
+	for _, sig := range rec.Signals {
+		if cycleNode, ok := parseIncidentCycleNode(sig); ok {
+			connect(cycleNode, KindAffected, "cycle")
+		}
+	}
+	for _, pr := range rec.PRs {
+		if pr > 0 {
+			connect(fmt.Sprintf("pr:%d", pr), KindFixedBy, "pr")
+		}
+	}
+	for _, item := range rec.Items {
+		if item != "" {
+			connect("item:"+item, KindTrackedBy, "item")
+		}
+	}
+}
+
+func parseIncidentCycleNode(signal string) (string, bool) {
+	parts := strings.Split(signal, ":")
+	if len(parts) < 2 || parts[0] != "cycle" {
+		return "", false
+	}
+	n, err := strconv.Atoi(parts[1])
+	if err != nil || n <= 0 {
+		return "", false
+	}
+	return fmt.Sprintf("cycle:%d", n), true
 }
 
 func (g *Graph) Neighbors(id string, hops int) (Subgraph, error) {

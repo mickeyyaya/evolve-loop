@@ -55,7 +55,7 @@ func SearchPathsFromEnv(cfg policy.PathsConfig) []string {
 	return SplitSearchPaths(defaultSearchPaths)
 }
 
-const defaultSearchPaths = "knowledge-base/research/:.evolve/instincts/lessons/:docs/research/:docs/retrospectives/"
+const defaultSearchPaths = "knowledge-base/research/:.evolve/instincts/lessons/:docs/research/:docs/retrospectives/:docs/incidents/"
 
 func tokenize(s string) []string {
 	var out []string

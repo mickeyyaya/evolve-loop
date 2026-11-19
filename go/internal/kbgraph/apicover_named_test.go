@@ -8,7 +8,7 @@ func TestNamedExports(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	kinds := []string{KindRecursAs, KindHasDefect, KindYielded, KindConnectsTo, KindDependsOn}
+	kinds := []string{KindRecursAs, KindHasDefect, KindYielded, KindConnectsTo, KindDependsOn, KindAffected, KindFixedBy, KindTrackedBy}
 	for _, k := range kinds {
 		if k == "" {
 			t.Error("empty edge kind constant")
