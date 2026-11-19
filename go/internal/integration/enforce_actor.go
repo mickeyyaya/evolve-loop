@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -102,7 +103,7 @@ func (a EnforceActor) Flush(ctx context.Context, b PendingBatch) (FlushResult, e
 func (a EnforceActor) recordLanded(ctx context.Context, out Outcome, byCycle map[int]DeliverableRecord, res *FlushResult) (int, error) {
 	var promoteErr error
 	prNum := 0
-	for _, ref := range out.Landed {
+	for _, ref := range slices.Concat(out.Landed, out.OnMain) {
 		rec, ok := byCycle[ref]
 		if !ok {
 			continue

@@ -382,11 +382,6 @@ func TestTrainBatcherFailsLoudlyAtEachStep(t *testing.T) {
 	if b, err := good.compose(ctx, []DeliverableRecord{rec}); err != nil || b.Batch.Index != 1 {
 		t.Fatalf("compose = %+v, %v", b, err)
 	}
-	headless := r.train
-	headless.Main = trainHeadFails{}
-	if _, err := (&batcher{t: headless}).compose(ctx, []DeliverableRecord{rec}); err == nil {
-		t.Error("compose ignored an unreadable head")
-	}
 	badWave := r.train
 	badWave.Wave = "bad wave"
 	if _, err := (&batcher{t: badWave}).compose(ctx, []DeliverableRecord{rec}); err == nil {

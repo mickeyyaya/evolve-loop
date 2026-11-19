@@ -60,7 +60,7 @@ func isolatedProfile(t *testing.T, isolated bool, goos string) string {
 		req.HostIsolated, req.SeatRoot = true, seatRoot
 	}
 	prefix, ok := defaultSandboxWrapWithProbe(Deps{SandboxMode: "on"}, fakeProbe(goos, true))(req)
-	if !ok {
+	if !ok.Applied {
 		t.Fatal("the wrap was refused")
 	}
 	if goos == "darwin" {

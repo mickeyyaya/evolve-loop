@@ -37,7 +37,7 @@ func TestSandboxTerminalFailurePreventsLaunch(t *testing.T) {
 			root := t.TempDir()
 			mux := &failedTerminalTmux{fakeTmux: &fakeTmux{}, path: tc.path, err: tc.err}
 			calls := 0
-			deps := Deps{Tmux: mux, Stderr: io.Discard, Sleep: func(time.Duration) {}, Env: map[string]string{}, SandboxWrap: func(SandboxWrapRequest) ([]string, bool) { calls++; return nil, false }, hostOS: "darwin"}.withDefaults()
+			deps := Deps{Tmux: mux, Stderr: io.Discard, Sleep: func(time.Duration) {}, Env: map[string]string{}, SandboxWrap: func(SandboxWrapRequest) ([]string, WrapOutcome) { calls++; return nil, WrapOutcome{} }, hostOS: "darwin"}.withDefaults()
 			cfg := &Config{ProjectRoot: root, Worktree: root, Workspace: root, RequireSandbox: true}
 			code, err := runTmuxREPL(context.Background(), cfg, deps, tmuxLaunch{name: "terminal-fixture", session: "terminal-fixture", launchCmd: "fixture-must-not-launch", bootOnly: true})
 			if err != nil || code != ExitSafetyGate {

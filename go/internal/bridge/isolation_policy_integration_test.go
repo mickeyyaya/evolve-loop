@@ -57,7 +57,7 @@ func TestSandboxPreservesLinkedWorktreeGitIndex(t *testing.T) {
 	}
 	wrap := defaultSandboxWrapWithProbe(Deps{}, func() sandbox.ProbeResult { return probe })
 	prefix, ok := wrap(SandboxWrapRequest{Phase: "builder", RepoRoot: root, Worktree: wt, Workspace: ws, DenyPaths: denies, AllowNetwork: true})
-	if !ok {
+	if !ok.Applied {
 		t.Fatal("supported fixture policy declined")
 	}
 	writeMain := append(append([]string{}, prefix[1:]...), "/bin/sh", "-c", `printf forbidden > "$1"`, "fixture", filepath.Join(root, "outside-worktree"))

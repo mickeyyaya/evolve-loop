@@ -111,7 +111,7 @@ type Deps struct {
 	terminalCheck         func(string) error
 }
 
-type SandboxWrapper func(req SandboxWrapRequest) (prefixArgv []string, available bool)
+type SandboxWrapper func(req SandboxWrapRequest) (prefixArgv []string, outcome WrapOutcome)
 
 type SandboxWrapRequest struct {
 	CLI           string

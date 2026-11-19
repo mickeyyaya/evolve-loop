@@ -19,12 +19,12 @@ type fakeWrap struct {
 }
 
 func (f *fakeWrap) wrap() SandboxWrapper {
-	return func(req SandboxWrapRequest) ([]string, bool) {
+	return func(req SandboxWrapRequest) ([]string, WrapOutcome) {
 		f.calls = append(f.calls, req)
 		if f.returnEmpty {
-			return nil, false
+			return nil, WrapOutcome{}
 		}
-		return f.prefix, f.available
+		return f.prefix, WrapOutcome{Applied: f.available}
 	}
 }
 
@@ -34,7 +34,7 @@ func TestSandboxPrefix_NoWorktree_SkipsWrap(t *testing.T) {
 	deps := Deps{SandboxWrap: fw.wrap()}
 	cfg := &Config{Worktree: "", Agent: "scout"}
 	prefix, ok := sandboxPrefixForLaunch(deps, cfg, "")
-	if ok || prefix != nil {
+	if ok.Applied || prefix != nil {
 		t.Errorf("non-worktree phase should skip wrap; got (%v, %v)", prefix, ok)
 	}
 	if len(fw.calls) != 0 {
@@ -48,10 +48,10 @@ func TestSandboxPrefix_RequiredContractConsultsWrapperWithoutWorktree(t *testing
 	deps := Deps{SandboxWrap: fw.wrap()}
 	cfg := &Config{RequireSandbox: true, Workspace: "/ws", ProjectRoot: "/repo", Agent: "build"}
 	prefix, ok := sandboxPrefixForLaunch(deps, cfg, "")
-	if !ok || len(prefix) == 0 || len(fw.calls) != 1 {
+	if !ok.Applied || len(prefix) == 0 || len(fw.calls) != 1 {
 		t.Fatalf("required contract did not request confinement: prefix=%v ok=%v calls=%d", prefix, ok, len(fw.calls))
 	}
-	if !sandboxRequiredButUnavailable(Deps{Env: map[string]string{}}, cfg, false) || sandboxRequiredButUnavailable(Deps{Env: map[string]string{}}, cfg, true) {
+	if !sandboxRequiredButUnavailable(Deps{Env: map[string]string{}}, cfg, WrapOutcome{}) || sandboxRequiredButUnavailable(Deps{Env: map[string]string{}}, cfg, WrapOutcome{Applied: true}) {
 		t.Fatal("required-sandbox fail-closed predicate is incorrect")
 	}
 }
@@ -67,7 +67,7 @@ func TestSandboxPrefix_WorktreePhase_PassesAbsolutePaths(t *testing.T) {
 		Agent:       "build",
 	}
 	prefix, ok := sandboxPrefixForLaunch(deps, cfg, "")
-	if !ok || len(prefix) != 3 {
+	if !ok.Applied || len(prefix) != 3 {
 		t.Fatalf("worktree phase should wrap; got (%v, %v)", prefix, ok)
 	}
 	if len(fw.calls) != 1 {
@@ -127,7 +127,7 @@ func TestSandboxPrefix_NoWrapper_Degrades(t *testing.T) {
 	deps := Deps{SandboxWrap: nil}
 	cfg := &Config{Worktree: "/abs/wt/x", Agent: "build"}
 	prefix, ok := sandboxPrefixForLaunch(deps, cfg, "")
-	if ok || prefix != nil {
+	if ok.Applied || prefix != nil {
 		t.Errorf("nil wrapper should degrade silently; got (%v, %v)", prefix, ok)
 	}
 }
@@ -175,7 +175,7 @@ func TestDefaultSandboxWrap_OffMode_NeverWraps(t *testing.T) {
 	deps := Deps{SandboxMode: config.SandboxModeOff}
 	wrap := defaultSandboxWrap(deps)
 	prefix, ok := wrap(SandboxWrapRequest{Phase: "build", Worktree: "/wt", Workspace: "/ws", RepoRoot: "/r"})
-	if ok || prefix != nil {
+	if ok.Applied || prefix != nil {
 		t.Errorf("--sandbox-off must short-circuit before Probe; got (%v, %v)", prefix, ok)
 	}
 }
@@ -187,7 +187,7 @@ func TestDefaultSandboxWrap_NestedClaudeAuto_DoesNotWrap(t *testing.T) {
 	}}
 	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("linux", true))
 	prefix, ok := wrap(SandboxWrapRequest{Phase: "build", Worktree: "/wt", Workspace: "/ws", RepoRoot: "/r"})
-	if ok || prefix != nil {
+	if ok.Applied || prefix != nil {
 		t.Errorf("nested-claude+auto must skip wrap; got (%v, %v)", prefix, ok)
 	}
 }
@@ -207,7 +207,7 @@ func TestDefaultSandboxWrap_NestedViaLookupEnv_DoesNotWrap(t *testing.T) {
 	prefix, ok := wrap(SandboxWrapRequest{
 		Phase: "build", Worktree: t.TempDir(), Workspace: t.TempDir(), RepoRoot: t.TempDir(),
 	})
-	if ok || prefix != nil {
+	if ok.Applied || prefix != nil {
 		t.Errorf("nested signal via LookupEnv must skip wrap; got (%v, %v)", prefix, ok)
 	}
 }
@@ -226,7 +226,7 @@ func TestDefaultSandboxWrap_Darwin_WritesSBPLAndUsesDashF(t *testing.T) {
 	prefix, ok := wrap(SandboxWrapRequest{
 		Phase: "build", Worktree: t.TempDir(), Workspace: ws, RepoRoot: t.TempDir(),
 	})
-	if !ok || len(prefix) != 3 || prefix[0] != "sandbox-exec" {
+	if !ok.Applied || len(prefix) != 3 || prefix[0] != "sandbox-exec" {
 		t.Fatalf("unexpected prefix: %v", prefix)
 	}
 	if prefix[1] != "-f" {
@@ -256,7 +256,7 @@ func TestDefaultSandboxWrap_Darwin_AllowsHomeReadAndProfileNetwork(t *testing.T)
 		RepoRoot:     t.TempDir(),
 		AllowNetwork: true,
 	})
-	if !ok {
+	if !ok.Applied {
 		t.Fatal("sandbox wrapper did not return a prefix")
 	}
 	raw, err := os.ReadFile(prefix[2])
@@ -279,7 +279,7 @@ func TestDefaultSandboxWrap_OnMode_UnavailableProbe_LogsWarn(t *testing.T) {
 	deps := Deps{SandboxMode: config.SandboxModeOn, Stderr: &stderr}
 	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("linux", false))
 	prefix, ok := wrap(SandboxWrapRequest{Phase: "build", Worktree: "/wt", Workspace: "/ws", RepoRoot: "/r"})
-	if ok || prefix != nil {
+	if ok.Applied || prefix != nil {
 		t.Errorf("no host sandbox → must return (nil, false); got (%v, %v)", prefix, ok)
 	}
 	if !strings.Contains(stderr.String(), "sandbox.mode=on") || !strings.Contains(stderr.String(), "UNCONFINED") {
@@ -307,7 +307,7 @@ func TestDefaultSandboxWrap_UnknownMode_NestedClaude_DoesNotWrap(t *testing.T) {
 	prefix, ok := wrap(SandboxWrapRequest{
 		Phase: "scout", Worktree: t.TempDir(), Workspace: t.TempDir(), RepoRoot: t.TempDir(),
 	})
-	if ok || prefix != nil {
+	if ok.Applied || prefix != nil {
 		t.Errorf("unrecognized sandbox mode must normalize to auto and skip wrap under nested-claude; got (%v, %v)", prefix, ok)
 	}
 }
@@ -320,7 +320,7 @@ func TestDefaultSandboxWrap_UnknownMode_NormalizesToAuto_WarnsAndWrapsWhenNotNes
 	prefix, ok := wrap(SandboxWrapRequest{
 		Phase: "build", Worktree: t.TempDir(), Workspace: t.TempDir(), RepoRoot: t.TempDir(),
 	})
-	if !ok || len(prefix) == 0 {
+	if !ok.Applied || len(prefix) == 0 {
 		t.Errorf("unknown value normalizes to auto; not-nested + available probe → should wrap; got (%v, %v)", prefix, ok)
 	}
 	if !strings.Contains(stderr.String(), "sandbox mode") || !strings.Contains(stderr.String(), "unrecognized") {
@@ -338,7 +338,7 @@ func TestDefaultSandboxWrap_OnMode_NestedClaude_DoesNotWrap(t *testing.T) {
 	prefix, ok := wrap(SandboxWrapRequest{
 		Phase: "scout", Worktree: t.TempDir(), Workspace: t.TempDir(), RepoRoot: t.TempDir(),
 	})
-	if ok || prefix != nil {
+	if ok.Applied || prefix != nil {
 		t.Errorf("on-mode + nested-claude must NOT wrap (inner sandbox-exec hangs on nested macOS); got (%v, %v)", prefix, ok)
 	}
 	if !strings.Contains(stderr.String(), "sandbox.mode=on") || !strings.Contains(stderr.String(), "UNCONFINED") {
@@ -375,7 +375,7 @@ func TestDefaultSandboxWrap_Darwin_PerInvocationProfileDir(t *testing.T) {
 
 	prefixA, okA := wrap(req)
 	prefixB, okB := wrap(req)
-	if !okA || !okB {
+	if !okA.Applied || !okB.Applied {
 		t.Fatalf("darwin not-nested should wrap; got okA=%v okB=%v", okA, okB)
 	}
 	pathA, pathB := sbplPathOf(t, prefixA), sbplPathOf(t, prefixB)
@@ -404,7 +404,7 @@ func TestDefaultSandboxWrap_Darwin_ProfileDirMkdirFails_FallsBackToWorkspace(t *
 	}
 	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))
 	prefix, ok := wrap(SandboxWrapRequest{Phase: "build", Worktree: t.TempDir(), Workspace: ws, RepoRoot: t.TempDir()})
-	if !ok {
+	if !ok.Applied {
 		t.Fatal("mkdir failure must fall back to the shared workspace profile, not abort confinement")
 	}
 	if got, want := sbplPathOf(t, prefix), filepath.Join(ws, "sandbox-build.sb"); got != want {

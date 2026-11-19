@@ -867,4 +867,18 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/practice-claude-model-release-notes-linked-billing-5cd04824-202611171847.md](research/practice-claude-model-release-notes-linked-billing-5cd04824-202611171847.md) | Note on Claude release notes snapshot `2026-11-16T22:41:47Z` (linked billing and a cut-off managed hosting line) for item `5cd04824`, read as untrusted data. All personas and the claude model notes stay unchanged. |
 
+## 2026-11-18 — Incident reports in the knowledge base
+
+| Document | What it records |
+|---|---|
+| [research/incident-knowledge-base-2026-11.md](research/incident-knowledge-base-2026-11.md) | Research: 101 records have no frontmatter, no Go reader and no copy of their evidence. Run directories go after 14 days. Current practice: contributing factors, typed actions with an owner, a measured effectiveness check, a SHA-256 evidence manifest and a searchable store. Refinements R1 to R7. |
+| [plans/incident-knowledge-base-2026-11.md](plans/incident-knowledge-base-2026-11.md) | Plan: five designs scored; records on the self-heal intake win. The decisions add frontmatter, ten sections and a committed evidence bundle with ledger-line anchors. They also add `evolve issue` verbs, self-heal levels as policy data, new detectors, graph nodes and a measured effectiveness verdict. |
+
+## 2026-11-18 — Tests that cannot fail, tests that pin code text, and fakes that differ
+
+| Document | What it records |
+|---|---|
+| [research/test-quality-audit-2026-11.md](research/test-quality-audit-2026-11.md) | Research: a census of 33,528 test functions, with a command for each repeatable figure. The census finds tests with no assertion and self-asserting `apicover_named` files. It also finds skips that hide load errors, single-file source pins, source-text-only `acs` predicates and four fakes that differ from the real tool. One of the four is a production defect in the bridge. It gives refinements R1 to R8. |
+| [plans/test-quality-audit-2026-11.md](plans/test-quality-audit-2026-11.md) | Plan: an analyzer with a baseline ratchet in shards and a metric fix for `apicover`. It adds verified fakes with contract suites, and test-only fix items with a recorded mutation check. Components T1 to T10 and P1. |
+
 <!-- GENERATED:research-index END -->

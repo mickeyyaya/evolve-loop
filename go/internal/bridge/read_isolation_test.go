@@ -153,7 +153,7 @@ func TestSandboxWrap_TheProfileCarriesTheReadIsolationOfTheCellAndItsTag(t *test
 	req := c.request()
 	req.Worktree = realDir(t)
 	prefix, ok := defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))(req)
-	if !ok {
+	if !ok.Applied {
 		t.Fatal("the wrap was refused")
 	}
 	sbpl, err := os.ReadFile(prefix[2])
@@ -173,7 +173,7 @@ func TestSandboxWrap_TheProfileCarriesTheReadIsolationOfTheCellAndItsTag(t *test
 func TestSandboxPrefixForLaunch_TagsTheCellWithItsDispatchID(t *testing.T) {
 	t.Parallel()
 	var got SandboxWrapRequest
-	deps := Deps{SandboxWrap: func(req SandboxWrapRequest) ([]string, bool) { got = req; return nil, false }}
+	deps := Deps{SandboxWrap: func(req SandboxWrapRequest) ([]string, WrapOutcome) { got = req; return nil, WrapOutcome{} }}
 	sandboxPrefixForLaunch(deps, &Config{Worktree: "/wt", DispatchID: "d-77"}, "")
 	if got.Tag != "d-77" {
 		t.Fatalf("the wrap request tag = %q, want the dispatch id d-77", got.Tag)

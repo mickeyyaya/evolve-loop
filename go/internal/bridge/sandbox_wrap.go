@@ -16,7 +16,7 @@ func defaultSandboxWrap(deps Deps) SandboxWrapper {
 }
 
 func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult) SandboxWrapper {
-	return func(req SandboxWrapRequest) ([]string, bool) {
+	return func(req SandboxWrapRequest) ([]string, WrapOutcome) {
 		mode := strings.TrimSpace(deps.SandboxMode)
 		if mode == "" {
 			mode = config.SandboxModeAuto
@@ -30,7 +30,7 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			mode = config.SandboxModeAuto
 		}
 		if mode == config.SandboxModeOff {
-			return nil, false
+			return nil, WrapOutcome{}
 		}
 
 		probe := probeFunc()
@@ -39,25 +39,19 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			if mode == config.SandboxModeOn && deps.Stderr != nil {
 				fmt.Fprintf(deps.Stderr, "[bridge] WARN: sandbox.mode=on but inner sandbox not applied; phase runs UNCONFINED at the inner layer. Reason: %s\n", reason)
 			}
-			return nil, false
+			return nil, WrapOutcome{Cause: CauseProbe, Reason: reason}
 		}
 
 		if probe.OS == "darwin" && req.TerminalPath != "" {
 			if err := validateSandboxTerminal(req.TerminalPath); err != nil {
-				if deps.Stderr != nil {
-					fmt.Fprintf(deps.Stderr, "[bridge] sandbox terminal unavailable: %v\n", err)
-				}
-				return nil, false
+				return deps.refuseWrap(CauseProfile, fmt.Sprintf("sandbox terminal unavailable: %v", err))
 			}
 		}
 
 		home, _ := os.UserHomeDir()
 		holders, err := ensureSeatHolder(home)
 		if err != nil {
-			if deps.Stderr != nil {
-				fmt.Fprint(deps.Stderr, seatHolderRefusal(err))
-			}
-			return nil, false
+			return deps.refuseWrap(CauseProfile, seatHolderRefusal(err))
 		}
 		cfg := sandbox.Config{
 			TerminalPath:    req.TerminalPath,
@@ -86,17 +80,11 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			gitDenies, err = resolveSandboxDenials(gitDenies, "", "", true)
 		}
 		if err != nil {
-			if deps.Stderr != nil {
-				fmt.Fprintf(deps.Stderr, "[bridge] sandbox capability unavailable: %v\n", err)
-			}
-			return nil, false
+			return deps.refuseWrap(CauseProfile, fmt.Sprintf("sandbox capability unavailable: %v", err))
 		}
 		grants, err := resolveSandboxWriteGrants(req.WriteSubpaths, req.RepoRoot, req.Worktree, req.Workspace)
 		if err != nil {
-			if deps.Stderr != nil {
-				fmt.Fprintf(deps.Stderr, "[bridge] sandbox write grant unavailable: %v\n", err)
-			}
-			return nil, false
+			return deps.refuseWrap(CauseProfile, fmt.Sprintf("sandbox write grant unavailable: %v", err))
 		}
 		cfg.WritePaths = append(cfg.WritePaths, grants...)
 		cfg.WritePaths = append(cfg.WritePaths, gitWrites...)
@@ -109,10 +97,7 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			}
 			real, err := canonicalSandboxPath(path)
 			if err != nil {
-				if deps.Stderr != nil {
-					fmt.Fprintf(deps.Stderr, "[bridge] sandbox path resolution failed: %v\n", err)
-				}
-				return nil, false
+				return deps.refuseWrap(CauseProfile, fmt.Sprintf("sandbox path resolution failed: %v", err))
 			}
 			paths[i] = real
 		}
@@ -120,10 +105,7 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 		cfg = deps.withProtectedWrites(cfg, ownWorktree(req, cfg.WritePaths), cfg.RepoRoot)
 		socketDir, sockets, err := tmuxSocketGuard()
 		if err != nil {
-			if deps.Stderr != nil {
-				fmt.Fprintf(deps.Stderr, "[bridge] sandbox tmux socket guard unavailable: %v\n", err)
-			}
-			return nil, false
+			return deps.refuseWrap(CauseProfile, fmt.Sprintf("sandbox tmux socket guard unavailable: %v", err))
 		}
 		cfg.DenySockets = sockets
 		cfg.DenyLiterals = append(append(append(slices.Clone(cfg.DenyLiterals), socketDir), sockets...), cred.literals...)
@@ -147,7 +129,7 @@ func applySeatGrants(cfg sandbox.Config, req SandboxWrapRequest, holders []strin
 	return cfg
 }
 
-func osSandboxPrefix(goos string, deps Deps, req SandboxWrapRequest, cfg sandbox.Config) ([]string, bool) {
+func osSandboxPrefix(goos string, deps Deps, req SandboxWrapRequest, cfg sandbox.Config) ([]string, WrapOutcome) {
 	switch goos {
 	case "darwin":
 		sbpl := sandbox.GenerateSBPL(cfg)
@@ -165,22 +147,19 @@ func osSandboxPrefix(goos string, deps Deps, req SandboxWrapRequest, cfg sandbox
 		}
 		sbplPath := filepath.Join(sbplDir, "sandbox-"+req.Phase+".sb")
 		if err := os.WriteFile(sbplPath, []byte(sbpl), 0o644); err != nil {
-			return nil, false
+			return deps.refuseWrap(CauseProfile, fmt.Sprintf("sandbox profile unavailable: %v", err))
 		}
-		return []string{"sandbox-exec", "-f", sbplPath}, true
+		return []string{"sandbox-exec", "-f", sbplPath}, WrapOutcome{Applied: true}
 	case "linux":
 		for _, path := range append(append([]string{}, req.DenyPaths...), req.DenyReadPaths...) {
 			info, err := os.Stat(path)
 			if err != nil || (!info.IsDir() && slices.Contains(req.DenyReadPaths, path)) {
-				if deps.Stderr != nil {
-					fmt.Fprintf(deps.Stderr, "[bridge] sandbox policy unavailable: Linux denial target %q must exist; read denials require directories (stat: %v)\n", path, err)
-				}
-				return nil, false
+				return deps.refuseWrap(CauseProfile, fmt.Sprintf("sandbox policy unavailable: Linux denial target %q must exist; read denials require directories (stat: %v)", path, err))
 			}
 		}
-		return append([]string{"bwrap"}, sandbox.BwrapPrefix(cfg)...), true
+		return append([]string{"bwrap"}, sandbox.BwrapPrefix(cfg)...), WrapOutcome{Applied: true}
 	default:
-		return nil, false
+		return nil, WrapOutcome{Cause: CauseProbe, Reason: sandbox.UnsupportedOSReason(goos)}
 	}
 }
 
@@ -214,12 +193,12 @@ func depEnvGetter(deps Deps) func(string) string {
 
 const modelNetworkRequired = true
 
-func sandboxPrefixForLaunch(deps Deps, cfg *Config, terminalPath string) ([]string, bool) {
+func sandboxPrefixForLaunch(deps Deps, cfg *Config, terminalPath string) ([]string, WrapOutcome) {
 	if cfg == nil || cfg.Worktree == "" && !cfg.RequireSandbox {
-		return nil, false
+		return nil, WrapOutcome{}
 	}
 	if deps.SandboxWrap == nil {
-		return nil, false
+		return nil, WrapOutcome{}
 	}
 	if !cfg.AllowNetwork && deps.Stderr != nil {
 		fmt.Fprintf(deps.Stderr, "[bridge] WARN: source-writing phase %q has sandbox.allow_network=false; forcing true (a sandboxed model-reaching CLI cannot boot with network denied)\n", cfg.Agent)
@@ -286,20 +265,20 @@ func joinPrefixForTmux(prefix []string) string {
 	return strings.Join(parts, " ")
 }
 
-func wrapHeadlessInvocation(deps Deps, cfg *Config, name string, args []string) (wrappedName string, wrappedArgs []string, wrapped bool) {
-	prefix, ok := sandboxPrefixForLaunch(deps, cfg, "")
-	if !ok {
-		return name, args, false
+func wrapHeadlessInvocation(deps Deps, cfg *Config, name string, args []string) (wrappedName string, wrappedArgs []string, wrapped WrapOutcome) {
+	prefix, wrapped := sandboxPrefixForLaunch(deps, cfg, "")
+	if !wrapped.Applied {
+		return name, args, wrapped
 	}
 	newArgs := make([]string, 0, len(prefix)-1+1+len(args))
 	newArgs = append(newArgs, prefix[1:]...)
 	newArgs = append(newArgs, name)
 	newArgs = append(newArgs, args...)
-	return prefix[0], newArgs, true
+	return prefix[0], newArgs, wrapped
 }
 
-func sandboxRequiredButUnavailable(deps Deps, cfg *Config, wrapped bool) bool {
-	if cfg == nil || !cfg.RequireSandbox || wrapped {
+func sandboxRequiredButUnavailable(deps Deps, cfg *Config, wrapped WrapOutcome) bool {
+	if cfg == nil || !cfg.RequireSandbox || wrapped.Applied {
 		return false
 	}
 	ok, optOut, reason := sandbox.ConfinementSatisfied(
@@ -312,7 +291,7 @@ func sandboxRequiredButUnavailable(deps Deps, cfg *Config, wrapped bool) bool {
 		return false
 	}
 	if deps.Stderr != nil {
-		fmt.Fprintf(deps.Stderr, "[bridge] sandbox requirement unsatisfied: %s\n", reason)
+		fmt.Fprintf(deps.Stderr, "[bridge] sandbox requirement unsatisfied: %s\n", wrapped.describe(reason))
 	}
 	return true
 }

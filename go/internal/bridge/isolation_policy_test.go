@@ -93,7 +93,7 @@ func TestLinuxSandboxDenialsAndUnsupportedTargets(t *testing.T) {
 	wrap := defaultSandboxWrapWithProbe(Deps{}, fakeProbe("linux", true))
 	req := SandboxWrapRequest{RepoRoot: root, Worktree: root, DenyPaths: []string{protected}, DenyReadPaths: []string{private}}
 	args, ok := wrap(req)
-	if !ok {
+	if !ok.Applied {
 		t.Fatal("valid directory restrictions must be supported")
 	}
 	if len(args) == 0 || args[0] != "bwrap" {
@@ -104,7 +104,7 @@ func TestLinuxSandboxDenialsAndUnsupportedTargets(t *testing.T) {
 		t.Fatalf("missing restrictions: %v", args)
 	}
 	req.DenyPaths = []string{filepath.Join(root, "absent")}
-	if _, ok := wrap(req); ok {
+	if _, ok := wrap(req); ok.Applied {
 		t.Fatal("missing target must not silently discard restriction")
 	}
 	file := filepath.Join(root, "file")
@@ -113,7 +113,7 @@ func TestLinuxSandboxDenialsAndUnsupportedTargets(t *testing.T) {
 	}
 	req.DenyPaths = nil
 	req.DenyReadPaths = []string{file}
-	if _, ok := wrap(req); ok {
+	if _, ok := wrap(req); ok.Applied {
 		t.Fatal("unsupported read-denied file must not claim directory confinement")
 	}
 }
@@ -121,11 +121,11 @@ func TestLinuxSandboxDenialsAndUnsupportedTargets(t *testing.T) {
 func TestMandatorySandboxDoesNotTrustNestedEnvironment(t *testing.T) {
 	t.Parallel()
 	deps := Deps{Env: map[string]string{"CLAUDECODE": "1"}}
-	if !sandboxRequiredButUnavailable(deps, &Config{RequireSandbox: true}, false) {
+	if !sandboxRequiredButUnavailable(deps, &Config{RequireSandbox: true}, WrapOutcome{}) {
 		t.Fatal("nested marker is not proof of required filesystem restrictions")
 	}
 	deps.SandboxMode = "off"
-	if sandboxRequiredButUnavailable(deps, &Config{RequireSandbox: true}, false) {
+	if sandboxRequiredButUnavailable(deps, &Config{RequireSandbox: true}, WrapOutcome{}) {
 		t.Fatal("explicit operator opt-out must remain supported")
 	}
 }
@@ -146,8 +146,8 @@ func TestLinuxLinkedGitMetadataIsolationFailsClosed(t *testing.T) {
 	deps := Deps{Stderr: &log}
 	wrap := defaultSandboxWrapWithProbe(deps, fakeProbe("linux", true))
 	_, wrapped := wrap(SandboxWrapRequest{Phase: "builder", RepoRoot: root, Worktree: worktree, Workspace: t.TempDir()})
-	if wrapped || !strings.Contains(log.String(), "Git metadata isolation unsupported") {
-		t.Fatalf("missing explicit capability failure: wrapped=%v %s", wrapped, log.String())
+	if wrapped.Applied || !strings.Contains(log.String(), "Git metadata isolation unsupported") {
+		t.Fatalf("missing explicit capability failure: wrapped=%v %s", wrapped.Applied, log.String())
 	}
 	if !sandboxRequiredButUnavailable(deps, &Config{RequireSandbox: true}, wrapped) {
 		t.Fatal("mandatory launch must fail closed")

@@ -20,6 +20,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/selfheal"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -28,6 +29,7 @@ const (
 	integrationRecordUsage = "usage: evolve integration record-pr --pr N (--reviewed | --class NAME)"
 	inboxDir               = ".evolve/inbox/"
 	mainRedFixFlag         = "--main-red-fix"
+	batchHeldCode          = signalcenter.Code("SHIP_INTEGRATION_BATCH_HELD")
 )
 
 var reviewClasses = map[string]func(paths []string) bool{
@@ -38,14 +40,16 @@ type batchPorts struct {
 	Repo integration.Repo
 	CI   integration.GhCI
 	Main integration.GitMain
+	Runs *integration.RunLog
 }
 
 func (e integrationEnv) ports() batchPorts {
 	repo := integration.Repo{Dir: e.Root, Git: e.Git}
-	return batchPorts{Repo: repo, CI: integration.GhCI{Repo: repo, Gh: e.Gh, Settle: e.Settle}, Main: integration.GitMain{Repo: repo}}
+	runs := integration.NewRunLog()
+	return batchPorts{Repo: repo, CI: integration.GhCI{Repo: repo, Gh: e.Gh, Settle: e.Settle, Runs: runs}, Main: integration.GitMain{Repo: repo}, Runs: runs}
 }
 
-func (e integrationEnv) train(projectRoot string, warn io.Writer) integration.Train {
+func (e integrationEnv) train(projectRoot string, warn io.Writer) (integration.Train, *integration.RunLog) {
 	p := e.ports()
 	gate := e.stopGate(projectRoot, warn)
 	return integration.Train{
@@ -58,7 +62,7 @@ func (e integrationEnv) train(projectRoot string, warn io.Writer) integration.Tr
 		Root:     e.Root,
 		Wave:     e.Wave,
 		MainCI:   p.CI,
-	}
+	}, p.Runs
 }
 
 func inboxCloser(root string) integration.InboxFunc {
@@ -82,9 +86,16 @@ func (c cliIO) fail(err error) int {
 	fmt.Fprintf(c.stderr, "%s%v\n", integrationPrefix, err)
 	var mainRefusal *integration.MainRefusal
 	if errors.As(err, &mainRefusal) {
-		fmt.Fprintf(c.stderr, "Next: rerun the failed job of main when the red is a flake, or land the fix alone with %s <PR>\n", mainRedFixFlag)
+		fmt.Fprintln(c.stderr, mainRefusalHint(mainRefusal))
 	}
 	return refusalExit(err)
+}
+
+func mainRefusalHint(r *integration.MainRefusal) string {
+	if r.Reason == string(integration.MainPending) {
+		return "Next: wait for the CI run of main to finish, then run the batch again"
+	}
+	return fmt.Sprintf("Next: rerun the failed job of main when the red is a flake, or land the fix alone with %s <PR>", mainRedFixFlag)
 }
 
 func usageFail(stderr io.Writer, err error, usage string) int {
@@ -119,33 +130,68 @@ func batchVerb(env integrationEnv, args []string, stdout, stderr io.Writer) int 
 	if rc != 0 {
 		return rc
 	}
-	t := env.train(root, stderr)
-	t.MainRedFix, t.Progress = redFix, stepPrinter(stdout)
+	t, runs := env.train(root, stderr)
+	t.MainRedFix, t.Progress = redFix, batchProgress(stdout, runs, stopWiring{env: env, projectRoot: root, warn: stderr})
 	if dry {
 		t.MainCI = integration.PeekCI{CI: env.ports().CI}
 	}
 	return runBatch(t, batchRequest{prs: prs, dry: dry}, cliIO{stdout, stderr})
 }
 
-func stepPrinter(w io.Writer) func(integration.Step) {
+func batchProgress(w io.Writer, runs *integration.RunLog, signals stopWiring) func(integration.Step) {
 	return func(s integration.Step) {
-		fmt.Fprintln(w, stepLine(s))
+		fmt.Fprintln(w, stepLine(s, runs))
+		if s.Kind == integration.StepHold {
+			if !baseCheckFailed(s) {
+				signals.emit(holdEvent(s, runs))
+			}
+		}
 	}
 }
 
-func stepLine(s integration.Step) string {
+func baseCheckFailed(s integration.Step) bool {
+	var refusal *integration.MainRefusal
+	return s.Err != nil && !errors.As(s.Err, &refusal)
+}
+
+func mainNotGreen(base string) string {
+	return fmt.Sprintf("main %s is not green", integration.ShortSHA(base))
+}
+
+func holdEvent(s integration.Step, runs *integration.RunLog) signalcenter.Event {
+	return signalcenter.Event{
+		Origin: batchEventOrigin, Kind: signalcenter.KindShipWarning, Code: batchHeldCode, Severity: signalcenter.SeverityWarn,
+		Reason: fmt.Sprintf("batch PR #%d is held: %s", s.Batch, mainNotGreen(s.Base)),
+		Fields: map[string]string{"base": s.Base, "base_run": runText(runs, s.Base), "batch": strconv.Itoa(s.Batch), "prs": joinInts(s.PRs)},
+	}
+}
+
+func runText(runs *integration.RunLog, tip string) string {
+	if id := runs.Run(tip); id != "" {
+		return id
+	}
+	return "none"
+}
+
+func stepLine(s integration.Step, runs *integration.RunLog) string {
 	prs := joinInts(s.PRs)
+	run := runText(runs, s.Tip)
 	switch s.Kind {
 	case integration.StepTest:
 		return fmt.Sprintf("step: test PRs %s in batch PR #%d", prs, s.Batch)
 	case integration.StepVerdict:
-		return fmt.Sprintf("step: batch PR #%d of PRs %s is %s", s.Batch, prs, s.Verdict)
+		return fmt.Sprintf("step: batch PR #%d of PRs %s is %s (run %s)", s.Batch, prs, s.Verdict, run)
 	case integration.StepRerun:
-		return fmt.Sprintf("step: rerun the failed jobs of batch PR #%d", s.Batch)
+		return fmt.Sprintf("step: rerun the failed jobs of batch PR #%d (run %s)", s.Batch, run)
 	case integration.StepSplit:
 		return fmt.Sprintf("step: split PRs %s in halves", prs)
 	case integration.StepLand:
-		return fmt.Sprintf("step: landed PRs %s through batch PR #%d", prs, s.Batch)
+		return fmt.Sprintf("step: landed PRs %s through batch PR #%d (run %s)", prs, s.Batch, run)
+	case integration.StepHold:
+		if baseCheckFailed(s) {
+			return fmt.Sprintf("step: stop PRs %s in batch PR #%d: the check of main %s failed: %v", prs, s.Batch, integration.ShortSHA(s.Base), s.Err)
+		}
+		return fmt.Sprintf("step: hold PRs %s in batch PR #%d: %s (base run %s)", prs, s.Batch, mainNotGreen(s.Base), runText(runs, s.Base))
 	}
 	return fmt.Sprintf("step: %s PRs %s in batch PR #%d", s.Kind, prs, s.Batch)
 }
@@ -296,7 +342,8 @@ func recordPRVerb(env integrationEnv, args []string, stdout, stderr io.Writer) i
 		}
 		bind = reviewedBinder(store)
 	}
-	return recordPR(env.train(env.Root, stderr), recordRequest{pr: n, bind: bind}, c)
+	t, _ := env.train(env.Root, stderr)
+	return recordPR(t, recordRequest{pr: n, bind: bind}, c)
 }
 
 type missingRecordError struct{ path string }

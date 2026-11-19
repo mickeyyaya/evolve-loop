@@ -217,9 +217,9 @@ func runInPane(t *testing.T, probe sandbox.ProbeResult, target parityTarget, mut
 	deps := itDeps(250 * time.Millisecond)
 	deps.Env, deps.LookupEnv, deps.BootTimeoutS = map[string]string{}, mapLookup(nil), 2400
 	wrap := defaultSandboxWrapWithProbe(deps, func() sandbox.ProbeResult { return probe })
-	deps.SandboxWrap = func(req SandboxWrapRequest) ([]string, bool) {
+	deps.SandboxWrap = func(req SandboxWrapRequest) ([]string, WrapOutcome) {
 		prefix, ok := wrap(req)
-		if ok && mutate != nil {
+		if ok.Applied && mutate != nil {
 			mutate(t, prefix[2])
 		}
 		return prefix, ok

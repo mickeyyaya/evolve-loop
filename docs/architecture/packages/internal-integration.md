@@ -191,8 +191,21 @@ The file is `mainci.go`. The design is in [plan §12](../../plans/wave-integrati
 - A red verdict, `ErrNoRun` and a `RunConclusionError` give a `MainRefusal`, unless `MainRedFix` is set. Any other error stays an error, so a `gh` outage never reads as a red main.
 - `GhCI` gives the typed results at their source: `runID` gives `ErrNoRun`, and `verdict` gives `RunConclusionError`. With no `Settle`, `verdict` gives `ErrRunPending`.
 - `PeekCI` reads a run once with no watch and no wait. The dry run uses it. The real run uses the raw `GhCI`, not the gated port, so a red main never asks the main-red stop.
-- `Merger` emits a typed `Step` for each CI run, verdict, rerun, split and landing through `Progress`. The command formats the `step:` line. A `Merger` with no `Progress` emits nothing.
+- `Merger` emits a typed `Step` for each CI run, verdict, rerun, split, hold and landing through `Progress`. The command formats the `step:` line. A `Merger` with no `Progress` emits nothing.
 - Pinned by `TestTrainPlanChecksTheCIOfTheBaseItPlansOn`, `TestPeekCIReadsTheRunOnceAndNeverWatchesIt`, `TestMergerEmitsEachStepOfARedSplitAndTheLandings` and the `TestRunBatch_*` journeys of `cmd/evolve`.
+
+## The base check of a red batch
+
+The files are `batchpr.go`, `train.go`, `runlog.go` and `ghci.go`. The design is in [the plan](../../plans/train-red-batch-attribution-2026-11.md).
+
+- `Merger.Base` is a func port. A nil port keeps the split. When the rerun of a batch stays red, `Merger.land` calls the port with the base of the same pass, before it splits. Each level of a split calls it again.
+- A port error stops the land. No split follows. `Merger.land` emits a `StepHold` step with the base, the batch and the tip. The outcome keeps the PRs that landed before the hold.
+- The port is not called on a green verdict or on a flake.
+- `Train.holdOnBase` wires the port to `checkMain`. A `MainRefusal` holds the batch. A base that is still pending also holds it. `MainRedFix` gives `MainRedOverridden`, so the batch splits as before. `ErrRunTimeout` stops the land with that error.
+- `GhCI.Runs` is a `RunLog`. `GhCI.Watch` writes the run id that its one `runID` lookup finds, keyed by the tip. `Step.Tip` and `Step.Base` let the command read the run from the log. The `CI` and `MainCI` interfaces do not change.
+- `batcher.compose` takes its base from `rev-parse refs/evolve/main` after its fetch. It checks each kept member with `Repo.CheckLanded` against that base. A member that main took goes to `Composition.OnMain`, and `Merger.land` adds it to `Outcome.OnMain`. `settle` closes it with the text of `alreadyLanded`. `EnforceActor` marks it as merged.
+- The command prints the hold line, emits one `SHIP_INTEGRATION_BATCH_HELD` signal through the batch event origin, and exits with the code of a main refusal.
+- Pinned by `TestMergerHoldsARedBatchWhenTheBasePortRefuses`, `TestTrainLandHoldsARedBatchWhenTheBaseIsRed`, `TestTrainLandClosesAMemberThatMainTookDuringTheRunAsAlreadyLanded` and `TestRunBatch_HoldsARedBatchOnARedBaseAndSaysSo`.
 
 ## The stop gate of the train
 

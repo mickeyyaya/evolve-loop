@@ -253,7 +253,7 @@ func TestLaunchArgs_Agy_NoPermissionModeBackCompat(t *testing.T) {
 }
 
 func noSandboxWrap() SandboxWrapper {
-	return func(SandboxWrapRequest) ([]string, bool) { return nil, false }
+	return func(SandboxWrapRequest) ([]string, WrapOutcome) { return nil, WrapOutcome{} }
 }
 
 func runWithSandbox(t *testing.T, fr *fakeRunner, sw SandboxWrapper, args []string) (int, string) {

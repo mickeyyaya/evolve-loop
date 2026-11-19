@@ -21,13 +21,19 @@ type prStep struct {
 
 func (j *trainJourney) prSteps(t *testing.T, n int, steps ...prStep) {
 	t.Helper()
+	j.onPR(n, func() {
+		for _, s := range steps {
+			j.work.Write(s.file, s.body)
+			j.work.Git("add", ".")
+			j.work.Git("commit", "-q", "-m", s.message)
+		}
+	})
+}
+
+func (j *trainJourney) onPR(n int, commits func()) {
 	name := "pr-" + strconv.Itoa(n)
 	j.work.Git("checkout", "-q", "-b", name, "main")
-	for _, s := range steps {
-		j.work.Write(s.file, s.body)
-		j.work.Git("add", ".")
-		j.work.Git("commit", "-q", "-m", s.message)
-	}
+	commits()
 	j.work.Git("push", "-q", "origin", name+":refs/pull/"+strconv.Itoa(n)+"/head")
 	j.work.Git("checkout", "-q", "main")
 }

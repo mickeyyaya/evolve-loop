@@ -30,7 +30,7 @@ func ensureSeatHolder(home string) ([]string, error) {
 }
 
 func seatHolderRefusal(err error) string {
-	return fmt.Sprintf("[bridge] the seat token holder cannot be created: %v. The launch is refused, because the cell would run with no deny on the holder.\n", err)
+	return fmt.Sprintf("the seat token holder cannot be created: %v. The launch is refused, because the cell would run with no deny on the holder.", err)
 }
 
 func withSeatHolderDeny(cfg sandbox.Config, holders ...string) sandbox.Config {

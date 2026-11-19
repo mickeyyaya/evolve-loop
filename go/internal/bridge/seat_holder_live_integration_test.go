@@ -36,7 +36,7 @@ func liveSeatHome(t *testing.T) (home, token string, prefix []string) {
 		HostIsolated: true, SeatRoot: paths.SeatRoot(resolved),
 	}
 	prefix, ok := defaultSandboxWrapWithProbe(Deps{SandboxMode: "on"}, func() sandbox.ProbeResult { return probe })(req)
-	if !ok {
+	if !ok.Applied {
 		t.Fatal("the wrap was refused")
 	}
 	return resolved, token, prefix

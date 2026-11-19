@@ -25,7 +25,7 @@ func TestIntegrationProductionEnvSetsEveryPort(t *testing.T) {
 	if env.Emit == nil || env.KeyRun == nil || !env.Now.Equal(time.Date(2026, 11, 4, 5, 41, 12, 0, time.UTC)) {
 		t.Errorf("env = %+v, want the signal emitter, the key run and the clock of the main-red stop", env)
 	}
-	train := env.train("/repo", io.Discard)
+	train, _ := env.train("/repo", io.Discard)
 	if train.CI == nil || train.Main == nil || train.Host == nil || train.Inbox == nil || train.Root != "/repo" || train.Wave != env.Wave || train.Composer.Stage != policy.FleetIntegrationShadow {
 		t.Errorf("train = %+v, want every port set from the env", train)
 	}

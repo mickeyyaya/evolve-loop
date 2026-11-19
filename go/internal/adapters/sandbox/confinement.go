@@ -28,11 +28,15 @@ func ConfinementSatisfied(nested bool, mode string) (ok, optOut bool, reason str
 	return false, false, "inner sandbox required but unavailable"
 }
 
+func UnsupportedOSReason(goos string) string {
+	return "Unsupported OS: " + goos + " — no sandbox implementation"
+}
+
 func ShouldWrap(nested bool, probe ProbeResult) (bool, string) {
 	switch probe.OS {
 	case "darwin", "linux":
 	default:
-		return false, "Unsupported OS: " + probe.OS + " — no sandbox implementation"
+		return false, UnsupportedOSReason(probe.OS)
 	}
 	if !probe.Available {
 		reason := probe.Reason

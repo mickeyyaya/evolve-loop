@@ -72,8 +72,8 @@ func TestBootSmokeTest_SandboxPrefixApplied(t *testing.T) {
 	wt := t.TempDir()
 	tmux := &fakeTmux{paneSeq: []string{"❯"}}
 	deps, _ := bootSmokeDeps(tmux)
-	deps.SandboxWrap = func(req SandboxWrapRequest) ([]string, bool) {
-		return []string{"sandbox-exec", "-f", "/tmp/x.sb"}, true
+	deps.SandboxWrap = func(req SandboxWrapRequest) ([]string, WrapOutcome) {
+		return []string{"sandbox-exec", "-f", "/tmp/x.sb"}, WrapOutcome{Applied: true}
 	}
 	rc, _ := BootSmokeTest(context.Background(), "claude-tmux", &Config{Workspace: ws, Worktree: wt, Agent: "build"}, deps)
 	if rc != ExitOK {
