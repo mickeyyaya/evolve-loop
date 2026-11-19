@@ -16,6 +16,9 @@
   "kind": "pipeline-integrity",
   "origin": "console",
   "priority_class": "correctness",
+  "route": "lane",
+  "routed_at": "2026-11-19T20:47:20Z",
+  "routed_reason": "backlog review D6 (PR #1571): a lane can build it; no protected path in files[] (first-pass LANE claim, F5.2)",
   "summary": "The cycle composed gate runs make test, which has a treewalk guard. CI runs make test-integration, which has no treewalk guard. Three tests leaked .evolve ledgers under go/ (cmd/evolve, internal/core, internal/phases/triage), CI on main stayed green, and every lane composed gate went red (cycle 2419, wave 174: ORCHESTRATOR_COMPOSED_GATE_DECLINED, 4 LEAK paths).",
   "title": "CI test-integration runs the treewalk leak guard that make test runs",
   "weight": 0.8

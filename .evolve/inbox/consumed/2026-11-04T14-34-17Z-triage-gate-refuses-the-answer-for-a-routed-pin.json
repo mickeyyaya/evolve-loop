@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "A journey test: a lane pinned on a console-routed item ends as planned no-work, not FAIL",
+    "The rejection text names only answers that pass"
+  ],
+  "consumed": {
+    "at": "2026-11-19T20:43:18Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "DONE, confirmed by adversarial review 2026-11-19 (backlog review D1, PR #1571): `git show 0cbfd3f5f`, `origin/main:go/internal/committedset/committedset.go`, `origin/main:go/internal/deliverable/route_effect.go`"
+  },
+  "created_at": "2026-11-04T14:34:17Z",
+  "files": [
+    "go/internal/committedset/committedset.go",
+    "go/internal/deliverable/effects.go"
+  ],
+  "fix": "The answer for a pinned item that the claim floor refuses for its route ends the cycle as planned no-work. The gate reads the route as a host fact. Correct the rejection text.",
+  "id": "triage-gate-refuses-the-answer-for-a-routed-pin",
+  "kind": "pipeline-integrity",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "routed_at": "2026-11-14T14:18:44Z",
+  "routed_cycle": 2381,
+  "routed_reason": "lane triage (cycle 2381) skip_shipped: git_sha 0cbfd3f5fa1b8b0665be91b4e01f4bfb1e401a7a",
+  "summary": "In cycle 2161 the triage prompt told the agent to answer a routed item with escalate_block, and the inbox-claim gate rejected this twice with missing_effect. committedset.Committed uses the lane pin in place of top_n and subtracts only deferred. The rejection text says defer or drop it, but a dropped answer fails too. A correction could not change what the gate read.",
+  "title": "The triage gate must accept the prescribed answer for a routed lane pin",
+  "weight": 0.8
+}

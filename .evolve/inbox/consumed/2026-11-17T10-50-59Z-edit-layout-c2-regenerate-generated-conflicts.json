@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "two branches that each add an index shard compose with no conflict, and the aggregate holds both rows, red before the change",
+    "a conflict in a generated file and a source file still stops"
+  ],
+  "consumed": {
+    "at": "2026-11-18T04:54:09Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "Landed by PR #1558 through batch PR #1563 (main 36dee80b3): integration batch regenerates a derived-file conflict through derived.Worktree.Regenerate before it ejects a PR."
+  },
+  "created_at": "2026-11-17T10:50:59Z",
+  "files": [
+    "go/internal/integration/train.go",
+    "go/internal/phases/ship/landing/integrate.go"
+  ],
+  "fix": "Write a red test for Q1. Then, when a composition or fleet rebase conflicts only in generated files, run their generators (evolve docs index generate, evolve signals codes generate) and take the output.",
+  "id": "edit-layout-c2-regenerate-generated-conflicts",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "performance",
+  "summary": "Plan docs/plans/concurrent-edit-layout-2026-11.md (PR #1545), D2. docs/research-index.md and docs/architecture/signal-codes.md take 164 touches in 30 days; their sources never conflict (research F2.3). First answer Q1: does git merge-tree --write-tree read a merge driver from .gitattributes.",
+  "title": "A conflict only in generated files regenerates them (concurrent-edit C2)",
+  "weight": 0.65
+}

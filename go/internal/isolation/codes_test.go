@@ -67,3 +67,13 @@ func TestInit_RegistersTheRequestRefusalInModuleIsolation(t *testing.T) {
 		}
 	}
 }
+
+func TestInit_RegistersTheEnvRefusedCodeInModuleIsolation(t *testing.T) {
+	t.Parallel()
+	if m, ok := signalcenter.IsRegistered(CodeEnvRefused); !ok || m != signalcenter.ModuleIsolation || CodeEnvRefused != "ISOLATION_ENV_REFUSED" {
+		t.Fatalf("%s registered=%v module=%q", CodeEnvRefused, ok, m)
+	}
+	if !signalcenter.KindIsolationEnv.Known() {
+		t.Fatal("the kind isolation.env must be known")
+	}
+}

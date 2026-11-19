@@ -212,7 +212,7 @@ func verifyProtectedPathClaim(claim BlockerClaim, c BlockerCase) string {
 	if c.Protected == nil {
 		return "no protected-surface manifest is wired, so the path cannot be proven protected"
 	}
-	if why := claimTargetProblem(claim.Path, c); why != "" {
+	if why := claimFileProblem(claim.Path, c); why != "" {
 		return why
 	}
 	if !c.Protected(claim.Path) {
@@ -246,8 +246,15 @@ func verifyPredicateConflictClaim(claim BlockerClaim, c BlockerCase) string {
 }
 
 func claimTargetProblem(p string, c BlockerCase) string {
-	if !fs.ValidPath(p) || !strings.HasSuffix(p, ".go") || strings.HasSuffix(p, "_test.go") {
+	if strings.HasSuffix(p, "_test.go") {
 		return p + " is not a non-test Go source file in the tree"
+	}
+	return claimFileProblem(p, c)
+}
+
+func claimFileProblem(p string, c BlockerCase) string {
+	if !fs.ValidPath(p) || !strings.HasSuffix(p, ".go") {
+		return p + " is not a Go source file in the tree"
 	}
 	if info, err := os.Lstat(filepath.Join(c.Worktree, filepath.FromSlash(p))); err != nil || !info.Mode().IsRegular() {
 		return p + " does not exist in the worktree as a regular file"
@@ -318,11 +325,12 @@ func explainedFailure(f string, proven []BlockerClaim, explainable func(string) 
 func namesOnlyProvenFiles(text string, proven []BlockerClaim) (int, bool) {
 	named := 0
 	for _, token := range goSourceToken.FindAllString(text, -1) {
-		if strings.HasSuffix(token, "_test.go") {
+		isProven := slices.ContainsFunc(proven, func(c BlockerClaim) bool { return samePathTail(token, c.Path) })
+		if strings.HasSuffix(token, "_test.go") && !isProven {
 			continue
 		}
 		named++
-		if !slices.ContainsFunc(proven, func(c BlockerClaim) bool { return samePathTail(token, c.Path) }) {
+		if !isProven {
 			return named, false
 		}
 	}

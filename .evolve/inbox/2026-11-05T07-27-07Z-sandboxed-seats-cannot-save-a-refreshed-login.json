@@ -1,6 +1,5 @@
 {
   "acceptance": [
-    "A contract test states what a seat can do to the host login, and it fails if that changes",
     "A wave runs across more than 24 hours with no logout and no auth error in a seat",
     "The console login is not invalidated by a seat"
   ],

@@ -1,7 +1,8 @@
 {
   "acceptance": [
     "A test through the real entry shows one signal for an unmeasured cell, red without the fix.",
-    "N16 passes alone on the host, or the row names the host fault as its cause."
+    "N16 passes alone on the host, or the row names the host fault as its cause.",
+    "A test feeds a log with the fence and no open record, and the poll reports the missing record; red before the fix."
   ],
   "created_at": "2026-11-06T07:40:04Z",
   "files": [

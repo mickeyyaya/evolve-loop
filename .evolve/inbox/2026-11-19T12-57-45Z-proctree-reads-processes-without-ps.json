@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "A test inside a lane cell (the build floor of a cycle) lists the process table and reads the command of one pid through proctree with no exec of ps, red before the change",
+    "The darwin and linux readers return the same pid, ppid, pgid and comm as ps for the test process and its parent",
+    "go test -count=1 ./internal/faketmux passes inside a lane cell after faketmux moves to the new reader"
+  ],
+  "created_at": "2026-11-19T12:57:45Z",
+  "deps": [],
+  "files": [
+    "go/internal/proctree/list.go",
+    "go/internal/proctree/procargs_darwin.go",
+    "go/internal/proctree/procargs_linux.go"
+  ],
+  "fix": "Design first (protected path; design review before build). Candidate: export a per-pid reader (for example proctree.ArgsOf(pid)) that wraps readProcArgs, and a ps-free table lister (sysctl KERN_PROC_ALL on darwin, a /proc scan on linux) that returns pid, ppid, pgid and comm, behind the existing Lister seam. List every caller of NewLister/ExecLister and decide whether each moves to the ps-free lister. Then faketmux-reaper-needs-no-ps-binary builds on it.",
+  "id": "proctree-reads-processes-without-ps",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "A console-builder run on 2026-11-19 (agent-console-builder-20261119T125612Z-7945) for faketmux-reaper-needs-no-ps-binary found the blocker in go/internal/proctree: NewLister and ExecLister run `ps -A -o pid=,ppid=,pgid=,uid=,lstart=,comm=` through sysexec (list.go), and the per-pid readers readProcArgs (procargs_darwin.go, procargs_linux.go) and readProcStart are unexported. ArgsReader is an exported type with no exported implementation. A lane cell denies ps ('fork/exec /bin/ps: operation not permitted'), so faketmux (session.go:31 commandOf, format.go:80 runPS) and every caller of the proctree listers fail inside a cell. 8 faketmux tests are red in every lane cell.",
+  "title": "proctree reads the process table through ps, which a lane cell denies, and exports no ps-free reader",
+  "weight": 0.8
+}

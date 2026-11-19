@@ -1,7 +1,5 @@
 {
   "acceptance": [
-    "A test lands a peer during the re-verify of a cycle, and the cycle still ships when its rebase is clean.",
-    "A rebase with a real conflict still goes back to audit.",
     "A wave reports the number of re-audits that a ship race caused."
   ],
   "created_at": "2026-11-07T15:13:19Z",

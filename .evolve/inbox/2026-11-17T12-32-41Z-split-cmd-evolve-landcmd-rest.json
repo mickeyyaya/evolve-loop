@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "TestLandCmdRunRest in internal/cli/landcmd for integration and ship (fails before the move); only shims remain"
+  ],
+  "created_at": "2026-11-17T12:32:41Z",
+  "deps": [
+    "split-cmd-evolve-wavecmd"
+  ],
+  "files": [
+    "go/cmd/evolve/",
+    "go/internal/cli/landcmd/"
+  ],
+  "fix": "Step 5 of docs/plans/split-cmd-evolve-2026-11.md (parent plan concurrent-edit-layout-2026-11, C6/D5). Run at a wave boundary with no open lane in the group's files (evolve wave supply). Red test: TestLandCmdRunRest in internal/cli/landcmd for integration and ship (fails before the move); only shims remain. dependsOn: split-cmd-evolve-wavecmd. Note split (C7) follows the same group.",
+  "id": "split-cmd-evolve-landcmd-rest",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "performance",
+  "summary": "Step 5 of docs/plans/split-cmd-evolve-2026-11.md. Filed by the console from the refused request inbox-add-5 of cycle 2460: the request channel runs only dispatch requests, so the pipeline never filed it.",
+  "title": "Move the integration and ship verbs into go/internal/cli/landcmd behind shims",
+  "weight": 0.6
+}

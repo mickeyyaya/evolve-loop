@@ -8,8 +8,8 @@ import (
 func boundedUTF8(value string) string {
 	value = strings.ToValidUTF8(value, "�")
 	runes := []rune(value)
-	if len(runes) > maxDiagnosticRunes {
-		value = string(runes[:maxDiagnosticRunes-1]) + "…"
+	if len(runes) > MaxDiagnosticRunes {
+		value = string(runes[:MaxDiagnosticRunes-1]) + "…"
 	}
 	return value
 }

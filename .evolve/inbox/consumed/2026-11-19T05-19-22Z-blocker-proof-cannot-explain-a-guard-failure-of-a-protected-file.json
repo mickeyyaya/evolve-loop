@@ -1,0 +1,30 @@
+{
+  "acceptance": [
+    "a replay of the cycle 2508 floor failures plus its BLOCKER protected-path line on the real integrity surface ends the cycle as blocked-needs-console with no repair round",
+    "a plain unit-test failure whose failing tests are not declared in a proven protected file stays unexplained",
+    "the 'a plain unit-test failure' row of TestBlockerProver_AProvenClaimDoesNotExcuseAFailureItDoesNotExplain still holds"
+  ],
+  "consumed": {
+    "at": "2026-11-19T20:48:39Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "merged into blocker-proof-accepts-a-protected-acs-predicate (backlog review D5, PR #1571): same goal and shared files; its acceptance, files and deps now live on blocker-proof-accepts-a-protected-acs-predicate"
+  },
+  "created_at": "2026-11-19T05:19:22Z",
+  "deps": [
+    "blocker-proof-refuses-a-protected-test-file"
+  ],
+  "files": [
+    "go/internal/core/build_blocker_exit.go",
+    "go/internal/core/blocker_proof.go",
+    "go/internal/core/blocker_proof_test.go"
+  ],
+  "fix": "Design first (design review before build). Candidate: a failure explains through a proven protected test file when the failing test names a test function that is declared in that file (resolve the name against the worktree source), and a plain unit-test failure becomes explainable only in that case. Reject any rule that excuses a failure by package alone.",
+  "id": "blocker-proof-cannot-explain-a-guard-failure-of-a-protected-file",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "Cycle 2508: the floor failures were './cmd/evolve: unit tests FAIL' (--- FAIL: TestParallelDefault_EveryTopLevelTestIsParallelOrListedSerial) and an integration-tag failure of the same test. buildFloorExplainable (go/internal/core/build_blocker_exit.go:28) accepts only cover-strict and ./acs/cycleN predicate failures, and explainedFailure (go/internal/core/blocker_proof.go) needs the failure text to name the proven file. The guard failure names neither the kind nor the file (the guard reports the test name TestWireOrchestratorDeps_RequestChannelWired, which lives in the protected go/cmd/evolve/request_channel_test.go). So after blocker-proof-refuses-a-protected-test-file lands, a 2508-shaped cycle gets a proven claim plus 'these failures are not explained' and still runs repair rounds.",
+  "title": "a proven blocker cannot explain a guard test failure that names no file, so the cycle still runs repair rounds",
+  "weight": 0.7
+}

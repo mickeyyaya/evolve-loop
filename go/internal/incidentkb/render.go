@@ -1,9 +1,15 @@
 package incidentkb
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
+)
+
+var (
+	ErrMissingMarker      = errors.New("missing generated marker")
+	ErrOverlappingMarkers = errors.New("overlapping generated markers")
 )
 
 type markerSpan struct {
@@ -20,12 +26,12 @@ func findMarkerSpan(doc, part string) (markerSpan, error) {
 	beginTok, endTok := markerTokens(part)
 	bIdx := strings.Index(doc, beginTok)
 	if bIdx < 0 {
-		return markerSpan{}, fmt.Errorf("missing %s generated begin marker", part)
+		return markerSpan{}, fmt.Errorf("%w: %s begin", ErrMissingMarker, part)
 	}
 	contentS := bIdx + len(beginTok)
 	eRel := strings.Index(doc[contentS:], endTok)
 	if eRel < 0 {
-		return markerSpan{}, fmt.Errorf("missing %s generated end marker", part)
+		return markerSpan{}, fmt.Errorf("%w: %s end", ErrMissingMarker, part)
 	}
 	return markerSpan{part: part, contentS: contentS, contentE: contentS + eRel}, nil
 }
@@ -52,7 +58,7 @@ func Render(doc []byte) ([]byte, error) {
 	cursor := 0
 	for _, sp := range spans {
 		if sp.contentS < cursor {
-			return nil, fmt.Errorf("overlapping %s generated markers", sp.part)
+			return nil, fmt.Errorf("%w: %s", ErrOverlappingMarkers, sp.part)
 		}
 		b.WriteString(text[cursor:sp.contentS])
 		b.WriteByte('\n')

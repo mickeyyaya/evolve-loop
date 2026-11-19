@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "The cause has a regression test that fails before the fix and passes after it. The cause: `acssuite.runGoTest` runs the cycle, regression and red-team predicate scopes serially; the fix runs them concurrently, bounded by the lane CPU budget (`lanebudget`), with the verdict kept in scope-list order and a failing or stuck scope kept red. Test source: `console-followup/acssuite_scope_concurrency_test.go.txt` in the cycle 2494 run directory.",
+    "evolve wave latency --check reports the newest wave ok or left out. The audit host gate share is the cause; it falls only when the audit ACS suite stops running its predicate scopes one after another (the fix of AC 2). The check reads live wave data, so it is verified after the next closed wave."
+  ],
+  "created_at": "2026-11-18T05:41:59Z",
+  "files": [
+    "go/internal/acssuite/golane.go"
+  ],
+  "fix": "Make the change that AC 2 needs on the protected path(s) go/internal/acssuite/golane.go, then prove the criterion with a test.",
+  "id": "latency-wave-breach-from-wave-158-ac-2-console",
+  "kind": "fix",
+  "origin": "cycle",
+  "priority_class": "performance",
+  "route": "console-manual",
+  "source": "cycle 2494, tdd test-report.md AC 2 (console-followup)",
+  "summary": "The TDD phase of cycle 2494 gave AC 2 of latency-wave-breach-from-wave-158 the console-followup disposition. A lane builder can never change the paths it needs (go/internal/acssuite/golane.go). The lane part ships without it, so the console owns this part.",
+  "title": "Console part of latency-wave-breach-from-wave-158: AC 2, which needs a protected path changed",
+  "weight": 0.7
+}

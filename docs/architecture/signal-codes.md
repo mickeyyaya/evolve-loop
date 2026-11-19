@@ -264,8 +264,9 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 |---|---|
 | `ISOLATION_CONTEXT_BUDGET_OVER` | the cell context index: required entries of a layer passed its token budget and lost the flag; fields layer, limit_tokens, over (cell-context-index.md §6) |
 | `ISOLATION_CONTEXT_REQUIRED_UNOPENED` | the cell context index: a cell closed without a read of a required entry; fields.unopened lists the ids, and fields.source is sandbox (cell-context-index.md §8) |
+| `ISOLATION_ENV_REFUSED` | I-2 hermetic environment at enforce: the allowlist refused launcher variables that no earlier dispatch of the process reported; one INFO event for each dispatch. Fields: invariant, action, stage, cell, family, rule, source, count, names (names holds no value and is capped below the log field limit, with a +N more tail) (llm-isolation.md I-2) |
 | `ISOLATION_I1_VIOLATION` | I-1 single launcher: a code path started an LLM binary outside the bridge launch API; fields.target names the binary (ADR-0154) |
-| `ISOLATION_I2_VIOLATION` | I-2 hermetic environment: the allowlist dropped a launcher variable. Shadow keeps it (action=logged); enforce drops it (action=refused). Fields: invariant, stage, action, cell, family, target, rule, source (ADR-0154) |
+| `ISOLATION_I2_VIOLATION` | I-2 hermetic environment: the allowlist would drop a launcher variable, and shadow keeps it (action=logged); sent at shadow only, while enforce sends ISOLATION_ENV_REFUSED. Fields: invariant, stage, action, cell, family, target, rule, source (ADR-0154) |
 | `ISOLATION_I3_VIOLATION` | I-3 no nested agency: a cell tried to start an LLM binary or an evolve dispatch; fields.target names it (ADR-0154) |
 | `ISOLATION_I4_VIOLATION` | I-4 pipeline-mediated communication: a cell tried to read raw output or to write its inputs; fields.target names the path (ADR-0154) |
 | `ISOLATION_I5_VIOLATION` | I-5 read isolation: a cell tried to read outside its index, its worktree and its CLI files; fields.target names the path (ADR-0154) |

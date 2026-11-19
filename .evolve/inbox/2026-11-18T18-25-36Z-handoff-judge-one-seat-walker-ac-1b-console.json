@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Remainder of criterion 1: the judge itself (core/handoff_judge.go, cmd/evolve/handoff_judge.go), its profile .evolve/profiles/handoff-judge.json agreeing with cli_routing.agents.handoff-judge in .evolve/policy.json, and the two mutant-kill tests that belong to the judge (empty Worktree fallback, multi-line ask text)"
+  ],
+  "created_at": "2026-11-18T18:25:36Z",
+  "files": [
+    ".evolve/policy.json"
+  ],
+  "fix": "Make the change that AC 1b needs on the protected path(s) .evolve/policy.json, .evolve/profiles/handoff-judge.json, go/internal/core/handoff_judge.go, go/cmd/evolve/handoff_judge.go, then prove the criterion with a test.",
+  "id": "handoff-judge-one-seat-walker-ac-1b-console",
+  "kind": "fix",
+  "origin": "cycle",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "cycle 2515, tdd test-report.md AC 1b (console-followup)",
+  "summary": "The TDD phase of cycle 2515 gave AC 1b of handoff-judge-one-seat-walker the console-followup disposition. A lane builder can never change the paths it needs (.evolve/policy.json, .evolve/profiles/handoff-judge.json, go/internal/core/handoff_judge.go, go/cmd/evolve/handoff_judge.go). The lane part ships without it, so the console owns this part.",
+  "title": "Console part of handoff-judge-one-seat-walker: AC 1b, which needs a protected path changed",
+  "weight": 0.7
+}

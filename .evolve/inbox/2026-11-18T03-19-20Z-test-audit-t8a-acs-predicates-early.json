@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "each such finding of cycles 1-999 leaves the baseline; a converted predicate fails on a behavior mutant; a retired one names the unit test that covers its claim"
+  ],
+  "created_at": "2026-11-18T03:19:20Z",
+  "deps": [
+    "test-audit-t1-analyzer",
+    "test-audit-t5-no-source-text-predicates"
+  ],
+  "files": [
+    "go/acs/cycle4/",
+    "go/acs/cycle336/"
+  ],
+  "fix": "Build T8 for cycles 1-999 (D7, D9). Never touch go/acs/regression/ (protected). Scope: change only *_test.go files and testdata. Never change production code; a finding that needs a production change gets its own inbox item. Keep pipeline-core and guard test files (go/internal/guards/integrity_surface.go) unchanged. See docs/plans/test-quality-audit-2026-11.md (lands with C2).",
+  "id": "test-audit-t8a-acs-predicates-early",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "convert or retire the source-text-only acs predicates of cycles 1 to 999 (T8)",
+  "title": "convert or retire the source-text-only acs predicates of cycles 1 to 999 (T8)",
+  "weight": 0.75
+}

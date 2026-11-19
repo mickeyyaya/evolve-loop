@@ -1,0 +1,41 @@
+{
+  "acceptance": [
+    "a top-level test with no t.Parallel and no declaration fails the guard, red before the change",
+    "a declared serial test passes the guard",
+    "go/cmd/evolve has no serialTests map after the move"
+  ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2508",
+    "branch": "cycle-cd3ae73e-2508",
+    "snapshot_sha": "c4918607bccb817de60e9d7fca4aea2d1acb54f6",
+    "base_sha": "1e2e9d64237c14870e58f875b05356071181b767",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2508/audit-fail-reason.json",
+    "cycle": 2508
+  },
+  "created_at": "2026-11-17T10:50:50Z",
+  "failure_count": 1,
+  "files": [
+    "go/internal/paralleltest/paralleltest.go",
+    "go/cmd/evolve/parallel_serial_tests_test.go"
+  ],
+  "fix": "Give internal/paralleltest a declaration that a test makes in its own file (for example a call with the reason as its first statement). The guard reads it. Move one package at a time, starting with go/cmd/evolve; remove its map in the same change.",
+  "id": "edit-layout-c3-serial-tests-declare-in-place",
+  "kind": "feature",
+  "last_failure_class": "capability",
+  "last_failure_cycle": 2508,
+  "last_failure_findings": "review gate: phase \"build\" deliverable rejected after 1 correction(s): build handoff floor: 2 deterministic check failure(s) — fix these exactly before handoff:\n  the tests of the changed packages fail under -tags integration, so no changed function is proven:\n    --- FAIL: TestParallelDefault_EveryTopLevelTestIsParallelOrListedSerial (0.88s)\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/cmd/evolve\t310.112s\n…26-11-02T00-00-00Z-item-a.json → processing/cycle-8/\nFAIL\ncoverage: 94.4% of statements\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/cmd/evolve\t310.112s\nok  \tgithub.com/mickeyyaya/evolve-loop/go/internal/paralleltest\t0.050s\tcoverage: 93.7% of statements\nFAIL\n\n  ./cmd/evolve: unit tests FAIL\n--- FAIL: TestParallelDefault_EveryTopLevelTestIsParallelOrListedSerial (0.35s)\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/cmd/evolve\t216.329s\n…n → processing/cycle-7/\n[inbox-mover] claimed: 2026-11-02T00-00-00Z-item-a.json → processing/cycle-7/\n[inbox-mover] claimed: 2026-11-02T00-00-00Z-item-a.json → processing/cycle-8/\nFAIL\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/cmd/evolve\t216.329s\nFAIL\n",
+  "last_failure_fingerprint": "codes:inbox-mover",
+  "last_failure_reason": "cycle-failure-release",
+  "last_failure_rung": "R2",
+  "origin": "console",
+  "priority_class": "performance",
+  "retry_plan": "fresh-deep-plan",
+  "route": "console-manual",
+  "routed_at": "2026-11-18T23:36:08Z",
+  "routed_by": "operator",
+  "routed_cycle": 2508,
+  "routed_reason": "cycle 2508 FAIL: the fix needs serial() as the first statement of TestWireOrchestratorDeps_RequestChannelWired in go/cmd/evolve/request_channel_test.go:178, an integrity-surface file (integrity_surface.go:142) that the role guard denies to a build cell; the console makes that one edit",
+  "summary": "Plan docs/plans/concurrent-edit-layout-2026-11.md (PR #1545), D3. go/cmd/evolve/parallel_serial_tests_test.go has 1,014 lines and 91 touches in 30 days; the serial maps of 10 packages take 155 touches (research F2.2).",
+  "title": "Serial tests declare their reason in their own file; the central serial maps go (concurrent-edit C3)",
+  "weight": 0.65
+}

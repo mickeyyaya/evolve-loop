@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A kind:pipeline-repair item whose files are all unprotected is lane-routable; one with a protected file stays console-owned",
+    "A practice item with empty files[] whose summary names a protected path is not console-owned by the text scan, and inbox lint reports the missing files[]",
+    "The existing ConsoleRouted refusals for a protected path and for a console route still hold (no row of consoleroute_test.go changes its result)"
+  ],
+  "created_at": "2026-11-19T07:57:50Z",
+  "deps": [],
+  "files": [
+    "go/internal/inboxbatch/consoleroute.go",
+    "go/internal/inboxbatch/consoleroute_test.go"
+  ],
+  "fix": "Design first (design review before build). Candidate: a pipeline-* kind is console-owned only when a file in files[] is protected or the kind is on an explicit console-kind list in policy data. The free-text scan runs only for an item whose origin is not research or practice; such an item must declare files[]. Keep the refusal for each protected path unchanged.",
+  "id": "console-route-derivation-reads-the-files-not-the-kind-or-free-text",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "ConsoleRouted (go/internal/inboxbatch/consoleroute.go) makes every kind:pipeline-* item console-owned (consoleKindDerivation, :57-61), even when no file in files[] is protected: ci-macos-fixed-parallelism and core-tests-cut-git-starts are examples. protectedDerivation (:68) scans free text when files[] is empty, so a pasted third-party changelog that names .claude/settings.json made practice-claude-code-changelog-1bd0f3ce-202611140548 console-owned. On 2026-11-19 the review of 280 console items found 35 that a lane can build. Source: docs/research/console-backlog-review-2026-11.md F7.3 and F7.6.",
+  "title": "the console route holds unprotected pipeline-kind items and free-text matches off the lanes",
+  "weight": 0.8
+}

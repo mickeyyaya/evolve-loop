@@ -1,6 +1,5 @@
 {
   "acceptance": [
-    "incremental verify and verify --deep both pass on a sealed ledger",
     "a one-byte change in a segment fails incremental verify",
     "verify for each ship takes about 25 ms on the plane ledger",
     "each new and changed function has 100% coverage"

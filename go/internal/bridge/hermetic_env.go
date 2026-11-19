@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/isolation"
+	evolog "github.com/mickeyyaya/evolve-loop/go/internal/log"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -233,19 +234,52 @@ func readHostGitConfig(key string) string {
 	return strings.TrimSpace(string(out))
 }
 
+const envNamesCap = evolog.MaxDiagnosticRunes - 32
+
+func capNames(names []string) string {
+	sorted := slices.Sorted(slices.Values(names))
+	var b strings.Builder
+	for i, name := range sorted {
+		add := len(name)
+		if i > 0 {
+			add++
+		}
+		if b.Len()+add > envNamesCap {
+			return b.String() + ",+" + strconv.Itoa(len(sorted)-i) + " more"
+		}
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		b.WriteString(name)
+	}
+	return b.String()
+}
+
 func (deps Deps) reportDroppedEnv(cfg *Config, stage string, names []string) {
-	action := "logged"
-	if stage == envStageEnforce {
-		action = "refused"
+	first := deps.EnvDrops.firstSeen(cfg.CLI, names)
+	if len(first) == 0 {
+		return
 	}
 	id := configIdentity(cfg)
-	for _, name := range deps.EnvDrops.firstSeen(cfg.CLI, names) {
+	if stage == envStageEnforce {
+		deps.Signals.Emit(signalcenter.Event{
+			Cycle: id.cycle, RunID: id.runID, Phase: id.phase, Module: signalcenter.ModuleIsolation, Origin: cellEnvOrigin,
+			Kind: signalcenter.KindIsolationEnv, Severity: signalcenter.SeverityInfo, Code: isolation.CodeEnvRefused,
+			Reason: strconv.Itoa(len(first)) + " launcher variables are outside the environment allowlist of " + cfg.CLI,
+			Fields: map[string]string{
+				"invariant": "I2", "stage": stage, "action": "refused", "cell": cfg.Agent, "family": cfg.CLI,
+				"rule": "env.allowlist", "source": "launcher", "count": strconv.Itoa(len(first)), "names": capNames(first),
+			},
+		})
+		return
+	}
+	for _, name := range first {
 		deps.Signals.Emit(signalcenter.Event{
 			Cycle: id.cycle, RunID: id.runID, Phase: id.phase, Module: signalcenter.ModuleIsolation, Origin: cellEnvOrigin,
 			Kind: signalcenter.KindIsolationViolation, Severity: signalcenter.SeverityWarn, Code: isolation.ViolationCode(2),
 			Reason: "launcher variable " + name + " is outside the environment allowlist of " + cfg.CLI,
 			Fields: map[string]string{
-				"invariant": "I2", "stage": stage, "action": action, "cell": cfg.Agent, "family": cfg.CLI,
+				"invariant": "I2", "stage": stage, "action": "logged", "cell": cfg.Agent, "family": cfg.CLI,
 				"target": name, "rule": "env.allowlist", "source": "launcher",
 			},
 		})

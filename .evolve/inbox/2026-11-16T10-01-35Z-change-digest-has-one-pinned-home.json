@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "One treestate function computes every change digest, and a structure test fails on a second sha256-of-git-diff site",
+    "An audit ledger entry and treestate.SHA agree under diff.noprefix=true and under a different core.abbrev"
+  ],
+  "created_at": "2026-11-16T10:01:35Z",
+  "files": [
+    "go/internal/treestate/treestate.go",
+    "go/internal/core/phase_bindings.go",
+    "go/internal/integration/train.go"
+  ],
+  "fix": "Design first: route every home through one treestate argument builder with pinned settings (--full-index, --no-ext-diff, --no-textconv, --no-color, fixed prefixes, --no-renames); add a red test that an audit ledger entry and treestate.SHA agree under diff.noprefix=true; plan a one-time re-digest for cycles in flight and open records at a boundary.",
+  "id": "change-digest-has-one-pinned-home",
+  "kind": "pipeline-integrity",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "The change digest (sha256 of a git diff) has several homes with different flags: treestate.SHA (plain git diff HEAD; callers commitgate.go:285, review_runs.go:26, agentcmd/agent.go:71, ship/audit.go:332), core/phase_bindings.go:128/200/232 (the audit ledger TreeStateSHA), subagent.go:287, cyclesimulator.go:355, the shiptest fixture, and integration/train.go:410 (--no-ext-diff --no-textconv). Unpinned settings (auto abbrev growth near 72k objects, diff.noprefix, external diff) can change one home and break every binding. Found by the design review of docs/plans/train-commit-chain-attestation-2026-11.md (round 2, finding 1).",
+  "title": "The change digest has one home with pinned git diff settings",
+  "weight": 0.85
+}

@@ -365,7 +365,7 @@ The builder is `Deps.cellEnv` in `go/internal/bridge/hermetic_env.go`. Each LLM 
 | Stage default | `shadow` (an empty value), resolved by `channel.ResolveStage`. An unknown word is `off`. |
 | `off` | today's environment, no signal |
 | `shadow` | today's environment, one `ISOLATION_I2_VIOLATION` for each dropped name, `action=logged` |
-| `enforce` | the union only, one `ISOLATION_I2_VIOLATION` for each dropped name, `action=refused` |
+| `enforce` | the union only, one INFO `ISOLATION_ENV_REFUSED` event for each dispatch with new names, `action=refused` |
 | Base allowlist | the names of the table above and each `LC_*` name |
 | Pipeline markers | the cell part of the marker list, `ipcenv.CellMarkers()` (X18b): `EVOLVE_PROJECT_ROOT`, `EVOLVE_WORKTREE_ROOT`, `EVOLVE_CYCLE_STATE_FILE`, `EVOLVE_TMUX_SOCKET`, the four `EVOLVE_FLEET*` keys, `EVOLVE_DISPATCH_DEPTH` and `EVOLVE_PHASE`. It applies to the launcher and to `Deps.Env`. A gate or bypass name (`EVOLVE_BYPASS_*`, `EVOLVE_SANDBOX*`, `EVOLVE_MSG_TOKEN`, `BRIDGE_*`) never reaches a child at `enforce`. |
 | Operator opt-ins | The policy key `bridge.allow_anthropic_base_url` passes `ANTHROPIC_BASE_URL`, and `bridge.allow_openai_api_key` passes `OPENAI_API_KEY` (X18d). So the route that the operator opted into stays the route of the child. Each opt-in that is on emits `CONTROL_BYPASS_USED` at each start of the bridge adapter of a cycle. |
@@ -1300,12 +1300,14 @@ The contract reuses the shape of [llm-quality-indexes.md](llm-quality-indexes.md
 | Module | `isolation` (code prefix `ISOLATION_`) |
 | Kind `isolation.violation` | WARN. A cell did a thing that an invariant forbids. In `shadow` the action went through; in `enforce` the pipeline refused it. |
 | Kind `isolation.access` | INFO. The entries of the index that a cell opened (§8.4, optional). No code. Proposed: X5 adds it if it builds §8.4. |
+| Kind `isolation.env` | INFO. At `enforce`, the I-2 allowlist refused launcher variables. One `ISOLATION_ENV_REFUSED` event for each dispatch with new names. It is not a violation, because the cell did not get the variables. |
 | Origin | the Go function that found the violation, for example `bridge.buildEnv` |
 
 | Code | Invariant | Emitter |
 |---|---|---|
 | `ISOLATION_I1_VIOLATION` | I-1 | the launch API, when a caller outside the bridge registers a launch; the AST guard covers the static case |
-| `ISOLATION_I2_VIOLATION` | I-2 | the environment builder, for each dropped name |
+| `ISOLATION_I2_VIOLATION` | I-2 | the environment builder at `shadow`, for each dropped name |
+| `ISOLATION_ENV_REFUSED` | I-2 | the environment builder at `enforce`, one INFO summary for each dispatch with new names |
 | `ISOLATION_I3_VIOLATION` | I-3 | built: the refusal of the sandbox opt-out in a phase (`rule=sandbox.off.phase`). Proposed: the sandbox report of a denied exec, and the refusal in `evolve agent run` (§7.1). |
 | `ISOLATION_I4_VIOLATION` | I-4 | built (X5): the sandbox report of a read of raw output or a write of `inputs/`, read by `Deps.reportReadViolations` on macOS |
 | `ISOLATION_I5_VIOLATION` | I-5 | built (X5): the sandbox report of a read of another run directory or a home secret, read by `Deps.reportReadViolations` on macOS |
@@ -1370,7 +1372,8 @@ X1 registers the `isolation.violation` kind, the nine codes (`go/internal/isolat
 | Code | What it means | First step | Fix |
 |---|---|---|---|
 | `ISOLATION_I1_VIOLATION` | A code path started an LLM binary outside the bridge. | Read the `origin` field. | Route the path through the launch API. |
-| `ISOLATION_I2_VIOLATION` | The allowlist dropped a variable that the launcher had. | Read `target`: is it a variable that the CLI needs? | If yes, add it to `env_passthrough` of the manifest. If no, ignore it. |
+| `ISOLATION_I2_VIOLATION` | The allowlist dropped a variable that the launcher had, at `shadow`. | Read `target`: is it a variable that the CLI needs? | If yes, add it to `env_passthrough` of the manifest. If no, ignore it. |
+| `ISOLATION_ENV_REFUSED` | The allowlist refused launcher variables at `enforce`. This is the allowlist at work, not a breach. | Read `names` and `count`. | If the CLI needs a name, add it to `env_passthrough` of the manifest. If not, ignore it. |
 | `ISOLATION_I3_VIOLATION` | An agent tried to start an LLM or an `evolve` dispatch. | Read the persona and the prompt of the cell. | Remove the instruction that asks for it. A repeat is a prompt injection signal: read the inputs of the cell. |
 | `ISOLATION_I4_VIOLATION` | An agent tried to read raw output or write its inputs. | Read `target`. | Change the persona to open the index entry. |
 | `ISOLATION_I5_VIOLATION` | An agent tried to read outside its index, worktree or CLI files. | Read `process`, `pid`, `rule`, and `target`; check if `rule` is `read.home.secret` or if lineage missed `target`. | For a git or `gh` `read.home.secret`, check `ipcenv.CredentialIsolation`. For a missed lineage file, fix the lineage rule. |

@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "each such finding of cycles 2000 and later leaves the baseline, under the rules of T8a"
+  ],
+  "created_at": "2026-11-18T03:19:21Z",
+  "deps": [
+    "test-audit-t1-analyzer",
+    "test-audit-t5-no-source-text-predicates"
+  ],
+  "files": [
+    "go/acs/cycle2278/"
+  ],
+  "fix": "Build T8 for cycles 2000 and later (D7, D9). Scope: change only *_test.go files and testdata. Never change production code; a finding that needs a production change gets its own inbox item. Keep pipeline-core and guard test files (go/internal/guards/integrity_surface.go) unchanged. See docs/plans/test-quality-audit-2026-11.md (lands with C2).",
+  "id": "test-audit-t8c-acs-predicates-late",
+  "intake_override": {
+    "reason": "split by cycle range or by file set; each item edits disjoint test files; the shared file is only the baseline",
+    "overlaps": [
+      "test-audit-t8b-acs-predicates-mid"
+    ]
+  },
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "convert or retire the source-text-only acs predicates of cycles 2000 and later (T8)",
+  "title": "convert or retire the source-text-only acs predicates of cycles 2000 and later (T8)",
+  "weight": 0.75
+}

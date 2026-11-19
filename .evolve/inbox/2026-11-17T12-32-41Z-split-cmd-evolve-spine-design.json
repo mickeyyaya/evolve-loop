@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "a design under docs/plans passes evolve docs ste-lint --strict and scores at least 3 groupings"
+  ],
+  "created_at": "2026-11-17T12:32:41Z",
+  "deps": [
+    "split-cmd-evolve-landcmd-rest"
+  ],
+  "files": [
+    "go/cmd/evolve/"
+  ],
+  "fix": "Step 6 of docs/plans/split-cmd-evolve-2026-11.md (parent plan concurrent-edit-layout-2026-11, C6/D5). Run at a wave boundary with no open lane in the group's files (evolve wave supply). Red test: a design under docs/plans passes evolve docs ste-lint --strict and scores at least 3 groupings. dependsOn: split-cmd-evolve-landcmd-rest. Note split (C7) follows the same group.",
+  "id": "split-cmd-evolve-spine-design",
+  "kind": "docs",
+  "origin": "console",
+  "priority_class": "performance",
+  "summary": "Step 6 of docs/plans/split-cmd-evolve-2026-11.md. Filed by the console from the refused request inbox-add-6 of cycle 2460: the request channel runs only dispatch requests, so the pipeline never filed it.",
+  "title": "Design the split of the cycle, loop and CORE spine of go/cmd/evolve (cycle 74 and loop 74 touches, 24 shared, CORE 183) or choose the admission fallback K5",
+  "weight": 0.6
+}
