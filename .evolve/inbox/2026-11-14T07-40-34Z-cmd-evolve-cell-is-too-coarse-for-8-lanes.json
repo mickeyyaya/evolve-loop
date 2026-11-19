@@ -4,14 +4,6 @@
     "Red first: two items that touch different cmd/evolve verb files are admitted together; two that touch the same file are not.",
     "Docs in STE; 100% coverage on each changed function; zero code comments."
   ],
-  "continuation": {
-    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2405",
-    "branch": "cycle-cd3ae73e-2405",
-    "snapshot_sha": "a60582c45c033427e89786a91ec778d9e67e3f75",
-    "base_sha": "109b1b22f1c889be72db4ec0ff88ee21f2e520d6",
-    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2405/audit-fail-reason.json",
-    "cycle": 2405
-  },
   "created_at": "2026-11-14T07:40:34Z",
   "failure_count": 1,
   "files": [
@@ -28,6 +20,19 @@
   "last_failure_rung": "R3",
   "origin": "console",
   "priority_class": "performance",
+  "released_continuations": [
+    {
+      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2405",
+      "branch": "cycle-cd3ae73e-2405",
+      "snapshot_sha": "a60582c45c033427e89786a91ec778d9e67e3f75",
+      "base_sha": "109b1b22f1c889be72db4ec0ff88ee21f2e520d6",
+      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2405/audit-fail-reason.json",
+      "cycle": 2405,
+      "released_at": "2026-11-19T00:41:11Z",
+      "reason": "older than 100 cycles",
+      "released_by": "evolve gc (continuation max age)"
+    }
+  ],
   "retry_plan": "fresh-deep-plan",
   "route": "console-manual",
   "routed_at": "2026-11-16T04:01:51Z",

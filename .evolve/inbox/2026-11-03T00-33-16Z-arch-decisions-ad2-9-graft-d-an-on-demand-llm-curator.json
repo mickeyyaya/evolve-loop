@@ -5,14 +5,6 @@
     "The spec and package note of the changed package state the change in STE."
   ],
   "campaign": "architecture-decisions-2026-11",
-  "continuation": {
-    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2394",
-    "branch": "cycle-cd3ae73e-2394",
-    "snapshot_sha": "a51aa60edd2db8981c38c559a9a20802d5c1c4f8",
-    "base_sha": "2b45c9c2b7a45f603ce79e8a7e0739a923da07e9",
-    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2394/audit-fail-reason.json",
-    "cycle": 2394
-  },
   "created_at": "2026-11-03T00:33:16Z",
   "failure_count": 1,
   "files": [
@@ -28,12 +20,25 @@
   "kind": "feature",
   "last_failure_class": "capability",
   "last_failure_cycle": 2394,
-  "last_failure_findings": "review gate: phase \"build\" deliverable rejected after 2 correction(s): build handoff floor: 2 deterministic check failure(s) — fix these exactly before handoff:\n  ./acs/cycle2394 (-tags acs): unit tests FAIL\n--- FAIL: TestC2394_007_TheAuditorSeatIsWiredAsAProposalOnlyReader (0.03s)\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/acs/cycle2394\t12.957s\n…file or directory (the file may have moved or been renamed; repoint the predicate at its current location)\n    predicates_test.go:296: RED: .evolve/profiles/inbox-auditor.json is missing\nFAIL\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/acs/cycle2394\t12.957s\nFAIL\n\n  repo-contract scanner pack RED: github.com/mickeyyaya/evolve-loop/go/internal/phasecoherence.TestRepoPersonaProfilePairing — ship runs these repo-wide suites before it pushes and refuses a red one. Reproduce each from go/ with `go test -count=1 \u003cpackage\u003e` (for a named test add `-run '^\u003cTest\u003e$'`) and fix the change before handoff:\n--- FAIL: TestRepoPersonaProfilePairing (0.01s)\n…er\n    unpaired_test.go:132: allowlisted profile-only \"model-classifier\": the classifier prompt is built in Go (modelquery buildClassifyPrompt); the profile holds only the containment of the seat\n    unpaired_test.go:132: allowlisted profile-only \"tool-policy\": shared tool-policy fragment, not an agent\n--- FAIL: TestRepoPersonaProfilePairing (0.01s)\n",
+  "last_failure_findings": "review gate: phase \"build\" deliverable rejected after 2 correction(s): build handoff floor: 2 deterministic check failure(s) — fix these exactly before handoff:\n  ./acs/cycle2394 (-tags acs): unit tests FAIL\n--- FAIL: TestC2394_007_TheAuditorSeatIsWiredAsAProposalOnlyReader (0.03s)\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/acs/cycle2394\t12.957s\n…file or directory (the file may have moved or been renamed; repoint the predicate at its current location)\n    predicates_test.go:296: RED: .evolve/profiles/inbox-auditor.json is missing\nFAIL\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/acs/cycle2394\t12.957s\nFAIL\n\n  repo-contract scanner pack RED: github.com/mickeyyaya/evolve-loop/go/internal/phasecoherence.TestRepoPersonaProfilePairing — ship runs these repo-wide suites before it pushes and refuses a red one. Reproduce each from go/ with `go test -count=1 <package>` (for a named test add `-run '^<Test>$'`) and fix the change before handoff:\n--- FAIL: TestRepoPersonaProfilePairing (0.01s)\n…er\n    unpaired_test.go:132: allowlisted profile-only \"model-classifier\": the classifier prompt is built in Go (modelquery buildClassifyPrompt); the profile holds only the containment of the seat\n    unpaired_test.go:132: allowlisted profile-only \"tool-policy\": shared tool-policy fragment, not an agent\n--- FAIL: TestRepoPersonaProfilePairing (0.01s)\n",
   "last_failure_fingerprint": "text:f9eb57da0872",
   "last_failure_reason": "cycle-failure-release",
   "last_failure_rung": "R3",
   "origin": "console",
   "priority_class": "correctness",
+  "released_continuations": [
+    {
+      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2394",
+      "branch": "cycle-cd3ae73e-2394",
+      "snapshot_sha": "a51aa60edd2db8981c38c559a9a20802d5c1c4f8",
+      "base_sha": "2b45c9c2b7a45f603ce79e8a7e0739a923da07e9",
+      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2394/audit-fail-reason.json",
+      "cycle": 2394,
+      "released_at": "2026-11-19T00:41:11Z",
+      "reason": "older than 100 cycles",
+      "released_by": "evolve gc (continuation max age)"
+    }
+  ],
   "retry_plan": "fresh-deep-plan",
   "route": "console-manual",
   "routed_at": "2026-11-15T16:38:29Z",
