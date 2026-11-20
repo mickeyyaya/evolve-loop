@@ -172,6 +172,7 @@ var serialRequiredTests = map[string]string{
 	"core.TestAddedTaggedTestFailures_AOneOffRedIsRetaken":                                                        swapsBuildSelfCheckTaggedRunner,
 	"core.TestAddedTaggedTestFailures_NeverRunsAnEnvExclusivePackage":                                             swapsBuildSelfCheckTaggedRunner,
 	"core.TestCoverChangedFailures_ARedTheRetakeConfirmedIsNotCancelledByAGreenUnitRun":                           swapsBuildSelfCheckRunner,
+	"core.TestTestAuditFailures_ARuleChangeRunsTheAuditPackageInTheWorktree":                                      swapsBuildSelfCheckRunner,
 	"core.TestDefaultBuildFloorChecks_IncludesPersonaBudgetCheck":                                                 swapsBuildSelfCheckRunner,
 	"core.TestPersonaBudgetFailures":                                                                              swapsBuildSelfCheckRunner,
 	"core.TestRecordAndBranch_BuildGraduationGuardAborts":                                                         swapsBuildSelfCheckRunner,

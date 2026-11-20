@@ -37,6 +37,7 @@ func StaticBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
 	out = append(out, PlaceholderTokenFailures(ctx, in)...)
 	paths := changedFloorPaths(ctx, in)
 	out = append(out, personaBudgetFailures(ctx, in.Worktree, paths)...)
+	out = append(out, testAuditFailures(ctx, in)...)
 	out = append(out, docsFloorChecks(ctx, in, paths)...)
 	out = append(out, commentFloorFailures(ctx, in)...)
 	out = append(out, sizeFloorFailures(ctx, in)...)
