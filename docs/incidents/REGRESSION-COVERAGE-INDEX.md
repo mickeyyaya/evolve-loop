@@ -17,11 +17,11 @@
 
 | | Count |
 |---|---|
-| Incidents mapped | 68 |
-| Distinct failure modes (coverage-map rows) | 113 |
-| ✅ covered (a test fails if the bug comes back) | 83 |
+| Incidents mapped | 69 |
+| Distinct failure modes (coverage-map rows) | 115 |
+| ✅ covered (a test fails if the bug comes back) | 84 |
 | 🟡 partial (related test, doesn't pin the exact mode) | 11 |
-| ❌ none (no regression test) | 19 |
+| ❌ none (no regression test) | 20 |
 | ⛔ untestable (external infra / live CLI) | 0 |
 
 These counts are tallies of the coverage map's rows, so they move with it: a new
@@ -160,6 +160,8 @@ not the coverage map, which is the hand-maintained per-incident record.
 | 2026-11-19 — the console applied the backlog dispositions with two errors | 9 of 31 items routed to lanes on an unchecked first-pass claim were not lane work. `inbox route-lane` does not check a prerequisite that the item names in prose | `inboxmover` (route-lane) | ❌ | none: the adversarial pass before a route batch is the control; corrections wait for the boundary |
 | [2026-11-20 — salvage bundles filled the disk and hung a loop test](2026-11-20-salvage-bundles-filled-the-disk-and-hung-a-loop-test.md) | each gc salvage leaf bundled the full history (1.1 GB), and no sweep removed a leaf. The store grew to 187 GB, and the host disk had 2.6% free | `gc/salvage.go` (`writeSalvageLeaf`) | ❌ | inbox item `gc-salvage-bundles-hold-the-whole-history-with-no-retention` |
 | 2026-11-20 — salvage bundles filled the disk and hung a loop test | `TestLoop_MaxCyclesExit_ClearsCompletedMarker` reads the host disk through the production disk guard. On a full host it waited without end. It spent the ACS Go lane budget of cycles 2547, 2548, 2550 and 2551 | `cmd/evolve` loop tests, `looppreflight/cyclestart.go` (`RunCycleStart`) | ❌ | inbox item `loop-tests-read-the-real-host-disk-through-the-disk-guard` |
+| [2026-11-20 — a lane shipped error-text tests and turned main red](2026-11-20-a-lane-shipped-error-text-tests-and-turned-main-red.md) | three tests in `stageevidence` matched error text, and two errors had no sentinel | `stageevidence/version.go`, `stageevidence/score.go` | ✅ | `testaudit/ratchet_tree_test.go::TestTreeRatchet` |
+| 2026-11-20 — a lane shipped error-text tests and turned main red | the lane build floor does not run the test-audit ratchet, so main CI was the first check to find the new tests. A recurrence of the [2026-11-19 incident](2026-11-19-two-lanes-turned-main-red-with-error-text-tests.md) | build floor (`DefaultBuildFloorChecks`) | ❌ | inbox item `build-floor-runs-the-test-audit-ratchet`, open since 2026-11-19 |
 
 ## Prioritized gap backlog (13-agent sweep; agent confidence in parens)
 
