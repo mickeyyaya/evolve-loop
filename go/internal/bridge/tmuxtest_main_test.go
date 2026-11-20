@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tmuxtest"
 )
 
@@ -26,6 +27,7 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	code := tmuxtest.Main(m)
+	bridge.RunTestMainCleanups()
 	if err := os.RemoveAll(codexHome); err != nil {
 		fmt.Fprintf(os.Stderr, "TestMain: remove %s: %v\n", codexHome, err)
 	}

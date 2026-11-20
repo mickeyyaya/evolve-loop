@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -487,7 +488,7 @@ func (h *contractHost) withProject(t *testing.T) {
 func (h *contractHost) withIsolationFixtures(t *testing.T) {
 	t.Helper()
 	h.home = contractTempDir(t, "", "sbc-home")
-	h.dispatch = dispatchcred.Store{Dir: filepath.Join(h.home, ".evolve", "dispatch")}
+	h.dispatch = dispatchcred.Store{Dir: sharedEvolveDispatchDir(t)}
 	t.Setenv("HOME", h.home)
 	runs := filepath.Dir(h.run)
 	for rel, body := range map[string]string{
@@ -538,15 +539,75 @@ func (h *contractHost) withIsolationFixtures(t *testing.T) {
 	h.netPort = strconv.Itoa(ln.Addr().(*net.TCPAddr).Port)
 }
 
+var sharedEvolve struct {
+	dirOnce   sync.Once
+	buildOnce sync.Once
+	dir       string
+	dispatch  string
+	bin       string
+	err       error
+}
+
+func sharedEvolveDispatchDir(t *testing.T) string {
+	t.Helper()
+	sharedEvolve.dirOnce.Do(func() {
+		dir, err := os.MkdirTemp("", "sbc-shared")
+		if err != nil {
+			sharedEvolve.err = err
+			return
+		}
+		AddTestMainCleanup(func() { _ = os.RemoveAll(dir) })
+		real, err := filepath.EvalSymlinks(dir)
+		if err != nil {
+			sharedEvolve.err = err
+			return
+		}
+		sharedEvolve.dir = real
+		sharedEvolve.dispatch = filepath.Join(real, "home", ".evolve", "dispatch")
+	})
+	if sharedEvolve.err != nil {
+		t.Fatal(sharedEvolve.err)
+	}
+	return sharedEvolve.dispatch
+}
+
+func sharedEvolveBinary(t *testing.T) string {
+	t.Helper()
+	return evolveBinaryBuiltFrom(t, filepath.Join("..", ".."))
+}
+
+func evolveBinaryBuiltFrom(t *testing.T, moduleDir string) string {
+	t.Helper()
+	dispatch := sharedEvolveDispatchDir(t)
+	sharedEvolve.buildOnce.Do(func() {
+		bin := filepath.Join(sharedEvolve.dir, "evolve")
+		flags := "-X github.com/mickeyyaya/evolve-loop/go/internal/dispatchcred.root=" + dispatch
+		build := exec.Command("go", "build", "-ldflags", flags, "-o", bin, "./cmd/evolve")
+		build.Dir = moduleDir
+		if out, err := build.CombinedOutput(); err != nil {
+			sharedEvolve.err = fmt.Errorf("build the evolve binary with the shared dispatch store: %w\n%s", err, out)
+			return
+		}
+		sharedEvolve.bin = bin
+	})
+	if sharedEvolve.err != nil {
+		t.Fatal(sharedEvolve.err)
+	}
+	return sharedEvolve.bin
+}
+
+func goModuleDir(t *testing.T) string {
+	t.Helper()
+	out, err := exec.Command("go", "list", "-m", "-f", "{{.Dir}}").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.TrimSpace(string(out))
+}
+
 func (h *contractHost) withEvolveBinary(t *testing.T) {
 	t.Helper()
-	h.evolveBin = filepath.Join(contractTempDir(t, "", "sbc-evolve"), "evolve")
-	flags := "-X github.com/mickeyyaya/evolve-loop/go/internal/dispatchcred.root=" + h.dispatch.Dir
-	build := exec.Command("go", "build", "-ldflags", flags, "-o", h.evolveBin, "./cmd/evolve")
-	build.Dir = filepath.Join("..", "..")
-	if out, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("build the evolve binary with the dispatch store of the cell home: %v\n%s", err, out)
-	}
+	h.evolveBin = sharedEvolveBinary(t)
 }
 
 func builderPrefix(t *testing.T, probe sandbox.ProbeResult, h contractHost, execStage string) []string {

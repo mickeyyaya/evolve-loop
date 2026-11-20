@@ -1,6 +1,7 @@
 package bridge
 
 var serialTests = map[string]string{
+	"bridge.TestEvolveBuildRunsOnce":                                                                            "sets PATH through its helper",
 	"bridge.TestLaunch_AParameterSeatOnAHostWithNoHolderNamesClearAndNotSet":                                    "sets HOME for the seat launch",
 	"bridge.TestSeatHolder_ALiveSeatCanWriteItsOwnDirectory":                                                    "sets HOME for the live sandbox",
 	"bridge.TestSeatHolder_ALiveSeatCannotReadOrChangeTheHolder":                                                "sets HOME for the live sandbox",
