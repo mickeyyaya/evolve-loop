@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -82,8 +83,19 @@ func salvageRef(branch string) string {
 	return "refs/heads/" + branch
 }
 
+const salvageOriginMainRef = "refs/remotes/origin/main"
+
 func bundleVerified(git gitRun, dir, file, ref, tip string) error {
-	if _, err := git(dir, "bundle", "create", file, ref); err != nil {
+	args := []string{"bundle", "create", file, ref}
+	if hasOriginMain(git, dir) {
+		if count, ok := commitsAhead(git, dir, salvageOriginMainRef, tip); ok {
+			if count == 0 {
+				return nil
+			}
+			args = append(args, "^"+salvageOriginMainRef)
+		}
+	}
+	if _, err := git(dir, args...); err != nil {
 		return err
 	}
 	if _, err := git(dir, "bundle", "verify", file); err != nil {
@@ -97,6 +109,23 @@ func bundleVerified(git gitRun, dir, file, ref, tip string) error {
 		return fmt.Errorf("bundle %s does not hold %s@%s", file, ref, tip)
 	}
 	return nil
+}
+
+func hasOriginMain(git gitRun, dir string) bool {
+	out, err := git(dir, "rev-parse", "--verify", "--quiet", salvageOriginMainRef)
+	return err == nil && salvageHeadSHARe.MatchString(strings.TrimSpace(out))
+}
+
+func commitsAhead(git gitRun, dir, base, tip string) (int, bool) {
+	out, err := git(dir, "rev-list", "--count", base+".."+tip)
+	if err != nil {
+		return 0, false
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(out))
+	if err != nil || n < 0 {
+		return 0, false
+	}
+	return n, true
 }
 
 func archiveUntracked(root, nulList, dest string) (err error) {
