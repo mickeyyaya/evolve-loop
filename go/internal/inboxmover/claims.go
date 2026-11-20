@@ -120,6 +120,9 @@ func ReleaseStaleClaims(opts Options, reason string) ([]ClaimRelease, error) {
 			continue
 		}
 		rel, err := releaseHeld(opts, it.ID, it.Location, holder, reason+": "+holder.Reason, (*lifecycle.Mover).ReleaseClaim)
+		if err == nil && holder.Evidence.Closeout != "" {
+			opts.warnSealedClaim(rel, holder)
+		}
 		if err != nil {
 			errs = append(errs, fmt.Errorf("release %s from cycle %d: %w", it.ID, it.Cycle, err))
 			continue

@@ -209,7 +209,7 @@ func TestApplyCycleOutcome_FailDrain_EmitsInboxCodesThroughOptionsSignals(t *tes
 		t.Fatalf("res = %+v, err = %v", res, err)
 	}
 	var codes []signalcenter.Code
-	for _, e := range rc.events {
+	for _, e := range eventsOfKind(rc.events, signalcenter.KindInboxWarning) {
 		codes = append(codes, e.Code)
 	}
 	want := []signalcenter.Code{lifecycle.CodePromoteMoveFailed, lifecycle.CodeQuarantineFailed}

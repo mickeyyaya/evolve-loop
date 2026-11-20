@@ -164,6 +164,7 @@ func (m *Mover) releaseOne(d drained, reason string, cycle int, stamp *continuat
 		Cycle:  intPtr(strconv.Itoa(cycle)),
 		Reason: reason,
 	})
+	m.emitReleased(d.taskID, cycle, reason)
 	return true
 }
 

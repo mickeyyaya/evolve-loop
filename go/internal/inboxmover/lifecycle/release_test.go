@@ -38,8 +38,8 @@ func TestMover_Release_DoubleMove_EmitsReleaseDoubleMove(t *testing.T) {
 	if body, _ := os.ReadFile(filepath.Join(inbox, "dup.json")); !strings.Contains(string(body), "dup-original") {
 		t.Errorf("the root copy was clobbered: %s", body)
 	}
-	if len(rc.events) != 1 || rc.events[0].Code != CodeReleaseDoubleMove || rc.events[0].Cycle != 5 || rc.events[0].Fields["base"] != "dup.json" || rc.events[0].Fields["task_id"] != "dup-claimed" {
-		t.Errorf("events = %+v", rc.events)
+	if len(rc.faults()) != 1 || rc.faults()[0].Code != CodeReleaseDoubleMove || rc.faults()[0].Cycle != 5 || rc.faults()[0].Fields["base"] != "dup.json" || rc.faults()[0].Fields["task_id"] != "dup-claimed" {
+		t.Errorf("events = %+v", rc.faults())
 	}
 }
 
@@ -97,11 +97,11 @@ func TestMover_Release_QuarantineFailed_OutcomeErrorAndNoop(t *testing.T) {
 	if err != nil || res.Recovered != 1 || res.Paths[0] != filepath.Join(inbox, "t7.json") {
 		t.Fatalf("res = %+v, err = %v", res, err)
 	}
-	if got := rc.codes(); len(got) != 2 || got[0] != CodePromoteMoveFailed || got[1] != CodeQuarantineFailed || rc.events[1].Fields["outcome"] != "error" || rc.events[1].Origin != "Mover.Release" || rc.events[0].Origin != "Mover.Promote" {
-		t.Errorf("events = %+v", rc.events)
+	if got := rc.codes(); len(got) != 2 || got[0] != CodePromoteMoveFailed || got[1] != CodeQuarantineFailed || rc.faults()[1].Fields["outcome"] != "error" || rc.faults()[1].Origin != "Mover.Release" || rc.faults()[0].Origin != "Mover.Promote" {
+		t.Errorf("events = %+v", rc.faults())
 	}
-	if rc.events[1].Fields["failure_count"] != "1" || rc.events[1].Fields["ceiling"] != "1" || rc.events[1].Fields["step"] != "quarantine" {
-		t.Errorf("fields = %v", rc.events[1].Fields)
+	if rc.faults()[1].Fields["failure_count"] != "1" || rc.faults()[1].Fields["ceiling"] != "1" || rc.faults()[1].Fields["step"] != "quarantine" {
+		t.Errorf("fields = %v", rc.faults()[1].Fields)
 	}
 	if err := os.Remove(filepath.Join(inbox, "quarantine")); err != nil {
 		t.Fatal(err)
@@ -112,8 +112,8 @@ func TestMover_Release_QuarantineFailed_OutcomeErrorAndNoop(t *testing.T) {
 	if res, err := m.Release(12, "", &Policy{Ceiling: 1}); err != nil || res.Recovered != 1 {
 		t.Fatalf("res = %+v, err = %v", res, err)
 	}
-	if got := rc.codes(); len(got) != 2 || got[1] != CodeQuarantineFailed || rc.events[1].Fields["outcome"] != "noop" {
-		t.Errorf("events = %+v", rc.events)
+	if got := rc.codes(); len(got) != 2 || got[1] != CodeQuarantineFailed || rc.faults()[1].Fields["outcome"] != "noop" {
+		t.Errorf("events = %+v", rc.faults())
 	}
 	writeItem(t, procPath(inbox, 13, "t9.json"), `{"id":"t9"}`)
 	mkdirAll(t, filepath.Join(inbox, "quarantine", "t9.json"))
@@ -136,8 +136,8 @@ func TestMover_Release_ItemRewriteFailed_Steps(t *testing.T) {
 	if res, err := m.Release(4, "", &Policy{Ceiling: 1}); err != nil || res.Recovered != 1 || res.Paths[0] != filepath.Join(inbox, "poison.json") {
 		t.Fatalf("res = %+v, err = %v", res, err)
 	}
-	if len(rc.events) != 1 || rc.events[0].Code != CodeItemRewriteFailed || rc.events[0].Fields["step"] != "failure_bump" || rc.events[0].Fields["path"] != item {
-		t.Errorf("events = %+v", rc.events)
+	if len(rc.faults()) != 1 || rc.faults()[0].Code != CodeItemRewriteFailed || rc.faults()[0].Fields["step"] != "failure_bump" || rc.faults()[0].Fields["path"] != item {
+		t.Errorf("events = %+v", rc.faults())
 	}
 	if err := os.Remove(tmpPathOf(item)); err != nil {
 		t.Fatal(err)
@@ -160,8 +160,8 @@ func TestMover_Release_ItemRewriteFailed_Steps(t *testing.T) {
 	if res, err := stamper.Release(9, "", nil); err != nil || res.Recovered != 1 {
 		t.Fatalf("res = %+v, err = %v", res, err)
 	}
-	if len(rc.events) != 1 || rc.events[0].Code != CodeItemRewriteFailed || rc.events[0].Fields["step"] != "continuation_stamp" {
-		t.Errorf("events = %+v", rc.events)
+	if len(rc.faults()) != 1 || rc.faults()[0].Code != CodeItemRewriteFailed || rc.faults()[0].Fields["step"] != "continuation_stamp" {
+		t.Errorf("events = %+v", rc.faults())
 	}
 	if doc := readJSON(t, filepath.Join(inbox, "t5.json")); string(doc["continuation"]) != "" {
 		t.Errorf("released unstamped: %s", doc["continuation"])
@@ -183,8 +183,8 @@ func TestMover_ReleaseFromQuarantine_CounterResetFails_EmitsItemRewriteFailed(t 
 	if doc := readJSON(t, res.DestPath); string(doc["failure_count"]) != "3" {
 		t.Errorf("released with the stale count: %s", doc["failure_count"])
 	}
-	if len(rc.events) != 1 || rc.events[0].Code != CodeItemRewriteFailed || rc.events[0].Origin != "Mover.ReleaseFromQuarantine" || rc.events[0].Fields["step"] != "counter_reset" || rc.events[0].Fields["path"] != src {
-		t.Errorf("events = %+v", rc.events)
+	if len(rc.faults()) != 1 || rc.faults()[0].Code != CodeItemRewriteFailed || rc.faults()[0].Origin != "Mover.ReleaseFromQuarantine" || rc.faults()[0].Fields["step"] != "counter_reset" || rc.faults()[0].Fields["path"] != src {
+		t.Errorf("events = %+v", rc.faults())
 	}
 	if len(rec.records) != 1 || rec.records[0].Action != "quarantine-release" || rec.records[0].Message != ".evolve/inbox/quarantine/q.json → .evolve/inbox/q.json: operator-quarantine-release" {
 		t.Errorf("ledger = %+v", rec.records)
@@ -239,8 +239,8 @@ func TestMover_RecoverOrphans_MoveFailed_EmitsReleaseMoveFailed_StepRecoverOrpha
 	if err != nil || res.Recovered != 1 || res.Paths[0] != filepath.Join(inbox, "b.json") {
 		t.Fatalf("res = %+v, err = %v", res, err)
 	}
-	if len(rc.events) != 1 || rc.events[0].Code != CodeReleaseMoveFailed || rc.events[0].Origin != "Mover.RecoverOrphans" || rc.events[0].Fields["step"] != "recover_orphans" || rc.events[0].Cycle != 3 {
-		t.Errorf("events = %+v", rc.events)
+	if len(rc.faults()) != 1 || rc.faults()[0].Code != CodeReleaseMoveFailed || rc.faults()[0].Origin != "Mover.RecoverOrphans" || rc.faults()[0].Fields["step"] != "recover_orphans" || rc.faults()[0].Cycle != 3 {
+		t.Errorf("events = %+v", rc.faults())
 	}
 }
 
@@ -288,8 +288,8 @@ func TestMover_Release_ManifestUnreadable_EmitsContinuationManifestUnreadable(t 
 	if res, err := m.Release(8, "", nil); err != nil || res.Recovered != 1 {
 		t.Fatalf("res = %+v, err = %v", res, err)
 	}
-	if len(rc.events) != 1 || rc.events[0].Code != CodeContinuationManifestUnreadable || rc.events[0].Fields["workspace"] != ws || rc.events[0].Fields["err"] == "" {
-		t.Errorf("events = %+v", rc.events)
+	if len(rc.faults()) != 1 || rc.faults()[0].Code != CodeContinuationManifestUnreadable || rc.faults()[0].Fields["workspace"] != ws || rc.faults()[0].Fields["err"] == "" {
+		t.Errorf("events = %+v", rc.faults())
 	}
 	if body, _ := os.ReadFile(filepath.Join(inbox, "t.json")); string(body) != `{"id":"t"}` {
 		t.Errorf("released unstamped, bytes untouched: %s", body)
@@ -353,8 +353,8 @@ func TestMover_Release_DirArmsAndMoveFailed(t *testing.T) {
 	if _, statErr := os.Stat(item); statErr != nil {
 		t.Fatalf("the read-only cycle dir must have kept the item (the fault did not happen): %v", statErr)
 	}
-	if len(rc.events) != 1 || rc.events[0].Code != CodeReleaseMoveFailed || rc.events[0].Origin != "Mover.Release" || rc.events[0].Fields["step"] != "release_cycle" || rc.events[0].Fields["base"] != "t6.json" {
-		t.Errorf("events = %+v", rc.events)
+	if len(rc.faults()) != 1 || rc.faults()[0].Code != CodeReleaseMoveFailed || rc.faults()[0].Origin != "Mover.Release" || rc.faults()[0].Fields["step"] != "release_cycle" || rc.faults()[0].Fields["base"] != "t6.json" {
+		t.Errorf("events = %+v", rc.faults())
 	}
 }
 

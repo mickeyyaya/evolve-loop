@@ -29,9 +29,19 @@ func (r *recordingCenter) accessor() func() *signalcenter.Center {
 	return func() *signalcenter.Center { return r.c }
 }
 
+func (r *recordingCenter) faults() []signalcenter.Event {
+	var out []signalcenter.Event
+	for _, e := range r.events {
+		if e.Kind == signalcenter.KindInboxWarning {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
 func (r *recordingCenter) codes() []signalcenter.Code {
 	var out []signalcenter.Code
-	for _, e := range r.events {
+	for _, e := range r.faults() {
 		out = append(out, e.Code)
 	}
 	return out
@@ -292,7 +302,7 @@ func TestMover_Warn_TwoLinks(t *testing.T) {
 			if got := rc.codes(); len(got) != len(row.wantCodes) {
 				t.Fatalf("codes = %v, want %v", got, row.wantCodes)
 			}
-			for i, e := range rc.events {
+			for i, e := range rc.faults() {
 				if e.Code != row.wantCodes[i] || e.Module != signalcenter.ModuleInbox || e.Kind != signalcenter.KindInboxWarning ||
 					e.Severity != signalcenter.SeverityWarn || e.Cycle != row.cycle || e.Fields["step"] != row.wantSteps[i] {
 					t.Errorf("event %d = %+v; want %s under inbox/inbox.warning/WARN cycle=%d step=%s", i, e, row.wantCodes[i], row.cycle, row.wantSteps[i])
@@ -300,7 +310,7 @@ func TestMover_Warn_TwoLinks(t *testing.T) {
 				if perItem := e.Code != CodeContinuationManifestUnreadable; perItem && e.Fields["task_id"] == "" || !perItem && e.Fields["workspace"] == "" {
 					t.Errorf("event %d = %+v; want task_id on a per-item event, workspace on the manifest fault", i, e)
 				}
-				if i == len(rc.events)-1 && e.Origin != row.origin {
+				if i == len(rc.faults())-1 && e.Origin != row.origin {
 					t.Errorf("origin = %q, want %q", e.Origin, row.origin)
 				}
 				if e.Reason == "" || strings.HasPrefix(e.Reason, "[inbox-mover]") {
@@ -335,6 +345,7 @@ var codeSteps = map[signalcenter.Code][]string{
 	CodePromoteMoveFailed:              {"mkdir", "rename"},
 	CodeLandedCheckFailed:              {"landing"},
 	CodeReleaseDoubleMove:              {"release_cycle"},
+	CodeClaimStale:                     {"stale_sweep"},
 	CodeReleaseMoveFailed:              {"release_cycle", "recover_orphans"},
 	CodeQuarantineFailed:               {"quarantine"},
 	CodeContinuationManifestUnreadable: {"manifest"},
@@ -345,8 +356,8 @@ var codeSteps = map[signalcenter.Code][]string{
 }
 
 func TestMover_Codes_RegisteredUnderInbox_DocsNameTheirSteps_NoLedgerDouble(t *testing.T) {
-	if len(codeSteps) != 15 {
-		t.Fatalf("the unit registers 15 codes, the table names %d", len(codeSteps))
+	if len(codeSteps) != 16 {
+		t.Fatalf("the unit registers 16 codes, the table names %d", len(codeSteps))
 	}
 	docs := map[signalcenter.Code]string{}
 	for _, cd := range signalcenter.RegisteredCodes()[signalcenter.ModuleInbox] {
