@@ -5,7 +5,8 @@
     "Red first: teardownCycleWorktree removes no tree and runs no branch -d",
     "Red first: a PASS cycle whose branch is merged only into the hub HEAD keeps its branch",
     "A second call of the step does nothing, and a crash between the record and the release leaves the release state open for K4",
-    "The shadow stage deletes nothing"
+    "The shadow stage deletes nothing",
+    "A test runs a fleet lane cycle to its seal and sees the sealed-cycle sweep run once for that cycle; the test is red before the fix"
   ],
   "created_at": "2026-11-20T00:51:04Z",
   "deps": [

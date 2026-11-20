@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "TestRun_StopSignalEndsRunAndClosesFile sends the stop from the reader after a counted read and has no time.Sleep",
+    "go test -race -count=50 ./cmd/hostsampler/ -run TestRun_StopSignalEndsRunAndClosesFile passes"
+  ],
+  "created_at": "2026-11-20T19:09:42Z",
+  "files": [
+    "go/cmd/hostsampler/main_test.go"
+  ],
+  "fix": "Make the stop depend on counted reads, not on a sleep. The test wraps fakeReader in a reader that sends SIGTERM on the stop channel when it serves its Nth read (N large enough for at least one sample, given that a CPU percent needs two readings), and the test asserts at least one sample. Keep the 80ms sleep out of the test. Red first: a reader that sends the stop on its first read makes the current assertion fail, which proves that the test depends on the order of reads and stop.",
+  "id": "hostsampler-stop-test-stops-after-a-counted-read",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Main CI run 44781012877 on b2884a911 (2026-11-20) failed in the macOS darwin set on go/cmd/hostsampler TestRun_StopSignalEndsRunAndClosesFile with main_test.go:83 'no samples' after 0.11s. The next two main runs passed with no change to the package, so the test is flaky. The test (go/cmd/hostsampler/main_test.go:72-85) starts a goroutine that sleeps 80ms and then sends SIGTERM, and it expects at least one sample at a 10ms interval. Under -race on a loaded macOS runner, the run can receive the stop before it writes a sample, because the test synchronises on wall time and not on work that the sampler did.",
+  "title": "the hostsampler stop test sends its signal after a sleep, so a loaded runner can stop the run before the first sample",
+  "weight": 0.6
+}

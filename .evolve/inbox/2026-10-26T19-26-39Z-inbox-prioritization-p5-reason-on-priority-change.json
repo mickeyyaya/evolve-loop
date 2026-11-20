@@ -4,7 +4,8 @@
     "evolve inbox edit --set priority_class=... without --reason is refused",
     "An edit with --reason writes the reason to the ledger",
     "A recurrence escalation moves the rank of the item and does not write its weight",
-    "No production code outside the lifecycle writer writes an item weight, and a source-scan test proves it"
+    "No production code outside the lifecycle writer writes an item weight, and a source-scan test proves it",
+    "Branch cycle-cd3ae73e-2520 holds unmerged work for this item; reuse or retire it, then evolve gc no longer flags cycle-cd3ae73e-2520"
   ],
   "continuation": {
     "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2520",

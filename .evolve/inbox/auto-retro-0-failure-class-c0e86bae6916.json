@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Root cause fixed so failure class audit|gate-block|class-c0e86bae6916 stops recurring"
+  ],
+  "action": "Stop recurring failure class audit|gate-block|class-c0e86bae6916 (3 occurrences)",
+  "evidence_pointer": "floor: recurrence 3 \u003e= 3 — the defect survived prior fixes",
+  "files": null,
+  "id": "failure-class-c0e86bae6916",
+  "injected_at": "2026-11-20T19:07:03Z",
+  "injected_by": "retro-preventive-actions-autofiler",
+  "kind": "pipeline-repair",
+  "origin": "retro",
+  "priority": "HIGH",
+  "priority_class": "correctness",
+  "recurrence": 3,
+  "summary": "cycle 2547: phase=audit pre_class=gate-block layer=infra checks=[] fingerprint=audit|gate-block|dfd43ea29fbc\ncycle 2548: phase=audit pre_class=gate-block layer=infra checks=[] fingerprint=audit|gate-block|dfd43ea29fbc\ncycle 2551: phase=audit pre_class=gate-block layer=infra checks=[] fingerprint=audit|gate-block|dfd43ea29fbc",
+  "title": "Stop recurring failure class audit|gate-block|class-c0e86bae6916 (3 occurrences)",
+  "weight": 0.75
+}

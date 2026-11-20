@@ -4,6 +4,14 @@
     "Red first: a server whose owner pid is alive stays",
     "No test signals a real process"
   ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2567",
+    "branch": "cycle-cd3ae73e-2567",
+    "snapshot_sha": "fe6614b31950d0c24c5a75981c183b306246d264",
+    "base_sha": "dad6bdf3482ca3b084aafe568be4da3a764578e8",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2567/audit-fail-reason.json",
+    "cycle": 2567
+  },
   "created_at": "2026-11-20T00:51:06Z",
   "deps": [],
   "files": [

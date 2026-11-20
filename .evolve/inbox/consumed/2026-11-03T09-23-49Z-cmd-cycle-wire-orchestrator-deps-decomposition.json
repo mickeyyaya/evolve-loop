@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "wireOrchestratorDeps is under 50 lines and each extracted function is under 50 lines.",
+    "The existing cmd_cycle wiring tests pass unchanged; 100% statement coverage on each extracted function; zero code comments."
+  ],
+  "consumed": {
+    "at": "2026-11-20T19:12:41Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "retired, not built: the inbox review of 2026-11-20 (boundary 183) dropped it: Pure 181-line function split with no pipeline outcome."
+  },
+  "created_at": "2026-11-03T09:23:49Z",
+  "files": [
+    "go/cmd/evolve/cmd_cycle.go"
+  ],
+  "fix": "Extract the phase runners map, the reviewer chain and the core option list into named functions that take one parameter object (the wiring site). Keep the behavior byte-identical: the existing cmd_cycle wiring tests must pass unchanged.",
+  "id": "cmd-cycle-wire-orchestrator-deps-decomposition",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "route": "lane",
+  "routed_at": "2026-11-19T20:47:20Z",
+  "routed_reason": "backlog review D6 (PR #1571): a lane can build it; no protected path in files[] (first-pass LANE claim, F5.2); earlier reason: built by a claude --cloud session in the operator credit window on 2026-11-03",
+  "source": "console 2026-11-03: the I0 architecture review flagged wireOrchestratorDeps in go/cmd/evolve/cmd_cycle.go at 181 lines against the 50-line cap; each new phase or gate adds lines to it",
+  "summary": "wireOrchestratorDeps builds the signal center, the bridge, the routing table, the phase runners map, the reviewer chain and about 40 core options in one function. Each component adds lines, and coverage of a touched line needs a test that drives the whole function.",
+  "title": "Split wireOrchestratorDeps (181 lines) into named wiring steps",
+  "weight": 0.5
+}

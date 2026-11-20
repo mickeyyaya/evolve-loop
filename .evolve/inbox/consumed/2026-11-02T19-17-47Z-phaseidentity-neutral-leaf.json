@@ -1,0 +1,36 @@
+{
+  "acceptance": [
+    "no family name in the leaf package",
+    "existing WrapPasted tests pass unchanged"
+  ],
+  "campaign": "docs/plans/opus55-effort-config-2026-10",
+  "consumed": {
+    "at": "2026-11-20T19:12:41Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "retired, not built: the inbox review of 2026-11-20 (boundary 183) dropped it: A package move plus a headless system note, tied to no pipeline outcome, listed as a vague later item (weight 0.25)."
+  },
+  "created_at": "2026-11-02T19:17:47Z",
+  "deps": [],
+  "files": [
+    "go/internal/phaseidentity"
+  ],
+  "fix": "Move phaseidentity to a family-neutral leaf and add the headless claude -p system note the plan names.",
+  "id": "phaseidentity-neutral-leaf",
+  "kind": "refactor",
+  "notes": "",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "protected_files": [
+    "go/internal/bridge/driver_tmux_prepare.go"
+  ],
+  "route": "console-manual",
+  "routed_at": "2026-11-17T18:59:53Z",
+  "routed_by": "loop",
+  "routed_cycle": 2479,
+  "routed_reason": "lane triage (cycle 2479) escalate_block: protected-surface: go/internal/bridge/driver_tmux_prepare.go — control-plane changes go through the console route (operator-gated), not lane top_n",
+  "source": "console, 2026-11-03, plan audit of docs/plans (operator request: no task overlooked); plan docs/plans/opus55-effort-config-2026-10.md",
+  "summary": "Listed under 'later' in the plan; no item names it.",
+  "title": "Effort config later-1: move WrapPasted to a neutral leaf package and add the headless system note",
+  "weight": 0.25
+}
