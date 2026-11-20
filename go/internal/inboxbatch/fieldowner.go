@@ -68,6 +68,8 @@ const (
 	IntakeOverrideField          = "intake_override"
 	LandedSHAField               = "landed_sha"
 	RoutedByField                = "routed_by"
+	EvidenceVerifiedField        = "evidence_verified"
+	StaleDropCountField          = "stale_drop_count"
 )
 
 const (
@@ -117,6 +119,8 @@ var fieldRoles = map[string]FieldRole{
 	GitSHAField:                 loopStamp,
 	LandedSHAField:              loopStamp,
 	RoutedByField:               loopStamp,
+	EvidenceVerifiedField:       loopStamp,
+	StaleDropCountField:         loopCounter,
 	ProtectedFilesField:         loopGrowOnly,
 
 	PremiseVerifiedAtField:       operatorStamp,

@@ -162,6 +162,19 @@ func TestPremiseDriftSection_SilentWithoutDriftVisibleWhenUnavailable(t *testing
 	}
 }
 
+func TestPremiseDriftSection_DeclaredDriftFailureIsVisible(t *testing.T) {
+	dir := premiseRepo(t, staleItem)
+	binDir := t.TempDir()
+	script := "#!/bin/sh\ncase \"$*\" in\n*--grep=*) exit 0 ;;\n*) exit 1 ;;\nesac\n"
+	if err := os.WriteFile(filepath.Join(binDir, "git"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	if s := premiseDriftSection(context.Background(), dir, "warn-gap"); !strings.Contains(s, "warn-gap (filed 2026-08-16): drift unavailable") {
+		t.Errorf("declaredDrift failure must be visible, got:\n%s", s)
+	}
+}
+
 func TestComposePrompt_RendersPremiseDriftOnlyForAFleetLane(t *testing.T) {
 	dir := premiseRepo(t, staleItem)
 	lane := core.PhaseRequest{ProjectRoot: dir, Context: map[string]string{"fleet_scope": "warn-gap"}}

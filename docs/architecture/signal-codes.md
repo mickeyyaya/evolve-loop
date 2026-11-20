@@ -257,6 +257,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `INBOX_RELEASE_MOVE_FAILED` | an item could not be renamed back to the inbox root — by the cycle drain (fields.step=release_cycle, origin Mover.Release) or by orphan recovery (fields.step=recover_orphans, origin Mover.RecoverOrphans); the item stays in processing/cycle-N/ and the walk continues; fields.task_id, base, err |
 | `INBOX_ROUTE_NOT_FOUND` | the FAIL closeout could not find the item it was told to route (fields.task_id, inbox_dir, step=locate) — or found it held by another cycle's claim (fields.held_by_cycle) — the refusal is NOT recorded on it and it WILL be re-picked; neither processing/cycle-*/ nor the inbox root holds the id |
 | `INBOX_ROUTING_FALLBACK` | the lane-routing predicate failed to load the build profile (fields.profile, fields.project_root; reason holds the error). Routing judges protected surface and frozen checks only, so a sandbox-denied item can reach a lane. Emitted once per predicate |
+| `INBOX_STALE_DROP_REPEATED` | the same inbox item was stale-dropped a second time after a console re-queue; the item stays console-manual and no third lane is dispatched; fields.task_id, stale_drop_count |
 
 ### isolation
 

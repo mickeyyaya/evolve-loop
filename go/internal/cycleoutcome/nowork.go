@@ -68,7 +68,7 @@ func ApplyNoWork(in NoWorkInputs) (NoWorkResult, error) {
 		if stampLanded(in, d.ID, claims[d.ID]) {
 			continue
 		}
-		if err := stampProtectedPath(in, d); err != nil {
+		if err := stampDisposition(in, d); err != nil {
 			errs = append(errs, err)
 		}
 		if _, err := inboxmover.RouteConsole(opts, d.ID, answers[d.ID], in.Cycle); err != nil {

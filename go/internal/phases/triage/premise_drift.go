@@ -68,7 +68,12 @@ func itemDrift(ctx context.Context, root string, it inboxbatch.Item) string {
 	if since.IsZero() {
 		return ""
 	}
-	head := fmt.Sprintf("  - %s (filed %s): ", promptSafe(it.ID), since.UTC().Format("2006-01-02"))
+	label := "filed"
+	if verified := it.VerifiedAt(); verified.After(since) {
+		since = verified
+		label = "premise verified"
+	}
+	head := fmt.Sprintf("  - %s (%s %s): ", promptSafe(it.ID), label, since.UTC().Format("2006-01-02"))
 	naming, ok := commitsSince(ctx, root, since, []string{"-E", "--grep=" + idMentionPattern(it.ID)}, nil)
 	if !ok {
 		return head + premiseDriftUnavailable

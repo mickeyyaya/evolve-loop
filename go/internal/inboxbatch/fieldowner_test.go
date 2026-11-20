@@ -12,8 +12,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
-var loopStampKeys = []string{"consumed", "continuation", "failure_count", "git_sha", "landed_sha", "last_failure_class", "last_failure_cycle", "last_failure_findings", "last_failure_fingerprint", "last_failure_reason", "last_failure_rung", "protected_files", "released_continuations",
-	"retired_cycle", "retired_reason", "retry_plan", "route", "routed_at", "routed_by", "routed_cycle", "routed_reason", "unbacked"}
+var loopStampKeys = []string{"consumed", "continuation", "evidence_verified", "failure_count", "git_sha", "landed_sha", "last_failure_class", "last_failure_cycle", "last_failure_findings", "last_failure_fingerprint", "last_failure_reason", "last_failure_rung", "protected_files", "released_continuations",
+	"retired_cycle", "retired_reason", "retry_plan", "route", "routed_at", "routed_by", "routed_cycle", "routed_reason", "stale_drop_count", "unbacked"}
 
 var operatorStampKeys = []string{"intake_override", "premise_verified_at", "premise_verified_evidence", "premise_verified_sha"}
 
@@ -161,6 +161,10 @@ func TestStampFieldConstants_SpellTheKeysTheInboxHolds(t *testing.T) {
 		{inboxbatch.PremiseVerifiedAtField, "premise_verified_at"},
 		{inboxbatch.PremiseVerifiedSHAField, "premise_verified_sha"},
 		{inboxbatch.PremiseVerifiedEvidenceField, "premise_verified_evidence"},
+		{inboxbatch.LandedSHAField, "landed_sha"},
+		{inboxbatch.RoutedByField, "routed_by"},
+		{inboxbatch.EvidenceVerifiedField, "evidence_verified"},
+		{inboxbatch.StaleDropCountField, "stale_drop_count"},
 		{inboxbatch.IntakeOverrideField, "intake_override"},
 	} {
 		if pair[0] != pair[1] {
