@@ -14,7 +14,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/treestate"
 )
 
-const CauseCI = "ci"
+const (
+	CauseCI     = "ci"
+	CauseHeadCI = "head ci"
+)
 
 type PRHost interface {
 	Ready(ctx context.Context) ([]int, error)
@@ -36,9 +39,14 @@ type Train struct {
 	Root     string
 	Wave     string
 
+	HeadCI     headWatcher
 	MainCI     MainCI
 	MainRedFix bool
 	Progress   func(Step)
+}
+
+type headWatcher interface {
+	Watch(ctx context.Context, pr PR) (Verdict, error)
 }
 
 type Plan struct {
@@ -84,6 +92,10 @@ func (t Train) Plan(ctx context.Context, prs []int) (Plan, error) {
 		return Plan{}, err
 	}
 	plan.Landed = landed
+	open, headEjected, err := t.checkHeadCI(ctx, open)
+	if err != nil {
+		return Plan{}, err
+	}
 	base, err := t.Main.Head(ctx)
 	if err != nil {
 		return Plan{}, err
@@ -92,7 +104,33 @@ func (t Train) Plan(ctx context.Context, prs []int) (Plan, error) {
 		return Plan{}, err
 	}
 	plan.Kept, plan.Ejected, err = t.dryCompose(ctx, open, base)
+	plan.Ejected = append(headEjected, plan.Ejected...)
 	return plan, err
+}
+
+func (t Train) checkHeadCI(ctx context.Context, recs []DeliverableRecord) ([]DeliverableRecord, []*Ejection, error) {
+	if t.HeadCI == nil {
+		return recs, nil, nil
+	}
+	var kept []DeliverableRecord
+	var ejected []*Ejection
+	for _, rec := range recs {
+		last := rec.Commits[len(rec.Commits)-1].SHA
+		verdict, err := t.HeadCI.Watch(ctx, PR{Number: rec.PR, Tip: last})
+		var conclusion *RunConclusionError
+		switch {
+		case errors.Is(err, ErrRunPending):
+		case errors.Is(err, ErrNoRun), errors.As(err, &conclusion):
+			ejected = append(ejected, withErr(ejectionOf(rec, CauseHeadCI), err))
+		case err != nil:
+			return nil, nil, fmt.Errorf("integration: read the CI of the head of PR #%d: %w", rec.PR, err)
+		case verdict == Red:
+			ejected = append(ejected, withErr(ejectionOf(rec, CauseHeadCI), fmt.Errorf("the CI of its head %s is red: fix it and push, then record its review again", last)))
+		default:
+			kept = append(kept, rec)
+		}
+	}
+	return kept, ejected, nil
 }
 
 func refsOf(recs []DeliverableRecord) []int {

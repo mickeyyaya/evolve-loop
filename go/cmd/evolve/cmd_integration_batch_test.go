@@ -27,6 +27,36 @@ type trainGh struct {
 	noRunYet    int
 	conclusions []string
 	main        mainRun
+	pullHeads   func() []string
+	headRuns    map[string]string
+}
+
+const headRunIDBase = 1000000
+
+func (g *trainGh) headRunID(sha string) string {
+	n, _ := strconv.ParseInt(sha[:7], 16, 64)
+	return strconv.FormatInt(headRunIDBase+n, 10)
+}
+
+func (g *trainGh) headReply(args []string) (string, int, bool) {
+	if g.pullHeads == nil {
+		return "", 0, false
+	}
+	joined := strings.Join(args, " ")
+	for _, sha := range g.pullHeads() {
+		id := g.headRunID(sha)
+		switch {
+		case strings.HasPrefix(joined, "run list") && slices.Contains(args, sha):
+			return `[{"databaseId":` + id + `}]` + "\n", 0, true
+		case strings.HasPrefix(joined, "run view "+id+" "):
+			conclusion := "success"
+			if c, ok := g.headRuns[sha]; ok {
+				conclusion = c
+			}
+			return `{"conclusion":"` + conclusion + `","status":"completed"}` + "\n", 0, true
+		}
+	}
+	return "", 0, false
 }
 
 type mainRun struct {
@@ -62,6 +92,9 @@ func (g *trainGh) run(_ context.Context, _ string, args ...string) (string, int,
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if out, rc, ok := g.main.reply(args); ok {
+		return out, rc, nil
+	}
+	if out, rc, ok := g.headReply(args); ok {
 		return out, rc, nil
 	}
 	joined := strings.Join(args, " ")
@@ -131,6 +164,10 @@ func newTrainJourney(t *testing.T) *trainJourney {
 	env := integrationEnv{Gh: gh.run, Git: integration.SysGit(), Root: work.Dir, Wave: "j1"}
 	j := &trainJourney{work: work, origin: origin, gh: gh, env: env}
 	gh.main = mainRun{tip: j.originMain(), status: "completed", conclusion: "success"}
+	gh.headRuns = map[string]string{}
+	gh.pullHeads = func() []string {
+		return strings.Fields(origin.Git("for-each-ref", "--format=%(objectname)", "refs/pull/"))
+	}
 	return j
 }
 

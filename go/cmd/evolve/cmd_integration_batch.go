@@ -62,6 +62,7 @@ func (e integrationEnv) train(projectRoot string, warn io.Writer) (integration.T
 		Inbox:    inboxCloser(e.Root),
 		Root:     e.Root,
 		Wave:     e.Wave,
+		HeadCI:   integration.PeekCI{CI: p.CI},
 		MainCI:   p.CI,
 	}, p.Runs
 }
