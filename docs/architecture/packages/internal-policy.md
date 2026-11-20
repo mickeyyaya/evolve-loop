@@ -160,3 +160,13 @@
 ## fleet.orchestrator.file_cells (plan K1)
 
 `FleetOrchestratorPolicy.FileCells` lists the leaf packages that admission keys by file (internal-admission.md, "File keys for leaf packages"). `Parse` refuses an empty or blank entry, an entry with a line break and a repeated entry, with an error that names `file_cells`. `OrchestratorConfig` keeps the list as one newline-joined string so that the struct stays comparable; `OrchestratorConfig.FileCells()` splits it. An unset key gives no list.
+
+## fleet.orchestrator.window.adaptive (plan fleet-host-adaptive-window)
+
+`FleetWindowPolicy.Adaptive` is a pointer to `FleetAdaptivePolicy` (`fleet_adaptive.go`). Absent means that `OrchestratorConfig.Adaptive` is the zero value, `Enabled` is false and the cap equals the sized width (`TestFleetConfig_AdaptiveAbsentMeansCapEqualsSized`). An empty block `{}` enables the controller at stage `shadow` with the compiled defaults (`TestFleetConfig_AdaptiveEmptyBlockEnablesTheShadowDefaults`).
+
+- **Keys.** `stage`, `load_per_core_high`, `load_per_core_low`, `mem_available_min_pct`, `swap_used_max_mb`, `step`, `decrease_factor`, `cooldown_s`, `increase_cooldown_s`, `sample_s` and `smooth_samples`. A zero value means the default.
+- **Defaults.** 1.5, 1.0, 15, 4096, 1, 0.5, 60, 180, 15 and 3. The stage is `shadow`.
+- **Validation.** `Parse` refuses these cases: an unknown key, a stage that is not `shadow` or `enforce`, and a negative value. It also refuses these cases: a `decrease_factor` of 1 or more, and a `mem_available_min_pct` of 100 or more. The low threshold must be under the high threshold. Each refusal wraps `ErrFleetAdaptive`. Pinned by `TestParse_FleetAdaptiveStrictAndValidated` and `TestParse_FleetAdaptiveRefusalsWrapTheAdaptiveError`.
+- **The window rule stays.** `window.start` must not exceed `fleet.count` (`TestParse_WindowStartAboveCountIsStillRefusedWithAdaptive`).
+- **Adaptive enforce needs orchestrator enforce.** The pool reads the window only at orchestrator stage `enforce`. So `Parse` refuses an adaptive stage of `enforce` when the orchestrator stage is `shadow` or absent (`TestParse_AdaptiveEnforceNeedsTheOrchestratorAtEnforce`). Without this rule, a signal can report `applied=true` when the pool does not apply the cap.

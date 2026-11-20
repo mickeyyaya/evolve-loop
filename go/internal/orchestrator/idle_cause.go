@@ -17,9 +17,10 @@ const (
 	CauseAdmissionRefused IdleCause = "admission_refused"
 	CauseBench            IdleCause = "bench"
 	CauseOperatorStop     IdleCause = "operator_stop"
+	CauseHostPressure     IdleCause = "host_pressure"
 )
 
-var IdleCauses = []IdleCause{CauseFamilyHeld, CauseRunCap, CauseSupplyEmpty, CauseAdmissionRefused, CauseBench, CauseOperatorStop}
+var IdleCauses = []IdleCause{CauseFamilyHeld, CauseRunCap, CauseSupplyEmpty, CauseAdmissionRefused, CauseBench, CauseOperatorStop, CauseHostPressure}
 
 var idleCauseList = func() string {
 	names := make([]string, len(IdleCauses))
@@ -57,8 +58,14 @@ func (p Pool) idleCause(t fleet.PoolTransition) IdleCause {
 		return CauseFamilyHeld
 	case t.Pending == 0:
 		return CauseSupplyEmpty
+	case p.hostCapped():
+		return CauseHostPressure
 	case p.Benched != nil && p.Benched():
 		return CauseBench
 	}
 	return CauseAdmissionRefused
+}
+
+func (p Pool) hostCapped() bool {
+	return p.Window != nil && p.Stage == StageEnforce && p.Window.HostCapped()
 }
