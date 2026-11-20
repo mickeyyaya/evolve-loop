@@ -4,6 +4,7 @@ package cycle2558
 
 import (
 	"crypto/rand"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -210,7 +211,7 @@ func TestC2558_005_FailedBundleStepOnABranchSweepKeepsTheBranch(t *testing.T) {
 
 			err := s.sweepBranch("lane/keep", tip)
 
-			if err == nil || !strings.Contains(err.Error(), "branch kept") {
+			if err == nil || !errors.Is(err, gc.ErrBranchKept) {
 				t.Fatalf("sweep err = %v, want a refusal that names the kept branch", err)
 			}
 			if !gittest.BranchExists(t, s.repo.Dir, "lane/keep") {
@@ -229,7 +230,7 @@ func TestC2558_006_FailedBundleStepOnASalvageKeepsTheTreeAndTheBranch(t *testing
 
 			err := s.salvageTree(tree, "cycle-fail-2558")
 
-			if err == nil || !strings.Contains(err.Error(), "tree kept") {
+			if err == nil || !errors.Is(err, gc.ErrTreeKept) {
 				t.Fatalf("salvage err = %v, want a refusal that names the kept tree", err)
 			}
 			if _, statErr := os.Stat(tree); statErr != nil {

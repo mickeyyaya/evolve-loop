@@ -18,6 +18,8 @@ import (
 
 var branchSweepOld = time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
 
+var errInjectedGit = errors.New("injected git failure")
+
 type branchSweepEnv struct {
 	t    *testing.T
 	repo *gittest.Repo
@@ -83,10 +85,9 @@ func (e *branchSweepEnv) bundles() []string {
 }
 
 func (e *branchSweepEnv) failing(match func(args []string) bool) {
-	boom := errors.New("injected git failure")
 	e.opts.Exec = failingGitF1(sysexec.DefaultRunner, func(_ string, args []string) error {
 		if match(args) {
-			return boom
+			return errInjectedGit
 		}
 		return nil
 	})
@@ -382,5 +383,21 @@ func TestBranchSweep_TheScopeTypeDefaultsToTheCycleScope(t *testing.T) {
 	var scope BranchScope
 	if scope != BranchScopeCycle || scope == BranchScopeAll {
 		t.Fatalf("zero BranchScope = %d, want BranchScopeCycle", scope)
+	}
+}
+
+func TestBranchSweep_AFailedBundleRefusalWrapsErrBranchKeptAndTheCause(t *testing.T) {
+	e := newBranchSweepEnv(t)
+	tip := e.land("feat/x", "x.txt")
+	e.failing(func(a []string) bool { return len(a) > 1 && a[0] == "bundle" && a[1] == "create" })
+	it := WorktreeItem{Branch: "feat/x", Head: tip, Action: WorktreeActionDeleteBranch, Bundle: true}
+
+	err := ApplyWorktrees(e.opts, WorktreeManifest{Items: []WorktreeItem{it}})
+
+	if !errors.Is(err, ErrBranchKept) {
+		t.Errorf("err = %v, want it to wrap ErrBranchKept", err)
+	}
+	if !errors.Is(err, errInjectedGit) {
+		t.Errorf("err = %v, want it to wrap the bundle failure", err)
 	}
 }

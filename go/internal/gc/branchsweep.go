@@ -1,12 +1,15 @@
 package gc
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 )
+
+var ErrBranchKept = errors.New("branch kept")
 
 type BranchScope int
 
@@ -99,7 +102,7 @@ func (o WorktreeOptions) deleteBundled(it WorktreeItem) error {
 		return err
 	}
 	if err := o.bundleBranch(it); err != nil {
-		return fmt.Errorf("gc: refuse to delete %s: bundle failed, branch kept: %w", it.Branch, err)
+		return fmt.Errorf("gc: refuse to delete %s: bundle failed, %w: %w", it.Branch, ErrBranchKept, err)
 	}
 	return o.dropRef(it)
 }

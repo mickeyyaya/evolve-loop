@@ -12,6 +12,8 @@ import (
 	"strings"
 )
 
+var ErrTreeKept = errors.New("tree kept")
+
 var salvageReadlink = os.Readlink
 
 func (o WorktreeOptions) salvageRemoveWorktrees(items []WorktreeItem, refused map[string]bool) (bool, []error) {
@@ -22,11 +24,11 @@ func (o WorktreeOptions) salvageRemoveWorktrees(items []WorktreeItem, refused ma
 			continue
 		}
 		if err := o.salvageWorktree(it.Path, it.Branch); err != nil {
-			errs = append(errs, fmt.Errorf("gc: refuse %s: salvage failed, tree kept: %w", it.Path, err))
+			errs = append(errs, fmt.Errorf("gc: refuse %s: salvage failed, %w: %w", it.Path, ErrTreeKept, err))
 			continue
 		}
 		if o.isLive(it.Path) {
-			errs = append(errs, fmt.Errorf("gc: refuse %s: became live during its salvage, tree kept", it.Path))
+			errs = append(errs, fmt.Errorf("gc: refuse %s: became live during its salvage, %w", it.Path, ErrTreeKept))
 			continue
 		}
 		if _, err := o.git(o.ProjectRoot, "worktree", "remove", "--force", it.Path); err != nil {
