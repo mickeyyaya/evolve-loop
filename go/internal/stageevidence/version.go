@@ -95,7 +95,7 @@ func canonicalPolicySubtree(policy []byte, subtree string) ([]byte, bool, error)
 	}
 	var extra any
 	if err := dec.Decode(&extra); !errors.Is(err, io.EOF) {
-		return nil, false, errors.New("stageevidence: trailing data in policy JSON")
+		return nil, false, fmt.Errorf("stageevidence: %w", ErrTrailingData)
 	}
 	if subtree == "" {
 		return nil, false, nil
@@ -191,7 +191,7 @@ func hashListedPackages(h hash.Hash, local []string, pkgs map[string]listedPkg) 
 	for _, pkg := range local {
 		info, ok := pkgs[pkg]
 		if !ok {
-			return fmt.Errorf("stageevidence: missing package %s in closure", pkg)
+			return fmt.Errorf("stageevidence: %w: %s", ErrMissingPackage, pkg)
 		}
 		writeChunk(h, "pkg", []byte(pkg))
 		for _, f := range info.files {

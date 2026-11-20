@@ -81,8 +81,11 @@ func TestAPICover_NamesAllStageEvidenceExports(t *testing.T) {
 	}
 
 	broken := &stageevidence.BrokenChainError{Cycle: 1, Seq: 1}
-	if !errors.Is(broken, stageevidence.ErrBrokenChain) || broken.Unwrap() != stageevidence.ErrBrokenChain || broken.Error() == "" {
+	if !errors.Is(broken, stageevidence.ErrBrokenChain) || broken.Unwrap() != stageevidence.ErrBrokenChain {
 		t.Fatalf("BrokenChainError: %v", broken)
+	}
+	if other := (&stageevidence.BrokenChainError{Cycle: 2, Seq: 3}); broken.Error() == other.Error() {
+		t.Fatalf("BrokenChainError messages do not name the position: %q", other.Error())
 	}
 	if stageevidence.ErrorCode(stageevidence.ErrEmptyChain) != "empty-chain" {
 		t.Fatal("ErrorCode mismatch")
