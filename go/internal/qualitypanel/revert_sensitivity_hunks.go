@@ -36,8 +36,12 @@ func ParseHunks(diff string) []Hunk {
 func productionGoFile(diffLine string) string {
 	fields := strings.Fields(diffLine)
 	file := strings.TrimPrefix(fields[len(fields)-1], "b/")
-	if strings.HasSuffix(file, ".go") && !strings.HasSuffix(file, "_test.go") {
+	if isProductionGo(file) {
 		return file
 	}
 	return ""
+}
+
+func isProductionGo(file string) bool {
+	return strings.HasSuffix(file, ".go") && !strings.HasSuffix(file, "_test.go")
 }

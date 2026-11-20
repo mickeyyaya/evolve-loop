@@ -23,7 +23,14 @@ func Wilson(k, n int) Interval {
 	d := 1 + z95*z95/nn
 	centre := (p + z95*z95/(2*nn)) / d
 	half := z95 / d * math.Sqrt(p*(1-p)/nn+z95*z95/(4*nn*nn))
-	return Interval{Value: p, Lo: math.Max(0, centre-half), Hi: math.Min(1, centre+half)}
+	lo, hi := math.Max(0, centre-half), math.Min(1, centre+half)
+	if k <= 0 {
+		lo = 0
+	}
+	if k >= n {
+		hi = 1
+	}
+	return Interval{Value: p, Lo: lo, Hi: hi}
 }
 
 func MDE(pBar float64, n int) float64 {
@@ -89,4 +96,37 @@ func flatten(clusters [][]float64) []float64 {
 
 func percentile(sorted []float64, q float64) float64 {
 	return sorted[int(q*float64(len(sorted)-1))]
+}
+
+func ClusterBootstrapRatio(num, den []float64, resamples int, seed int64) Interval {
+	if len(num) == 0 || resamples <= 0 {
+		return Interval{}
+	}
+	r := rand.New(rand.NewSource(seed))
+	ratios := make([]float64, resamples)
+	for i := range ratios {
+		var n, d float64
+		for range num {
+			j := r.Intn(len(num))
+			n, d = n+num[j], d+den[j]
+		}
+		ratios[i] = safeRatio(n, d)
+	}
+	sort.Float64s(ratios)
+	return Interval{Value: safeRatio(sum(num), sum(den)), Lo: percentile(ratios, bootstrapLow), Hi: percentile(ratios, bootstrapTop)}
+}
+
+func sum(xs []float64) float64 {
+	var total float64
+	for _, x := range xs {
+		total += x
+	}
+	return total
+}
+
+func safeRatio(n, d float64) float64 {
+	if d == 0 {
+		return 0
+	}
+	return n / d
 }

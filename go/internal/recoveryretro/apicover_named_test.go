@@ -131,3 +131,10 @@ func TestPublishPending_AnUnreadablePendingPathIsAnError(t *testing.T) {
 		t.Fatal("PublishPending of a file at the pending path returned no error")
 	}
 }
+
+func TestShipped_AShippedDossierHasAPassVerdictAndACommit(t *testing.T) {
+	pass := &dossier.Dossier{Cycle: 1, FinalVerdict: dossier.VerdictPass, CommitSHA: "c"}
+	if !Shipped(pass) || Shipped(&dossier.Dossier{FinalVerdict: dossier.VerdictPass}) || Shipped(&dossier.Dossier{FinalVerdict: dossier.VerdictFail, CommitSHA: "c"}) || Shipped(nil) {
+		t.Errorf("Shipped must hold for a pass with a commit and for nothing else")
+	}
+}

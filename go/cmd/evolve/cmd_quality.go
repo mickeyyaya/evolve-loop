@@ -62,6 +62,7 @@ func waveQualityReaders() []qualityReader {
 		flowReader("PQ7", flows.withSamples, pipelinerates.SlotUtilization),
 		flowReader("PQ8", flows.withSamples, pipelinerates.IdleCauseShare),
 		flowReader("PQ9", flows.phases, pipelinerates.GateShare),
+		recoveryQualityReader(),
 	}
 }
 
@@ -115,7 +116,7 @@ func flowReader(index string, flows func(root string) ([]pipelinerates.WaveFlow,
 }
 
 func treeQualityReaders() []qualityReader {
-	return []qualityReader{
+	return append(outcomeQualityReaders(), []qualityReader{
 		shapeReader("CQ4", func(t codeshape.Tree, root string) ([]qualitypanel.Reading, error) {
 			readings := []qualitypanel.Reading{codeshape.InterfaceDepth(t), codeshape.TreeDuplication(t)}
 			cycles, err := pipelinerates.LoadCycles(root)
@@ -132,7 +133,7 @@ func treeQualityReaders() []qualityReader {
 			lines, files, err := codeshape.RuleLines(root)
 			return []qualitypanel.Reading{codeshape.JudgmentSurface(lines, files)}, err
 		}},
-	}
+	}...)
 }
 
 func shapeReader(index string, read func(codeshape.Tree, string) ([]qualitypanel.Reading, error)) qualityReader {

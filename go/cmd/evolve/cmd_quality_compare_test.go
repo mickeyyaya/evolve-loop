@@ -52,13 +52,17 @@ func TestQualityReport_TheWaveScopeReadsShipRateDeadlineRateAndPackages(t *testi
 
 	rc, stdout := runQualityReport(t, env, root)
 
-	if rc != 0 || !strings.Contains(stdout, "39 reading(s)") || !strings.Contains(stdout, "10 warning(s)") {
-		t.Fatalf("rc %d stdout %q, want 39 readings (PQ1 x2, PQ4 x4, CQ2 x2, CQ1 tree and wave, PQ5 x20, PQ6 x7, PQ9 x2) and ten warnings: wave 2 shipped nothing (CQ2 and three PQ5 costs), the fixture tree has no function, PQ9 reads two waves with no lane time, and PQ7 and PQ8 find no orchestration stream", rc, stdout)
+	if rc != 0 || !strings.Contains(stdout, "40 reading(s)") || !strings.Contains(stdout, "11 warning(s)") {
+		t.Fatalf("rc %d stdout %q, want 40 readings (PQ1 x2, PQ4 x4, CQ2 x2, CQ1 tree and wave, PQ5 x20, PQ6 x7, PQ9 x2, OQ4) and eleven warnings: no dossier for OQ4, wave 2 shipped nothing (CQ2 and three PQ5 costs), the fixture tree has no function, PQ9 reads two waves with no lane time, and PQ7 and PQ8 find no orchestration stream", rc, stdout)
 	}
 	byWindow := map[string]map[string]string{}
 	for _, e := range channelEvents(t, root, "quality.reading") {
-		if len(e.Fields) != 11 {
-			t.Errorf("%s %s carries %d keys, want the 11 of spec §5.2", e.Fields["index"], e.Fields["window"], len(e.Fields))
+		wantKeys := 11
+		if e.Fields["index"] == "OQ4" {
+			wantKeys = 12
+		}
+		if len(e.Fields) != wantKeys {
+			t.Errorf("%s %s carries %d keys, want %d: the 11 of spec §5.2, and OQ4 adds median_hours", e.Fields["index"], e.Fields["window"], len(e.Fields), wantKeys)
 		}
 		byWindow[e.Fields["index"]+" "+e.Fields["window"]] = e.Fields
 	}
@@ -83,16 +87,19 @@ func TestWaveQualityReaders_AMissingWaveRecordIsASourceAbsentWarning(t *testing.
 
 	rc, stdout := runQualityReport(t, env, root)
 
-	if rc != 0 || !strings.Contains(stdout, "0 reading(s), 0 breach(es), 10 warning(s)") {
-		t.Errorf("rc %d stdout %q, want ten warnings and exit 0", rc, stdout)
+	if rc != 0 || !strings.Contains(stdout, "1 reading(s), 0 breach(es), 11 warning(s)") {
+		t.Errorf("rc %d stdout %q, want the empty OQ4 reading, eleven warnings and exit 0", rc, stdout)
 	}
 	for _, e := range channelEvents(t, root, "quality.breach") {
+		if e.Fields["index"] == "OQ4" && e.Code == "QUALITY_VACUOUS_DENOMINATOR" {
+			continue
+		}
 		if e.Code != "QUALITY_SOURCE_ABSENT" || !(strings.HasSuffix(e.Fields["source"], filepath.Join(".evolve", "waves")) || strings.HasSuffix(e.Fields["source"], "go")) {
 			t.Errorf("warning %+v, want QUALITY_SOURCE_ABSENT naming .evolve/waves or the go tree", e)
 		}
 	}
-	if got := len(qualityScopes["wave"]); got != 10 {
-		t.Errorf("the production wave scope has %d readers, want PQ1, PQ4, CQ2, the two CQ1 readers, PQ5 and PQ6 to PQ9", got)
+	if got := len(qualityScopes["wave"]); got != 11 {
+		t.Errorf("the production wave scope has %d readers, want PQ1, PQ4, CQ2, the two CQ1 readers, PQ5, PQ6 to PQ9 and OQ4", got)
 	}
 }
 

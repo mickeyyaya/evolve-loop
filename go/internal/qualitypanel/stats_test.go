@@ -76,3 +76,37 @@ func TestClusterBootstrapMedian_EmptyClustersDoNotDragTheMedianToZero(t *testing
 		t.Errorf("interval = %+v, want a point at 6: an empty cluster is no data, not a zero", got)
 	}
 }
+
+func TestClusterBootstrapRatio_TheValueIsThePooledRatioAndTheBandSpansTheClusters(t *testing.T) {
+	t.Parallel()
+	iv := ClusterBootstrapRatio([]float64{1, 0}, []float64{1, 1}, 200, 1)
+	if iv.Value != 0.5 || iv.Lo != 0 || iv.Hi != 1 {
+		t.Errorf("interval = %+v, want value 0.5 over the band 0 to 1", iv)
+	}
+	if again := ClusterBootstrapRatio([]float64{1, 0}, []float64{1, 1}, 200, 1); again != iv {
+		t.Errorf("same seed gave %+v then %+v, want a repeatable interval", iv, again)
+	}
+}
+
+func TestClusterBootstrapRatio_NothingToResampleIsTheEmptyIntervalAndAZeroDenominatorIsZero(t *testing.T) {
+	t.Parallel()
+	if iv := ClusterBootstrapRatio(nil, nil, 100, 1); iv != (Interval{}) {
+		t.Errorf("no clusters: %+v, want the empty interval", iv)
+	}
+	if iv := ClusterBootstrapRatio([]float64{1}, []float64{1}, 0, 1); iv != (Interval{}) {
+		t.Errorf("no resamples: %+v, want the empty interval", iv)
+	}
+	if iv := ClusterBootstrapRatio([]float64{3}, []float64{0}, 10, 1); iv != (Interval{}) {
+		t.Errorf("zero denominator: %+v, want zero, not NaN", iv)
+	}
+}
+
+func TestWilson_NoSuccessHasAnExactZeroLowerBoundAndAllSuccessAnExactOneUpperBound(t *testing.T) {
+	t.Parallel()
+	if iv := Wilson(0, 10); iv.Lo != 0 || iv.Value != 0 {
+		t.Errorf("Wilson(0, 10) = %+v, want an exact zero lower bound, not floating noise", iv)
+	}
+	if iv := Wilson(10, 10); iv.Hi != 1 || iv.Value != 1 {
+		t.Errorf("Wilson(10, 10) = %+v, want an exact one upper bound", iv)
+	}
+}

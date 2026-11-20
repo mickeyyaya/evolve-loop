@@ -270,8 +270,8 @@ func TestQualityReport_TheTreeScopeReadsDepthDuplicationAndJudgmentSurface(t *te
 
 	rc, stdout := runQualityReport(t, env, root)
 
-	if rc != 0 || !strings.Contains(stdout, "4 reading(s)") {
-		t.Fatalf("rc %d stdout %q, want CQ3, CQ4 tree, CQ4 added and CQ5", rc, stdout)
+	if rc != 0 || !strings.Contains(stdout, "6 reading(s)") {
+		t.Fatalf("rc %d stdout %q, want OQ2, OQ3, CQ3, CQ4 tree, CQ4 added and CQ5", rc, stdout)
 	}
 	got := map[string]string{}
 	for _, e := range channelEvents(t, root, "quality.reading") {
@@ -283,8 +283,8 @@ func TestQualityReport_TheTreeScopeReadsDepthDuplicationAndJudgmentSurface(t *te
 			t.Errorf("%s = %q, want %q (all %v)", k, got[k], v, got)
 		}
 	}
-	if len(qualityScopes["tree"]) != 2 {
-		t.Errorf("the production tree scope has %d readers, want 2: one scan for CQ3 and CQ4, and CQ5", len(qualityScopes["tree"]))
+	if len(qualityScopes["tree"]) != 4 {
+		t.Errorf("the production tree scope has %d readers, want 4: OQ2, OQ3, one scan for CQ3 and CQ4, and CQ5", len(qualityScopes["tree"]))
 	}
 }
 
@@ -298,7 +298,7 @@ func TestTreeQualityReaders_AMissingWaveRecordWarnsForTheAddedForm(t *testing.T)
 
 	_, stdout := runQualityReport(t, env, root)
 
-	if !strings.Contains(stdout, "3 reading(s)") || !strings.Contains(stdout, "4 warning(s)") {
+	if !strings.Contains(stdout, "3 reading(s)") || !strings.Contains(stdout, "6 warning(s)") {
 		t.Errorf("stdout %q", stdout)
 	}
 	absent := 0

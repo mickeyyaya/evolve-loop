@@ -25,3 +25,12 @@ func TestShipPaths_AFakeListerFeedsPackagesPerShip(t *testing.T) {
 		t.Errorf("readings %+v, %v; want a median of 2 packages", readings, err)
 	}
 }
+
+func TestRecoveryExports_AreNamed(t *testing.T) {
+	t.Parallel()
+	var in RecoveryInput
+	var res RecoveryResult = MeasureRecovery(in)
+	if res.Recoveries != 0 || res.OQ4.Index != "OQ4" || len(res.Events(qualitypanel.StageShadow)) == 0 {
+		t.Errorf("result = %+v, want an empty OQ4 reading", res)
+	}
+}

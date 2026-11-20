@@ -54,7 +54,7 @@ func failuresSinceLastPass(ordered []*dossier.Dossier, task string, before int) 
 		}
 		seen[d.Cycle] = true
 		switch {
-		case shipped(d):
+		case Shipped(d):
 			failures = nil
 		case d.FinalVerdict == dossier.VerdictFail:
 			failures = append(failures, tryOf(d))
@@ -63,12 +63,12 @@ func failuresSinceLastPass(ordered []*dossier.Dossier, task string, before int) 
 	return failures
 }
 
-func shipped(d *dossier.Dossier) bool {
+func Shipped(d *dossier.Dossier) bool {
 	return d != nil && d.FinalVerdict == dossier.VerdictPass && d.CommitSHA != ""
 }
 
 func shippedWithTasks(d *dossier.Dossier) bool {
-	return shipped(d) && d.Tasks != nil
+	return Shipped(d) && d.Tasks != nil
 }
 
 func cycleOf(d *dossier.Dossier) int {

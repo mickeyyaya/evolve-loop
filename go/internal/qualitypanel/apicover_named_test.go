@@ -62,3 +62,16 @@ func TestRevertSensitivityExports_AreNamed(t *testing.T) {
 		t.Errorf("err=%v events=%d, want a no-data reading", err, len(res.Events(StageShadow)))
 	}
 }
+
+func TestOutcomeReaderExports_AreNamed(t *testing.T) {
+	var churn ChurnResult
+	churnIn := ChurnInput{Repo: "/no/such/repository"}
+	var rev RevertRateResult
+	revIn := RevertRateInput{Repo: "/no/such/repository"}
+	churn, errChurn := MeasureChurn(churnIn)
+	rev, errRev := MeasureRevertRate(revIn)
+	iv := ClusterBootstrapRatio([]float64{1}, []float64{2}, 5, 1)
+	if errChurn == nil || errRev == nil || churn.Added != 0 || rev.Commits != 0 || iv.Value != 0.5 {
+		t.Errorf("churn %+v %v, revert %+v %v, ratio %+v; want errors for the empty repo path and a ratio of 0.5", churn, errChurn, rev, errRev, iv)
+	}
+}
