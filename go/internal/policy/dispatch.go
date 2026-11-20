@@ -112,6 +112,7 @@ type BridgePolicy struct {
 	BootTimeoutS          int            `json:"boot_timeout_s,omitempty"`
 	ArtifactTimeoutS      int            `json:"artifact_timeout_s,omitempty"`
 	ArtifactMaxExtends    int            `json:"artifact_max_extends,omitempty"`
+	IdleCheckpointGraceS  int            `json:"idle_checkpoint_grace_s,omitempty"`
 	ScrollbackLines       int            `json:"scrollback_lines,omitempty"`
 	PhaseArtifactTimeoutS map[string]int `json:"phase_artifact_timeout_s,omitempty"`
 	AnthropicBaseURL      string         `json:"anthropic_base_url,omitempty"`

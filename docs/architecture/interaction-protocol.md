@@ -72,6 +72,8 @@ resilience against adversarial/degenerate scenarios.
 | 263–269 | `nudgeSent=true` and nothing measures if any nudge ever worked | Interactions are fired and forgotten — no outcome record, so no tuning signal and no learning. |
 | 262 (archaeology) | the bridge's own nudge echoed into a dead pane and read as "progress" | Injection without correlation/recording is self-interference. |
 
+**Idle checkpoint.** A pane that sits idle at its prompt with no deliverable gets its stop-review checkpoint, and so its one-shot nudge, after `bridge.idle_checkpoint_grace_s` seconds (default 120). The pane does not wait for the whole artifact interval. A busy pane keeps the full interval. The nudge fires once, and a later checkpoint follows the normal interval.
+
 **Root observation.** The loop already *interacts* (auto-respond keystrokes, one-shot nudge,
 contract-correction re-dispatch, inbox envelopes, the opt-in ADR-0037 `Supervisor.Ask`). But the
 interactions are **point mechanisms**: single-rung, evidence-free, unmeasured, and closed to

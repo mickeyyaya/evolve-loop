@@ -35,13 +35,14 @@ func runTransientDwell(t *testing.T, fx launchFixture, paneSeq []string, stage s
 	rev := &scriptedReviewer{verdicts: []ReviewVerdict{{Action: ReviewPause, Reason: "full artifact timeout reached"}}}
 	var sleeps []time.Duration
 	d := Deps{
-		Tmux:               &fakeTmux{paneSeq: paneSeq},
-		Sleep:              func(dur time.Duration) { sleeps = append(sleeps, dur) },
-		CaptureBaseline:    zeroBaselineCapture,
-		Reviewer:           rev,
-		ArtifactTimeoutS:   timeoutS,
-		ArtifactMaxExtends: 5,
-		RecoveryStage:      stage,
+		Tmux:                 &fakeTmux{paneSeq: paneSeq},
+		Sleep:                func(dur time.Duration) { sleeps = append(sleeps, dur) },
+		CaptureBaseline:      zeroBaselineCapture,
+		Reviewer:             rev,
+		ArtifactTimeoutS:     timeoutS,
+		IdleCheckpointGraceS: timeoutS,
+		ArtifactMaxExtends:   5,
+		RecoveryStage:        stage,
 	}
 	eng := newTestEngine(d)
 	var stdout, stderr bytes.Buffer

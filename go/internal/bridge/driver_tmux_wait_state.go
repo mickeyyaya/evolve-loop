@@ -13,6 +13,7 @@ type replWaitState struct {
 	result replWaitResult
 
 	intervalS       int
+	idleGraceS      int
 	maxExtends      int
 	reviewer        StopReviewer
 	livenessCenter  *panestream.LivenessCenter
@@ -43,6 +44,7 @@ type replWaitState struct {
 	cancellationErr         error
 	attempt                 int
 	intervalStartS          int
+	idleSinceS              int
 	waitedS                 int
 
 	checkpointExhaustion *exhaustionGate
@@ -104,6 +106,7 @@ func newReplWaitState(w replWaiter) *replWaitState {
 
 	return &replWaitState{
 		intervalS:            interval,
+		idleGraceS:           defaultIfZero(w.deps.IdleCheckpointGraceS, defaultIdleCheckpointGraceS),
 		maxExtends:           maxExtends,
 		reviewer:             reviewer,
 		livenessCenter:       livenessCenter,

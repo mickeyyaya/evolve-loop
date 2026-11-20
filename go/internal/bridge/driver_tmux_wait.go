@@ -116,7 +116,7 @@ func (w replWaiter) wait() (replWaitResult, int) {
 			}
 			break
 		}
-		if elapsed-state.intervalStartS >= state.intervalS {
+		if state.checkpointDue(elapsed) {
 			rawPane, _ := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
 			curPane, renderWedged := recoverBlankPane(ctx, deps, lp.session, lp.bootScrollback, rawPane, pfx)
 			if w.reviewCheckpoint(state, elapsed, curPane, renderWedged) == checkpointFailover {

@@ -59,6 +59,7 @@ type Deps struct {
 	BootTimeoutS          int
 	ArtifactTimeoutS      int
 	ArtifactMaxExtends    int
+	IdleCheckpointGraceS  int
 	PhaseArtifactTimeoutS map[string]int
 	MaxConcurrent         map[string]int
 	SandboxMode           string

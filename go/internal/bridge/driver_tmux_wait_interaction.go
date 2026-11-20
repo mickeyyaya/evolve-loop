@@ -41,6 +41,7 @@ func (w replWaiter) handleTickInteractions(state *replWaitState, elapsed int, pa
 		w.channel.injectionDelivered(cid)
 	}
 
+	state.observeIdleClock(elapsed, captureOK, state.livenessCenter.BusyOf(pane, state.paneProfile))
 	w.observeTickPane(state, pane, captureOK)
 	action, rc := w.responder.tickPane(w.ctx, w.launch.session, pane, captureOK)
 	switch rc {
