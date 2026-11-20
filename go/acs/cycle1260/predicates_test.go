@@ -53,9 +53,9 @@ func asExitError(err error, target **exec.ExitError) bool {
 }
 
 func TestC1260_001_regression_tia_policy_stage(t *testing.T) {
-	out, code := runScoped(t, "./internal/policy", "TestRegressionTIAConfig")
-	if code != 0 {
-		t.Errorf("policy.RegressionTIAConfig contract is not satisfied (exit %d).\n%s", code, tail(out))
+	out, code := runScoped(t, "./internal/policy", "^TestTheRegressionTIAPolicyKeyIsRetired$", "-v")
+	if code != 0 || !strings.Contains(out, "--- PASS: TestTheRegressionTIAPolicyKeyIsRetired") {
+		t.Errorf("the retired regression_tia policy key contract is not satisfied (exit %d).\n%s", code, tail(out))
 	}
 }
 
