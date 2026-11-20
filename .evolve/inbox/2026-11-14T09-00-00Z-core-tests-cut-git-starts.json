@@ -4,6 +4,14 @@
     "Core system_s divided by user_s on macOS falls below 1.2.",
     "Docs in STE."
   ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2560",
+    "branch": "cycle-cd3ae73e-2560",
+    "snapshot_sha": "38b98a115749bce9d6397e35e5b85917ef7a16e0",
+    "base_sha": "499c111b5f3a1ddb8e30fec6de050faf4d5233ce",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2560/audit-fail-reason.json",
+    "cycle": 2560
+  },
   "created_at": "2026-11-14T09:00:00Z",
   "deps": [],
   "files": [

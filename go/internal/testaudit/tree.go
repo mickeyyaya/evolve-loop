@@ -24,7 +24,7 @@ func Rebaseline(root, pkg string, cfg Config) error {
 	if err != nil {
 		return err
 	}
-	newRows, err := analyzeSingle(base, cleanPkg, cfg)
+	newRows, err := packageFindings(base, cleanPkg, cfg)
 	if err != nil {
 		return err
 	}
@@ -76,22 +76,6 @@ func resolvePkgDir(base, cleanPkg string) string {
 		return filepath.FromSlash(cleanPkg)
 	}
 	return filepath.Join(base, filepath.FromSlash(cleanPkg))
-}
-
-func analyzeSingle(base, pkg string, cfg Config) ([]Finding, error) {
-	dir := resolvePkgDir(base, pkg)
-	p, err := loadPackage(dir)
-	if err != nil {
-		return nil, err
-	}
-	p.dir = pkg
-	found := auditPackage(p, cfg)
-	for _, row := range cfg.Fakes {
-		if row.SuiteDir != "" && cleanPath(row.SuiteDir) == pkg && !suiteDeclaredPkg(p, row.Tool) {
-			found = append(found, Finding{Package: pkg, Test: "fakes:" + row.Tool, Rule: ruleUnverifiedFake})
-		}
-	}
-	return finish(found, cfg), nil
 }
 
 func rebaselineLocal(targetDir, cleanPkg string, newRows []Finding) error {

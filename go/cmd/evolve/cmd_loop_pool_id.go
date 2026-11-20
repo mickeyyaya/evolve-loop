@@ -27,7 +27,7 @@ func (b *loopBatchCoordinator) mintPoolID(fc policy.FleetConfig) int {
 }
 
 func (b *loopBatchCoordinator) cycleLaunch(bin string, pool int) cycleLaunch {
-	return cycleLaunch{Bin: bin, Root: b.cfg.ProjectRoot, GoalHash: b.cfg.GoalHash, GoalText: b.cfg.GoalText, Stdout: b.stdout, Stderr: b.stderr, Pool: pool}
+	return cycleLaunch{Bin: bin, Root: b.cfg.ProjectRoot, GoalHash: b.cfg.GoalHash, GoalText: b.cfg.GoalText, Stdout: b.stdout, Stderr: b.stderr, Pool: pool, Signals: b.deps.Signals}
 }
 
 func cycleRunPoolArgs(l cycleLaunch, outputContract string) []string {

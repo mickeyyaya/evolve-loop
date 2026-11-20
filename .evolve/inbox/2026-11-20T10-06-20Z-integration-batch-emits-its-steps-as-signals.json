@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "TestBatchProgress_EmitsSignalForEveryStepKind",
+    "TestBatch_StallSignalPastBudget (budget from policy data)",
+    "TestEventsDefaults_HasIntegrationChannel",
+    "evolve signals codes check passes"
+  ],
+  "created_at": "2026-11-20T10:06:20Z",
+  "deps": [
+    "signal-roots-under-unregistered-roles-publish-nothing"
+  ],
+  "files": [
+    "go/cmd/evolve/cmd_integration_batch.go",
+    "go/internal/integration/batchpr.go",
+    "go/internal/policy/policy_events.go",
+    "go/internal/signalcenter/registry.go"
+  ],
+  "fix": "Emit one signal per batch step (SHIP_INTEGRATION_BATCH_STEP with step kind, PRs, batch PR, run id), SHIP_INTEGRATION_BATCH_SPLIT on a split, and SHIP_INTEGRATION_BATCH_STALLED (WARN) when a step passes a policy time budget. Add an integration channel to the events defaults.",
+  "id": "integration-batch-emits-its-steps-as-signals",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "summary": "batchProgress (go/cmd/evolve/cmd_integration_batch.go:141-155) prints test, verdict, split and land steps to stdout only; train.go emits nothing. The events config has no integration channel (go/internal/policy/policy_events.go:23-34); batch events go to ship, which was silent after 03:19Z on 2026-11-20 while a batch bisected for 3 h.",
+  "title": "the boundary batch prints its steps to stdout only, so a 3 h bisect is silent on the signal bus",
+  "weight": 0.7
+}

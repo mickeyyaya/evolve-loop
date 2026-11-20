@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/internal/hostpressure"
 	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
 	"io"
 	"path/filepath"
@@ -38,6 +39,9 @@ type loopBatchCoordinator struct {
 	driverFinishLimit time.Duration
 	driverTick        time.Duration
 	oversightSource   func() (orchestrator.Source, error)
+	hostReader        func() (hostpressure.Reading, error)
+	hostSamples       func([]byte) error
+	hostTicker        func(time.Duration) (<-chan time.Time, func())
 	startHooks        cycleStartHooks
 }
 

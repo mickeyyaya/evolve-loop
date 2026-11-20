@@ -127,6 +127,7 @@ func (b *loopBatchCoordinator) orchestratedRun(fc policy.FleetConfig, launch fle
 		}
 		stopOversight := b.startOversight(ctx, fc, pool, intake)
 		defer stopOversight()
+		defer b.startHostPressure(ctx, fc, hostSeat{window: pool.Window, intake: intake})()
 		return pool.Run(ctx, backlog)
 	}
 }
@@ -183,11 +184,7 @@ func (b *loopBatchCoordinator) oversightResize(fc policy.FleetConfig) func() (in
 				paused = append(paused, e.Family)
 			}
 		}
-		sized := fc.Count
-		if fc.Concurrency > 0 {
-			sized = min(sized, fc.Concurrency)
-		}
-		return max(sized, 1), paused
+		return fc.SizedWidth(), paused
 	}
 }
 
@@ -204,10 +201,7 @@ func (b *loopBatchCoordinator) orchestratorResupply(resupply poolSupplyFn, itera
 
 func (b *loopBatchCoordinator) laneWindow(fc policy.FleetConfig) *orchestrator.Window {
 	oc := fc.Orchestrator
-	sized := fc.Count
-	if fc.Concurrency > 0 {
-		sized = min(sized, fc.Concurrency)
-	}
+	sized := fc.SizedWidth()
 	w := orchestrator.NewWindow(orchestrator.WindowConfig{Start: oc.WindowStart, Min: oc.WindowMin, Sized: sized}, b.deps.Signals.Emit)
 	fmt.Fprintf(b.stderr, "[loop] orchestrator: adaptive window (stage %s): %d of %d lane(s), min %d\n", oc.Stage, w.Size(), sized, oc.WindowMin)
 	return w

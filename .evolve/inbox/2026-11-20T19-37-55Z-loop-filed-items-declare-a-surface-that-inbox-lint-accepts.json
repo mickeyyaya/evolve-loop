@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A test builds the item that the wave latency check files for a breach and asserts that inbox lint accepts it (HasDeclaredSurface or ConsoleRouted); red on main",
+    "A test builds the item that the practice watch files for a changed source and asserts that inbox lint accepts it; red on main",
+    "evolve inbox lint returns 0 on a runtime inbox that holds only loop-filed items of these two sources"
+  ],
+  "created_at": "2026-11-20T19:37:55Z",
+  "files": [
+    "go/cmd/evolve/cmd_wave_latency_check.go",
+    "go/internal/practicewatch/item.go",
+    "go/internal/practicewatch/item_test.go"
+  ],
+  "fix": "Make each generator file an item that lint accepts, decided by data at the generator: the practice watch declares files [the model-notes COMPACT.md of the family] and lets the protected-surface route make it console-manual, or files it with kind and route that consoleKindDerivation owns; the wave latency check declares the files of the cause it names (or routes console-manual when the cause is a protected path, as the split of latency-wave-breach-from-wave-158 shows). Add a guard test that runs each generator's item builder and asserts inboxbatch.Item.HasDeclaredSurface() or ConsoleRouted() is true. Red first.",
+  "id": "loop-filed-items-declare-a-surface-that-inbox-lint-accepts",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "At the boundary of wave 183 (2026-11-21), `evolve inbox lint` returned rc 1 on the inbox PR branch with two errors: 'latency-wave-breach-from-wave-158: undeclared surface (cites protected basename: policy.json)' and 'practice-agy-cli-changelog-command-349fd321-202611200952: undeclared surface (cites protected basename: COMPACT.md, settings.json)'. Both items were filed by the loop, not the console: source wave-latency-check (go/cmd/evolve/cmd_wave_latency_check.go) and the practice watch (go/internal/practicewatch/item.go). Each has files null and no console route, so inbox lint (go/internal/cli/inboxcmd/cmd_inbox.go, the undeclared loop) counts it as undeclared: HasDeclaredSurface is false and ConsoleRouted is false. The CI job 'inbox lint' runs the same check, so publishing the runtime inbox turns the PR red. The console withdrew both (the latency copy duplicated its console split; the practice note named no pipeline change). The latency check can file the id again while the breach holds, and the practice watch files a new note at each change.",
+  "title": "the wave latency check and the practice watch file inbox items that fail inbox lint, so each boundary inbox PR goes red until the console removes them",
+  "weight": 0.7
+}

@@ -51,7 +51,7 @@ ratchet_tree_test.go:22: testaudit: internal/stageevidence TestAPICover_NamesAll
 | Change | Pull request | Regression test |
 |---|---|---|
 | The two errors wrap the sentinels `ErrTrailingData` and `ErrMissingPackage`. The tests use `errors.Is`. The API-cover test checks that two broken-chain positions give two different messages. | #1586 | `testaudit/ratchet_tree_test.go::TestTreeRatchet` (red on `origin/main`, green on the fix) |
-| The build floor runs the test-audit ratchet | inbox item `build-floor-runs-the-test-audit-ratchet` | open |
+| The build floor runs the test-audit ratchet on the changed packages | inbox item `build-floor-runs-the-test-audit-ratchet` (console PR) | `core/build_testaudit_check_test.go::TestStaticBuildFloorChecks_RefusesANewTestAuditFinding` |
 
 ## Limits
 

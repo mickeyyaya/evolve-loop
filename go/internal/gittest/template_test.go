@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -12,6 +11,8 @@ import (
 	"sync"
 	"syscall"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 func resetTemplates(t *testing.T) {
@@ -341,15 +342,6 @@ func TestRepoWrite_FailsTheTestWhenThePathIsADirectory(t *testing.T) {
 	}
 }
 
-func exitedPID(t *testing.T) int {
-	t.Helper()
-	cmd := exec.Command("true")
-	if err := cmd.Run(); err != nil {
-		t.Fatal(err)
-	}
-	return cmd.Process.Pid
-}
-
 func TestSweepDeadTemplates_RemovesOnlyDirsOfExitedProcesses(t *testing.T) {
 	tmp := t.TempDir()
 	mk := func(name string) string {
@@ -359,7 +351,7 @@ func TestSweepDeadTemplates_RemovesOnlyDirsOfExitedProcesses(t *testing.T) {
 		}
 		return dir
 	}
-	dead := mk(fmt.Sprintf("%s%d-abc", templatePrefix, exitedPID(t)))
+	dead := mk(fmt.Sprintf("%s%d-abc", templatePrefix, acsassert.ExitedPID(t)))
 	alive := mk(fmt.Sprintf("%s%d-abc", templatePrefix, os.Getpid()))
 	unparsable := mk(templatePrefix + "not-a-pid")
 	other := mk("unrelated-dir")

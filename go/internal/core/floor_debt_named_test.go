@@ -7,11 +7,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/research"
 )
 
-func TestDefaultBuildFloorChecks_NonRepoWorktreeIsClean(t *testing.T) {
+func TestDefaultBuildFloorChecks_AnUnchangedWorktreeIsClean(t *testing.T) {
 	t.Parallel()
 
-	if fails := DefaultBuildFloorChecks(context.Background(), ReviewInput{Worktree: t.TempDir()}); len(fails) != 0 {
-		t.Fatalf("non-repo worktree must produce no floor failures, got %v", fails)
+	repo, _ := auditRepo(t, nil)
+	if fails := DefaultBuildFloorChecks(context.Background(), ReviewInput{Worktree: repo.Dir}); len(fails) != 0 {
+		t.Fatalf("an unchanged worktree must produce no floor failures, got %v", fails)
 	}
 }
 

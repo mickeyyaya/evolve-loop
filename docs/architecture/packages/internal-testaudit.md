@@ -13,6 +13,11 @@
 - `fakes.json` lists each fake command-line tool. A row with real side `none` needs a reason. A row with a suite directory needs a `fakecontract.Suite` for its tool in that directory.
 - `WriteShard` writes `testdata/testaudit-baseline.json` in a package. `CheckShard` fails on a finding with no baseline row. It also fails on a baseline row with no finding.
 - `AnalyzeTree` walks a module root and emits clean relative package keys. `CheckTree` loads every package shard and `internal/testaudit/unwritable-baselines.json`, then fails on any missing or stale row.
+- `CheckPackages` gives the same rows as `CheckTree`, but for a list of packages. It drops each package with a `testdata`, `vendor`, `.x` or `_x` path segment. It keeps a deleted package, so the central rows of that package show as stale. A red package outside the list is not reported.
+- `packageFindings` and `packageBaseline` are the one projection of a package. `Rebaseline` uses `packageFindings`. `CheckPackages` uses both functions.
+- `AuditScope` is the one rule that maps a changed path to a `Scope`. A `.go` file or a local shard gives its package. A change to `guards.json`, `fakes.json`, `unwritable-baselines.json` or a non-test `.go` file of this package sets `Whole`. Then only the full tree check can judge the change.
+- `LoadConfig` reads `fakes.json` and `guards.json` from a module root. `DefaultConfig` reads the embedded copies. Both call `parseConfig`, the one step that parses and validates. A test pins `LoadConfig` of the real module equal to `DefaultConfig`.
+- `RowError` is the typed error for one finding. Its kind is `RowMissing` (no baseline row) or `RowStale` (a row with no finding). It unwraps to `ErrNoBaselineRow` or `ErrStaleBaselineRow`. The message text is the same as before. `Problems` flattens a joined error into its parts.
 - `Rebaseline` updates one package's shard or its entry in `internal/testaudit/unwritable-baselines.json`. It refuses any finding absent from an existing baseline, and it removes an empty local shard.
 
 ## Invariants
@@ -25,6 +30,7 @@
 ## Callers
 
 - `evolve test audit` (`go/cmd/evolve/cmd_test_audit.go`, registered in `go/cmd/evolve/registry.go`) calls `AnalyzeTree`, `CheckTree`, and `Rebaseline`.
+- `testAuditFailures` in `go/internal/core/build_testaudit_check.go` calls `AuditScope`, `LoadConfig`, `CheckPackages` and `Problems` in the build floor.
 - `TestTreeRatchet` (`go/internal/testaudit/ratchet_tree_test.go`) calls `CheckTree` on the module root during `go test ./internal/testaudit`.
 
 ## Known limits

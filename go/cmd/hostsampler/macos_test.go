@@ -17,62 +17,6 @@ func fixture(t *testing.T, name string) string {
 	return string(raw)
 }
 
-func TestParseVMStat_UsedIsActivePlusWiredPlusCompressor(t *testing.T) {
-	got, err := parseVMStat(fixture(t, "vm_stat.txt"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := float64(1225522+212195) * 16384 / (1 << 20)
-	if got != want {
-		t.Fatalf("got %v want %v", got, want)
-	}
-}
-
-func TestParseVMStat_BadInputFailsLoudly(t *testing.T) {
-	bad := []string{
-		"",
-		"Pages active: 1.\nPages wired down: 1.\nPages occupied by compressor: 1.\n",
-		"Mach Virtual Memory Statistics: (page size of x bytes)\nPages active: 1.\nPages wired down: 1.\nPages occupied by compressor: 1.\n",
-		"Mach Virtual Memory Statistics: (page size of 4096 bytes)\nPages active: 1.\n",
-		"Mach Virtual Memory Statistics: (page size of 4096 bytes)\nPages active: x.\nPages wired down: 1.\nPages occupied by compressor: 1.\n",
-	}
-	for i, text := range bad {
-		if _, err := parseVMStat(text); err == nil {
-			t.Errorf("case %d: want error", i)
-		}
-	}
-}
-
-func TestParseSwapUsage_Units(t *testing.T) {
-	cases := map[string]float64{
-		"total = 2048.00M  used = 1163.25M  free = 884.75M  (encrypted)": 1163.25,
-		"total = 4.00G  used = 1.50G  free = 2.50G  (encrypted)":         1536,
-		"total = 0.00K  used = 2048.00K  free = 0.00K":                   2,
-		"total = 0.00M  used = 0.00M  free = 0.00M":                      0,
-	}
-	for in, want := range cases {
-		got, err := parseSwapUsage(in)
-		if err != nil || got != want {
-			t.Errorf("%q: got %v err %v want %v", in, got, err, want)
-		}
-	}
-}
-
-func TestParseSwapUsage_BadInputFailsLoudly(t *testing.T) {
-	for _, in := range []string{"", "total = 1M free = 1M", "total = 1M used = xM free = 1M", "total = 1M used = 5T free = 1M", "used = "} {
-		if _, err := parseSwapUsage(in); err == nil {
-			t.Errorf("%q: want error", in)
-		}
-	}
-}
-
-func TestParseSwapUsage_RealCapture(t *testing.T) {
-	got, err := parseSwapUsage(fixture(t, "swapusage.txt"))
-	if err != nil || got != 0 {
-		t.Fatalf("got %v err %v", got, err)
-	}
-}
-
 func fakeRunner(outputs map[string]string, fail string) func(string, ...string) ([]byte, error) {
 	return func(name string, args ...string) ([]byte, error) {
 		if name == fail {

@@ -1,6 +1,7 @@
 package acsassert
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -9,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 var absPath = filepath.Abs
@@ -56,6 +59,15 @@ func ModuleDir(start string) (string, error) {
 		}
 		dir = parent
 	}
+}
+
+func ExitedPID(t testing.TB) int {
+	t.Helper()
+	cmd := sysexec.Command(context.Background(), "true")
+	if err := cmd.Run(); err != nil {
+		t.Fatal(err)
+	}
+	return cmd.ProcessState.Pid()
 }
 
 func OutputTail(output string, n int) string {

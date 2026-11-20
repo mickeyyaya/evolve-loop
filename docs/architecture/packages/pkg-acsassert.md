@@ -18,6 +18,8 @@
 - **`ValidateSHA` checks hexadecimal length and characters.** It accepts only 7 to 64 hexadecimal characters. It rejects shell separators, spaces, and newlines before Git runs.
 
 
+- **`ExitedPID` returns the ID of a reaped child.** It runs `true` to the end and returns the ID from the process state, so the ID names no live process. Tests use it for a dead lease owner or a stale temp file.
+
 ## Invariants
 
 - **An absence assertion uses `FileNotContains`.** `FileContains` is a positive assertion. It calls `Errorf` "missing" when the substring is absent. The idiom `if FileContains(...) { Errorf("present") }` thus fails on the correct (absent) state, because the inner `Errorf` fires and the `if` body is skipped. The `FileNotContains` tests in `assertions_test.go` pin this.

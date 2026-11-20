@@ -83,13 +83,14 @@ const (
 	ModuleSignal          Module = "signal"
 	ModuleLatency         Module = "latency"
 	ModuleParallelEval    Module = "parallel.evaluate"
+	ModuleHost            Module = "host"
 )
 
 var knownModules = map[Module]bool{
 	ModuleOrchestrator: true, ModuleAdvisor: true, ModuleRunner: true, ModuleBridge: true, ModuleLiveness: true,
 	ModuleShip: true, ModuleAudit: true, ModuleTriage: true, ModuleScout: true, ModuleBuild: true, ModuleTDD: true,
 	ModuleGateContract: true, ModuleGateEval: true, ModuleGateRepo: true, ModuleInbox: true, ModuleConfig: true,
-	ModuleLoop: true, ModuleWatchdog: true, ModuleObserver: true, ModuleDashboard: true, ModuleLedger: true, ModuleOutcome: true, ModuleFailureDiag: true, ModuleCarryover: true, ModuleFailureLearning: true, ModuleSignalCenter: true, ModuleReview: true, ModuleQuality: true, ModuleIsolation: true, ModuleCLI: true, ModuleLadder: true, ModuleHealing: true, ModuleControl: true, ModuleRepair: true, ModuleCycle: true, ModuleTokens: true, ModuleConvergence: true, ModuleCI: true, ModuleSignal: true, ModuleLatency: true, ModuleParallelEval: true,
+	ModuleLoop: true, ModuleWatchdog: true, ModuleObserver: true, ModuleDashboard: true, ModuleLedger: true, ModuleOutcome: true, ModuleFailureDiag: true, ModuleCarryover: true, ModuleFailureLearning: true, ModuleSignalCenter: true, ModuleReview: true, ModuleQuality: true, ModuleIsolation: true, ModuleCLI: true, ModuleLadder: true, ModuleHealing: true, ModuleControl: true, ModuleRepair: true, ModuleCycle: true, ModuleTokens: true, ModuleConvergence: true, ModuleCI: true, ModuleSignal: true, ModuleLatency: true, ModuleParallelEval: true, ModuleHost: true,
 }
 
 func (m Module) Known() bool { return knownModules[m] }
@@ -213,6 +214,8 @@ const (
 )
 
 const CodeLatencyBudgetExceeded Code = "LATENCY_BUDGET_EXCEEDED"
+
+const CodeHostDiskLow Code = "HOST_DISK_LOW"
 
 var codeRE = regexp.MustCompile(`^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$`)
 

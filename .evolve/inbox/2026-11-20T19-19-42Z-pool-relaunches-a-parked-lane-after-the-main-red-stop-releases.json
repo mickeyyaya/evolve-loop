@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "TestPoolResupply_RelaunchesAParkedLeadAfterItsLaneExited (go/internal/fleet): a pool launches A, A exits, Resupply returns [A marked resume, B], and the launch fake sees A a second time; red on main, where it sees only B",
+    "TestPoolResupply_KeepsAnUnmarkedKnownTodoDeduped: an unmarked todo that was already launched is not launched again",
+    "A marked todo is not launched while a lane for the same id is running or pending",
+    "A CUJ test at poolPlanner.plan (cmd/evolve, with the paused fixtures): a released main-red stop, a paused scope and a pool that already launched that id; the scope is launched again, not only ordered first"
+  ],
+  "created_at": "2026-11-20T19:19:42Z",
+  "files": [
+    "go/internal/fleet/pool.go",
+    "go/internal/fleet/pool_test.go",
+    "go/internal/fleet/partition.go",
+    "go/cmd/evolve/cmd_loop_pool_paused.go",
+    "go/cmd/evolve/cmd_loop_pool_paused_test.go"
+  ],
+  "fix": "Give the lead todo of a paused scope an explicit resume mark (for example a field on fleet.Todo set by pausedPlan.lead) and let pool.resupply accept a marked todo whose id is known, but only when no lane for that id is running or pending. Ordinary known ids stay deduped. Red first.",
+  "id": "pool-relaunches-a-parked-lane-after-the-main-red-stop-releases",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Wave 183 (pool pid 48601): cycle 2563 (scope ci-macos-fixed-parallelism) parked at ship on the main-red stop (signals.ndjson:11390-11391, 13:46:51Z LOOP_ORCH_LANE_EXITED). The stop released at 14:30:47Z (GATE_REPO_MAIN_RED_STOP_RELEASED, 'the parked lanes resume in the next pool fill'). Two later pool fills (15:13Z, 16:12Z) found 2563 resumable ([resume] WARN origin/main is 2 / 3 commits past the base 45272e443, loop.log:3337 and 3636 in .evolve/logs/20261120T094708Z/), and pausedPlan.lead put the scope first, but the pool never launched it; it resupplied other items while 5 of 8 slots ran. Cause: go/internal/fleet/pool.go: pool.add sets known[td.ID] = true, pool.resupply skips each todo whose id is in known, and pool.settle never removes an id. The lead todo of a paused scope carries the same id as the first launch (strings.Join(scope, \",\")), so resupply drops it. The parked lane waits for the next wave; 2563 lost about 5 h of the wave. The pausedPlan tests assert only the order() output, so the drop at the pool was not tested.",
+  "title": "the pool drops the resumed lead todo of a parked lane, because its id is already known from the first launch in the same pool run",
+  "weight": 0.9
+}

@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Docs: the bridge package note and interaction-protocol.md change in STE; 100% coverage on each changed function; zero code comments."
+  ],
+  "created_at": "2026-11-20T12:33:12Z",
+  "files": [
+    "go/internal/adapters/bridge/bridge.go"
+  ],
+  "fix": "Make the change that AC 4 needs on the protected path(s) go/internal/adapters/bridge/bridge.go, then prove the criterion with a test.",
+  "id": "idle-at-prompt-checkpoint-before-the-artifact-timeout-ac-4-console",
+  "kind": "pipeline-repair",
+  "origin": "cycle",
+  "priority_class": "performance",
+  "route": "console-manual",
+  "source": "cycle 2568, tdd test-report.md AC 4 (console-followup)",
+  "summary": "The TDD phase of cycle 2568 gave AC 4 of idle-at-prompt-checkpoint-before-the-artifact-timeout the console-followup disposition. A lane builder can never change the paths it needs (go/internal/adapters/bridge/bridge.go). The lane part ships without it, so the console owns this part.",
+  "title": "Console part of idle-at-prompt-checkpoint-before-the-artifact-timeout: AC 4, which needs a protected path changed",
+  "weight": 0.8
+}

@@ -5,6 +5,8 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -33,21 +35,41 @@ var fakesJSON []byte
 //go:embed guards.json
 var guardsJSON []byte
 
-const realSideNone = "none"
+const (
+	realSideNone = "none"
+	fakesFile    = "fakes.json"
+	guardsFile   = "guards.json"
+)
 
 func DefaultConfig() (Config, error) {
+	return parseConfig(fakesJSON, guardsJSON)
+}
+
+func LoadConfig(moduleRoot string) (Config, error) {
+	fakes, err := os.ReadFile(filepath.Join(moduleRoot, filepath.FromSlash(auditDir), fakesFile))
+	if err != nil {
+		return Config{}, err
+	}
+	guards, err := os.ReadFile(filepath.Join(moduleRoot, filepath.FromSlash(auditDir), guardsFile))
+	if err != nil {
+		return Config{}, err
+	}
+	return parseConfig(fakes, guards)
+}
+
+func parseConfig(fakesRaw, guardsRaw []byte) (Config, error) {
 	var fakes struct {
 		Rows []Fake `json:"rows"`
 	}
-	if err := json.Unmarshal(fakesJSON, &fakes); err != nil {
-		return Config{}, fmt.Errorf("testaudit: fakes.json: %w", err)
+	if err := json.Unmarshal(fakesRaw, &fakes); err != nil {
+		return Config{}, fmt.Errorf("testaudit: %s: %w", fakesFile, err)
 	}
 	var guards struct {
 		MaxRows int     `json:"max_rows"`
 		Rows    []Guard `json:"rows"`
 	}
-	if err := json.Unmarshal(guardsJSON, &guards); err != nil {
-		return Config{}, fmt.Errorf("testaudit: guards.json: %w", err)
+	if err := json.Unmarshal(guardsRaw, &guards); err != nil {
+		return Config{}, fmt.Errorf("testaudit: %s: %w", guardsFile, err)
 	}
 	cfg := Config{Guards: guards.Rows, Fakes: fakes.Rows, MaxGuardRows: guards.MaxRows}
 	if err := cfg.validate(); err != nil {

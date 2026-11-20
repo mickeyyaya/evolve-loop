@@ -51,6 +51,8 @@ func (in *Intake) Resize(limit int) {
 	in.nudge()
 }
 
+func (in *Intake) Kick() { in.nudge() }
+
 func (in *Intake) Wake() <-chan struct{} { return in.kick }
 
 func (in *Intake) Gate(next Admit) Admit {

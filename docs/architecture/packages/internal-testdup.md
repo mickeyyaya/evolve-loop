@@ -12,6 +12,7 @@
 - `Scan` skips `vendor`, `testdata`, hidden and underscore directories.
 - An `acs/<dir>` directory is read only when it is newer than the baseline date. The age comes from the commit of its files. A fresh checkout makes each mtime new. An untracked directory uses the newest mtime.
 - A directory with a change against `HEAD` (`git diff --name-only HEAD`) is new. The ship gate runs before the landing commit, while the change is only staged. This rule makes the gate count the same directories as main counts after the landing ([incident 2026-11-09](../../incidents/2026-11-09-duplicate-ratchet-misses-staged-predicates.md)).
+- `NormalizedBodies` returns the normalized body of each function with two statements or more in one parsed file, by function name. The TDD handoff floor uses it to find the kit function that has the same body as a copy.
 - `GroupsUnder` keeps each group with a site under one directory. The TDD handoff floor of `internal/core` uses it for `acs/cycle<N>`.
 - `go/.test-dup-baseline` holds `count=` and `date=`.
 - `Check` fails when the count is above the baseline.

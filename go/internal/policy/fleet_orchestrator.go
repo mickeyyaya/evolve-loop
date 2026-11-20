@@ -23,6 +23,8 @@ type FleetOrchestratorPolicy struct {
 type FleetWindowPolicy struct {
 	Start *int `json:"start,omitempty"`
 	Min   *int `json:"min,omitempty"`
+
+	Adaptive *FleetAdaptivePolicy `json:"adaptive,omitempty"`
 }
 
 type OrchestratorConfig struct {
@@ -36,6 +38,7 @@ type OrchestratorConfig struct {
 	RunMaxLanes          int
 	WindowStart          int
 	WindowMin            int
+	Adaptive             AdaptiveConfig
 	fileCells            string
 }
 
@@ -97,6 +100,9 @@ func (o FleetOrchestratorPolicy) validate() error {
 	if err := validateFileCells(o.FileCells); err != nil {
 		return err
 	}
+	if o.Window != nil && o.Window.Adaptive != nil && o.Window.Adaptive.Stage == AdaptiveStageEnforce && o.Stage != "enforce" {
+		return fmt.Errorf("%w: adaptive stage enforce needs orchestrator stage enforce, because the pool reads the window only then", ErrFleetAdaptive)
+	}
 	return o.Window.validate()
 }
 
@@ -148,6 +154,9 @@ func orchestratorConfig(o *FleetOrchestratorPolicy, count int) OrchestratorConfi
 	}
 	c.fileCells = strings.Join(o.FileCells, fileCellsSeparator)
 	c.WindowStart, c.WindowMin = o.Window.resolve()
+	if o.Window != nil {
+		c.Adaptive = o.Window.Adaptive.resolve()
+	}
 	return c
 }
 
@@ -164,7 +173,7 @@ func (w *FleetWindowPolicy) validate() error {
 	if start, floor := w.resolve(); floor > start {
 		return fmt.Errorf("window.min %d is above window.start %d; set window.start to at least %d", floor, start, floor)
 	}
-	return nil
+	return w.Adaptive.validate()
 }
 
 func (w *FleetWindowPolicy) resolve() (start, floor int) {

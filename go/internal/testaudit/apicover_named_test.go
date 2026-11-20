@@ -1,6 +1,7 @@
 package testaudit
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -84,5 +85,16 @@ func TestConfigValidate_RejectsRowsThatBreakTheBounds(t *testing.T) {
 		if err := cfg.validate(); err == nil {
 			t.Errorf("%s: validate accepted %+v", name, cfg)
 		}
+	}
+}
+
+func TestRowError_Unwrap(t *testing.T) {
+	missing := &RowError{Kind: RowMissing}
+	stale := &RowError{Kind: RowStale}
+	if !errors.Is(missing, ErrNoBaselineRow) || errors.Is(missing, ErrStaleBaselineRow) {
+		t.Errorf("missing row unwraps to %v, want only ErrNoBaselineRow", missing.Unwrap())
+	}
+	if !errors.Is(stale, ErrStaleBaselineRow) || errors.Is(stale, ErrNoBaselineRow) {
+		t.Errorf("stale row unwraps to %v, want only ErrStaleBaselineRow", stale.Unwrap())
 	}
 }

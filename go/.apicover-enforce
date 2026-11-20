@@ -893,3 +893,4 @@
 ./internal/incidentkb
 ./internal/stageevidence
 ./internal/cli/landcmd
+./internal/hostpressure

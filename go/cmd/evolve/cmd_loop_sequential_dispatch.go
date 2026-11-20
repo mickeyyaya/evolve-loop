@@ -14,6 +14,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
 )
 
+const hostDiskLowStopReason = "host_disk_low"
+
 type sequentialCycle struct {
 	result     core.CycleResult
 	lastBefore int
@@ -23,10 +25,21 @@ type sequentialCycle struct {
 }
 
 func (b *loopBatchCoordinator) dispatchSequentialCycle() (sequentialCycle, batchDecision) {
-	if err := looppreflight.RunCycleStart(b.ctx, buildCycleStartOptions(b.cfg.ProjectRoot, b.cfg.EvolveDir, b.stderr, b.startHooks)); err != nil {
+	hooks := b.startHooks
+	hooks.signals = b.deps.Signals
+	startOpts, err := buildCycleStartOptions(b.cfg.ProjectRoot, b.cfg.EvolveDir, b.stderr, hooks)
+	if err == nil {
+		err = looppreflight.RunCycleStart(b.ctx, startOpts)
+	}
+	if err != nil {
 		if b.ctx.Err() != nil {
 			emitSignalStop(b.stdout, b.stderr, b.result, 0)
 			return sequentialCycle{}, batchDecision{flow: batchReturn, exitCode: 130}
+		}
+		if errors.Is(err, looppreflight.ErrDiskPauseExceeded) {
+			fmt.Fprintf(b.stderr, "evolve loop: cycle not started: %v\n", err)
+			b.result.StopReason = hostDiskLowStopReason
+			return sequentialCycle{}, batchDecision{flow: batchStopIterations}
 		}
 		return sequentialCycle{}, b.handleCycleError(core.CycleResult{}, err)
 	}

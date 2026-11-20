@@ -161,6 +161,14 @@ type FleetConfig struct {
 	Warnings         []string
 }
 
+func (c FleetConfig) SizedWidth() int {
+	width := c.Count
+	if c.Concurrency > 0 {
+		width = min(width, c.Concurrency)
+	}
+	return max(width, 1)
+}
+
 const (
 	defaultStarvationK      = 3
 	defaultStarvationWeight = 0.9

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,6 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 const (
@@ -72,23 +72,10 @@ func TestRunGuard_Role_AbortedCycleWithAnUnreadableLeaseStillRefuses(t *testing.
 	}
 }
 
-func exitedPID(t *testing.T) int {
-	t.Helper()
-	cmd := exec.Command("true")
-	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
-	}
-	pid := cmd.Process.Pid
-	if err := cmd.Wait(); err != nil {
-		t.Fatal(err)
-	}
-	return pid
-}
-
 func TestRunGuard_Role_AbortedCycleWithAFreshLeaseAndAnExitedOwnerLetsTheBoundarySelfHealWrite(t *testing.T) {
 	t.Parallel()
 	evolveDir, workspace := abortedCycleFixture(t)
-	if err := runlease.Write(workspace, runlease.Lease{RunID: "r", OwnerPID: exitedPID(t)}, time.Now()); err != nil {
+	if err := runlease.Write(workspace, runlease.Lease{RunID: "r", OwnerPID: acsassert.ExitedPID(t)}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	if rc := runRoleWrite(evolveDir, boundaryDeliverable); rc != 0 {
