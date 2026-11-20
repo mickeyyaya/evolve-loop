@@ -1,4 +1,4 @@
-package main
+package landcmd
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciwatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mergewindow"
@@ -20,7 +21,7 @@ import (
 )
 
 const (
-	prBoundaryUsage  = "usage: evolve pr boundary [--json] [--project-root P]"
+	usagePRBoundary  = "usage: evolve pr boundary [--json] [--project-root P]"
 	prBoundaryPrefix = "evolve pr boundary: "
 	prListLimit      = "200"
 	prMergeable      = "MERGEABLE"
@@ -50,8 +51,8 @@ type prBoundaryReport struct {
 func defaultBoundaryPlane(root string) boundaryPlane {
 	evolveDir := paths.EvolveDirOf(root)
 	return boundaryPlane{
-		gh:       ghIn(root),
-		liveRuns: func() ([]runlease.LiveRun, error) { return planeLiveRuns(root, time.Now()) },
+		gh:       cmdutil.GHIn(root),
+		liveRuns: func() ([]runlease.LiveRun, error) { return cmdutil.PlaneLiveRuns(root, time.Now()) },
 		poolLive: func() (int, bool, error) {
 			records, err := wave.NewStore(evolveDir).Records()
 			if err != nil || len(records) == 0 {
@@ -77,12 +78,15 @@ func runPRBoundaryWith(planeOf func(string) boundaryPlane, args []string, stdout
 		projectRoot string
 		asJSON      bool
 	}
-	operands, err := cliFlags{bools: map[string]*bool{"--json": &a.asJSON}, values: map[string]*string{"--project-root": &a.projectRoot}}.parse(args)
+	operands, err := cmdutil.Flags().
+		Bools(map[string]*bool{"--json": &a.asJSON}).
+		Values(map[string]*string{"--project-root": &a.projectRoot}).
+		Parse(args)
 	if err == nil && len(operands) > 0 {
 		err = fmt.Errorf("unexpected operand %q", operands[0])
 	}
 	if err != nil {
-		fmt.Fprintf(stderr, "%s%v\n%s\n", prBoundaryPrefix, err, prBoundaryUsage)
+		fmt.Fprintf(stderr, "%s%v\n%s\n", prBoundaryPrefix, err, usagePRBoundary)
 		return exitUsage
 	}
 	rep, err := boundaryReport(a.projectRoot, planeOf, stderr)
@@ -100,7 +104,7 @@ func runPRBoundaryWith(planeOf func(string) boundaryPlane, args []string, stdout
 }
 
 func boundaryReport(projectRoot string, planeOf func(string) boundaryPlane, stderr io.Writer) (prBoundaryReport, error) {
-	root, err := loopStopRoot(projectRoot, stderr)
+	root, err := resolveRoot(projectRoot, stderr)
 	if err != nil {
 		return prBoundaryReport{}, err
 	}

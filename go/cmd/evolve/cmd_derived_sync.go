@@ -6,6 +6,7 @@ import (
 	"io"
 	"path/filepath"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/researchindex"
 )
@@ -34,14 +35,14 @@ var (
 	darwinSetVerb = syncVerb{
 		usage: darwinSetUsage, prefix: "evolve ci darwin-set: ", output: "go/" + ciparity.DarwinSetFile, stale: ciparity.ErrDarwinSetStale,
 		sync: func(root string, write bool) (bool, error) {
-			return ciparity.SyncDarwinSet(filepath.Join(root, ciModuleDir), write)
+			return ciparity.SyncDarwinSet(filepath.Join(root, "go"), write)
 		},
 	}
 )
 
 func (v syncVerb) run(args []string, stdout, stderr io.Writer) int {
 	var projectRoot string
-	operands, err := cliFlags{values: map[string]*string{"--project-root": &projectRoot}}.parse(args)
+	operands, err := cmdutil.Flags().Values(map[string]*string{"--project-root": &projectRoot}).Parse(args)
 	if err != nil || len(operands) != 1 || (operands[0] != "generate" && operands[0] != "check") {
 		fmt.Fprintln(stderr, v.usage)
 		return exitUsage

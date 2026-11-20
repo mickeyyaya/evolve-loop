@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxstamps"
@@ -190,7 +191,7 @@ func applyQueuedRequest(root string, e queueEntry, stdout, stderr io.Writer) int
 
 func runQueueApply(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var projectRoot string
-	operands, err := cliFlags{values: map[string]*string{"--project-root": &projectRoot}}.parse(args)
+	operands, err := cmdutil.Flags().Values(map[string]*string{"--project-root": &projectRoot}).Parse(args)
 	if err == nil && len(operands) > 0 {
 		err = fmt.Errorf("unexpected argument %q", operands[0])
 	}

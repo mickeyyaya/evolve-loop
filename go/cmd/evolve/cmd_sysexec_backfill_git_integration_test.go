@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseintegrity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
@@ -174,7 +175,7 @@ func TestPlaneLiveRuns_TheRootListedAgainIsCountedOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	live, err := planeLiveRuns(repo.Dir, now)
+	live, err := cmdutil.PlaneLiveRuns(repo.Dir, now)
 
 	if err != nil || len(live) != 1 || live[0].Lease.RunID != "cycle-3" {
 		t.Fatalf("planeLiveRuns = %+v, %v; want the root's cycle-3 exactly once", live, err)

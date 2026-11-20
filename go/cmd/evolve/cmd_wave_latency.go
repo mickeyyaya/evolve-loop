@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/lanetime"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
 )
@@ -96,10 +97,7 @@ func (s latencyScope) holds(id int) bool {
 func runWaveLatency(env waveEnv, args []string, stdout, stderr io.Writer) int {
 	var projectRoot, waveFlag, cyclesFlag string
 	var asJSON, check bool
-	operands, err := cliFlags{
-		bools:  map[string]*bool{"--json": &asJSON, "--check": &check},
-		values: map[string]*string{"--project-root": &projectRoot, "--wave": &waveFlag, "--cycles": &cyclesFlag},
-	}.parse(args)
+	operands, err := cmdutil.Flags().Bools(map[string]*bool{"--json": &asJSON, "--check": &check}).Values(map[string]*string{"--project-root": &projectRoot, "--wave": &waveFlag, "--cycles": &cyclesFlag}).Parse(args)
 	if err == nil && len(operands) > 0 {
 		err = fmt.Errorf("unexpected argument %q", operands[0])
 	}

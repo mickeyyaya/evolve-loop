@@ -1,4 +1,4 @@
-package main
+package landcmd
 
 import (
 	"bytes"
@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciwatch"
-	"github.com/mickeyyaya/evolve-loop/go/internal/commentaudit"
 )
 
 func TestParseCIClassifyArgs_OneTargetAndKnownFlags(t *testing.T) {
@@ -28,8 +27,8 @@ func TestRunCI_UsageExitsTen(t *testing.T) {
 	t.Parallel()
 	for _, args := range [][]string{nil, {"bogus"}, {"classify"}, {"classify", "abcde1"}} {
 		var stdout, stderr bytes.Buffer
-		if code := runCI(args, nil, &stdout, &stderr); code != exitUsage || stdout.Len() != 0 || !strings.Contains(stderr.String(), "usage: evolve ci classify") {
-			t.Errorf("runCI(%q) = %d, stdout %q, stderr %q", args, code, stdout.String(), stderr.String())
+		if code := runCICmd(args, nil, &stdout, &stderr); code != exitUsage || stdout.Len() != 0 || !strings.Contains(stderr.String(), "usage: evolve ci classify") {
+			t.Errorf("runCICmd(%q) = %d, stdout %q, stderr %q", args, code, stdout.String(), stderr.String())
 		}
 	}
 }
@@ -76,18 +75,6 @@ func TestWriteClassifyReport_TextTableAndJSON(t *testing.T) {
 	var js bytes.Buffer
 	if err := writeClassifyReport(&js, rep, true); err != nil || !strings.Contains(js.String(), `"retry_safe": false`) || !strings.Contains(js.String(), `"rule": "default"`) {
 		t.Errorf("json report: %v\n%s", err, js.String())
-	}
-}
-
-func TestRunComments_IsCommentauditMain(t *testing.T) {
-	t.Parallel()
-	for _, args := range [][]string{nil, {"bogus"}} {
-		var evolveOut, evolveErr, toolOut, toolErr bytes.Buffer
-		got := runComments(args, nil, &evolveOut, &evolveErr)
-		want := commentaudit.Main(args, &toolOut, &toolErr, commentaudit.ExecGit{})
-		if got != 2 || got != want || evolveOut.String() != toolOut.String() || evolveErr.String() != toolErr.String() {
-			t.Errorf("runComments(%q) = %d %q %q; commentaudit.Main = %d %q %q", args, got, evolveOut.String(), evolveErr.String(), want, toolOut.String(), toolErr.String())
-		}
 	}
 }
 

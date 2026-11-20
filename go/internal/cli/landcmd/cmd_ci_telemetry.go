@@ -1,4 +1,4 @@
-package main
+package landcmd
 
 import (
 	"encoding/json"
@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/citelemetry"
 )
 
@@ -17,11 +18,11 @@ func runCITelemetry(args []string, stdout, stderr io.Writer) int {
 	var jobsFile string
 	var bindings []string
 	var asJSON bool
-	operands, err := cliFlags{
-		bools:  map[string]*bool{"--json": &asJSON},
-		values: map[string]*string{"--jobs": &jobsFile},
-		lists:  map[string]*[]string{"--job-artifacts": &bindings},
-	}.parse(args)
+	operands, err := cmdutil.Flags().
+		Bools(map[string]*bool{"--json": &asJSON}).
+		Values(map[string]*string{"--jobs": &jobsFile}).
+		Lists(map[string]*[]string{"--job-artifacts": &bindings}).
+		Parse(args)
 	if err == nil && (jobsFile == "" || len(operands) != 0) {
 		err = errTelemetryUsage
 	}

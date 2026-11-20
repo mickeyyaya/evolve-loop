@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
@@ -17,11 +18,7 @@ import (
 func parseWaveNextArgs(args []string) (waveNextArgs, error) {
 	a := waveNextArgs{raw: args}
 	var merge, number string
-	operands, err := cliFlags{
-		bools:  map[string]*bool{"--dry-run": &a.dryRun, "--json": &a.json},
-		values: map[string]*string{"--merge": &merge, "--max-cycles": &a.boundary.maxCycles, "--only": &a.boundary.only, "--exclude": &a.boundary.exclude, "--number": &number, "--project-root": &a.boundary.projectRoot},
-		lists:  map[string]*[]string{"--note": &a.notes},
-	}.parse(args)
+	operands, err := cmdutil.Flags().Bools(map[string]*bool{"--dry-run": &a.dryRun, "--json": &a.json}).Values(map[string]*string{"--merge": &merge, "--max-cycles": &a.boundary.maxCycles, "--only": &a.boundary.only, "--exclude": &a.boundary.exclude, "--number": &number, "--project-root": &a.boundary.projectRoot}).Lists(map[string]*[]string{"--note": &a.notes}).Parse(args)
 	switch {
 	case err != nil:
 		return a, err

@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/ciwatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/agentcmd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
@@ -239,24 +239,32 @@ func contractAgentRun(t *testing.T, vars map[string]string) func([]string, io.Wr
 	}
 }
 
-func contractPRMerge(t *testing.T, _ map[string]string) func([]string, io.Writer, io.Writer) int {
+func contractPRMerge(t *testing.T, vars map[string]string) func([]string, io.Writer, io.Writer) int {
 	t.Helper()
-	green := func(context.Context, string) (ciwatch.RunStatus, error) {
-		return ciwatch.RunStatus{Status: ciwatch.StatusCompleted, Conclusion: ciwatch.ConclusionSuccess}, nil
+	t.Setenv(ipcenv.PhaseKey, "")
+	t.Setenv(ipcenv.DispatchDepthKey, "")
+	bin := t.TempDir()
+	root := vars["root"]
+	gitScript := "#!/bin/sh\nprintf 'worktree %s\\n' '" + root + "'\n"
+	ghScript := `#!/bin/sh
+case "$*" in
+  "pr view 12 --json number,"*) printf '{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","headRefOid":"h12","baseRefName":"main","body":"Closes-Inbox: none"}' ;;
+  "pr view 12 --json state,mergeCommit") printf '{"state":"MERGED","mergeCommit":{"oid":"0123456789abcdef0123456789abcdef01234567"}}' ;;
+  "api repos/{owner}/{repo}/compare/"*) printf '{"behind_by":0}' ;;
+  "run list "*) printf '[{"status":"completed","conclusion":"success","url":"https://x/runs/1","databaseId":1}]' ;;
+  "pr merge "*) exit 0 ;;
+  *) echo "fake gh: unexpected $*" >&2; exit 2 ;;
+esac
+`
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(gitScript), 0o755); err != nil {
+		t.Fatal(err)
 	}
-	gh := &fakePRGitHub{
-		views:  map[string]string{"12": openPR("h12")},
-		behind: map[string]string{"h12": `{"behind_by":0}`},
-		merged: map[string]string{"12": `{"state":"MERGED","mergeCommit":{"oid":"` + mergeSHA + `"}}`},
+	if err := os.WriteFile(filepath.Join(bin, "gh"), []byte(ghScript), 0o755); err != nil {
+		t.Fatal(err)
 	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	return func(args []string, stdout, stderr io.Writer) int {
-		a, err := parsePRMergeArgs(args[2:])
-		if err != nil {
-			t.Fatal(err)
-		}
-		m, _, _ := greenMerger(gh, green, nil)
-		m.stdout, m.stderr = stdout, stderr
-		return mergePRs(m, a, stdout, stderr)
+		return runPR(args[1:], nil, stdout, stderr)
 	}
 }
 

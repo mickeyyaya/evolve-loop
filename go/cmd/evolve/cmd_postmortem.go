@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/attemptpostmortem"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -90,7 +91,7 @@ func parsePostmortemArgs(args []string, collect bool) (postmortemArgs, error) {
 	if collect {
 		bools["--force"] = &a.force
 	}
-	operands, err := cliFlags{bools: bools, values: values}.parse(args)
+	operands, err := cmdutil.Flags().Bools(bools).Values(values).Parse(args)
 	if err == nil && len(operands) > 0 {
 		err = fmt.Errorf("unexpected operand %q", operands[0])
 	}

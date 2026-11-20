@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/opscmd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
@@ -141,7 +142,7 @@ func processStartTime(pid int) (time.Time, bool) {
 func runWaveNote(env waveEnv, args []string, stdout, stderr io.Writer) int {
 	var projectRoot string
 	var asJSON bool
-	operands, err := cliFlags{bools: map[string]*bool{"--json": &asJSON}, values: map[string]*string{"--project-root": &projectRoot}}.parse(args)
+	operands, err := cmdutil.Flags().Bools(map[string]*bool{"--json": &asJSON}).Values(map[string]*string{"--project-root": &projectRoot}).Parse(args)
 	if err == nil && len(operands) == 0 {
 		err = errors.New("note needs add, list or clear")
 	}
@@ -232,7 +233,7 @@ func dispatchWaveVerb(run sysexec.RunFunc) boundaryDispatch {
 
 func runWaveBuild(run sysexec.RunFunc, args []string, stdout, stderr io.Writer) int {
 	var projectRoot string
-	if _, err := (cliFlags{values: map[string]*string{"--project-root": &projectRoot}}).parse(args); err != nil || projectRoot == "" {
+	if _, err := cmdutil.Flags().Values(map[string]*string{"--project-root": &projectRoot}).Parse(args); err != nil || projectRoot == "" {
 		fmt.Fprintf(stderr, "%s%s needs --project-root\n", wavePrefix, waveBuildVerb)
 		return exitUsage
 	}

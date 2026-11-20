@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/events/channel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/events/filter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/events/reader"
@@ -46,7 +47,7 @@ type eventsReadArgs struct {
 
 func parseEventsReadArgs(verb string, args []string, stderr io.Writer) (eventsReadArgs, bool) {
 	var a eventsReadArgs
-	operands, err := (cliFlags{values: map[string]*string{"--project-root": &a.root}, bools: map[string]*bool{"--json": &a.asJSON}}).parse(args)
+	operands, err := cmdutil.Flags().Bools(map[string]*bool{"--json": &a.asJSON}).Values(map[string]*string{"--project-root": &a.root}).Parse(args)
 	if err != nil || len(operands) > 0 {
 		fmt.Fprintf(stderr, "evolve events %s: want no operand and no other flag\n%s\n", verb, eventsUsage)
 		return a, false

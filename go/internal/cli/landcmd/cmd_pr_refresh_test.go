@@ -1,4 +1,4 @@
-package main
+package landcmd
 
 import (
 	"bytes"
@@ -46,11 +46,11 @@ func (f *fakeGenerators) run(_ context.Context, args ...string) error {
 		return errors.New(key + " failed")
 	}
 	if slices.Equal(args[:2], []string{"docs", "index"}) {
-		var out, errOut bytes.Buffer
-		if docsIndexVerb.run(append(args[2:], "--project-root", f.root), &out, &errOut) != 0 {
-			return errors.New(errOut.String())
+		if args[2] == "check" {
+			return researchindex.Check(f.root)
 		}
-		return nil
+		_, err := researchindex.Generate(f.root)
+		return err
 	}
 	output := map[string]string{"signals codes": signalDoc, "ci darwin-set": darwinSet}[strings.Join(args[:2], " ")]
 	if args[len(args)-1] == "check" {
@@ -84,7 +84,14 @@ func useFakeGenerators(t *testing.T, f *fakeGenerators) {
 	t.Cleanup(func() { prRefreshWorktree = prev })
 }
 
-func prVerb(args []string, stdout, stderr *bytes.Buffer) int { return runPR(args, nil, stdout, stderr) }
+func runVerb(verb func([]string, *bytes.Buffer, *bytes.Buffer) int, args ...string) (int, string, string) {
+	out, errOut := new(bytes.Buffer), new(bytes.Buffer)
+	return verb(args, out, errOut), out.String(), errOut.String()
+}
+
+func prVerb(args []string, stdout, stderr *bytes.Buffer) int {
+	return runPRCmd(args, nil, stdout, stderr)
+}
 
 func TestPRRefresh_RegeneratesTheThreeDerivedFilesAndCommitsNothingElse(t *testing.T) {
 	repo := refreshRepo(t)

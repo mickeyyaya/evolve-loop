@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/researchindex"
 )
+
+const prRefreshMessage = "chore: regenerate the derived files"
+
+func prVerb(args []string, stdout, stderr *bytes.Buffer) int {
+	return runPR(args, nil, stdout, stderr)
+}
 
 func TestPRRefresh_TheRealGeneratorsOfACloneCommitOnlyTheStaleIndex(t *testing.T) {
 	t.Setenv("GOFLAGS", "-mod=readonly")

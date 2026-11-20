@@ -7,11 +7,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -63,6 +65,8 @@ func runBoundary(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 func dispatchBoundaryVerb(verb string, args []string, stdout, stderr io.Writer) int {
 	return dispatchPlaneVerbs(sysexec.DefaultRunner)(verb, args, stdout, stderr)
 }
+
+var prNumber = regexp.MustCompile(`^[1-9][0-9]*$`)
 
 var planeBinaryVerbs = []string{"inbox", "selfheal", "gc", "code"}
 
@@ -152,13 +156,10 @@ func runBoundaryJSON(dispatch boundaryDispatch, a boundaryArgs, steps []boundary
 func parseBoundaryArgs(args []string) (boundaryArgs, error) {
 	var a boundaryArgs
 	var merge, goalFile string
-	operands, err := cliFlags{
-		bools: map[string]*bool{"--dry-run": &a.dryRun, "--json": &a.json},
-		values: map[string]*string{
-			"--merge": &merge, "--goal-text-file": &goalFile, "--max-cycles": &a.maxCycles, "--project-root": &a.projectRoot,
-			"--only": &a.only, "--exclude": &a.exclude,
-		},
-	}.parse(args)
+	operands, err := cmdutil.Flags().Bools(map[string]*bool{"--dry-run": &a.dryRun, "--json": &a.json}).Values(map[string]*string{
+		"--merge": &merge, "--goal-text-file": &goalFile, "--max-cycles": &a.maxCycles, "--project-root": &a.projectRoot,
+		"--only": &a.only, "--exclude": &a.exclude,
+	}).Parse(args)
 	switch {
 	case err != nil:
 		return a, err

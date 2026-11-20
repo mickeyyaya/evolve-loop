@@ -1,4 +1,4 @@
-package main
+package landcmd
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciwatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
@@ -17,7 +18,7 @@ import (
 )
 
 const (
-	ciWatchUsage = "usage: evolve ci watch (--sha S | --pr N | --tag T) [--workflow W]... [--cycle N] [--project-root P]\n" +
+	usageCIWatch = "usage: evolve ci watch (--sha S | --pr N | --tag T) [--workflow W]... [--cycle N] [--project-root P]\n" +
 		"  --sha S        watch a pushed commit; red files one fix-forward inbox item\n" +
 		"  --pr N         watch a PR's head commit; red files no inbox item\n" +
 		"  --tag T        watch a release tag: required.yml and release.yml\n" +
@@ -39,11 +40,11 @@ type ciWatchArgs struct {
 func parseCIWatchArgs(args []string) (ciWatchArgs, error) {
 	var a ciWatchArgs
 	var cycle string
-	operands, err := cliFlags{
-		bools:  map[string]*bool{"--help": &a.help, "-h": &a.help},
-		values: map[string]*string{"--sha": &a.sha, "--pr": &a.pr, "--tag": &a.tag, "--cycle": &cycle, "--project-root": &a.projectRoot},
-		lists:  map[string]*[]string{"--workflow": &a.workflows},
-	}.parse(args)
+	operands, err := cmdutil.Flags().
+		Bools(map[string]*bool{"--help": &a.help, "-h": &a.help}).
+		Values(map[string]*string{"--sha": &a.sha, "--pr": &a.pr, "--tag": &a.tag, "--cycle": &cycle, "--project-root": &a.projectRoot}).
+		Lists(map[string]*[]string{"--workflow": &a.workflows}).
+		Parse(args)
 	if err != nil || a.help {
 		return a, err
 	}
@@ -105,20 +106,20 @@ func (a ciWatchArgs) watchedWorkflows() []string {
 func runCIWatch(args []string, stdout, stderr io.Writer) int {
 	a, err := parseCIWatchArgs(args)
 	if a.help && err == nil {
-		fmt.Fprintln(stdout, ciWatchUsage)
+		fmt.Fprintln(stdout, usageCIWatch)
 		return 0
 	}
 	if err != nil {
-		fmt.Fprintf(stderr, "%s%v\n%s\n", ciWatchPrefix, err, ciWatchUsage)
+		fmt.Fprintf(stderr, "%s%v\n%s\n", ciWatchPrefix, err, usageCIWatch)
 		return exitUsage
 	}
-	root, err := loopStopRoot(a.projectRoot, stderr)
+	root, err := resolveRoot(a.projectRoot, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "%s%v\n", ciWatchPrefix, err)
 		return exitIO
 	}
 	ctx := context.Background()
-	signals, closeSignals := newRoleSignalCenter("ci", root, paths.EvolveDirOf(root), stderr)
+	signals, closeSignals := newSignalCenter("ci", root, paths.EvolveDirOf(root), stderr)
 	defer closeSignals()
 	opts, err := ciWatchOptions(ctx, root, a)
 	if err != nil {

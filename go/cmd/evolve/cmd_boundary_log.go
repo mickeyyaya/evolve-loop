@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
@@ -27,7 +28,7 @@ func boundaryLogStepDesc(runID string) string {
 
 func runBoundaryLog(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var projectRoot, runID string
-	operands, err := cliFlags{values: map[string]*string{"--project-root": &projectRoot, "--run-id": &runID}}.parse(args)
+	operands, err := cmdutil.Flags().Values(map[string]*string{"--project-root": &projectRoot, "--run-id": &runID}).Parse(args)
 	if err == nil && (len(operands) > 0 || !gcpolicy.IsLogRunID(runID)) {
 		err = fmt.Errorf("--run-id %q is not a log run id", runID)
 	}

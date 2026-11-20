@@ -7,6 +7,7 @@ import (
 	"io"
 	"slices"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guidance"
 )
@@ -93,17 +94,15 @@ func runGuidance(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 
 func parseGuidanceArgs(args []string, withIndexFlags bool) (guidanceArgs, error) {
 	var a guidanceArgs
-	f := cliFlags{
-		bools:  map[string]*bool{"--help": &a.help, "-h": &a.help},
-		values: map[string]*string{"--project-root": &a.projectRoot},
-	}
+	bools := map[string]*bool{"--help": &a.help, "-h": &a.help}
+	values := map[string]*string{"--project-root": &a.projectRoot}
 	if withIndexFlags {
-		f.bools["--json"] = &a.json
-		f.values["--audience"] = &a.audience
-		f.values["--phase"] = &a.phase
-		f.values["--cli"] = &a.cli
+		bools["--json"] = &a.json
+		values["--audience"] = &a.audience
+		values["--phase"] = &a.phase
+		values["--cli"] = &a.cli
 	}
-	operands, err := f.parse(args)
+	operands, err := cmdutil.Flags().Bools(bools).Values(values).Parse(args)
 	switch {
 	case err != nil:
 		a.json = withIndexFlags && slices.Contains(args, "--json")

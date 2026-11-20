@@ -202,22 +202,7 @@
     },
     {
       "package": "cmd/evolve",
-      "test": "TestDecidePRWindow_AFileNameThatIsNotJSONIsAnError",
-      "rule": "error-text-match"
-    },
-    {
-      "package": "cmd/evolve",
-      "test": "TestDecidePRWindow_EachUnreadableInputIsAnError",
-      "rule": "error-text-match"
-    },
-    {
-      "package": "cmd/evolve",
       "test": "TestDeclaredFiles_AnItemThatIsGoneOrDoesNotDecodeIsAnErrorThatNamesIt",
-      "rule": "error-text-match"
-    },
-    {
-      "package": "cmd/evolve",
-      "test": "TestDefaultBoundaryPlane_ReadsThePoolOfTheLastRecordedWave",
       "rule": "error-text-match"
     },
     {
@@ -353,11 +338,6 @@
     {
       "package": "cmd/evolve",
       "test": "TestGitWaveAdapters_ReadTheHeadAndTheMergedPRs",
-      "rule": "error-text-match"
-    },
-    {
-      "package": "cmd/evolve",
-      "test": "TestGoModulePath_Cases",
       "rule": "error-text-match"
     },
     {
@@ -502,16 +482,6 @@
     },
     {
       "package": "cmd/evolve",
-      "test": "TestNewPRMerger_AnUnreadableWindowStageFailsAndTheOpenGateIsRead",
-      "rule": "error-text-match"
-    },
-    {
-      "package": "cmd/evolve",
-      "test": "TestNewPRMerger_RefusesAnInvalidPolicy",
-      "rule": "error-text-match"
-    },
-    {
-      "package": "cmd/evolve",
       "test": "TestNilSignalCenterRootsPin_UsesTheASTCount",
       "rule": "single-file-source-pin"
     },
@@ -528,11 +498,6 @@
     {
       "package": "cmd/evolve",
       "test": "TestParseBoundaryArgs_Refusals",
-      "rule": "error-text-match"
-    },
-    {
-      "package": "cmd/evolve",
-      "test": "TestParseCIWatchArgs",
       "rule": "error-text-match"
     },
     {
@@ -933,11 +898,6 @@
     {
       "package": "cmd/evolve",
       "test": "TestWireSimulateOrchestrator_BridgeExitWarningRenders",
-      "rule": "error-text-match"
-    },
-    {
-      "package": "cmd/evolve",
-      "test": "TestWriteClassifyReport_AMarshalFailureIsReturned",
       "rule": "error-text-match"
     },
     {

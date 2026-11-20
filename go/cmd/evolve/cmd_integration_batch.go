@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/commitgate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
@@ -106,7 +107,7 @@ func usageFail(stderr io.Writer, err error, usage string) int {
 func batchVerb(env integrationEnv, args []string, stdout, stderr io.Writer) int {
 	var dry, help, redFix bool
 	var rootFlag string
-	operands, err := cliFlags{bools: map[string]*bool{"--dry-run": &dry, "--help": &help, mainRedFixFlag: &redFix}, values: map[string]*string{"--project-root": &rootFlag}}.parse(args)
+	operands, err := cmdutil.Flags().Bools(map[string]*bool{"--dry-run": &dry, "--help": &help, mainRedFixFlag: &redFix}).Values(map[string]*string{"--project-root": &rootFlag}).Parse(args)
 	if help && err == nil {
 		fmt.Fprintln(stdout, integrationBatchUsage)
 		return 0
@@ -315,7 +316,7 @@ func joinInts(items []int) string {
 func recordPRVerb(env integrationEnv, args []string, stdout, stderr io.Writer) int {
 	var help, reviewed bool
 	var pr, class string
-	operands, err := cliFlags{bools: map[string]*bool{"--help": &help, "--reviewed": &reviewed}, values: map[string]*string{"--pr": &pr, "--class": &class}}.parse(args)
+	operands, err := cmdutil.Flags().Bools(map[string]*bool{"--help": &help, "--reviewed": &reviewed}).Values(map[string]*string{"--pr": &pr, "--class": &class}).Parse(args)
 	if help && err == nil {
 		fmt.Fprintln(stdout, integrationRecordUsage)
 		return 0

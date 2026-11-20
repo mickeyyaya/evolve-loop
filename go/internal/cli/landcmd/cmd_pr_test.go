@@ -1,4 +1,4 @@
-package main
+package landcmd
 
 import (
 	"bytes"
@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciwatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
@@ -32,8 +33,8 @@ func TestRunPR_UsageExitsTen(t *testing.T) {
 	t.Parallel()
 	for _, args := range [][]string{nil, {"bogus"}, {"merge"}, {"merge", "0"}} {
 		var stdout, stderr bytes.Buffer
-		if code := runPR(args, nil, &stdout, &stderr); code != exitUsage || stdout.Len() != 0 || !strings.Contains(stderr.String(), "usage: evolve pr merge") {
-			t.Errorf("runPR(%q) = %d, stdout %q, stderr %q", args, code, stdout.String(), stderr.String())
+		if code := runPRCmd(args, nil, &stdout, &stderr); code != exitUsage || stdout.Len() != 0 || !strings.Contains(stderr.String(), "usage: evolve pr merge") {
+			t.Errorf("runPRCmd(%q) = %d, stdout %q, stderr %q", args, code, stdout.String(), stderr.String())
 		}
 	}
 }
@@ -195,11 +196,11 @@ func TestPlaneLiveRuns_SeesSiblingWorktreesOnly(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	live, err := planeLiveRuns(repo.Dir, now)
+	live, err := cmdutil.PlaneLiveRuns(repo.Dir, now)
 	if err != nil || len(live) != 1 || live[0].Lease.RunID != "cycle-7" {
 		t.Fatalf("planeLiveRuns = %+v, %v; want only the sibling worktree's cycle-7", live, err)
 	}
-	if _, err := planeLiveRuns(t.TempDir(), now); err == nil {
+	if _, err := cmdutil.PlaneLiveRuns(t.TempDir(), now); err == nil {
 		t.Error("a root that is no git repository cannot prove the plane idle")
 	}
 }

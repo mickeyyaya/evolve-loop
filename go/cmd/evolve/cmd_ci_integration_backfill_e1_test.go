@@ -4,7 +4,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -16,8 +15,9 @@ import (
 )
 
 const (
-	ciFakeHead = "0123456789abcdef0123456789abcdef01234567"
-	ciFakeBase = "fedcba9876543210fedcba9876543210fedcba98"
+	ciFakeHead       = "0123456789abcdef0123456789abcdef01234567"
+	ciFakeBase       = "fedcba9876543210fedcba9876543210fedcba98"
+	ciClassifyPrefix = "evolve ci classify: "
 )
 
 const ciFakeGHScript = `#!/bin/sh
@@ -318,21 +318,6 @@ func TestRunCIWatch_SetupAndFetchFailuresAreIOErrors(t *testing.T) {
 				t.Errorf("code=%d stdout=%q stderr=%q, want exitIO and %q", code, out, errOut, tc.want)
 			}
 		})
-	}
-}
-
-func TestClassifyRedRuns_AnUnloadablePolicyClassifiesNothing(t *testing.T) {
-	gh := newCIFakeGH(t, nil)
-	root := ciProjectRoot(t, `{"ci_watch":`, true)
-	var out, errb bytes.Buffer
-
-	classifyRedRuns(context.Background(), root, []redWorkflow{{workflow: "required.yml", runID: 5}}, &out, &errb)
-
-	if out.Len() != 0 || !strings.HasPrefix(errb.String(), ciWatchPrefix+"classify: policy: parse ") {
-		t.Errorf("stdout=%q stderr=%q, want only the classify policy error", out.String(), errb.String())
-	}
-	if gh.calls() != "" {
-		t.Errorf("gh calls = %q, want none", gh.calls())
 	}
 }
 

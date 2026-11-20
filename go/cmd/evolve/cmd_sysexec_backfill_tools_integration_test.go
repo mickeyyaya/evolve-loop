@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 )
 
@@ -90,7 +91,7 @@ func TestMainCIRedForSHA_JudgesOnlyCompletedRuns(t *testing.T) {
 func TestGhIn_RunsInTheRootAndReturnsStdout(t *testing.T) {
 	root := bfRealDir(t, t.TempDir())
 	record := bfStub(t, "gh", `[ "$1" = fail ] && { echo 'gh: boom ' >&2; exit 1; }; printf '{"number":12}'; echo noise >&2`)
-	run := ghIn(root)
+	run := cmdutil.GHIn(root)
 
 	out, err := run(context.Background(), "pr", "view", "12")
 	if err != nil || string(out) != `{"number":12}` {

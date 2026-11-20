@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/pipelinerates"
 	"github.com/mickeyyaya/evolve-loop/go/internal/qualitypanel"
@@ -80,7 +81,7 @@ func runQualityCompare(env qualityEnv, args []string, stdout, stderr io.Writer) 
 func parseQualityCompare(args []string) (qualityCompareArgs, error) {
 	var o qualityCompareArgs
 	var a, b string
-	operands, err := (cliFlags{values: map[string]*string{"--index": &o.index, "--a": &a, "--b": &b, "--project-root": &o.root}, bools: map[string]*bool{"--paired": &o.paired, "--json": &o.json}}).parse(args)
+	operands, err := cmdutil.Flags().Bools(map[string]*bool{"--paired": &o.paired, "--json": &o.json}).Values(map[string]*string{"--index": &o.index, "--a": &a, "--b": &b, "--project-root": &o.root}).Parse(args)
 	switch {
 	case err != nil:
 		return o, err

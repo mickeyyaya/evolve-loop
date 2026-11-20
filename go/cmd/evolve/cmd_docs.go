@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/stelint"
@@ -75,11 +76,7 @@ func runDocs(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 
 func parseSteLintArgs(args []string) (steLintArgs, error) {
 	var a steLintArgs
-	operands, err := cliFlags{
-		bools:  map[string]*bool{"--json": &a.asJSON, "--strict": &a.strict, "--go": &a.goMode, "--added": &a.added, "--help": &a.help, "-h": &a.help},
-		values: map[string]*string{"--project-root": &a.projectRoot},
-		lists:  map[string]*[]string{"--changed": &a.changed},
-	}.parse(args)
+	operands, err := cmdutil.Flags().Bools(map[string]*bool{"--json": &a.asJSON, "--strict": &a.strict, "--go": &a.goMode, "--added": &a.added, "--help": &a.help, "-h": &a.help}).Values(map[string]*string{"--project-root": &a.projectRoot}).Lists(map[string]*[]string{"--changed": &a.changed}).Parse(args)
 	a.paths = operands
 	switch {
 	case err != nil:

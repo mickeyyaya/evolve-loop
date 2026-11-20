@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/rawgitratchet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sizeratchet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
@@ -33,7 +34,7 @@ var (
 
 func runBoundaryRatchetTighten(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	var projectRoot string
-	if _, err := (cliFlags{values: map[string]*string{"--project-root": &projectRoot}}).parse(args); err != nil || projectRoot == "" {
+	if _, err := cmdutil.Flags().Values(map[string]*string{"--project-root": &projectRoot}).Parse(args); err != nil || projectRoot == "" {
 		fmt.Fprintf(stderr, "%s%s needs --project-root\n", boundaryPrefix, boundaryRatchetVerb)
 		return exitUsage
 	}

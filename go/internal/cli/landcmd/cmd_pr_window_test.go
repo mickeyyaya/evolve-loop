@@ -1,4 +1,4 @@
-package main
+package landcmd
 
 import (
 	"bytes"
@@ -18,7 +18,7 @@ import (
 func windowPlane(t *testing.T, policyJSON string) string {
 	t.Helper()
 	root := t.TempDir()
-	workflow, err := os.ReadFile(filepath.Join("..", "..", "..", requiredWorkflowPath))
+	workflow, err := os.ReadFile(filepath.Join("..", "..", "..", "..", requiredWorkflowPath))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ const windowOn = `{"pr":{"merge_window":{"stage":"on"}},"fleet":{"integration":{
 func runWindow(t *testing.T, args ...string) (int, string, string) {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
-	code := runPR(append([]string{"window"}, args...), nil, &stdout, &stderr)
+	code := runPRCmd(append([]string{"window"}, args...), nil, &stdout, &stderr)
 	return code, stdout.String(), stderr.String()
 }
 
@@ -207,7 +207,7 @@ func TestPRWindow_UsageErrorsExitTen(t *testing.T) {
 		}
 	}
 	var stderr bytes.Buffer
-	if code := runPR(nil, nil, &bytes.Buffer{}, &stderr); code != exitUsage || !strings.Contains(stderr.String(), prWindowUsage) {
+	if code := runPRCmd(nil, nil, &bytes.Buffer{}, &stderr); code != exitUsage || !strings.Contains(stderr.String(), prWindowUsage) {
 		t.Errorf("bare pr must name both sub-verbs: %q", stderr.String())
 	}
 }

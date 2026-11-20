@@ -1,4 +1,4 @@
-package main
+package landcmd
 
 import (
 	"bytes"
@@ -309,7 +309,7 @@ func TestRunPR_AnInvalidPolicyExitsTwo(t *testing.T) {
 	root := e3PolicyRoot(t, `{"pr":{"merge_method":"octopus"}}`)
 	var stdout, stderr bytes.Buffer
 
-	code := runPR([]string{"merge", "12", "--project-root", root}, nil, &stdout, &stderr)
+	code := runPRCmd([]string{"merge", "12", "--project-root", root}, nil, &stdout, &stderr)
 
 	if code != exitIO || stdout.Len() != 0 || !strings.HasPrefix(stderr.String(), prMergePrefix+"policy: pr.merge_method") {
 		t.Fatalf("code %d stdout %q stderr %q", code, stdout.String(), stderr.String())
@@ -323,7 +323,7 @@ func TestRunPR_AnUnresolvableWorkingDirectoryExitsTwo(t *testing.T) {
 	t.Setenv("EVOLVE_PROJECT_ROOT", "")
 	var stdout, stderr bytes.Buffer
 
-	code := runPR([]string{"merge", "12"}, nil, &stdout, &stderr)
+	code := runPRCmd([]string{"merge", "12"}, nil, &stdout, &stderr)
 
 	if code != exitIO || stderr.String() != prMergePrefix+"getwd: no such file or directory\n" {
 		t.Fatalf("code %d stderr %q", code, stderr.String())
@@ -335,7 +335,7 @@ func TestRunPR_ARootThatIsNoRepositoryCannotProveThePlaneIdle(t *testing.T) {
 	t.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(root))
 	var stdout, stderr bytes.Buffer
 
-	code := runPR([]string{"merge", "12", "13", "--project-root", root}, nil, &stdout, &stderr)
+	code := runPRCmd([]string{"merge", "12", "13", "--project-root", root}, nil, &stdout, &stderr)
 
 	if code != exitIO || stdout.Len() != 0 {
 		t.Fatalf("code %d stdout %q stderr %q", code, stdout.String(), stderr.String())

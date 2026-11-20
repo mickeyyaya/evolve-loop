@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 )
 
@@ -20,7 +21,7 @@ type dossierShowResult struct {
 func runDossierShow(args []string, stdout, stderr io.Writer) int {
 	var projectRoot string
 	var asJSON bool
-	operands, err := (cliFlags{values: map[string]*string{"--project-root": &projectRoot}, bools: map[string]*bool{"--json": &asJSON}}).parse(args)
+	operands, err := cmdutil.Flags().Bools(map[string]*bool{"--json": &asJSON}).Values(map[string]*string{"--project-root": &projectRoot}).Parse(args)
 	if err != nil || len(operands) != 1 {
 		fmt.Fprintln(stderr, dossierShowUsage)
 		return cliExitUsage

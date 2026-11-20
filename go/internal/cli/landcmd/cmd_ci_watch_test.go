@@ -1,7 +1,10 @@
-package main
+package landcmd
 
 import (
 	"bytes"
+	"context"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -55,18 +58,18 @@ func TestParseCIWatchArgs(t *testing.T) {
 func TestRunCI_RoutesWatchAndPrintsItsUsage(t *testing.T) {
 	t.Parallel()
 	var stdout, stderr bytes.Buffer
-	if code := runCI([]string{"watch", "--help"}, nil, &stdout, &stderr); code != 0 {
+	if code := runCICmd([]string{"watch", "--help"}, nil, &stdout, &stderr); code != 0 {
 		t.Fatalf("ci watch --help exit = %d, stderr %s", code, stderr.String())
 	}
 	if !strings.Contains(stdout.String(), "--workflow W") {
 		t.Errorf("ci watch --help printed %q", stdout.String())
 	}
 	stdout.Reset()
-	if code := runCI([]string{"watch"}, nil, &stdout, &stderr); code != exitUsage || !strings.Contains(stderr.String(), "ci watch") {
+	if code := runCICmd([]string{"watch"}, nil, &stdout, &stderr); code != exitUsage || !strings.Contains(stderr.String(), "ci watch") {
 		t.Errorf("bare ci watch exit = %d, stderr %q", code, stderr.String())
 	}
 	stderr.Reset()
-	if code := runCI([]string{"bogus"}, nil, &stdout, &stderr); code != exitUsage || !strings.Contains(stderr.String(), "ci watch") {
+	if code := runCICmd([]string{"bogus"}, nil, &stdout, &stderr); code != exitUsage || !strings.Contains(stderr.String(), "ci watch") {
 		t.Errorf("unknown ci subcommand exit = %d, usage %q does not list ci watch", code, stderr.String())
 	}
 }
@@ -90,5 +93,31 @@ func TestRunCIWatch_NonexistentRootExitsIO(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), ciWatchPrefix) {
 		t.Errorf("stderr %q lacks prefix %q", stderr.String(), ciWatchPrefix)
+	}
+}
+
+func TestClassifyRedRuns_AnUnloadablePolicyClassifiesNothing(t *testing.T) {
+	bin := t.TempDir()
+	log := filepath.Join(bin, "gh.log")
+	if err := os.WriteFile(filepath.Join(bin, "gh"), []byte("#!/bin/sh\necho \"$*\" >> '"+log+"'\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), []byte(`{"ci_watch":`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+
+	classifyRedRuns(context.Background(), root, []redWorkflow{{workflow: "required.yml", runID: 5}}, &out, &errb)
+
+	if out.Len() != 0 || !strings.HasPrefix(errb.String(), ciWatchPrefix+"classify: policy: parse ") {
+		t.Errorf("stdout=%q stderr=%q, want only the classify policy error", out.String(), errb.String())
+	}
+	if raw, _ := os.ReadFile(log); len(raw) != 0 {
+		t.Errorf("gh calls = %q, want none", string(raw))
 	}
 }

@@ -1,4 +1,4 @@
-package main
+package landcmd
 
 import (
 	"bytes"
@@ -173,12 +173,12 @@ func TestPRBoundary_UsageAndAnAbsentPlane(t *testing.T) {
 	t.Parallel()
 	for _, args := range [][]string{{"--bogus"}, {"12"}, {"--project-root"}} {
 		var stdout, stderr bytes.Buffer
-		if code := runPR(append([]string{"boundary"}, args...), nil, &stdout, &stderr); code != exitUsage || !strings.Contains(stderr.String(), prBoundaryUsage) {
+		if code := runPRCmd(append([]string{"boundary"}, args...), nil, &stdout, &stderr); code != exitUsage || !strings.Contains(stderr.String(), prBoundaryUsage) {
 			t.Errorf("runPR boundary %q = %d, stderr %q", args, code, stderr.String())
 		}
 	}
 	var stdout, stderr bytes.Buffer
-	if code := runPR(nil, nil, &stdout, &stderr); code != exitUsage || !strings.Contains(stderr.String(), prBoundaryUsage) {
+	if code := runPRCmd(nil, nil, &stdout, &stderr); code != exitUsage || !strings.Contains(stderr.String(), prBoundaryUsage) {
 		t.Errorf("the pr usage must name the boundary verb: %q", stderr.String())
 	}
 	if code, _, stderr := runPRBoundaryT(t, boundaryPlaneOf(boundaryGH(), liveLoop, 2, true), "--project-root", filepath.Join(t.TempDir(), "absent")); code != exitIO || stderr == "" {

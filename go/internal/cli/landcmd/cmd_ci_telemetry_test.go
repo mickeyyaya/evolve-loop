@@ -1,4 +1,4 @@
-package main
+package landcmd
 
 import (
 	"bytes"
@@ -27,7 +27,7 @@ func telemetryJobsFile(t *testing.T) string {
 
 func runTelemetry(args ...string) (string, string, int) {
 	var out, errb bytes.Buffer
-	code := runCI(append([]string{"telemetry"}, args...), nil, &out, &errb)
+	code := runCICmd(append([]string{"telemetry"}, args...), nil, &out, &errb)
 	return out.String(), errb.String(), code
 }
 
@@ -81,7 +81,7 @@ func TestRunCITelemetry_ReportsAWriteFailureInBothFormats(t *testing.T) {
 func TestRunCI_UsageNamesTheTelemetryVerb(t *testing.T) {
 	t.Parallel()
 	var out, errb bytes.Buffer
-	if code := runCI(nil, nil, &out, &errb); code != exitUsage || !strings.Contains(errb.String(), "evolve ci telemetry") {
+	if code := runCICmd(nil, nil, &out, &errb); code != exitUsage || !strings.Contains(errb.String(), "evolve ci telemetry") {
 		t.Errorf("code=%d err=%q", code, errb.String())
 	}
 }

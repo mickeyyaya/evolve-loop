@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
@@ -33,9 +34,9 @@ type landInput struct {
 
 func parseLandArgs(args []string) (landArgs, error) {
 	var a landArgs
-	operands, err := cliFlags{values: map[string]*string{
+	operands, err := cmdutil.Flags().Values(map[string]*string{
 		"--branch": &a.branch, "--patch": &a.patch, "--salvage": &a.salvage, "--project-root": &a.projectRoot,
-	}}.parse(args)
+	}).Parse(args)
 	switch {
 	case err != nil:
 		return a, err

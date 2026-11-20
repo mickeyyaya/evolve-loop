@@ -1,4 +1,4 @@
-package main
+package landcmd
 
 import (
 	"context"
@@ -7,39 +7,40 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/derived"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
 const (
-	prRefreshUsage   = "usage: evolve pr refresh [--project-root P]"
+	usagePRRefresh   = "usage: evolve pr refresh [--project-root P]"
 	prRefreshPrefix  = "evolve pr refresh: "
 	prRefreshMessage = "chore: regenerate the derived files"
 	gitVerifyMissing = 1
 )
 
 var (
-	prRefreshEntries  = []string{"signal-codes", "darwin-set", "research-index"}
-	prRefreshWorktree = core.DerivedWorktree
-	prRefreshOpHeads  = []string{"MERGE_HEAD", "REBASE_HEAD", "CHERRY_PICK_HEAD"}
+	prRefreshEntries = []string{"signal-codes", "darwin-set", "research-index"}
+	prRefreshOpHeads = []string{"MERGE_HEAD", "REBASE_HEAD", "CHERRY_PICK_HEAD"}
 )
 
 func runPRRefresh(args []string, stdout, stderr io.Writer) int {
 	var projectRoot string
-	operands, err := cliFlags{values: map[string]*string{"--project-root": &projectRoot}}.parse(args)
+	operands, err := cmdutil.Flags().
+		Values(map[string]*string{"--project-root": &projectRoot}).
+		Parse(args)
 	if err != nil || len(operands) > 0 {
-		fmt.Fprintln(stderr, prRefreshUsage)
+		fmt.Fprintln(stderr, usagePRRefresh)
 		return exitUsage
 	}
-	root, err := loopStopRoot(projectRoot, stderr)
+	root, err := resolveRoot(projectRoot, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "%s%v\n", prRefreshPrefix, err)
 		return exitIO
 	}
 	ctx := context.Background()
 	g := gitexec.Default(root)
-	outputs, err := refreshEntries(ctx, prRefreshWorktree(root), g)
+	outputs, err := refreshEntries(ctx, refreshWorktree(root), g)
 	if err == nil {
 		err = landRefreshed(ctx, g, outputs, stdout)
 	}

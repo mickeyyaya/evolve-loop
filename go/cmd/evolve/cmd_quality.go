@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codeshape"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/pipelinerates"
@@ -225,7 +226,7 @@ func parseQualityArgs(verb string, args []string, scopes map[string][]qualityRea
 	if len(args) == 0 || args[0] != verb {
 		return a, fmt.Errorf("want the %s verb", verb)
 	}
-	operands, err := (cliFlags{values: map[string]*string{"--scope": &a.scope, "--project-root": &a.root}, bools: map[string]*bool{"--json": &a.json}}).parse(args[1:])
+	operands, err := cmdutil.Flags().Bools(map[string]*bool{"--json": &a.json}).Values(map[string]*string{"--scope": &a.scope, "--project-root": &a.root}).Parse(args[1:])
 	switch {
 	case err != nil:
 		return a, err

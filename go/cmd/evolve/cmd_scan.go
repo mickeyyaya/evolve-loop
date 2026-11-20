@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/secretleakscan"
 )
@@ -48,11 +49,7 @@ func runScan(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 
 func parseScanSecretsArgs(args []string) (scanSecretsArgs, error) {
 	var a scanSecretsArgs
-	operands, err := cliFlags{
-		bools:  map[string]*bool{"--staged": &a.staged, "--help": &a.help, "-h": &a.help, "--json": &a.json},
-		values: map[string]*string{"--project-root": &a.projectRoot},
-		lists:  map[string]*[]string{"--diff": &a.diffRefs},
-	}.parse(args)
+	operands, err := cmdutil.Flags().Bools(map[string]*bool{"--staged": &a.staged, "--help": &a.help, "-h": &a.help, "--json": &a.json}).Values(map[string]*string{"--project-root": &a.projectRoot}).Lists(map[string]*[]string{"--diff": &a.diffRefs}).Parse(args)
 	switch {
 	case err != nil:
 		return a, err

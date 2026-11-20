@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/heldproposal"
@@ -49,10 +50,7 @@ type waveStatusReport struct {
 }
 
 func parseWaveReadArgs(args []string) (projectRoot string, asJSON bool, err error) {
-	operands, err := cliFlags{
-		bools:  map[string]*bool{"--json": &asJSON},
-		values: map[string]*string{"--project-root": &projectRoot},
-	}.parse(args)
+	operands, err := cmdutil.Flags().Bools(map[string]*bool{"--json": &asJSON}).Values(map[string]*string{"--project-root": &projectRoot}).Parse(args)
 	if err == nil && len(operands) > 0 {
 		err = fmt.Errorf("unexpected argument %q", operands[0])
 	}

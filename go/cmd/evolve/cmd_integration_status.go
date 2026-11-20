@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -238,7 +239,7 @@ func waveOfPool(root string, pool int) int {
 func statusVerb(env integrationEnv, args []string, stdout, stderr io.Writer) int {
 	var pool, waveN, rootFlag string
 	var asJSON bool
-	operands, err := cliFlags{bools: map[string]*bool{"--json": &asJSON}, values: map[string]*string{"--pool": &pool, "--wave": &waveN, "--project-root": &rootFlag}}.parse(args)
+	operands, err := cmdutil.Flags().Bools(map[string]*bool{"--json": &asJSON}).Values(map[string]*string{"--pool": &pool, "--wave": &waveN, "--project-root": &rootFlag}).Parse(args)
 	poolN, waveNum, err := statusSelectors(operands, pool, waveN, err)
 	if err != nil {
 		fmt.Fprintf(stderr, "%s%v\n%s\n", integrationPrefix, err, integrationStatusUsage)

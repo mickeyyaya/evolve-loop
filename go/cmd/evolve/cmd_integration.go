@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/derived"
@@ -106,7 +107,7 @@ func watchVerb(env integrationEnv, args []string, stdout, stderr io.Writer) int 
 	gh := env.Gh
 	var tip string
 	var help bool
-	operands, err := cliFlags{bools: map[string]*bool{"--help": &help}, values: map[string]*string{"--tip": &tip}}.parse(args)
+	operands, err := cmdutil.Flags().Bools(map[string]*bool{"--help": &help}).Values(map[string]*string{"--tip": &tip}).Parse(args)
 	if help && err == nil {
 		fmt.Fprintln(stdout, integrationWatchUsage)
 		return 0

@@ -892,3 +892,4 @@
 ./internal/evidencex
 ./internal/incidentkb
 ./internal/stageevidence
+./internal/cli/landcmd

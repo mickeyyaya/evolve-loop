@@ -53,6 +53,19 @@ func printVerbJSON(verb string, v any, stdout, stderr io.Writer) int {
 	return cliExitOK
 }
 
+const (
+	exitRefused = 1
+	exitIO      = 2
+	exitUsage   = 10
+)
+
+func shortSHA(sha string) string {
+	if len(sha) > 12 {
+		return sha[:12]
+	}
+	return sha
+}
+
 type errorLineWriter struct {
 	w       io.Writer
 	pending []byte

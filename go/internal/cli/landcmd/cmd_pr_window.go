@@ -1,4 +1,4 @@
-package main
+package landcmd
 
 import (
 	"context"
@@ -11,15 +11,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mergewindow"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 const (
-	prWindowUsage        = "usage: evolve pr window <n> | --files-from FILE [--json] [--project-root P]"
+	usagePRWindow        = "usage: evolve pr window <n> | --files-from FILE [--json] [--project-root P]"
 	prWindowPrefix       = "evolve pr window: "
-	exitBoundary         = 3
 	prWindowTimeout      = 2 * time.Minute
 	ghFileLimit          = 3000
 	reasonIntegration    = "merge windows wait for fleet.integration.stage enforce (ADR-0147)"
@@ -51,10 +51,10 @@ type prWindowDecision struct {
 
 func parsePRWindowArgs(args []string) (prWindowArgs, error) {
 	var a prWindowArgs
-	operands, err := cliFlags{
-		bools:  map[string]*bool{"--json": &a.asJSON},
-		values: map[string]*string{"--files-from": &a.filesFrom, "--project-root": &a.projectRoot},
-	}.parse(args)
+	operands, err := cmdutil.Flags().
+		Bools(map[string]*bool{"--json": &a.asJSON}).
+		Values(map[string]*string{"--files-from": &a.filesFrom, "--project-root": &a.projectRoot}).
+		Parse(args)
 	if err != nil {
 		return a, err
 	}
@@ -76,17 +76,17 @@ func parsePRWindowArgs(args []string) (prWindowArgs, error) {
 func runPRWindow(args []string, stdout, stderr io.Writer) int {
 	a, err := parsePRWindowArgs(args)
 	if err != nil {
-		fmt.Fprintf(stderr, "%s%v\n%s\n", prWindowPrefix, err, prWindowUsage)
+		fmt.Fprintf(stderr, "%s%v\n%s\n", prWindowPrefix, err, usagePRWindow)
 		return exitUsage
 	}
-	root, err := loopStopRoot(a.projectRoot, stderr)
+	root, err := resolveRoot(a.projectRoot, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "%s%v\n", prWindowPrefix, err)
 		return exitIO
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), prWindowTimeout)
 	defer cancel()
-	d, err := decidePRWindow(ctx, root, a, ghIn(root))
+	d, err := decidePRWindow(ctx, root, a, cmdutil.GHIn(root))
 	if err != nil {
 		fmt.Fprintf(stderr, "%s%v\n", prWindowPrefix, err)
 		return exitIO

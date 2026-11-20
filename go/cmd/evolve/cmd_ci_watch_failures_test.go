@@ -8,6 +8,8 @@ import (
 	"testing"
 )
 
+const ciWatchPrefix = "evolve ci watch: "
+
 func fakeGHFailingRunList(t *testing.T) {
 	t.Helper()
 	bin := t.TempDir()
@@ -27,7 +29,7 @@ func TestRunCIWatch_AWorkingDirectoryFaultExitsIOWhenNoRootIsGiven(t *testing.T)
 	breakWorkingDirectory(t)
 	var stdout, stderr bytes.Buffer
 
-	code := runCIWatch([]string{"--sha", ciWatchEventSHA}, &stdout, &stderr)
+	code := runCI([]string{"watch", "--sha", ciWatchEventSHA}, nil, &stdout, &stderr)
 
 	if code != exitIO {
 		t.Fatalf("exit = %d, want %d; stderr:\n%s", code, exitIO, stderr.String())
@@ -46,7 +48,7 @@ func TestRunCIWatch_AFailedRunLookupExitsIOAndNamesTheWorkflow(t *testing.T) {
 	}
 	var stdout, stderr bytes.Buffer
 
-	code := runCIWatch([]string{"--sha", ciWatchEventSHA, "--workflow", "required.yml", "--project-root", root}, &stdout, &stderr)
+	code := runCI([]string{"watch", "--sha", ciWatchEventSHA, "--workflow", "required.yml", "--project-root", root}, nil, &stdout, &stderr)
 
 	if code != exitIO {
 		t.Fatalf("exit = %d, want %d; stderr:\n%s", code, exitIO, stderr.String())

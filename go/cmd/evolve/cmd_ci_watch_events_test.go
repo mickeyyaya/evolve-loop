@@ -41,7 +41,7 @@ func TestCIWatchVerb_PublishesCICompletedForEachWatchedWorkflow(t *testing.T) {
 	}
 	var stdout, stderr bytes.Buffer
 
-	code := runCIWatch([]string{"--sha", ciWatchEventSHA, "--workflow", "required.yml", "--workflow", "release.yml", "--project-root", root}, &stdout, &stderr)
+	code := runCI([]string{"watch", "--sha", ciWatchEventSHA, "--workflow", "required.yml", "--workflow", "release.yml", "--project-root", root}, nil, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit = %d, want 0; stderr:\n%s", code, stderr.String())
@@ -71,7 +71,7 @@ func TestCIWatchVerb_ARedRunReachesTheErrorsChannelWithItsCode(t *testing.T) {
 	}
 	var stdout, stderr bytes.Buffer
 
-	code := runCIWatch([]string{"--sha", ciWatchEventSHA, "--project-root", root}, &stdout, &stderr)
+	code := runCI([]string{"watch", "--sha", ciWatchEventSHA, "--project-root", root}, nil, &stdout, &stderr)
 
 	if code != exitRefused {
 		t.Fatalf("exit = %d, want %d for a red run; stderr:\n%s", code, exitRefused, stderr.String())
@@ -91,7 +91,7 @@ func TestCIWatchVerb_ATagWatchPublishesOneEventForEachReleaseWorkflow(t *testing
 	}
 	var stdout, stderr bytes.Buffer
 
-	code := runCIWatch([]string{"--tag", "v1.2.3", "--project-root", root}, &stdout, &stderr)
+	code := runCI([]string{"watch", "--tag", "v1.2.3", "--project-root", root}, nil, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit = %d, want 0; stderr:\n%s", code, stderr.String())

@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/events/channel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/events/filter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/events/reader"
@@ -74,7 +75,7 @@ func runEventsWatch(args []string, stdout, stderr io.Writer) int {
 func runEventsWatchWith(env eventsWatchEnv, args []string, stdout, stderr io.Writer) int {
 	var a eventsWatchArgs
 	values := map[string]*string{"--project-root": &a.root, "--channel": &a.channels, "--filter": &a.filter, "--since": &a.since, "--until": &a.until}
-	operands, err := (cliFlags{values: values, bools: map[string]*bool{"--json": &a.asJSON}}).parse(args)
+	operands, err := cmdutil.Flags().Bools(map[string]*bool{"--json": &a.asJSON}).Values(values).Parse(args)
 	if err == nil && (len(operands) > 0 || strings.TrimSpace(a.channels) == "") {
 		err = errors.New("watch needs --channel C[,C] and no operand")
 	}

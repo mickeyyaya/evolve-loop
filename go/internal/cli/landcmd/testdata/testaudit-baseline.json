@@ -1,0 +1,44 @@
+{
+  "rows": [
+    {
+      "package": "internal/cli/landcmd",
+      "test": "TestDecidePRWindow_AFileNameThatIsNotJSONIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cli/landcmd",
+      "test": "TestDecidePRWindow_EachUnreadableInputIsAnError",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cli/landcmd",
+      "test": "TestDefaultBoundaryPlane_ReadsThePoolOfTheLastRecordedWave",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cli/landcmd",
+      "test": "TestGoModulePath_Cases",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cli/landcmd",
+      "test": "TestNewPRMerger_AnUnreadableWindowStageFailsAndTheOpenGateIsRead",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cli/landcmd",
+      "test": "TestNewPRMerger_RefusesAnInvalidPolicy",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cli/landcmd",
+      "test": "TestParseCIWatchArgs",
+      "rule": "error-text-match"
+    },
+    {
+      "package": "internal/cli/landcmd",
+      "test": "TestWriteClassifyReport_AMarshalFailureIsReturned",
+      "rule": "error-text-match"
+    }
+  ]
+}
