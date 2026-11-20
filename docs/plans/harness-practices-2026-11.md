@@ -126,7 +126,7 @@ The route follows the rule of ADR-0147 §6: an item that touches a gate file is 
 | R6 | `regression-proof-gate` | A fix with a test that passes without the fix gets `NOT_PROVEN`. A real proof gets `PROVEN`. A compile failure gets `INCONCLUSIVE`. | console-manual |
 | R7 | `agent-seat-health-states` | A pane that waits at its prompt with no deliverable reads `blocked`. A dead session reads `zombie`. | lane |
 | R8 | `enforce-evidence-for-integration` | I8 prints the evidence of the last two shadow waves, and I9 refuses to close with fewer. | console-manual |
-| R9 | `harness-removal-test` | Design only until M2. It names one component, one wave window and one measure. | operator |
+| R9 | `harness-removal-test` | Design only until M2: [harness removal test design](harness-removal-test-2026-11.md). It names one component, one wave window and one measure. | operator |
 
 **The first journeys to register.** Each one is an issue that this period fixed.
 
