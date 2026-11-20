@@ -13,15 +13,15 @@
 | ❌ none | No regression test pins this mode. |
 | ⛔ untestable | Depends on external infra/CLI behavior (vendor rate limit, interactive modal) a unit test cannot reproduce; mitigate by design + docs, not a unit test. |
 
-## Summary (counts moved 2026-11-20 for the records of waves 180 to 182)
+## Summary (counts moved 2026-11-21 for the records of wave 183)
 
 | | Count |
 |---|---|
-| Incidents mapped | 69 |
-| Distinct failure modes (coverage-map rows) | 115 |
-| ✅ covered (a test fails if the bug comes back) | 84 |
+| Incidents mapped | 80 |
+| Distinct failure modes (coverage-map rows) | 128 |
+| ✅ covered (a test fails if the bug comes back) | 85 |
 | 🟡 partial (related test, doesn't pin the exact mode) | 11 |
-| ❌ none (no regression test) | 20 |
+| ❌ none (no regression test) | 32 |
 | ⛔ untestable (external infra / live CLI) | 0 |
 
 These counts are tallies of the coverage map's rows, so they move with it: a new
@@ -34,6 +34,8 @@ carry incident's two rows were added beside cycle 1811's five: 51 incidents, 78 
 kept in the "Untestable-by-unit" section below rather than as ⛔ map rows.
 
 Recounted on 2026-11-16: the record of the test leak under `go/` adds two rows. One row is covered and one row has no test yet. The map now holds 58 incidents and 96 rows. The `issue-record` skill makes the row a step of each record ([skills/issue-record/SKILL.md](../../skills/issue-record/SKILL.md)).
+
+Recounted on 2026-11-21: the 11 records of wave 183 add 11 incidents and 13 rows. One row is covered and 12 rows have no test yet. The map now holds 80 incidents and 128 rows.
 
 **Historical baseline.** The 2026-05-29 13-agent parallel sweep counted 14
 incidents and 73 distinct failure modes: 40 covered, 20 partial, 10 with no
@@ -162,6 +164,19 @@ not the coverage map, which is the hand-maintained per-incident record.
 | 2026-11-20 — salvage bundles filled the disk and hung a loop test | `TestLoop_MaxCyclesExit_ClearsCompletedMarker` reads the host disk through the production disk guard. On a full host it waited without end. It spent the ACS Go lane budget of cycles 2547, 2548, 2550 and 2551 | `cmd/evolve` loop tests, `looppreflight/cyclestart.go` (`RunCycleStart`) | ❌ | inbox item `loop-tests-read-the-real-host-disk-through-the-disk-guard` |
 | [2026-11-20 — a lane shipped error-text tests and turned main red](2026-11-20-a-lane-shipped-error-text-tests-and-turned-main-red.md) | three tests in `stageevidence` matched error text, and two errors had no sentinel | `stageevidence/version.go`, `stageevidence/score.go` | ✅ | `testaudit/ratchet_tree_test.go::TestTreeRatchet` |
 | 2026-11-20 — a lane shipped error-text tests and turned main red | the lane build floor does not run the test-audit ratchet, so main CI was the first check to find the new tests. A recurrence of the [2026-11-19 incident](2026-11-19-two-lanes-turned-main-red-with-error-text-tests.md) | build floor (`DefaultBuildFloorChecks`) | ❌ | inbox item `build-floor-runs-the-test-audit-ratchet`, open since 2026-11-19 |
+| [2026-11-20 — cycle 2558 turned main red a third time](2026-11-20-cycle-2558-turned-main-red-a-third-time.md) | the predicates `TestC2558_005` and `TestC2558_006` matched error text, and `gc` had no sentinel for the two refusals | `gc/branchsweep.go` (`ErrBranchKept`), `gc/salvage.go` (`ErrTreeKept`) | ✅ | `testaudit/ratchet_tree_test.go::TestTreeRatchet` (red on `aa909f868`, green on `93775a479`) |
+| 2026-11-20 — cycle 2558 turned main red a third time | the lane build floor does not run the test-audit ratchet, third recurrence in 2 days | `core/build_floor_reviewer.go` | ❌ | PR #1597 (recorded, not on main at the base of the record); its test names are in the PR |
+| [2026-11-20 — the TDD floor deadlocked on a copy of an unimportable helper](2026-11-20-the-tdd-floor-deadlocked-on-a-copy-of-an-unimportable-helper.md) | the TDD handoff floor named a `_test.go` helper of another package that cannot be imported, and the agent renamed the copy. Class `tdd\|gate-block` recurred 5 times | `core/build_handoff_floor.go`, `pkg/acsassert/predicate_kit.go` | ❌ | pin lands with PR #1601: `core/tdd_predicate_floor_test.go::TestTddPredicateFloor_ACopyOfAnUnimportableHelperNamesTheKitHelperWithTheSameBody` + `::TestTddPredicateFloor_ACopyOfAnUnimportableHelperWithNoKitTwinSaysToDefineNoHelper` |
+| [2026-11-20 — cycle 2559 failed on a protected file after a wrong lane route](2026-11-20-cycle-2559-failed-on-a-protected-file-after-a-wrong-lane-route.md) | an item with a directory in `files[]` went to a lane, and the fix needs a protected file below it. A failed lane released the item back to the lane route | `inboxmover/outcome.go`, `inboxbatch/consoleroute.go` | ❌ | proposal: inbox item `lane-fail-on-a-protected-surface-routes-the-item-to-the-console` |
+| [2026-11-20 — sync-main refused the console inbox edits at the boundary](2026-11-20-sync-main-refused-the-console-inbox-edits-at-the-boundary.md) | `sync-main` counts a console inbox edit or consume as dirt, so `wave next` waits for an inbox PR | `inboxstamps/inboxstamps.go` (`Classify`), `cmd/evolve/cmd_syncmain.go` | ❌ | proposal: inbox item `sync-main-carries-console-inbox-edits` |
+| [2026-11-20 — the boundary batch ejected PR 1582 on two real failures](2026-11-20-the-boundary-batch-ejected-pr-1582-on-two-real-failures.md) | PR #1582 reached the batch with an STE finding and a stale duplicate baseline that the pre-ship checks of the console did not run | console pre-ship check set | ❌ | none: the gates exist and found it in CI; the pre-ship backstop is tracked by `ship-backstop-runs-the-test-audit-ratchet` |
+| [2026-11-20 — four console PRs failed PR CI after green local runs](2026-11-20-four-console-prs-failed-pr-ci-after-green-local-runs.md) | `repocontract.Packages()` lists 15 packages by hand and lacks `testaudit`, `gateregistry` and `sysexec`, so the ship backstop missed the `apicover`, `gateregistry` and `sysexec` gates | `repocontract/repocontract.go` (`Packages`) | ❌ | proposal: inbox item `ship-backstop-runs-the-test-audit-ratchet` |
+| [2026-11-20 — a mid-wave main-red landing stranded lane ships](2026-11-20-a-mid-wave-main-red-landing-stranded-lane-ships.md) | `GitMain.FastForward` moves origin only, so the local main of the runtime stayed behind and the ships of cycles 2565 and 2568 got `GIT_PUSH_REJECTED` | `integration/gitmain.go` (`FastForward`), `phases/ship/landing/push.go` | ❌ | proposal: inbox item `lane-ship-fast-forwards-local-main-to-origin-in-the-ship-window` |
+| [2026-11-20 — five signal roots publish nothing to the event bus](2026-11-20-five-signal-roots-publish-nothing-to-the-event-bus.md) | `publisher.Roles()` lacks `integration`, `auth`, `queue`, `latency` and `retire`, and the guard checks a hand-written list of 7 roles | `events/publisher/publisher.go` (`Roles`), `cmd/evolve/cmd_root_guard_test.go` | ❌ | proposal: inbox item `signal-roots-under-unregistered-roles-publish-nothing` (`TestRootSignalCenter_EveryCallSiteRoleIsAPublisherRole`) |
+| [2026-11-20 — tests and predicates that wait on host time failed on a loaded host](2026-11-20-tests-and-predicates-that-wait-on-host-time-failed-on-a-loaded-host.md) | the ACS predicate `TestC2560_006` required a macOS kernel to user time ratio below 1.2 and measured 1.31 on a loaded host | `acs/cycle2560` (not on main) | ❌ | proposal: inbox items `core-tests-cut-git-starts-salvage-without-ratio-gate` and `triage-defer-unreachable-host-timing-ratio-criteria` |
+| 2026-11-20 — tests and predicates that wait on host time failed on a loaded host | `TestRun_StopSignalEndsRunAndClosesFile` sends the stop after a sleep of 80 ms and expects a sample, so it fails on a loaded runner | `cmd/hostsampler/main_test.go` | ❌ | proposal: inbox item `hostsampler-stop-test-stops-after-a-counted-read` |
+| [2026-11-20 — inbox withdraw refused items that carry lifecycle stamps](2026-11-20-inbox-withdraw-refused-items-that-carry-lifecycle-stamps.md) | the boundary runbook chose `withdraw` for items that carry lifecycle stamps, and the verb refused 5 of them | console runbook, `inboxmover/lifecycle/withdraw.go` (`refuseLifecycleStamps`) | ❌ | none: the refusal is by design; the runbook check is the control |
+| [2026-11-20 — a parked lane never resumed after the main-red stop released](2026-11-20-a-parked-lane-never-resumed-after-the-main-red-stop-released.md) | `pool.resupply` skips an id that is in `known`, and `pool.settle` never clears it, so the lead todo of a paused scope is dropped | `fleet/pool.go` (`add`, `resupply`, `settle`) | ❌ | proposal: inbox item `pool-relaunches-a-parked-lane-after-the-main-red-stop-releases` (`TestPoolResupply_RelaunchesAParkedLeadAfterItsLaneExited`) |
 
 ## Prioritized gap backlog (13-agent sweep; agent confidence in parens)
 
