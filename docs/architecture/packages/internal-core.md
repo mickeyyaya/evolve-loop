@@ -141,7 +141,12 @@
 - **The TDD handoff floor** (`tdd_predicate_floor.go`, [incident 2026-11-09](../../incidents/2026-11-09-duplicate-ratchet-misses-staged-predicates.md)). `withMandatoryReviewers` puts `tddPredicateFloor` before the mandatory explanation reviewer. Every orchestrator gets it through `WithReviewer` or `NewOrchestrator`.
   - On a TDD handoff it scans `go/` of the worktree with `internal/testdup`. It rejects with retry each group of equal helper bodies that has a site under `go/acs/cycle<N>/`. No phase after TDD can change that directory, so the copy must leave there.
   - The correction names the replacement of each copy. `testdup.Group.Wraps` lists the `acsassert` functions that the copy calls. The floor reads `TestingForms` and the `testing.T` functions from `go/pkg/acsassert` of the worktree, so no second list exists.
-  - If every site is in `go/acs/cycle<N>/`, the text says to call the existing helper. If any site is elsewhere, the text says that a test helper of another package cannot be imported. It then names the `testing.T` form (for example `acsassert.GoModuleDir`), or says to inline the copy.
+  - If every site is in `go/acs/cycle<N>/`, the text says to call the existing helper. If any site is elsewhere, the text says that a test helper of another package cannot be imported. It then does one of four things:
+    - It names the kit function with the same body (for example `acsassert.ExitedPID`).
+    - It names the `testing.T` form of a kit call (for example `acsassert.GoModuleDir`).
+    - It says to inline the copy or to call a `testing.T` kit function that it wraps.
+    - It says to write the statements inside the test function and define no helper function, because a renamed helper is still a copy.
+  - The floor finds the kit function with the same body when it loads the kit. `testdup.NormalizedBodies` gives the normalized body of each kit function that takes a `testing.T`, and the floor compares it with `Group.Body`. No second list exists.
   - A tree without `go/.test-dup-baseline` is not judged. A baseline or a test file that the floor cannot read gives a `[tdd-floor] WARN` and an approval; the ship ratchet still counts the copies.
 - **The floor runs before the build session closes** (`builder_selfcheck.go`, `builder_selfcheck_receipt.go`, [ADR-0158](../adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md) decision 18).
   - Problem: a floor refusal at the review gate costs a new build dispatch with the full prompt. Wave 148 cycles 2092, 2093 and 2095 failed at the gate after their one correction, on cover-changed and Changed Areas findings.

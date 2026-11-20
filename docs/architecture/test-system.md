@@ -289,13 +289,16 @@ Each cycle wrote its own copy of the same predicate helpers: 597 copies (researc
 
 - the module directory, and its `testing.T` form `GoModuleDir`, which fails the test when no `go.mod` exists;
 - a `go test` run with its JSON result, and a check that tests ran;
+- the ID of a child process that has exited, `ExitedPID`;
 - the tail of an output;
 - the coverage of one function;
 - a walk of the module.
 
 `go/acs/README.md` §Predicate kit lists the helpers. The persona text of the phases that write predicates links to that list. A structure test fails when the list omits an exported function of the kit.
 
-The TDD handoff floor names the replacement of each copy. A test helper of another package cannot be imported. If the copy wraps `acsassert.ModuleDir`, the floor says to call `acsassert.GoModuleDir`. If the copy wraps only a `testing.T` function, the floor says to inline it or to call that function. `acsassert.TestingForms` maps a kit function to its `testing.T` form, and the floor reads it from the source of the package.
+The TDD handoff floor names the replacement of each copy. A test helper of another package cannot be imported. If the copy wraps `acsassert.ModuleDir`, the floor says to call `acsassert.GoModuleDir`. If the body of the copy equals the body of a kit function, the floor says to call that function (for example `acsassert.ExitedPID`).
+
+If the copy wraps only a `testing.T` function, the floor says to inline it or to call that function. Otherwise the floor says to write the statements in the test function and define no helper function. A renamed helper is still a copy. `acsassert.TestingForms` maps a kit function to its `testing.T` form. The floor reads it from the source of the package.
 
 ## 7. Wall time and scale
 

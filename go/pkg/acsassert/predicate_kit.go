@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -56,6 +57,15 @@ func ModuleDir(start string) (string, error) {
 		}
 		dir = parent
 	}
+}
+
+func ExitedPID(t testing.TB) int {
+	t.Helper()
+	cmd := exec.Command("true")
+	if err := cmd.Run(); err != nil {
+		t.Fatal(err)
+	}
+	return cmd.ProcessState.Pid()
 }
 
 func OutputTail(output string, n int) string {

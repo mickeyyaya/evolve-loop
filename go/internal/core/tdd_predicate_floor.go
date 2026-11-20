@@ -75,10 +75,11 @@ func tddHelperCopyGroups(moduleDir string, cycle int) ([]testdup.Group, error) {
 type tddKit struct {
 	forms   map[string]string
 	testing map[string]bool
+	bodies  map[string]string
 }
 
 func newTddKit() tddKit {
-	return tddKit{forms: map[string]string{}, testing: map[string]bool{}}
+	return tddKit{forms: map[string]string{}, testing: map[string]bool{}, bodies: map[string]string{}}
 }
 
 func loadTddKit(moduleDir string) tddKit {
@@ -94,16 +95,29 @@ func loadTddKit(moduleDir string) tddKit {
 		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
 			continue
 		}
-		file, err := parser.ParseFile(fset, filepath.Join(dir, name), nil, 0)
+		src, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			return newTddKit()
+		}
+		file, err := parser.ParseFile(fset, name, src, 0)
 		if err != nil {
 			return newTddKit()
 		}
 		kit.absorb(file)
+		kit.absorbBodies(fset, file, src)
 	}
 	for _, form := range kit.forms {
 		kit.testing[form] = true
 	}
 	return kit
+}
+
+func (k tddKit) absorbBodies(fset *token.FileSet, file *ast.File, src []byte) {
+	for fn, body := range testdup.NormalizedBodies(fset, file, src) {
+		if k.testing[fn] {
+			k.bodies[body] = "acsassert." + fn
+		}
+	}
 }
 
 func (k tddKit) absorb(file *ast.File) {
@@ -176,12 +190,14 @@ func tddCopyRemedy(g testdup.Group, cycle int, kit tddKit) string {
 	sort.Strings(forms)
 	forms = slices.Compact(forms)
 	switch {
+	case kit.bodies[g.Body] != "":
+		return cause + "call " + kit.bodies[g.Body]
 	case len(forms) > 0:
 		return cause + "call " + strings.Join(forms, " or ")
 	case len(direct) > 0 && len(direct) == len(g.Wraps):
 		return cause + "inline it, or call " + strings.Join(direct, " or ") + " directly"
 	}
-	return cause + "inline it"
+	return cause + "write the statements inside the test function and define no helper function, because a renamed helper is still a copy"
 }
 
 func siteDir(site string) string {

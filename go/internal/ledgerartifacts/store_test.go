@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 func sha256Hex(body []byte) string {
@@ -208,15 +209,6 @@ func TestDigest_IsTheNameAnObjectIsStoredUnder(t *testing.T) {
 	}
 }
 
-func exitedPID(t *testing.T) int {
-	t.Helper()
-	cmd := exec.Command("true")
-	if err := cmd.Run(); err != nil {
-		t.Fatal(err)
-	}
-	return cmd.ProcessState.Pid()
-}
-
 func TestPut_ReapsTheTempFilesOfAWriterThatDied(t *testing.T) {
 	evolveDir := t.TempDir()
 	store := Open(evolveDir)
@@ -226,7 +218,7 @@ func TestPut_ReapsTheTempFilesOfAWriterThatDied(t *testing.T) {
 	if err := os.MkdirAll(fanOut, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	stale := filepath.Join(fanOut, fmt.Sprintf(".put-%d-1", exitedPID(t)))
+	stale := filepath.Join(fanOut, fmt.Sprintf(".put-%d-1", acsassert.ExitedPID(t)))
 	inFlight := filepath.Join(fanOut, fmt.Sprintf(".put-%d-2", os.Getpid()))
 	for _, p := range []string{stale, inFlight} {
 		if err := os.WriteFile(p, []byte("partial"), 0o600); err != nil {
@@ -254,7 +246,7 @@ func TestPut_LeavesAloneEveryFileThatIsNotTheTempOfAWriterThatDied(t *testing.T)
 	if err := os.MkdirAll(fanOut, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	dead := exitedPID(t)
+	dead := acsassert.ExitedPID(t)
 	kept := []string{".put-notapid-1", fmt.Sprintf(".put-%d", dead), ".put-0-1", fmt.Sprintf("put-%d-1", dead), "0123456789abcdef"}
 	for _, name := range kept {
 		if err := os.WriteFile(filepath.Join(fanOut, name), []byte("kept"), 0o600); err != nil {
@@ -309,7 +301,7 @@ func TestPut_ReapsTheDurableTempOfAWriterThatDiedAndKeepsALiveOnes(t *testing.T)
 	durableTemp := func(pid int) string {
 		return filepath.Join(fanOut, fmt.Sprintf(".%s.%d.123.tmp", digest[2:], pid))
 	}
-	stale, inFlight := durableTemp(exitedPID(t)), durableTemp(os.Getpid())
+	stale, inFlight := durableTemp(acsassert.ExitedPID(t)), durableTemp(os.Getpid())
 	for _, p := range []string{stale, inFlight} {
 		if err := os.WriteFile(p, []byte("partial"), 0o600); err != nil {
 			t.Fatal(err)

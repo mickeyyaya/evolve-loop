@@ -3,7 +3,6 @@
 package observer
 
 import (
-	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -12,18 +11,11 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 var psCPUTime = regexp.MustCompile(`^\s*([0-9]+-)?[0-9]+(:[0-9]{2})+(\.[0-9]+)?\s*$`)
-
-func reapedPID(t *testing.T) int {
-	t.Helper()
-	cmd := exec.CommandContext(context.Background(), "true")
-	if err := cmd.Run(); err != nil {
-		t.Fatalf("run true: %v", err)
-	}
-	return cmd.ProcessState.Pid()
-}
 
 func burnCPU(d time.Duration) int {
 	n := 0
@@ -44,7 +36,7 @@ func TestRealPSRunner_ReportsCumulativeCPUTimeOfALiveProcess(t *testing.T) {
 }
 
 func TestRealPSRunner_GonePIDIsAnExitErrorWithNoTime(t *testing.T) {
-	out, err := realPSRunner(reapedPID(t))
+	out, err := realPSRunner(acsassert.ExitedPID(t))
 
 	var exitErr *exec.ExitError
 	if !errors.As(err, &exitErr) {
@@ -81,7 +73,7 @@ func TestNewProcessCPUProbe_DefaultRunnerSeesABusyProcessAdvance(t *testing.T) {
 }
 
 func TestNewProcessCPUProbe_DefaultRunnerMakesNoClaimForAGonePID(t *testing.T) {
-	if newProcessCPUProbe(writePIDFile(t, strconv.Itoa(reapedPID(t))), nil)() {
+	if newProcessCPUProbe(writePIDFile(t, strconv.Itoa(acsassert.ExitedPID(t))), nil)() {
 		t.Fatal("probe claimed liveness for a reaped pid")
 	}
 }

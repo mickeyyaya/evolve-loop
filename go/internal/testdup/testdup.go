@@ -198,6 +198,16 @@ func isTestEntry(name string) bool {
 	return false
 }
 
+func NormalizedBodies(fset *token.FileSet, file *ast.File, src []byte) map[string]string {
+	bodies := map[string]string{}
+	for _, decl := range file.Decls {
+		if fn, ok := decl.(*ast.FuncDecl); ok && fn.Body != nil && len(fn.Body.List) >= minStatements {
+			bodies[fn.Name.Name] = normalize(fset, src, fn.Body)
+		}
+	}
+	return bodies
+}
+
 func normalize(fset *token.FileSet, src []byte, body *ast.BlockStmt) string {
 	start := fset.Position(body.Lbrace).Offset
 	end := fset.Position(body.Rbrace).Offset + 1

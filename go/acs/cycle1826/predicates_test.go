@@ -197,15 +197,6 @@ func leaseRun(t *testing.T, root string, cycle, ownerPID int) {
 	}
 }
 
-func exitedPID(t *testing.T) int {
-	t.Helper()
-	cmd := exec.Command("true")
-	if err := cmd.Run(); err != nil {
-		t.Fatal(err)
-	}
-	return cmd.ProcessState.Pid()
-}
-
 func absent(path string) bool {
 	_, err := os.Lstat(path)
 	return errors.Is(err, fs.ErrNotExist)
@@ -323,7 +314,7 @@ func TestC1826_002_ALiveRunLeaseHoldsThePublishWithExit1NamingTheRun(t *testing.
 	})
 	t.Run("a sealed run whose owner exited does not hold", func(t *testing.T) {
 		r := addPairAndHalfPair(t, newPlane(t))
-		leaseRun(t, r.Dir, liveRunCycle, exitedPID(t))
+		leaseRun(t, r.Dir, liveRunCycle, acsassert.ExitedPID(t))
 
 		res := publish(t, r.Dir)
 
