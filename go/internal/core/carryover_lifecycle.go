@@ -2,9 +2,13 @@ package core
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/carryover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/recoveryretro"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -77,4 +81,11 @@ func (o *Orchestrator) closeoutCarryover(state *State, workspace, projectRoot st
 		o.carryover().MergeAcceptanceDeferrals(state, deferrals, cycle, now)
 	}
 	o.carryover().Closeout(state, workspace, cycle, now)
+	if projectRoot != "" && retrospectivesStage(projectRoot, o.errOut()) == config.StageEnforce {
+		docsDir := filepath.Join(projectRoot, filepath.FromSlash(recoveryretro.DocsHome))
+		o.carryover().RetireDocumentedJudgments(state, func(id string) bool {
+			info, err := os.Stat(filepath.Join(docsDir, id+".md"))
+			return err == nil && !info.IsDir()
+		})
+	}
 }

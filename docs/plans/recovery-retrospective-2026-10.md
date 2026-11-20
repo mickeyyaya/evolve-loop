@@ -1,6 +1,6 @@
 # Plan: the host writes a retrospective document for each recovery and each judgment lesson
 
-- **Status:** accepted. C1 to C3 are on `main` at stage `shadow`. On 2026-10-27 the operator moved the stage to `enforce`. C4 is built: the policy key, the pending dir and the boundary publish. The checked-in policy sets `enforce`, so the closeout writes into the pending dir and the boundary publish commits the pairs. C5 and C6 are open, and each has an inbox item (section 6).
+- **Status:** accepted. C1 to C3 are on `main` at stage `shadow`, and on 2026-10-27 the operator moved the stage to `enforce`. C4 is built: the policy key, the pending dir and the boundary publish. C5 is built: `closeoutCarryover` retires a judgment todo when its document is on `main`. The checked-in policy sets `enforce`, so the closeout writes into the pending dir and the boundary publish commits the pairs. C6 is open and has an inbox item (section 6).
 - **Design:** [recovery-retrospective.md](../architecture/recovery-retrospective.md). **Decision:** [ADR-0151](../architecture/adr/0151-the-host-writes-a-retrospective-document-for-each-recovery-and-each-judgment-lesson.md). **Research:** [recovery-retrospective-2026-10.md](../research/recovery-retrospective-2026-10.md).
 - **Package note:** [internal-recoveryretro.md](../architecture/packages/internal-recoveryretro.md).
 
@@ -129,7 +129,7 @@ Each criterion has a weight. The score is 1 (poor) to 5 (good).
 | C2 | `internal/recoveryretro`: `JudgmentLessons` and `RenderJudgmentLesson`, plus `LessonYAML` for both kinds. | Only `cycle-<N>-judgment-<phase>` todos are selected. The YAML parses in `internal/research` and its keywords match. | shadow (this PR) |
 | C3 | `WriteShadow`, called at the closeout of each cycle. It writes into `<workspace>/retrospectives/` only. | A PASS closeout after two FAILs writes one recovery pair. A FAIL closeout writes only the judgment pairs. Nothing is written outside the workspace. | shadow, on `main` |
 | C4 | The stage key `retrospectives.stage` and the pending dir. The boundary publish commits the pairs into `docs/retrospectives/`. | At `enforce`, a pair goes to the pending dir, and the publish commits it with the dossiers. | built: the key (2026-10-27), the pending dir and the boundary publish (cycle 2266, inbox item `recovery-retrospective-c4-stage-key-publish`). |
-| C5 | The judgment-todo retirement after the publish, through `carryover.Retire`. | A todo without its document on `main` stays. A todo with its document leaves. The second run changes nothing. | enforce. Inbox item `recovery-retrospective-c5-judgment-todo-retire` (2026-10-27). |
+| C5 | The judgment-todo retirement after the publish, through `carryover.Retire`. | A todo without its document on `main` stays. A todo with its document leaves. The second run changes nothing. | built: `RetireDocumentedJudgments` from `closeoutCarryover` at stage `enforce` (cycle 2555, inbox item `recovery-retrospective-c5-judgment-todo-retire`). |
 | C6 | `docs/retrospectives/` joins the default recall roots. | A lesson YAML there is recalled for a matching goal. | enforce. Inbox item `recovery-retrospective-c6-recall-root` (2026-10-27). |
 
 ## 7. Order
@@ -175,4 +175,4 @@ Each new and changed function has 100% measured coverage. The PR body has the ta
 ## 11. Open questions
 
 - **Q1 (operator, decided 2026-10-27):** when does the stage move to `enforce`? The operator approved the move to `enforce` on 2026-10-27. The first recommendation was to wait for five recovery documents at `shadow`.
-- **Q2 (operator, pending):** does a judgment todo keep its long retention until its document lands (C5)? Recommendation: yes, because a TTL alone drops a lesson that has no document.
+- **Q2 (decided, C5):** a judgment todo keeps its long retention until its document lands. `RetireDocumentedJudgments` removes it once `docs/retrospectives/<id>.md` is on `main`, because a TTL alone drops a lesson that has no document.

@@ -132,12 +132,12 @@ At `shadow`, `recoveryretro.WriteShadow` writes the pairs into `<workspace>/retr
 
 ## 6. The enforce stage
 
-Steps 1 to 3 are built (plan C4). Steps 4 and 5 are a design here, not code (plan C5 and C6).
+Steps 1 to 4 are built (plan C4 and C5). Step 5 is a design here, not code (plan C6).
 
 1. The key `retrospectives.stage` takes `off`, `shadow` or `enforce` (`policy.RetrospectivesConfig`). The compiled default stays `shadow`. The checked-in policy sets `enforce` since 2026-10-27, by the operator decision. At `off`, the closeout writes no document.
 2. At `enforce`, the closeout writes the pairs into `.evolve/retrospectives-pending/` through `recoveryretro.WriteInto`, and writes nothing into the workspace. A write failure prints one WARN line, and the closeout goes on.
 3. The boundary publish commits the pending pairs into `docs/retrospectives/` with the dossiers. The publish is create-only: it never replaces a document that is on `main`. `recoveryretro.PublishPending` commits each complete pair, and drops the pending copy of a pair whose document is in `docs/`. A half pair stays pending with a WARN line. A publish failure is a WARN line, and the boundary goes on.
-4. After the publish, a judgment todo whose `docs/retrospectives/<id>.md` is in the published tree leaves the carryover log through `carryover.Retire`. The check repeats at each closeout, so a failed publish keeps the todo.
+4. At `enforce`, `Orchestrator.closeoutCarryover` calls `RetireDocumentedJudgments` before `writeShadowRetrospectives`. A judgment todo whose `docs/retrospectives/<id>.md` is in the published tree leaves the carryover log through `carryover.Retire`. Until that document lands, the todo keeps its long retention (Q2). The check repeats at each closeout, so a failed publish keeps the todo.
 5. `docs/retrospectives/` joins the default recall roots.
 
 ## 7. Guards
@@ -168,7 +168,7 @@ Steps 1 to 3 are built (plan C4). Steps 4 and 5 are a design here, not code (pla
 | A document in `docs/` is kept and the pending pair is dropped | `TestPublishPending_ADocumentInDocsIsKeptAndThePendingPairIsDropped` | built |
 | The boundary publish reaches the pending pairs | `TestPublishPendingDossiers_PublishesTheRetrospectivesBesideTheDossiers`, `TestPublishDossierPairs_PublishesThePendingRetrospectives` | built |
 | A retrospective publish failure is a WARN line and the boundary goes on | `TestPublishPendingDossiers_ARetrospectivePublishFailureIsAWarnAndTheBoundaryGoesOn` | built |
-| A judgment todo leaves the log only with its document on `main` | the C5 tests | planned |
+| A judgment todo leaves the log only with its document on `main` | `TestJudgmentRetire_ATodoWithNoDocumentStays`, `TestJudgmentRetire_ATodoWithItsDocumentLeavesAndTheOthersKeepTheirOrder`, `TestJudgmentRetire_ASecondRunChangesNothing`, `TestJudgmentRetire_ATodoThatIsNotAJudgmentIsNeverAskedAboutAndNeverLeaves`, `TestRunCycle_AtEnforceAJudgmentTodoWithItsDocumentOnMainLeavesAndTheRestStay`, `TestRunCycle_AtEnforceTheJudgmentTodoLeavesOnlyAfterTheBoundaryPublishedItsDocument`, `TestRunCycle_BelowEnforceAJudgmentTodoWithItsDocumentOnMainStays` | built |
 
 ## 8. Limits
 

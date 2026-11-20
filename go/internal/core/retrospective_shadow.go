@@ -2,14 +2,19 @@ package core
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recoveryretro"
 )
 
+func retrospectivesStage(projectRoot string, warn io.Writer) config.Stage {
+	return floorStage(projectRoot, "retrospectives", "retrospective writer", func(p policy.Policy) string { return p.RetrospectivesConfig().Stage }, warn)
+}
+
 func (cr *cycleRun) writeShadowRetrospectives() {
-	stage := floorStage(cr.req.ProjectRoot, "retrospectives", "retrospective writer", func(p policy.Policy) string { return p.RetrospectivesConfig().Stage }, cr.o.errOut())
+	stage := retrospectivesStage(cr.req.ProjectRoot, cr.o.errOut())
 	if stage == config.StageOff {
 		return
 	}
