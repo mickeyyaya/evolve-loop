@@ -166,3 +166,23 @@ func TestDiskGuard_NilDefaultsAndCycleStartNilGuardAndWait(t *testing.T) {
 		t.Fatalf("waitForInterval = %v, want nil", err)
 	}
 }
+
+func TestDiskStatus_MeasureReportsPausedFreePctThresholdAndPath(t *testing.T) {
+	const total = uint64(200) << 30
+	free := total / 25
+	g := NewDiskGuard("/vol/work", DiskGuardConfig{}, func(string) (DiskUsage, error) {
+		return DiskUsage{FreeBytes: free, TotalBytes: total}, nil
+	}, nil)
+
+	st := g.Measure()
+	want := DiskStatus{Paused: true, FreePct: 4, PausePct: 5, Path: "/vol/work"}
+	if st != want {
+		t.Fatalf("Measure() at 4%% free = %+v, want %+v", st, want)
+	}
+
+	free = total / 2
+	want = DiskStatus{Paused: false, FreePct: 50, PausePct: 5, Path: "/vol/work"}
+	if st = g.Measure(); st != want {
+		t.Fatalf("Measure() at 50%% free = %+v, want %+v", st, want)
+	}
+}
