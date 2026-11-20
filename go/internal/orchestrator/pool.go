@@ -135,7 +135,7 @@ func (p Pool) transition(t fleet.PoolTransition) {
 	if t.Kind == fleet.PoolLaunched || t.Kind == fleet.PoolBackfilled {
 		p.FamilyHolds.forget(t.Todo)
 	}
-	if idleOrHeld && p.MinLanes > 0 && t.Live < p.MinLanes && (p.Halted == nil || !p.Halted()) {
+	if idleOrHeld && cause != CauseHostPressure && p.MinLanes > 0 && t.Live < p.MinLanes && (p.Halted == nil || !p.Halted()) {
 		uFields := map[string]string{
 			"live":      strconv.Itoa(t.Live),
 			"target":    strconv.Itoa(t.Target),

@@ -10,10 +10,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/hostpressure"
 )
 
 const (
-	kbPerMB          = 1024.0
 	cpuLineMinFields = 9
 	cpuIdleIndex     = 4
 	cpuIOWaitIndex   = 5
@@ -131,26 +132,11 @@ func cpuTicks(f []string) (busy, total uint64, err error) {
 }
 
 func parseMeminfo(text string) (usedMB, swapMB float64, err error) {
-	want := map[string]float64{}
-	for _, line := range strings.Split(text, "\n") {
-		f := strings.Fields(line)
-		if len(f) < 2 {
-			continue
-		}
-		key := strings.TrimSuffix(f[0], ":")
-		switch key {
-		case "MemTotal", "MemAvailable", "SwapTotal", "SwapFree":
-			v, perr := strconv.ParseFloat(f[1], 64)
-			if perr != nil {
-				return 0, 0, perr
-			}
-			want[key] = v
-		}
+	m, err := hostpressure.ParseMeminfo(text)
+	if err != nil {
+		return 0, 0, err
 	}
-	if len(want) != 4 {
-		return 0, 0, fmt.Errorf("/proc/meminfo: %w", errMissingField)
-	}
-	return (want["MemTotal"] - want["MemAvailable"]) / kbPerMB, (want["SwapTotal"] - want["SwapFree"]) / kbPerMB, nil
+	return m.UsedMB(), m.SwapUsedMB(), nil
 }
 
 func parseDiskstats(text string) (ticks uint64, disks int, err error) {

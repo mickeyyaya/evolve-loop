@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"sync"
 
@@ -12,6 +13,7 @@ const (
 	windowCauseCleanLanding = "clean_landing"
 	windowCauseConflict     = "conflict"
 	windowCauseResize       = "resize"
+	windowCauseHostPressure = "host_pressure"
 )
 
 type WindowConfig struct {
@@ -25,11 +27,12 @@ type Window struct {
 	size    int
 	sized   int
 	lowest  int
+	ceiling int
 	publish Publish
 }
 
 func NewWindow(cfg WindowConfig, publish Publish) *Window {
-	w := &Window{sized: max(cfg.Sized, 1), lowest: max(cfg.Min, 1), publish: publish}
+	w := &Window{sized: max(cfg.Sized, 1), lowest: max(cfg.Min, 1), ceiling: math.MaxInt, publish: publish}
 	w.size = w.clamp(cfg.Start)
 	return w
 }
@@ -37,8 +40,10 @@ func NewWindow(cfg WindowConfig, publish Publish) *Window {
 func (w *Window) Size() int {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return w.size
+	return w.admitted()
 }
+
+func (w *Window) admitted() int { return min(w.size, w.ceiling) }
 
 func (w *Window) CleanLanding() { w.change(windowCauseCleanLanding, func() { w.size++ }) }
 
@@ -46,16 +51,26 @@ func (w *Window) Conflict() { w.change(windowCauseConflict, func() { w.size /= 2
 
 func (w *Window) Resize(sized int) { w.change(windowCauseResize, func() { w.sized = max(sized, 1) }) }
 
+func (w *Window) SetCeiling(ceiling int) {
+	w.change(windowCauseHostPressure, func() { w.ceiling = ceiling })
+}
+
+func (w *Window) HostCapped() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.ceiling < w.sized
+}
+
 func (w *Window) clamp(size int) int {
 	return min(max(size, w.lowest), w.sized)
 }
 
 func (w *Window) change(cause string, apply func()) {
 	w.mu.Lock()
-	old := w.size
+	old := w.admitted()
 	apply()
 	w.size = w.clamp(w.size)
-	size, sized := w.size, w.sized
+	size, sized := w.admitted(), w.sized
 	w.mu.Unlock()
 	if size == old {
 		return
