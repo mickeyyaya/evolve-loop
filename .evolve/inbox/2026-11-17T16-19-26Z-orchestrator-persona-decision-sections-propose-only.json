@@ -3,6 +3,14 @@
     "A predicate test fails on today's persona text and passes after the rewrite.",
     "The persona names no script that ships, releases or writes cycle state as an action of the persona."
   ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2551",
+    "branch": "cycle-cd3ae73e-2551",
+    "snapshot_sha": "7cca8f1c00978e519f21c22bd3dcacee941c53ea",
+    "base_sha": "f25d49e4ae89c9d1c528d1c4fbc1687743635999",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2551/audit-fail-reason.json",
+    "cycle": 2551
+  },
   "created_at": "2026-11-17T16:19:26Z",
   "files": [
     "agents/evolve-orchestrator.md"

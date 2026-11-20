@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "Red first: a boundary run of a fixture loop runs each host check once",
+    "Red first: a cycle with a stale heartbeat and a live pid stays",
+    "Red first: an unreadable fresh lease and an absent lease with a young run dir stay",
+    "A cycle with a dead owner pid and no holder is recycled"
+  ],
+  "created_at": "2026-11-20T00:51:29Z",
+  "deps": [
+    "recycle-x4-mandatory-recycle-step",
+    "recycle-x1b-check-registry-run-dirs",
+    "recycle-x1c-check-registry-cache",
+    "recycle-x1d-check-registry-temp",
+    "recycle-x1e-check-registry-processes"
+  ],
+  "files": [
+    "go/cmd/evolve/cmd_loop_batch.go",
+    "go/cmd/evolve/cmd_loop_outcome.go",
+    "go/internal/gc/cycleseal.go"
+  ],
+  "fix": "At each boundary the loop runs each host check once. K4 recycles a cycle with no released record only when its lease owner pid is dead; an unreadable lease with a fresh file time and an absent lease with a young run dir count as held (go/internal/core/lane_resume_lease.go:26-32, go/internal/core/runlease_hook.go:22-24); no self-pid exclusion; no holder in its tree; no running phase.",
+  "id": "recycle-x9-loop-runs-host-checks",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Plan PR #1585, decisions D11, D16, check K4, component X9. Today the cache, temp and process sweeps run only in a manual evolve gc (go/cmd/evolve/cmd_gc.go:297, :412, :434).",
+  "title": "The loop runs the gc host checks at each boundary, and recycles a crashed cycle",
+  "weight": 0.8
+}

@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "Red first: a leaf of a branch one commit past origin/main is under 1 MB and its bundle verifies",
+    "Red first: a tip that is in origin/main gives a leaf with the tip and no bundle, and the release goes on",
+    "A failed bundle step still keeps the tree and the branch"
+  ],
+  "created_at": "2026-11-20T00:50:58Z",
+  "deps": [],
+  "files": [
+    "go/internal/gc/salvage.go",
+    "go/internal/gc/branchsweep.go"
+  ],
+  "fix": "Write `git bundle create <file> <tip> ^origin/main`. When `git rev-list --count origin/main..<tip>` is 0, record the tip in the leaf and write no bundle (git refuses an empty bundle). Keep the verify and list-heads checks.",
+  "id": "recycle-x0-thin-bundle-writers",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Plan docs/plans/cycle-recycle-and-gc-check-2026-11.md (PR #1585), decision D9, component X0. bundleVerified (go/internal/gc/salvage.go:85) and bundleBranch (go/internal/gc/branchsweep.go:115-125) bundle a ref with no negative base, so each bundle holds the full history (up to 1.1 GB). 254 leaves held 187 GB on 2026-11-20.",
+  "title": "Salvage and branch-sweep bundles hold only the commits that origin/main does not hold",
+  "weight": 0.9
+}

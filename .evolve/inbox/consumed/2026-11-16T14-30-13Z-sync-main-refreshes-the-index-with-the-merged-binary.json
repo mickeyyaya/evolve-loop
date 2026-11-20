@@ -3,6 +3,12 @@
     "wave next completes when the merged main adds a policy key that the running binary does not know",
     "a test through the real step order is red before the change"
   ],
+  "consumed": {
+    "at": "2026-11-20T03:33:50Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "done on main at b049da7c4: sync-main no longer refreshes the code index, so the merged policy is not parsed by the old binary; verified by adversarial route check agent-adversarial-review-20261119T214924Z-3772 and the console diff read 2026-11-20"
+  },
   "created_at": "2026-11-16T14:30:13Z",
   "files": [
     "go/cmd/evolve/cmd_syncmain.go",

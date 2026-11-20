@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Red first: a full bundle becomes a thin bundle that verifies",
+    "Red first: a leaf with untracked files stays",
+    "Red first: over the cap, an unlanded leaf younger than the TTL stays"
+  ],
+  "created_at": "2026-11-20T00:51:05Z",
+  "deps": [
+    "recycle-x0-thin-bundle-writers",
+    "recycle-x3-archive-leaf-writer"
+  ],
+  "files": [
+    "go/internal/gc/salvage.go",
+    "go/internal/gc/gc.go",
+    "go/internal/gcpolicy/gcpolicy.go"
+  ],
+  "fix": "K5: keep salvage_ttl_days, and add a size cap that evicts only landed leaves (tip in origin/main), the oldest first; write a thin bundle before a ref with unlanded work is dropped. K6: fetch each full bundle into a temporary ref, write a thin bundle, verify list-heads, replace, drop the temporary ref; keep the full leaf on each failure. Delete a leaf only when its tip is in origin/main, it has no uncommitted patch and no non-empty untracked archive. Never while a continuation binds the cycle.",
+  "id": "recycle-x6-salvage-retention-and-migration",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Plan PR #1585, checks K5, K6, component X6. It replaces the item gc-salvage-bundles-hold-the-whole-history-with-no-retention. On 2026-11-20, 206 legacy leaves held about 135 GB.",
+  "title": "Salvage leaves get a size cap and the legacy full bundles become thin bundles",
+  "weight": 0.85
+}

@@ -15,6 +15,11 @@
   "kind": "bug",
   "origin": "console",
   "priority_class": "correctness",
+  "route": "console-manual",
+  "routed_at": "2026-11-20T03:33:01Z",
+  "routed_by": "operator",
+  "routed_cycle": 2554,
+  "routed_reason": "recurrence: cycle 2554 turned main red with error-text tests (second time since 2026-11-19); the console builds the floor check right after PR #1583 lands, which changes the same build_floor_reviewer.go",
   "summary": "StaticBuildFloorChecks and SuiteBuildFloorChecks (go/internal/core/build_floor_reviewer.go:28-51) run the tests of the changed packages and a fixed list of static checks. The test-audit tree ratchet (go/internal/testaudit, TestTreeRatchet, verb `evolve test audit --check`) is not in the floor. On 2026-11-19 cycle 2530 shipped internal/incidentkb TestRender_EmptyAndErrorBranches and cycle 2533 shipped acs/cycle2533 TestC2533_004 with an error-text-match finding and no baseline row. Main required CI was red from 08:01 (run 44484192548) and stayed red after 09:39 (run 44498432850). The console fix is PR console/main-red-testaudit-errtext. The same escape class was closed for persona budgets by personaBudgetFailures.",
   "title": "the build floor does not run the test-audit ratchet, so a lane ships a weak test that turns main red",
   "weight": 0.85
