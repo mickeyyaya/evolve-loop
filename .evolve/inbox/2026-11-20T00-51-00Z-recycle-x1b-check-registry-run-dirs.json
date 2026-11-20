@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Red first: a run dir of a continuation-bound cycle stays past delete_after_days",
+    "Red first: an archived run older than the retention goes",
+    "The report lists each run dir with its rule"
+  ],
+  "created_at": "2026-11-20T00:51:00Z",
+  "deps": [
+    "recycle-x1a-check-registry-worktrees"
+  ],
+  "files": [
+    "go/internal/gc/gc.go",
+    "go/internal/gcpolicy/gcpolicy.go"
+  ],
+  "fix": "Port the run ladder as a check with no change of rule. Add a retention for .evolve/archive/runs. Keep the run dir of a cycle while a continuation binds the cycle, on the archive branch and on the delete branch (gc.go:96-97).",
+  "id": "recycle-x1b-check-registry-run-dirs",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "summary": "Plan PR #1585, decisions D7, D10, component X1b. The run ladder (go/internal/gc/gc.go:90-103) is the one owner of run dirs. It archives them under .evolve/archive/runs (:178-194), which has no retention.",
+  "title": "The gc check registry covers the run-dir ladder, with a retention for .evolve/archive/runs",
+  "weight": 0.6
+}

@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "Red first: an orphan test server whose owner pid is dead is stopped",
+    "Red first: a server whose owner pid is alive stays",
+    "No test signals a real process"
+  ],
+  "created_at": "2026-11-20T00:51:06Z",
+  "deps": [],
+  "files": [
+    "go/internal/swarm/reap_orphans.go",
+    "go/internal/tmuxtest/tmuxtest.go"
+  ],
+  "fix": "Extend the lister to the registered test socket dirs and keep the owner-pid rule. Tie the life of a test tmux server to its test binary. Inject the signal sender in each test.",
+  "id": "recycle-x8-test-tmux-socket-reap",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Plan PR #1585, check K10, component X8. On 2026-11-20, 282 tmux servers on sockets evolve-bridge-t<N> had ppid 1 (276 older than a day). swarm.ReapOrphanSockets has the right owner-pid rule (go/internal/swarm/reap_orphans.go:111) but its lister (:123-125) reads only its own socket dir (go/internal/bridge/tmux.go:90-95); test binaries use TMUX_TMPDIR=/tmp/evtmux* (go/cmd/evolve/main_test.go:56-61).",
+  "title": "The orphan socket reaper sees the test tmux socket dirs, and test servers end with their test binary",
+  "weight": 0.7
+}

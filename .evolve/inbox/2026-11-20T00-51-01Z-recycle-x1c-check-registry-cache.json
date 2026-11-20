@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Red first: the report of a fixture cache lists each entry with its rule",
+    "The existing gocache tests pass unchanged"
+  ],
+  "created_at": "2026-11-20T00:51:01Z",
+  "deps": [
+    "recycle-x1a-check-registry-worktrees",
+    "recycle-x2-gocache-counts-executable-dirs"
+  ],
+  "files": [
+    "go/internal/gc/gocache.go",
+    "go/cmd/evolve/cmd_gc.go"
+  ],
+  "fix": "Port TrimGoCache as a check with no change of rule. The report lists each trimmed entry with its age, its size and the rule (age or cap).",
+  "id": "recycle-x1c-check-registry-cache",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "summary": "Plan PR #1585, decision D10, component X1c.",
+  "title": "The gc check registry covers the Go cache trim",
+  "weight": 0.5
+}

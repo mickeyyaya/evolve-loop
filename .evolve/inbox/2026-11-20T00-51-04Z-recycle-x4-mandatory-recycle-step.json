@@ -1,0 +1,31 @@
+{
+  "acceptance": [
+    "Red first: a PASS cycle, a FAIL cycle, a resumed cycle, an abnormal exit and a deadline exit each end with a verified leaf and a record",
+    "Red first: the deadline case keeps its continuation",
+    "Red first: teardownCycleWorktree removes no tree and runs no branch -d",
+    "Red first: a PASS cycle whose branch is merged only into the hub HEAD keeps its branch",
+    "A second call of the step does nothing, and a crash between the record and the release leaves the release state open for K4",
+    "The shadow stage deletes nothing"
+  ],
+  "created_at": "2026-11-20T00:51:04Z",
+  "deps": [
+    "recycle-x5-continuation-reads-the-leaf",
+    "recycle-x1a-check-registry-worktrees"
+  ],
+  "files": [
+    "go/internal/core/cyclerun.go",
+    "go/internal/core/worktree.go",
+    "go/internal/core/cycle_worktree_teardown.go",
+    "go/cmd/evolve/cmd_cycle.go",
+    "go/cmd/evolve/cmd_loop_resume.go",
+    "go/cmd/evolve/cmd_loop_sequential_dispatch.go"
+  ],
+  "fix": "Run the step after each continuation stamp (cyclerun.go:198-201, cyclerun_epilogue.go:54 and :71) and the final state write, last in the defer stack (orchestrator.go:554-557), on each terminal path and the resume path. The step reads sealHold, writes and verifies the leaf and a record with a release state, then releases by the landing rule. Remove the release from gitWorktree.Cleanup and deleteCycleBranch (go/internal/core/worktree.go:205-231). The three sealed-sweep calls (cmd_cycle.go:280, cmd_loop_resume.go:76, cmd_loop_sequential_dispatch.go:53) call the step. The step is idempotent on the release state of its record. New destructive actions start in shadow (gc.checks.<id>.stage); the existing sealed-sweep releases keep their stage.",
+  "id": "recycle-x4-mandatory-recycle-step",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Plan PR #1585, decisions D1, D3 to D6, D15, component X4. Operator 2026-11-20: the recycle is a mandatory static step when the cycle change merged or failed to deliver. go/internal/core/cyclerun.go is protected (integrity_surface.go:103).",
+  "title": "Each cycle ends with a mandatory recycle step, the one releaser of its worktree and branch",
+  "weight": 0.95
+}

@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Red first: the report of a fixture tree lists each item with its rule and its evidence",
+    "Red first: a hub whose HEAD holds an unpushed merge of a cycle keeps the cycle branch",
+    "The existing worktree sweep tests pass unchanged",
+    "A failed fetch counts as not landed"
+  ],
+  "created_at": "2026-11-20T00:50:59Z",
+  "deps": [
+    "recycle-x0-thin-bundle-writers"
+  ],
+  "files": [
+    "go/internal/gc/worktrees.go",
+    "go/internal/gc/cycleseal.go",
+    "go/internal/gc/devleftovers.go",
+    "go/cmd/evolve/cmd_gc.go"
+  ],
+  "fix": "Add the registry and `evolve gc check [--json]` (report, no mutation). Port the worktree sweep as the first check. Change the landing target of mergedBranches and of the apply re-check (deleteBranch and deleteSquashed, go/internal/gc/worktrees.go:610-632) to the fetched origin/main, and delete refs with `update-ref -d <ref> <expected>` in place of `branch -d`. Move gateLeftovers out of the dev sweep (go/internal/gc/devleftovers.go:40) into a function that a cycle-tree check can call. An adapter keeps the current stage of the sweep.",
+  "id": "recycle-x1a-check-registry-worktrees",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "summary": "Plan PR #1585, decisions D4, D10, D11, components X1a. Each check is an adapter: Scan calls the existing Plan, the justification reads its Rule or Reason, and Apply calls the existing Apply. The sealed sweep judges landed against the hub HEAD (go/internal/gc/worktrees.go:267, :285), which can hold an unpushed integration merge.",
+  "title": "A gc check registry with `evolve gc check`, first for the worktree sweep, with the origin/main landing target",
+  "weight": 0.8
+}

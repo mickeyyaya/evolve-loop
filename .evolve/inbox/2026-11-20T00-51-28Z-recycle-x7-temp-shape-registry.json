@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Red first: the guard fails on an unregistered MkdirTemp pattern",
+    "Red first: a temp dir with a live socket stays",
+    "Red first: an evcodexhome dir past the horizon with no holder goes"
+  ],
+  "created_at": "2026-11-20T00:51:28Z",
+  "deps": [
+    "recycle-x8-test-tmux-socket-reap",
+    "recycle-x1d-check-registry-temp"
+  ],
+  "files": [
+    "go/internal/gc/tempdir.go"
+  ],
+  "fix": "One registry of temp shapes, owned by gc, replaces pipelineTempRe. A guard test fails when an os.MkdirTemp pattern of the repository has no registered shape. K8 runs after the socket reap and spares a temp dir with a live socket.",
+  "id": "recycle-x7-temp-shape-registry",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Plan PR #1585, check K8, component X7. On 2026-11-20 the temp dir held 131,402 entries older than 24 hours (evcodexhome, evghconfig, evcodeusage, buildfloor-cover and more). pipelineTempRe (go/internal/gc/tempdir.go:12) matches none. They leak when a test binary is killed (go/cmd/evolve/main_test.go:69, :78, :91-100).",
+  "title": "A temp shape registry replaces pipelineTempRe, and a guard checks each MkdirTemp pattern",
+  "weight": 0.7
+}
