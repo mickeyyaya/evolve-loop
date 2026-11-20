@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "TestLoopTick_MainCIRedOpensMainRedStopAndEmitsIncident (red before the change)",
+    "TestMainRedStop_CIOnlyRedNeedsNoLaneReproduction",
+    "TestShip_RefusesLandingWhileOriginMainCIRed",
+    "A green main closes the stop and the landings resume"
+  ],
+  "created_at": "2026-11-20T10:06:21Z",
+  "files": [
+    "go/cmd/evolve/cmd_loop_wavesync.go",
+    "go/internal/core/main_red_stop_open.go",
+    "go/internal/phases/ship/"
+  ],
+  "fix": "Poll the required CI of origin/main from the loop tick at a policy interval (reuse mainCIRedForSHA). On red: emit GATE_REPO_MAIN_CI_RED (INCIDENT) with the failed job names, and open the main-red stop without a lane reproduction. On green: close it. A ship precheck refuses a landing while the stop is open, with a typed cause.",
+  "id": "main-ci-red-is-polled-while-the-wave-runs",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "2026-11-20: main required CI went red at 02:11Z after cycle 2554; zero signals until the boundary, and three more landings (2555, 2550, 2549) went onto the red main. GATE_REPO_MAIN_RED_STOP opens only when a lane reproduces a red test itself (go/internal/core/main_red_stop_open.go:90). The only CI poll (go/cmd/evolve/cmd_loop_wavesync.go:33 mainCIRedForSHA) runs at the next wave start.",
+  "title": "a red main CI is invisible during a wave, so lanes keep landing on a red main",
+  "weight": 0.9
+}

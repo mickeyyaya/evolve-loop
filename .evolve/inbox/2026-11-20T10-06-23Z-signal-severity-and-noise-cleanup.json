@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "TestEventsDefaults_ErrorsChannelExcludesIsolationViolations",
+    "TestReadIsolation_OneEventPerLaunchWithTheCount",
+    "TestScopeDeltaSummary_CarveOnlyIsInfo",
+    "evolve signals codes check passes"
+  ],
+  "created_at": "2026-11-20T10:06:23Z",
+  "files": [
+    "go/internal/policy/policy_events.go",
+    "go/internal/bridge/read_isolation.go",
+    "go/internal/core/scope_delta_floor.go",
+    "go/internal/phasecontract/flow_decision.go"
+  ],
+  "fix": "Route kind isolation.violation out of the errors channel (it stays on its own channel); aggregate I5 reads per launch into one event (go/internal/bridge/read_isolation.go:283); ORCHESTRATOR_SCOPE_DELTA is WARN only when refuse > 0 (go/internal/core/scope_delta_floor.go:138-141); ORCHESTRATOR_PLAN_PHASE_GATED and RETAKE_GREEN are INFO; CONTEXT_FILL_HIGH clamps its percent. Each change keeps the code registry in sync.",
+  "id": "signal-severity-and-noise-cleanup",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "summary": "Signal review 2026-11-20: in wave 182 about 55% of the errors channel was not actionable (ISOLATION I5 229, I8 21, I4 17, ORCHESTRATOR_PLAN_PHASE_GATED 40, ORCHESTRATOR_SCOPE_DELTA, CONTEXT_FILL_HIGH with values over 100%); the month had 96k isolation.violation events. The errors route is severity >= WARN (go/internal/policy/policy_events.go:25).",
+  "title": "passes and shadow reports are logged as WARN, so the errors channel is mostly noise",
+  "weight": 0.6
+}

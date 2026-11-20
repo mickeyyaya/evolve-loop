@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "A unit test with an injected parent environment of 3 non-allowlisted variables at stage enforce gets exactly one INFO event that names all 3, and no WARN, red before the change",
+    "The same test at stage shadow gets one WARN per variable, as today",
+    "evolve signals codes check passes"
+  ],
+  "consumed": {
+    "at": "2026-11-20T19:12:55Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "already done on main (verified by the inbox review of 2026-11-20, adversarial pass): Enforce now emits one INFO ISOLATION_ENV_REFUSED per dispatch and keeps per-variable WARN only at shadow."
+  },
+  "created_at": "2026-11-19T17:00:52Z",
+  "deps": [],
+  "files": [
+    "go/internal/bridge/hermetic_env.go"
+  ],
+  "fix": "At stage enforce, emit one INFO event per dispatch (code ISOLATION_ENV_REFUSED or the I2 code at INFO) with the refused count and the sorted names in one field. Keep the per-variable WARN only at stage shadow, where the variable does reach the cell. Register the code in signalcenter and regenerate signal-codes.md.",
+  "id": "isolation-i2-refusal-is-not-a-violation",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "summary": "Wave 181 (cycles 2522-2542) emitted 2480 WARN ISOLATION_I2_VIOLATION signals, 61% of all its non-INFO signals. Each one is a launcher variable (CLAUDECODE, BRAVE_API_KEY, ANDROID_HOME, ...) that Deps.reportDroppedEnv (go/internal/bridge/hermetic_env.go:236) reports with action=refused at stage enforce. A refusal at enforce is the invariant working, not a breach: the cell never got the variable. EnvDrops.firstSeen dedupes only inside one process, so every evolve agent run and every phase dispatch repeats about 60 WARN events. A real I2 breach (a variable that reached a cell) is then one line in thousands.",
+  "title": "An env variable that the enforce stage refuses is emitted as a WARN violation, one per variable per dispatch, so 2480 WARNs hide the real ones",
+  "weight": 0.6
+}

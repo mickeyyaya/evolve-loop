@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "A test launches a seat whose write grant is refused, and the launch error names the write grant, not nesting; red before the fix.",
+    "A test with a probe that is not capable under a nested env still names nesting."
+  ],
+  "consumed": {
+    "at": "2026-11-20T19:12:55Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "already done on main (verified by the inbox review of 2026-11-20, adversarial pass): WrapOutcome typed result carries refusal cause; both acceptance tests exist"
+  },
+  "created_at": "2026-11-17T16:18:28Z",
+  "files": [
+    "go/internal/bridge/sandbox_wrap.go"
+  ],
+  "fix": "Carry the refusal reason of the wrap out of SandboxWrapper (a typed result instead of a bool), and make sandboxRequiredButUnavailable and the safety gate report that reason. Report nesting only when the probe was the cause.",
+  "id": "sandbox-refusal-names-nesting-when-the-write-grant-failed",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "summary": "On 2026-11-17 a console-builder seat run with --project-root equal to --worktree failed 4 times with launch exit=2. The final error and the launch-error file named 'nested LLM-CLI session: inner sandbox unavailable'. The real cause was one stderr line earlier: 'sandbox write grant unavailable: write grant {worktree_path} covers the run directories of other cycles'. defaultSandboxWrapWithProbe (go/internal/bridge/sandbox_wrap.go) returns false, and sandboxRequiredButUnavailable then asks ConfinementSatisfied, which reports nesting from the CLAUDECODE env, not the refusal that happened.",
+  "title": "A refused sandbox write grant ends a seat launch with the reason nested LLM-CLI session",
+  "weight": 0.6
+}

@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "A cycle that fails with a protected-path cause leaves its item console-routed, not ready (red before the change, through the failure outcome entry point)",
+    "route-lane refuses an item whose files[] directory contains a protected file and names that file",
+    "An item whose files[] lists only unprotected files keeps today's behavior"
+  ],
+  "created_at": "2026-11-20T12:16:34Z",
+  "files": [
+    "go/internal/inboxmover/outcome.go",
+    "go/internal/inboxbatch/consoleroute.go"
+  ],
+  "fix": "1) When a cycle's failure decision (or the build floor) names a protected fix surface, the failure outcome routes the item to the console (route console-manual with the protected path as the reason) instead of releasing it to ready. 2) Intake and route-lane expand a directory in files[] and refuse a lane route when any file under it is on the protected-surface manifest.",
+  "id": "lane-fail-on-a-protected-surface-routes-the-item-to-the-console",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "Cycle 2559 (2026-11-20) FAILED: its failure decision is intent-malformed because the fix needs go/internal/bridge/driver_tmux_submitverify_guard_test.go, a ProtectedSurfaceManifest path. The item bridge-test-engine-fakes-sandbox-fence went back to status ready with route lane, so another lane can claim it and fail again. Its files[] names the directory go/internal/bridge, which holds protected files; intake and route-lane checked only the listed path.",
+  "title": "a lane that fails because the fix needs a protected file leaves the item lane-ready, so the next lane fails the same way",
+  "weight": 0.7
+}

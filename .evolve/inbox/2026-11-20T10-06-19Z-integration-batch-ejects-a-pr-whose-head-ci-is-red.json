@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "TestTrainPlan_EjectsPRWhoseOwnCIIsRed: a PR with a red head CI is ejected with CauseHeadCI and no batch CI starts for it (red before the change)",
+    "TestTrainPlan_KeepsAPendingHeadOutWithoutEjecting",
+    "A batch of green heads plans exactly as before (existing train tests pass unchanged)"
+  ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2565",
+    "branch": "cycle-cd3ae73e-2565",
+    "snapshot_sha": "7e4899c749e2f1554d723e51706b2e9cf8dc46b4",
+    "base_sha": "aa909f8688805f68950c2d1be8eb02d7330842ce",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2565/audit-fail-reason.json",
+    "cycle": 2565
+  },
+  "created_at": "2026-11-20T10:06:19Z",
+  "files": [
+    "go/internal/integration/train.go",
+    "go/internal/integration/train_test.go",
+    "go/internal/integration/ghci.go"
+  ],
+  "fix": "After verifyHeads in Train.Plan, read each head's CI with the existing PeekCI.Watch reader. Eject a head whose CI is red or missing with a new typed cause CauseHeadCI before any compose or batch CI; keep a pending head out of this batch without ejecting it. The ejection brief names the failed required jobs.",
+  "id": "integration-batch-ejects-a-pr-whose-head-ci-is-red",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "performance",
+  "summary": "2026-11-20: PR #1582 had a red head CI, entered a 4-PR batch and forced a bisect (4 -> 2 -> 1, each a full CI run plus a rerun) that took about 3 h. Train.Plan (go/internal/integration/train.go:70) checks main's CI but never a PR head's CI; integration record-pr does not check it either.",
+  "title": "the boundary batch tests a PR whose own head CI is already red, so one bad PR costs a 3 h bisect",
+  "weight": 0.85
+}

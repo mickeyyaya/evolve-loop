@@ -15,6 +15,11 @@
   "kind": "bug",
   "origin": "console",
   "priority_class": "correctness",
+  "route": "console-manual",
+  "routed_at": "2026-11-20T19:13:22Z",
+  "routed_by": "operator",
+  "routed_cycle": 0,
+  "routed_reason": "blocker B1a (2026-11-20): the console built the fix in PR #1599 (disk guard: HOST_DISK_LOW, max_pause_s, tests never read the host disk); it lands in the boundary-183 batch",
   "summary": "In wave 182 cycles 2547, 2548, 2550 and 2551 failed ACS with 40 reds each. The ACS scope acs/regression/cycle1270 runs TestC1270_003, which runs TestLoop_MaxCyclesExit_ClearsCompletedMarker in cmd/evolve. That test calls runLoop, and dispatchSequentialCycle calls looppreflight.RunCycleStart with the production DiskGuard. The host had 2.6% free disk, under the 5% pause line, so RunCycleStart waited in 15 s steps for ever (goroutine dump: looppreflight.waitForInterval at cyclestart.go:51). The nested go test used the whole 10 min ACS Go lane budget, and every later scope was not run. The same test passes in 0.96 s after the console freed disk. The failure classifier said infra-systemic but did not name the disk.",
   "title": "Loop tests call the real disk guard, so a host under 5% free disk hangs them until the ACS Go lane budget expires",
   "weight": 0.85

@@ -2,7 +2,8 @@
   "acceptance": [
     "A design doc compares package, file and verb-family grains on the measured conflict record of waves 170-173.",
     "Red first: two items that touch different cmd/evolve verb files are admitted together; two that touch the same file are not.",
-    "Docs in STE; 100% coverage on each changed function; zero code comments."
+    "Docs in STE; 100% coverage on each changed function; zero code comments.",
+    "Branch cycle-cd3ae73e-2385 holds unmerged leaf-file-grain admission.go code, tests and docs; reuse or retire it, then evolve gc no longer flags cycle-cd3ae73e-2385"
   ],
   "created_at": "2026-11-14T07:40:34Z",
   "failure_count": 1,

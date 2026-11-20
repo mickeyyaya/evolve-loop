@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "TestPool_NoBackfillAfterSystemFailureHalt (red before the change)",
+    "TestIdleCause_SystemHaltIsNotOperatorStop",
+    "The wave ends when the last running cycle seals after a halt"
+  ],
+  "created_at": "2026-11-20T10:06:22Z",
+  "files": [
+    "go/internal/orchestrator/pool.go",
+    "go/internal/orchestrator/idle_cause.go",
+    "go/cmd/evolve/signal_loop.go"
+  ],
+  "fix": "A system-failure halt stops backfill at once, lets running cycles finish, emits LOOP_ORCH_HALT_DRAINING (INCIDENT) with the cause, and ends the wave when the pool is empty. The idle cause is system_halt, not operator_stop.",
+  "id": "system-halt-drains-the-pool",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Wave 182: after LOOP_SYSTEM_FAILURE_HALT at 23:26:22Z the pool backfilled lanes at 23:26:22Z and 23:36:28Z, then idled 3h38m with cause=operator_stop (go/internal/orchestrator/idle_cause.go:19-22,50-53; go/internal/orchestrator/pool.go:83) until the wave ended at 03:19Z.",
+  "title": "after a system-failure halt the pool still backfills lanes and idles for hours labelled operator_stop",
+  "weight": 0.8
+}

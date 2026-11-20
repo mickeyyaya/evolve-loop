@@ -1,0 +1,35 @@
+{
+  "acceptance": [
+    "A pool sized 12 under load per core above the high threshold stops backfill and keeps every running cycle (TestPoolRun_HighLoadPerCoreStopsBackfillButKeepsRunningCycles through Pool.Run)",
+    "Low pressure raises the cap one step per increase cooldown up to min(count, concurrency); a failed host read holds the cap and emits LOOP_HOST_PRESSURE_BLIND",
+    "Stage shadow computes and signals LOOP_ORCH_HOST_PRESSURE with applied=false and does not change the width",
+    "The starvation tracker and the underfill WARN take the host-capped width, so a pressure shrink files no starvation todo",
+    "Policy fleet.orchestrator.window.adaptive is strict-decoded and validated (low < high, 0 < decrease_factor < 1)"
+  ],
+  "created_at": "2026-11-20T09:35:51Z",
+  "files": [
+    "go/internal/hostpressure/",
+    "go/internal/orchestrator/window.go",
+    "go/internal/orchestrator/orchestrator.go",
+    "go/internal/orchestrator/idle_cause.go",
+    "go/internal/orchestrator/pool.go",
+    "go/internal/policy/fleet.go",
+    "go/internal/policy/fleet_orchestrator.go",
+    "go/cmd/evolve/cmd_loop_orchestrator.go",
+    "go/cmd/evolve/cmd_loop_window.go",
+    "go/cmd/hostsampler/"
+  ],
+  "fix": "New internal/hostpressure package (injected readers for darwin sysctl/vm_stat/swapusage and linux /proc/loadavg and /proc/meminfo; a failed read holds the cap) and a pure AIMD Decide with hysteresis and asymmetric cooldowns. Window.SetCeiling(cap, cause). A sampler goroutine in cmd/evolve next to startOversight applies the cap and nudges the intake. Policy fleet.orchestrator.window.adaptive {stage shadow|enforce, thresholds, step, decrease_factor, cooldowns, sample_s, smooth_samples}. Signals LOOP_ORCH_HOST_PRESSURE (INFO) and LOOP_HOST_PRESSURE_BLIND (WARN). Underfill WARN and the starvation tracker take the host cause. A shrink never touches a running cycle. Rollout: shadow one wave, set thresholds from the record, then enforce with fleet.count 12 and min_lanes 4.",
+  "id": "fleet-host-adaptive-window",
+  "intake_override": {
+    "reason": "operator 2026-11-20 asked the console to build 12 host-adaptive lanes now; the rollout edits .evolve/policy.json (PolicyGuarantee, operator side only)",
+    "console_route": true
+  },
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "performance",
+  "route": "console-manual",
+  "summary": "The operator asked (2026-11-20) for 12 lanes, sized live from the host CPU and memory. Today the orchestrator window (go/internal/orchestrator/window.go) grows on a clean landing and halves on a conflict; no host signal reaches it. Idle-with-console load is about 1.7 per core on 14 cores, and an earlier incident reached load 50-75 at 4 lanes.",
+  "title": "the fleet window ignores host CPU and memory, so it cannot run 12 lanes safely",
+  "weight": 0.8
+}

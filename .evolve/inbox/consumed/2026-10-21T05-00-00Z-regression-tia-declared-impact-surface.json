@@ -1,0 +1,32 @@
+{
+  "acceptance": [
+    "A plan and an ADR-0082 amendment compare at least three designs for non-Go file to test-package edges",
+    "A change to a declared non-Go path selects the predicate that declares it (red test first)",
+    "evolve acs tia-report over a soak shows would_skip greater than zero, and each miss is explained"
+  ],
+  "connects_to": [
+    ".evolve/inbox/2026-07-30T09-00-00Z-egps-regression-tia-selection.json"
+  ],
+  "consumed": {
+    "at": "2026-11-20T19:12:41Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "retired, not built: the inbox review of 2026-11-20 (boundary 183) dropped it: Operator rule 2026-11-15 retires the regression_tia stage (0 of 44 predicates pure), so designing impact surfaces for it is moot"
+  },
+  "created_at": "2026-10-21T05:00:00Z",
+  "files": [
+    "go/internal/regressiontia",
+    "go/internal/changedpkgs",
+    "go/acs/regression",
+    "docs/architecture/adr/0082-regression-test-impact-selection-shadow.md"
+  ],
+  "fix": "Design and build a declared impact surface: each go/acs/regression/\u003cpkg\u003e declares the files, directories and commands it observes (a manifest beside the predicates), and regressiontia.Select treats a change under a declared path as an edge. Write the design as a plan and an ADR-0082 amendment with at least three options, then build it with a test that a non-Go edit selects its predicate.",
+  "id": "regression-tia-declared-impact-surface",
+  "kind": "pipeline-integrity",
+  "priority_class": "performance",
+  "route": "console-manual",
+  "routed_reason": "design work on the EGPS gate input (ADR-0082); operator-approved shadow soak follow-up",
+  "summary": "ADR-0082 found that every regression predicate reads files or starts a process, so the import graph selects the whole corpus and the shadow reports would_skip=0. changedpkgs.FileToPackage also rejects non-.go paths, so config-dir and profile edits (the phasespec and profiles incident classes) map to no test package. The shadow soak that the operator approved on 2026-10-21 therefore cannot show a saving until predicates declare what they observe.",
+  "title": "Regression TIA cannot see non-Go edges: predicates need a declared impact surface before the shadow can skip anything",
+  "weight": 0.6
+}

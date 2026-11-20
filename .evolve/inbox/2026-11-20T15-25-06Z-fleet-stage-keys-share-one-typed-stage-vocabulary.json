@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "gateregistry TestNoStringTypedStageField passes with the 3 fleet string-typed-stage rows removed from testdata/stage_violations.json",
+    "No literal \"shadow\" or \"enforce\" stays in fleet_orchestrator.go, fleet_adaptive.go, orchestrator.go or cmd_loop_hostpressure.go",
+    "go test ./internal/policy/ ./internal/orchestrator/ ./internal/gateregistry/ ./cmd/evolve/ passes"
+  ],
+  "created_at": "2026-11-20T15:25:06Z",
+  "deps": [
+    "fleet-host-adaptive-window"
+  ],
+  "files": [
+    "go/internal/policy/fleet_adaptive.go",
+    "go/internal/policy/fleet_orchestrator.go",
+    "go/internal/orchestrator/orchestrator.go",
+    "go/cmd/evolve/cmd_loop_hostpressure.go",
+    "go/internal/gateregistry/testdata/stage_violations.json"
+  ],
+  "fix": "Keep one stage vocabulary for the fleet keys: one named type with its shadow and enforce constants in internal/policy, carried through OrchestratorConfig.Stage and AdaptiveConfig.Stage. orchestrator.StageShadow and StageEnforce become aliases of those constants or are removed. Type fleet.orchestrator.stage, fleet.integration.stage and fleet.budget.stage with the same type, and delete their string-typed-stage rows from stage_violations.json.",
+  "id": "fleet-stage-keys-share-one-typed-stage-vocabulary",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "summary": "PR #1598 (architecture review agent-architecture-reviewer-20261120T152202Z-15e9, MEDIUM) found that the stage spellings shadow and enforce have three homes: policy.AdaptiveStageShadow and AdaptiveStageEnforce (go/internal/policy/fleet_adaptive.go), orchestrator.StageShadow and StageEnforce (go/internal/orchestrator/orchestrator.go:13-14), and the bare literal \"enforce\" in FleetOrchestratorPolicy.validate (go/internal/policy/fleet_orchestrator.go:103). AdaptiveConfig.Stage is a string, and resolve() flattens the typed value with string(...). The sampler compares s.stage == orchestrator.StageEnforce (go/cmd/evolve/cmd_loop_hostpressure.go), so a rename in one home silently keeps the sampler in shadow. fleet.orchestrator.stage, fleet.integration.stage and fleet.budget.stage are still string-typed rows in go/internal/gateregistry/testdata/stage_violations.json.",
+  "title": "the fleet stage spellings live in three homes, so a renamed stage leaves the sampler silently in shadow",
+  "weight": 0.5
+}

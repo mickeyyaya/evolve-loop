@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "TestPackages_IncludesTheTestAuditRatchet",
+    "A landing with an error-text test and no baseline row is refused at ship",
+    "repocontract.Packages() includes internal/testaudit, internal/gateregistry and internal/sysexec, so a ship runs their whole-tree guards (PR CI of #1597, #1598 and #1601 failed on these three after green local runs on 2026-11-20)",
+    "The ship backstop runs apicover-enforce on the changed packages (PR CI of #1597 and #1599 failed on apicover on 2026-11-20)"
+  ],
+  "created_at": "2026-11-20T10:06:25Z",
+  "deps": [
+    "build-floor-runs-the-test-audit-ratchet"
+  ],
+  "files": [
+    "go/internal/repocontract/repocontract.go",
+    "go/internal/repocontract/repocontract_test.go"
+  ],
+  "fix": "Add ./internal/testaudit to repocontract.Packages so a landing runs TestTreeRatchet, as main CI does.",
+  "id": "ship-backstop-runs-the-test-audit-ratchet",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "repocontract.Packages() (go/internal/repocontract/repocontract.go:21) lists the whole-tree ratchets the ship gate runs; it holds rawgitratchet and sizeratchet but not internal/testaudit. The build floor now runs the scoped test-audit check (PR #1597); the ship backstop is the second line.",
+  "title": "the ship backstop runs rawgit and size ratchets but not the test-audit ratchet",
+  "weight": 0.6
+}

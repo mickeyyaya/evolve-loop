@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "TestSyncMain_CarriesAConsoleRouteEditThroughTheMerge (red before the change)",
+    "TestSyncMain_CarriesAConsoleConsumeMove",
+    "TestSyncMain_RemovesUntrackedCopiesIdenticalToOrigin and keeps a differing copy",
+    "A same-field conflict keeps origin and names the dropped console edit"
+  ],
+  "created_at": "2026-11-20T10:06:21Z",
+  "files": [
+    "go/cmd/evolve/cmd_syncmain.go",
+    "go/internal/inboxstamps/inboxstamps.go",
+    "go/internal/inboxstamps/fieldowner.go"
+  ],
+  "fix": "Let the stamp replay accept curated and operator-stamp fields (title, summary, fix, priority_class, weight, acceptance, files, deps, connects_to, route fields) and add a consume/withdraw move class, so sync-main carries console inbox edits through the merge with the existing replay; origin wins a same-field conflict and the console edit is reported. Untracked copies byte-identical to origin/main are removed by sync-main itself.",
+  "id": "sync-main-carries-console-inbox-edits",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "performance",
+  "summary": "2026-11-19 and 2026-11-20: console route-console, edit, consume and withdraw on tracked inbox files made sync-main refuse (go/cmd/evolve/cmd_syncmain.go:208), so wave next could not start until an inbox PR merged (about 1 h each boundary). The allow-list inboxstamps.Classify (go/internal/inboxstamps/inboxstamps.go:122, fieldowner.go:88) accepts only loop-stamp fields.",
+  "title": "sync-main refuses console inbox edits, so wave next waits for a separate inbox PR at every boundary",
+  "weight": 0.8
+}

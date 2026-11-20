@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "TestOffenderLines_ExitMinusOneNeverReportsOkLinesAsOffenders",
+    "TestGateFailed_KilledCauseCarriesElapsedAndDisk"
+  ],
+  "created_at": "2026-11-20T10:06:24Z",
+  "files": [
+    "go/internal/ciparitygate/offenders.go",
+    "go/internal/ciparitygate/vocabulary.go",
+    "go/internal/core/signal_cycle.go"
+  ],
+  "fix": "For a killed gate, the offender text names the kill (elapsed, budget, the last package started) and never lists ok lines; ORCHESTRATOR_SYSTEM_FAILURE with category infra-systemic carries free_disk_pct from the host probe.",
+  "id": "ciparity-failure-names-the-killed-gate-not-ok-lines",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "summary": "Wave 182: the first symptom of the disk-full hang was AUDIT_CIPARITY_GATE_FAILED whose reason listed passing 'ok' lines: go/internal/ciparitygate/offenders.go:30-60 falls back to the first 6 output lines when a gate is killed (exit=-1).",
+  "title": "a killed gate reports passing ok lines as its offenders, so the failure signal hides the cause",
+  "weight": 0.55
+}
