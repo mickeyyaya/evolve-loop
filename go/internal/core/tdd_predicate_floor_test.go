@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"strings"
@@ -141,7 +143,10 @@ func TestTddPredicateFloor_AnUnreadableRatchetWarnsAndLeavesTheCountToShip(t *te
 
 const tddFloorKitSource = `package acsassert
 
-import "testing"
+import (
+	"os/exec"
+	"testing"
+)
 
 var TestingForms = map[string]string{"ModuleDir": "GoModuleDir"}
 
@@ -151,12 +156,22 @@ func GoModuleDir(tb testing.TB) string { return "" }
 
 func RepoRoot(t *testing.T) string { return "" }
 
+func ExitedPID(t testing.TB) int {
+	t.Helper()
+	cmd := exec.Command("true")
+	if err := cmd.Run(); err != nil {
+		t.Fatal(err)
+	}
+	return cmd.ProcessState.Pid()
+}
+
 func OutputTail(output string, n int) string { return output }
 `
 
 const (
 	tddWrapRepoRoot = "package %s\n\nimport (\n\t\"path/filepath\"\n\t\"testing\"\n\n\t\"x/pkg/acsassert\"\n)\n\nfunc %s(t *testing.T) string {\n\tt.Helper()\n\treturn filepath.Join(acsassert.RepoRoot(t), \"go\")\n}\n"
 	tddWrapModule   = "package %s\n\nimport (\n\t\"testing\"\n\n\t\"x/pkg/acsassert\"\n)\n\nfunc %s(t *testing.T) string {\n\tt.Helper()\n\tdir, err := acsassert.ModuleDir(\".\")\n\tif err != nil {\n\t\tt.Fatal(err)\n\t}\n\treturn dir\n}\n"
+	tddWrapExited   = "package %s\n\nimport (\n\t\"os/exec\"\n\t\"testing\"\n)\n\nfunc %s(t *testing.T) int {\n\tt.Helper()\n\tcmd := exec.Command(\"true\")\n\tif err := cmd.Run(); err != nil {\n\t\tt.Fatal(err)\n\t}\n\treturn cmd.ProcessState.Pid()\n}\n"
 	tddWrapBoth     = "package %s\n\nimport (\n\t\"path/filepath\"\n\t\"testing\"\n\n\t\"x/pkg/acsassert\"\n)\n\nfunc %s(t *testing.T) string {\n\tt.Helper()\n\tdir, err := acsassert.ModuleDir(filepath.Join(acsassert.RepoRoot(t), \"go\"))\n\tif err != nil {\n\t\tt.Fatal(err)\n\t}\n\treturn dir\n}\n"
 )
 
@@ -198,6 +213,43 @@ func TestTddPredicateFloor_TheReasonNamesTheReplacementOfEachIncidentBody(t *tes
 				t.Errorf("Reason = %q, want %q and no \"the existing helper\": a helper of another cycle cannot be imported", res.Reason, tc.wantText)
 			}
 		})
+	}
+}
+
+func TestTddPredicateFloor_ACopyOfAnUnimportableHelperNamesTheKitHelperWithTheSameBody(t *testing.T) {
+	t.Parallel()
+	var stderr bytes.Buffer
+	wt := tddFloorKitWorktree(t, map[string]string{
+		"acs/cycle9/predicates_test.go": fmt.Sprintf(tddWrapExited, "cycle9", "finishedPID"),
+		"internal/a/a_test.go":          fmt.Sprintf(tddWrapExited, "a", "exitedPID"),
+	})
+
+	res := (tddPredicateFloor{}).Review(context.Background(), tddFloorInput(wt, &stderr))
+
+	if res.Approve {
+		t.Fatalf("Review = %+v, want reject", res)
+	}
+	if !strings.Contains(res.Reason, "cannot be imported: call acsassert.ExitedPID") {
+		t.Errorf("Reason = %q, want the kit helper with the same body named", res.Reason)
+	}
+	if strings.Contains(res.Reason, "define no helper") {
+		t.Errorf("Reason = %q: a kit helper exists, so the no-helper line is wrong", res.Reason)
+	}
+}
+
+func TestTddPredicateFloor_ACopyOfAnUnimportableHelperWithNoKitTwinSaysToDefineNoHelper(t *testing.T) {
+	t.Parallel()
+	var stderr bytes.Buffer
+	wt := tddFloorKitWorktree(t, map[string]string{
+		"acs/cycle9/predicates_test.go": fmt.Sprintf(tddFloorExistsHelper, "cycle9", "onDisk"),
+		"internal/a/a_test.go":          fmt.Sprintf(tddFloorExistsHelper, "a", "exists"),
+	})
+
+	res := (tddPredicateFloor{}).Review(context.Background(), tddFloorInput(wt, &stderr))
+
+	want := "cannot be imported: write the statements inside the test function and define no helper function, because a renamed helper is still a copy"
+	if res.Approve || !strings.Contains(res.Reason, want) {
+		t.Fatalf("Review = %+v, want reject with %q", res, want)
 	}
 }
 
@@ -254,14 +306,20 @@ func TestTddCopyRemedy_NamesNoFunctionWhenTheKitIsUnreadable(t *testing.T) {
 	writeFileAt(t, filepath.Join(broken, "pkg", "acsassert", "predicate_kit.go"), "package acsassert\n\nfunc broken( {\n")
 	writeFileAt(t, filepath.Join(broken, "pkg", "acsassert", "other.go"), "package acsassert\n\nvar TestingForms = map[string]string{\"ModuleDir\": \"GoModuleDir\"}\n")
 	writeFileAt(t, filepath.Join(good, "pkg", "acsassert", "kit_test.go"), "package acsassert\n\nfunc broken( {\n")
+	unreadable := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(unreadable, "pkg", "acsassert", "dir.go"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFileAt(t, filepath.Join(unreadable, "pkg", "acsassert", "other.go"), "package acsassert\n\nvar TestingForms = map[string]string{\"ModuleDir\": \"GoModuleDir\"}\n")
 	group := testdup.Group{Sites: []string{"acs/cycle9/p_test.go:m", "internal/a/a_test.go:m"}, Wraps: []string{"ModuleDir"}}
 
 	cases := map[string]struct {
 		dir  string
 		want string
 	}{
-		"missing package": {t.TempDir(), "inline it"},
-		"unparsable file": {broken, "inline it"},
+		"missing package": {t.TempDir(), "define no helper function, because a renamed helper is still a copy"},
+		"unreadable file": {unreadable, "define no helper function, because a renamed helper is still a copy"},
+		"unparsable file": {broken, "define no helper function, because a renamed helper is still a copy"},
 		"readable kit":    {good, "call acsassert.GoModuleDir"},
 	}
 	for name, tc := range cases {
@@ -276,11 +334,11 @@ func TestTddCopyRemedy_ACopyOfNoKitCallIsInlined(t *testing.T) {
 	kit := tddKit{forms: map[string]string{"ModuleDir": "GoModuleDir"}, testing: map[string]bool{"GoModuleDir": true, "RepoRoot": true}}
 	other := testdup.Group{Sites: []string{"acs/cycle9/p_test.go:m", "internal/a/a_test.go:m"}, Wraps: []string{"OutputTail", "RepoRoot"}}
 	none := testdup.Group{Sites: []string{"acs/cycle9/p_test.go:m", "internal/a/a_test.go:m"}}
-	if got := tddCopyRemedy(other, 9, kit); !strings.HasSuffix(got, "inline it") {
-		t.Errorf("remedy for a copy that wraps a kit call with no testing form = %q, want inline it", got)
+	if got := tddCopyRemedy(other, 9, kit); !strings.HasSuffix(got, "define no helper function, because a renamed helper is still a copy") {
+		t.Errorf("remedy for a copy that wraps a kit call with no testing form = %q, want the no-helper line", got)
 	}
-	if got := tddCopyRemedy(none, 9, kit); !strings.HasSuffix(got, "inline it") {
-		t.Errorf("remedy for a copy that wraps no kit call = %q, want inline it", got)
+	if got := tddCopyRemedy(none, 9, kit); !strings.HasSuffix(got, "define no helper function, because a renamed helper is still a copy") {
+		t.Errorf("remedy for a copy that wraps no kit call = %q, want the no-helper line", got)
 	}
 }
 
@@ -312,5 +370,50 @@ func TestLoadTddKit_TheRealKitNamesGoModuleDirForAModuleDirCopy(t *testing.T) {
 	}
 	if !kit.testing["GoModuleDir"] || !kit.testing["RepoRoot"] || kit.testing["FileExists"] {
 		t.Fatalf("testing forms of the real kit = %v, want GoModuleDir and RepoRoot and not the package TB form FileExists", kit.testing)
+	}
+}
+
+func TestLoadTddKit_TheRealKitNamesExitedPIDForACopyOfItsBody(t *testing.T) {
+	t.Parallel()
+	kit := loadTddKit(filepath.Join("..", ".."))
+	src := []byte(fmt.Sprintf(tddWrapExited, "cycle9", "finishedPID"))
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "fixture", src, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := testdup.NormalizedBodies(fset, file, src)["finishedPID"]
+	group := testdup.Group{Body: body, Sites: []string{"acs/cycle9/p_test.go:finishedPID", "internal/a/a_test.go:exitedPID"}}
+
+	if got := tddCopyRemedy(group, 9, kit); !strings.HasSuffix(got, "call acsassert.ExitedPID") {
+		t.Fatalf("remedy on the real kit = %q, want it to name acsassert.ExitedPID", got)
+	}
+}
+
+const tddKitUnnamedBodies = "package acsassert\n\nimport \"os\"\n\nfunc hidden(p string) bool {\n\t_, err := os.Stat(p)\n\treturn err == nil\n}\n\nfunc Plain(p string) bool {\n\t_, err := os.Lstat(p)\n\treturn err == nil\n}\n"
+
+func TestTddPredicateFloor_AKitFunctionThatTheCopyCannotCallIsNeverNamed(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		"unexported kit function":               fmt.Sprintf(tddFloorExistsHelper, "%s", "%s"),
+		"exported kit function with no testing": "package %s\n\nimport \"os\"\n\nfunc %s(p string) bool {\n\t_, err := os.Lstat(p)\n\treturn err == nil\n}\n",
+	}
+	for name, body := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var stderr bytes.Buffer
+			wt := tddFloorKitWorktree(t, map[string]string{
+				"pkg/acsassert/extra.go":        tddKitUnnamedBodies,
+				"acs/cycle9/predicates_test.go": fmt.Sprintf(body, "cycle9", "onDisk"),
+				"internal/a/a_test.go":          fmt.Sprintf(body, "a", "exists"),
+			})
+
+			res := (tddPredicateFloor{}).Review(context.Background(), tddFloorInput(wt, &stderr))
+
+			want := "cannot be imported: write the statements inside the test function and define no helper function, because a renamed helper is still a copy"
+			if res.Approve || !strings.Contains(res.Reason, want) || strings.Contains(res.Reason, "call acsassert.") {
+				t.Fatalf("Review = %+v, want reject with %q and no kit function named", res, want)
+			}
+		})
 	}
 }

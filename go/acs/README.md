@@ -156,12 +156,13 @@ subprocess path is the safety net the dual-root pattern keeps correct.
 
 ### Predicate kit — use the helper, never write a copy
 
-`go/pkg/acsassert` has five helpers that cycles copied 597 times. Call them.
+`go/pkg/acsassert` has six helpers that cycles copied 597 times. Call them.
 
 | Helper | Use |
 |---|---|
 | `ModuleDir` | Returns the nearest directory with a `go.mod` at or above a start path. |
 | `GoModuleDir` | Takes the `*testing.T` of a predicate and returns the module directory, or fails the test. Call it in place of a `moduleDir(t)` wrapper. |
+| `ExitedPID` | Takes the `*testing.T` of a predicate and returns the ID of a child process that has exited and was reaped. Call it in place of an `exitedPID(t)` helper. |
 | `OutputTail` | Returns the last N lines of a command output. |
 | `FuncCoverage` | Returns the coverage percentage of one function from `go tool cover -func` output. |
 | `WalkModule` | Lists the module files, as slash paths relative to the root, that a filter keeps. |

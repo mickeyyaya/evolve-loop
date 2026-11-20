@@ -1,6 +1,8 @@
 package testdup
 
 import (
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"slices"
@@ -574,5 +576,21 @@ func TestScan_ARepeatedBodyNamesTheKitFunctionsItWraps(t *testing.T) {
 	}
 	if got := byFirst["internal/c/c_test.go:plain"]; len(got) != 0 {
 		t.Errorf("plain helper Wraps = %q, want none", got)
+	}
+}
+
+func TestNormalizedBodies_KeysEachFunctionWithTwoStatementsByItsTokenBody(t *testing.T) {
+	t.Parallel()
+	src := []byte("package p\n\nfunc one() { a() }\n\nfunc two() {\n\ta()\n\tb()\n}\n\nfunc three() {\n\t\t\ta()\n\n\t\tb()\n\t}\n\nfunc decl()\n")
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "fixture", src, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bodies := NormalizedBodies(fset, file, src)
+
+	if len(bodies) != 2 || bodies["two"] == "" || bodies["two"] != bodies["three"] {
+		t.Fatalf("bodies = %v, want only two and three, with equal token bodies", bodies)
 	}
 }

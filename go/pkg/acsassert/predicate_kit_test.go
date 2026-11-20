@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -392,5 +393,46 @@ func TestPredicateKitTable_ListsEachExportedKitFunction(t *testing.T) {
 		if !strings.Contains(section, "| `"+name+"` |") {
 			t.Errorf("go/acs/README.md §Predicate kit table omits %s", name)
 		}
+	}
+}
+
+func TestExitedPID_ReturnsTheIDOfAProcessThatHasExited(t *testing.T) {
+	t.Parallel()
+	pid := ExitedPID(t)
+	if pid <= 0 || pid == os.Getpid() {
+		t.Fatalf("ExitedPID = %d, want the positive ID of a child other than this process", pid)
+	}
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := proc.Signal(syscall.Signal(0)); err == nil {
+		t.Fatalf("process %d still accepts signals, want an exited and reaped process", pid)
+	}
+}
+
+type exitingTB struct {
+	testing.TB
+	fatals []string
+}
+
+func (e *exitingTB) Helper() {}
+
+func (e *exitingTB) Fatal(args ...any) {
+	e.fatals = append(e.fatals, fmt.Sprint(args...))
+	runtime.Goexit()
+}
+
+func TestExitedPID_FailsTheTBWhenTheProgramCannotRun(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	fake := &exitingTB{}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		ExitedPID(fake)
+	}()
+	<-done
+	if len(fake.fatals) != 1 {
+		t.Fatalf("Fatal calls = %q, want one when the program is missing", fake.fatals)
 	}
 }
