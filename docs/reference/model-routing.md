@@ -10,8 +10,8 @@ Each profile in `.evolve/profiles/` names a default tier and an envelope (`model
 
 | Tier | `claude-tmux` | `agy-tmux` | `agy-claude-tmux` | `codex-tmux` |
 |---|---|---|---|---|
-| `fast` | haiku | Gemini 3.8 Flash (Low) | Claude Sonnet 5.5 (Low) | gpt-5.6-luna |
-| `balanced` | sonnet | Gemini 3.8 Flash (High) | Claude Sonnet 5.5 (Medium) | gpt-5.6-terra |
+| `fast` | haiku | Gemini 4 Hydrogen (Medium) | Claude Sonnet 5.5 (Low) | gpt-5.6-luna |
+| `balanced` | sonnet | Gemini 4 Hydrogen (High) | Claude Sonnet 5.5 (Medium) | gpt-5.6-terra |
 | `deep` | opus | Gemini 4 Argon (Medium) | Claude Opus 5.5 (Medium) | gpt-5.6-sol |
 | `top` | opus | Gemini 4 Argon (Medium) | Claude Opus 5.5 (Medium) | gpt-5.6-sol |
 
@@ -57,30 +57,31 @@ This section is the spec of record for what each tier is for and in which order 
 
 **The chain rule.** A chain walks from the pool with the most headroom to Claude Code. No chain puts two models of one quota pool next to each other. Claude Code goes last, because the floor seats can run nowhere else.
 
-| Tier | Use it when the phase… | Target chain | Model on each family |
+| Tier | Use it when the phase… | Chain | Model on each family |
 |---|---|---|---|
-| `fast` | does a mechanical transform that a later step checks. No profile uses it today. | `agy` → `agy-claude` → `claude` | Flash (Low); Sonnet 5.5 (Low); haiku |
-| `balanced` | reads and writes code or reports that a reviewer checks. | `agy` → `agy-claude` → `claude` | Flash (High); Sonnet 5.5 (Medium); sonnet |
-| `deep` | reasons about correctness, failure or design, without a floor seat at the same depth. | `agy-claude` → `agy` → `claude` | Opus 5.5 (Medium); Gemini 4 Argon (Medium); opus |
-| `top` | decides a dispute, or a decision that is expensive to undo. No profile uses it today. | `agy-claude` → `agy` → `claude` | Opus 5.5 (Medium); Gemini 4 Argon (Medium); opus |
+| `fast` | does a mechanical transform that a later step checks. No profile uses it today. | `claude` → `agy` → `agy-claude` | haiku; Gemini 4 Hydrogen (Medium); Sonnet 5.5 (Low) |
+| `balanced` | reads and writes code or reports that a reviewer checks. | `claude` → `agy` → `agy-claude` (`builder`: `agy` → `agy-claude` → `claude`) | sonnet; Gemini 4 Hydrogen (High); Sonnet 5.5 (Medium) |
+| `deep` | reasons about correctness, failure or design, without a floor seat at the same depth. | `claude` → `agy` → `agy-claude` | opus; Gemini 4 Argon (Medium); Opus 5.5 (Medium) |
+| `top` | decides a dispute, or a decision that is expensive to undo. No profile uses it today. | `agy-claude` → `claude` | Opus 5.5 (Medium); opus |
 | floor seats | review the work of another phase. | `claude` only | opus or sonnet, per profile |
 
-**How Argon stays at Medium.** agy has no effort flag; the effort is part of the model name. The live catalog picks a model for each tier and overrides the manifest. So a catalog tier pin in `.evolve/policy.json` holds `Gemini 4 Argon (Medium)` for agy `deep` and `top`:
+**How agy pins stay in place.** agy has no effort flag; the effort is part of the model name. The live catalog picks a model for each tier and overrides the manifest. A catalog tier pin in `.evolve/policy.json` holds `Gemini 4 Hydrogen (Medium)` for `fast` and `Gemini 4 Hydrogen (High)` for `balanced`, and the `agy-tmux` manifest sets `Gemini 4 Argon (Medium)` for `deep` and `top`:
 
 ```json
-"catalog": { "tier_pins": { "agy": { "deep": "Gemini 4 Argon (Medium)", "top": "Gemini 4 Argon (Medium)" } } }
+"catalog": { "tier_pins": { "agy": { "fast": "Gemini 4 Hydrogen (Medium)", "balanced": "Gemini 4 Hydrogen (High)" } } }
 ```
 
 The pin wins over the classifier, also for a cached catalog. A pin to a model that agy does not offer makes `evolve models refresh` fail; it does not fall back. Check the result with `evolve models list`.
 
-**State on 2026-10-17.** The table shows the target. `agy` is not yet in the `deep` and `top` chains. It returns there after the per-model bench fix (inbox `agy-model-429-benches-whole-family`). Until then, one Argon wall benches all of agy. Today agy-claude is also at 100% of its week, so `deep` and `top` run on Claude Code in effect.
+**Current state (2026-11-20).** Since 2026-10-21 ([ADR-0150](../architecture/adr/0150-the-deep-tier-gives-its-first-family-a-fixed-share-of-the-seats-and-paces-it-by-its-week-window.md)), `agy` is in the `deep` chain after `claude`. `cli_routing.tiers.deep` sets `share_pct` to 50. The first family (`claude`) takes half of the deep seats, paced by its week window. `top` walks `agy-claude`, then `claude`.
 
 ## The CLI routing table
 
 Since v22.27.0, one table in `.evolve/policy.json` (`cli_routing`) decides which CLI runs each dispatch ([ADR-0119](../architecture/adr/0119-one-routing-table-one-resolver.md)). The table of this repository has these rules:
 
-- A phase below the deep tier runs agy first, at the `balanced` tier (see the table above). Then it runs agy-owned Claude (`agy-claude`), then Claude Code. `evolve cli-routing explain <agent>` prints the chain and the model at the tier of the agent.
-- A phase at the deep or the top tier runs agy-owned Claude first, then Claude Code. Gemini 4 Argon, the successor of Gemini 3.1 Pro, is agy's deep model. It was in the chain on 2026-10-16 and is out again from 2026-10-17. A quota wall on Argon benched all of agy, Flash included (inbox `agy-model-429-benches-whole-family`).
+- A phase below the `deep` tier uses `default` (`claude`, then `agy`, then `agy-claude`). `builder` uses `agy`, then `agy-claude`, then `claude` at `balanced` on Gemini 4 Hydrogen (High). `console-builder` uses `claude`, then `agy-claude`, then `agy` at `balanced`. `evolve cli-routing explain <agent>` prints the chain and the model of an agent.
+- A phase at the `deep` tier walks `claude`, then `agy`, then `agy-claude`, with `share_pct` 50 ([ADR-0150](../architecture/adr/0150-the-deep-tier-gives-its-first-family-a-fixed-share-of-the-seats-and-paces-it-by-its-week-window.md)).
+- A phase at the `top` tier walks `agy-claude`, then `claude`.
 - The Claude-family floor agents (the auditor, the adversarial review, the tdd engineer, the code reviewer and the spec verifiers) run Claude Code only.
 - Codex runs only under `--bypass-policy`.
 - `agents.<agent>.model` is the base rung of the retry ladder ([retry-ladder](../architecture/retry-ladder.md)). The first try runs at that tier, and an advisor tier does not change it. A ladder rung raises the tier and the effort up to `max_tier` (default `deep`) and `max_effort` (default `high`). The ladder never reaches `top` or `xhigh` unless the rule names it.

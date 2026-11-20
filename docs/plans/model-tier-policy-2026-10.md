@@ -1,6 +1,7 @@
 # Plan: each model tier has one purpose, one chain across separate quota pools, and Gemini 4 Argon (Medium) for agy at deep and top
 
 - **Status:** accepted, 2026-10-17 (the operator approved it).
+- **Note (2026-11-20):** `cli_routing.default` is `claude, agy, agy-claude`. `agents.builder` is `agy, agy-claude, claude` at `balanced` on `Gemini 4 Hydrogen (High)`. `tiers.deep` is `claude, agy, agy-claude` with `share_pct` 50 ([ADR-0150](../architecture/adr/0150-the-deep-tier-gives-its-first-family-a-fixed-share-of-the-seats-and-paces-it-by-its-week-window.md)). `tiers.top` is `agy-claude, claude`.
 - **Research:** [model-tier-policy-2026-10](../research/model-tier-policy-2026-10.md). **Decision:** [ADR-0136](../architecture/adr/0136-each-model-tier-walks-separate-quota-pools-and-agy-runs-argon-medium-at-deep-and-top.md). **Spec of record:** [model-routing](../reference/model-routing.md), section "The tier policy". **Earlier work:** [cli-routing-table-2026-10](cli-routing-table-2026-10.md) and [ADR-0119](../architecture/adr/0119-one-routing-table-one-resolver.md). **Bridge rule:** every component that queries a CLI follows [bridge-factory-2026-10](bridge-factory-2026-10.md); its §8 names the layer of each component.
 
 ## Table of contents

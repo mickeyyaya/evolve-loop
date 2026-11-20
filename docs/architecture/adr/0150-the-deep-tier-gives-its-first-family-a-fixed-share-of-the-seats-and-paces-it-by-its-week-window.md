@@ -1,6 +1,7 @@
 # ADR-0150: the deep tier gives its first family a fixed share of the seats and paces it by its week window
 
 - **Status:** Accepted (2026-10-21).
+- **Amends:** [ADR-0136](0136-each-model-tier-walks-separate-quota-pools-and-agy-runs-argon-medium-at-deep-and-top.md): decision 4 moves to `claude`, then `agy`, then `agy-claude` at `deep` with `share_pct` 50, and `agy-claude`, then `claude` at `top`.
 - **Plan:** [deep-tier-share-2026-10](../../plans/deep-tier-share-2026-10.md). **Research:** [deep-tier-share-2026-10](../../research/deep-tier-share-2026-10.md). **Design:** [deep-tier-share](../deep-tier-share.md).
 - **Relates to:**
   - [ADR-0119](0119-one-routing-table-one-resolver.md): the share is data of the one routing table, and the resolver stays deterministic.

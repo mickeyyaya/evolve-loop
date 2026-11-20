@@ -1,6 +1,7 @@
 # ADR-0119 — One routing table, one resolver
 
 - **Status:** Accepted (operator, 2026-10-05: the design in [cli-routing-table-2026-10.md](../../plans/cli-routing-table-2026-10.md)). L1a built the resolver unwired (PR #770); L1b (2026-10-06) wires every launch path through it. The operator's own table lands in L2; the legacy keys are retired in L3.
+- **Note (2026-11-20):** Current `.evolve/policy.json` sets `default` to `claude, agy, agy-claude`, `agents.builder` to `agy, agy-claude, claude` (`Gemini 4 Hydrogen (High)`), `tiers.deep` to `claude, agy, agy-claude` (`share_pct` 50, [ADR-0150](0150-the-deep-tier-gives-its-first-family-a-fixed-share-of-the-seats-and-paces-it-by-its-week-window.md)), and `tiers.top` to `agy-claude, claude`.
 - **Amends:** [ADR-0029](0029-cli-fallback-chain-and-per-agent-overrides.md) (the per-agent chain is no longer each launcher's own `llmroute.Resolve` call) and [ADR-0104](0104-fallback-is-a-property-of-the-bridge-handle.md) §2–3 (the universal tail and its family ban are applied by the resolver, once, not by the discovery closure and each walker).
 - **Related:** the package notes [internal-cliroute.md](../packages/internal-cliroute.md); [internal-llmroute.md](../packages/internal-llmroute.md) (the plan primitives the resolver composes); [ADR-0104](0104-fallback-is-a-property-of-the-bridge-handle.md) (the walk stays a property of the bridge handle).
 

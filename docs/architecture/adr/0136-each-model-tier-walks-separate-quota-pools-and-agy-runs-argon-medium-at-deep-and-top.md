@@ -1,6 +1,7 @@
 # ADR-0136: Each model tier walks separate quota pools, and agy runs Gemini 4 Argon (Medium) at deep and top
 
 - **Status:** Accepted (2026-10-17, the operator approved the design set).
+- **Amended by:** [ADR-0150](0150-the-deep-tier-gives-its-first-family-a-fixed-share-of-the-seats-and-paces-it-by-its-week-window.md) (2026-10-21): `deep` walks `claude`, then `agy`, then `agy-claude` with `share_pct` 50; `top` walks `agy-claude`, then `claude`.
 - **Plan:** [model-tier-policy-2026-10](../../plans/model-tier-policy-2026-10.md). **Research:** [model-tier-policy-2026-10](../../research/model-tier-policy-2026-10.md). **Spec of record:** [model-routing](../../reference/model-routing.md), section "The tier policy".
 - **Relates to:**
   - [ADR-0119](0119-one-routing-table-one-resolver.md): one routing table decides every dispatch. This ADR sets the order inside that table. Decision 12 amends ADR-0119: `Resolve` then reads an injected usage-window source on each call.

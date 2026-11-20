@@ -6,6 +6,7 @@
 > - **Extends:** [model-discovery-and-catalog.md](../architecture/model-discovery-and-catalog.md).
 > - **Decision record:** ADR-0120, which lands with C2.
 > - **C3 status (2026-10-27):** the C3 stage flip that the operator approved landed: the checked-in policy sets `catalog.auto_refresh: true` and `catalog.refresh_stage: enforce`. Two C3 guards landed with it. The boot refresh and the `CONFIG_CATALOG_REFRESH_DEGRADED` Signal Center event landed later (cycle 2176). C2 is not built. Item: `model-currency-c3-adopt-only-live-picks`. See [C3 landing notes](#c3-landing-notes-2026-10-27).
+> - **Note (2026-11-20):** `agy-tmux` now uses `Gemini 4 Hydrogen (Medium)` at `fast`, `Gemini 4 Hydrogen (High)` at `balanced`, and `Gemini 4 Argon (Medium)` at `deep` and `top`. `cli_routing.default` is `claude, agy, agy-claude`, `agents.builder` is `agy, agy-claude, claude`, `tiers.deep` is `claude, agy, agy-claude` (`share_pct` 50), and `tiers.top` is `agy-claude, claude`.
 
 ## Context: why the loop ran Gemini 3.7 Flash while 3.8 was available
 

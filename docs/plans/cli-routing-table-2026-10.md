@@ -1,6 +1,8 @@
 # CLI routing table — design and landing plan (2026-10-05)
 
 > Status: approved by the operator 2026-10-05. L1 landed 2026-10-06; L2 built 2026-10-07 (see "L2 landing notes"); L3 open. Implementation tracked by ADR-0119. This file is the design record; the ADR states the decision.
+>
+> **Note (2026-11-20):** Current `.evolve/policy.json` sets `default` to `claude, agy, agy-claude`, `agents.builder` to `agy, agy-claude, claude` (`Gemini 4 Hydrogen (High)`), `tiers.deep` to `claude, agy, agy-claude` (`share_pct` 50), and `tiers.top` to `agy-claude, claude`.
 
 
 ## Context

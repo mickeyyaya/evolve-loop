@@ -1,6 +1,8 @@
 # Model tiers and quota pools: what each CLI offers, how its quota is counted, and how the loop uses it (research, 2026-10)
 
 > The plan that uses this research: [model-tier-policy-2026-10](../plans/model-tier-policy-2026-10.md). The design: [model-routing](../reference/model-routing.md), section "The tier policy". The decision record: [ADR-0136](../architecture/adr/0136-each-model-tier-walks-separate-quota-pools-and-agy-runs-argon-medium-at-deep-and-top.md).
+>
+> **Note (2026-11-20):** Current `policy.json` sets `default` to `claude, agy, agy-claude`, `agents.builder` to `agy, agy-claude, claude` (`Gemini 4 Hydrogen (High)`), `tiers.deep` to `claude, agy, agy-claude` (`share_pct` 50), and `tiers.top` to `agy-claude, claude`.
 
 Date: 2026-10-17. Method:
 

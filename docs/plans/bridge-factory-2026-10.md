@@ -1,6 +1,7 @@
 # Plan: every query and action on an LLM CLI goes through one bridge factory and the manifest data
 
 - **Status:** accepted, 2026-10-17 (the operator approved it).
+- **Note (2026-11-20):** `agy-tmux` maps `fast` to `Gemini 4 Hydrogen (Medium)`, `balanced` to `Gemini 4 Hydrogen (High)`, and `deep`/`top` to `Gemini 4 Argon (Medium)`. `cli_routing.default` is `claude, agy, agy-claude`, `agents.builder` is `agy, agy-claude, claude`, `tiers.deep` is `claude, agy, agy-claude` (`share_pct` 50), and `tiers.top` is `agy-claude, claude`.
 - **Research:** [bridge-factory-2026-10](../research/bridge-factory-2026-10.md). **Design:** [agent-bridge-factory](../architecture/agent-bridge-factory.md).
 - **Decision:** [ADR-0137](../architecture/adr/0137-one-bridge-factory-resolves-every-llm-cli-and-the-manifest-holds-its-facts.md). **Related plan:** [model-tier-policy-2026-10](model-tier-policy-2026-10.md), whose components Q1–Q5 depend on this plan. **Existing design:** [agent-bridge-dispatch-contract](../architecture/agent-bridge-dispatch-contract.md).
 
