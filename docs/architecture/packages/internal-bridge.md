@@ -586,6 +586,12 @@ The fallback has three axes: the CLI chain, the tier chain and the model inside 
 - **Single-shot cases.** A launch with a `SessionName` dispatches once. A named session keeps its REPL, so a new `--model` on a later try has no effect. An empty chain also dispatches `req.Model` once.
 - **The decision before `on`.** With the axis on, a deep seat on agy tries the other Gemini models before the table moves to agy-claude. Also, claude deep steps from opus to sonnet. The operator decides if that order is right.
 
+## The tmux tier and the floor build
+
+Each test file that reaches tmux carries `!notmux` in its build constraint, with `integration` where that tag is also needed. The build floor adds `notmux` to its cover run, so the compiler leaves the tier out and no tmux server starts (`tmuxtest.Main`, see [internal-tmuxtest.md](internal-tmuxtest.md)). `TestBridgeTests_EveryTmuxReachIsOutOfTheFloorBuild` holds the rule. It reads the tag from the env-exclusive entry of this package.
+
+The guard checks a closed marker table: `requireTmux`, `testhost.Tool` with `"tmux"`, `exec.LookPath` with `"tmux"`, `execTmux{}`, `itTmuxCtl`, `tmuxtest.StartServer`, `startOwnTmuxServer`, `ownTmuxServer` and `startContractServer`. Two uses are not markers: a `LookPath` call that only skips the test, and an `execTmux{}` that is only an interface conversion. `TestTmuxReachesAtTheFloor_FindsEveryMarkerAndSkipsTheExemptions` has one fixture for each marker and each exemption. The helpers that need no tmux are in `integration_helpers_test.go`. Thus the files without tmux build under `integration,notmux`.
+
 ## Invariants
 
 - **An LLM child gets the allowlist, its manifest and the pipeline markers, and no other launcher variable (I-2).** `TestN1_LauncherClaudeVariablesReachNoSeatAtEnforce` sets `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT` and `FOO_LEAK` on the parent and checks all eight manifests at `enforce`. `TestCellEnv_ShadowKeepsTodaysEnvAndReportsEachDroppedNameWithoutItsValue` pins the shadow stage, `TestTmuxBoot_AtEnforceThePaneIsBornWithTheCellEnvOnly` pins the pane, and `TestRealTmux_APollutedServerGivesThePaneOnlyItsEnvPairs` (integration) proves it on a polluted tmux server.

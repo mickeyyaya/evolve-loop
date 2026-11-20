@@ -24,7 +24,7 @@ func TestScopedCoverProfile_ASplitTestPackageKeepsTheCoverageOfThePackageItTests
 	t.Parallel()
 	module := coverSplitModule(t, "\tif p.F(1) != 1 {\n\t\tt.Fatal(\"F(1)\")\n\t}\n")
 
-	profile, out, status := scopedCoverProfile(context.Background(), ReviewInput{}, module, []string{"./p"}, []string{"integration"})
+	profile, out, status, _ := scopedCoverProfile(context.Background(), ReviewInput{}, module, []string{"./p"}, []string{"integration"})
 	defer func() { _ = os.RemoveAll(filepath.Dir(profile)) }()
 
 	if branch, hit := fCoverage(t, profile); status != coverStatusOK || !branch || !hit {
@@ -46,7 +46,7 @@ func TestScopedCoverProfile_EveryFaultOfASplitPassIsNamed(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			fakeGoOnPath(t, tc.script)
 			module := coverSplitModule(t, tc.splitBody)
-			profile, out, status := scopedCoverProfile(context.Background(), ReviewInput{}, module, []string{"./p"}, []string{"integration"})
+			profile, out, status, _ := scopedCoverProfile(context.Background(), ReviewInput{}, module, []string{"./p"}, []string{"integration"})
 			defer func() { _ = os.RemoveAll(filepath.Dir(profile)) }()
 			if status != tc.status || !strings.Contains(out, tc.want) {
 				t.Errorf("status %d out %q, want status %d naming %q", status, out, tc.status, tc.want)
@@ -59,11 +59,11 @@ func TestScopedCoverProfile_ABadSplitListOrNoPackageIsAPlumbingError(t *testing.
 	t.Parallel()
 	module := coverSplitModule(t, "")
 	writeFile(t, filepath.Join(module, ".cover-split"), "./p/ptest\n")
-	if profile, out, status := scopedCoverProfile(context.Background(), ReviewInput{}, module, []string{"./p"}, nil); status != coverStatusPlumbingError || profile != "" || !strings.Contains(out, ".cover-split") {
+	if profile, out, status, _ := scopedCoverProfile(context.Background(), ReviewInput{}, module, []string{"./p"}, nil); status != coverStatusPlumbingError || profile != "" || !strings.Contains(out, ".cover-split") {
 		t.Errorf("a bad split list: status %d profile %q out %q, want a plumbing error naming the list", status, profile, out)
 	}
 	empty := coverChangedModule(t, "")
-	profile, out, status := scopedCoverProfile(context.Background(), ReviewInput{}, empty, nil, nil)
+	profile, out, status, _ := scopedCoverProfile(context.Background(), ReviewInput{}, empty, nil, nil)
 	defer func() { _ = os.RemoveAll(filepath.Dir(profile)) }()
 	if status != coverStatusPlumbingError || !strings.Contains(out, "no coverage profile") {
 		t.Errorf("no package: status %d out %q, want a plumbing error", status, out)

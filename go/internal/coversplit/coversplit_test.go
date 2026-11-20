@@ -155,3 +155,14 @@ func TestMain_MergesTheNamedProfilesIntoOneFile(t *testing.T) {
 		}
 	}
 }
+
+func TestRunTagsOr_TheRunTagsWinOverTheFallbackOnlyWhenSet(t *testing.T) {
+	t.Parallel()
+	fallback := []string{"integration"}
+	if got := (Run{}).TagsOr(fallback); !reflect.DeepEqual(got, fallback) {
+		t.Fatalf("no run tags = %v, want the fallback", got)
+	}
+	if got := (Run{Tags: []string{"integration", "notmux"}}).TagsOr(fallback); !reflect.DeepEqual(got, []string{"integration", "notmux"}) {
+		t.Fatalf("run tags = %v", got)
+	}
+}

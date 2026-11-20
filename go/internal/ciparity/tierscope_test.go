@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/covchanged"
 	"github.com/mickeyyaya/evolve-loop/go/internal/testhost"
 )
 
@@ -143,5 +144,78 @@ func TestIntegrationTierScope_CoversCoreCmdShip_Cycle1594(t *testing.T) {
 	scoped, _, _ := TierScope(changed)
 	if strings.Join(scoped, " ") != strings.Join(changed, " ") {
 		t.Fatalf("CI-backstopped packages must not be skipped as env-exclusive (cycle-1594 class): got %v", scoped)
+	}
+}
+
+func TestEnvExclusiveTags_DeclareNotmuxForBridgeOnce(t *testing.T) {
+	t.Parallel()
+	if got := EnvExclusiveTags(); !slices.Equal(got, []string{"notmux"}) {
+		t.Errorf("EnvExclusiveTags = %v, want [notmux]", got)
+	}
+	if tag, ok := EnvExclusiveTagOf("./internal/bridge/..."); !ok || tag != "notmux" {
+		t.Errorf("EnvExclusiveTagOf(bridge) = %q, %v, want notmux, true", tag, ok)
+	}
+	if tag, ok := EnvExclusiveTagOf("internal/core"); ok || tag != "" {
+		t.Errorf("EnvExclusiveTagOf(core) = %q, %v, want no tag", tag, ok)
+	}
+}
+
+func TestExclusionTags_ListEachSharedTagOnce(t *testing.T) {
+	t.Parallel()
+	entries := []envExclusiveEntry{{pkg: "a", tag: "x"}, {pkg: "b", tag: "x"}, {pkg: "c", tag: "y"}, {pkg: "d"}}
+
+	if got := exclusionTags(entries); !slices.Equal(got, []string{"x", "y"}) {
+		t.Errorf("exclusionTags = %v, want [x y]", got)
+	}
+}
+
+func TestEnvExclusive_EntriesDeclareAnExclusionTag(t *testing.T) {
+	t.Parallel()
+	for _, e := range tierEnvExclusive {
+		if e.tag == "" {
+			t.Errorf("%s declares no exclusion tag; the floor cannot leave its tier out of the build", e.pkg)
+		}
+	}
+}
+
+func makeRecipe(makefile, target string) []string {
+	var recipe []string
+	in := false
+	for _, ln := range strings.Split(makefile, "\n") {
+		switch {
+		case strings.HasPrefix(ln, target+":"):
+			in = true
+		case in && strings.HasPrefix(ln, "\t"):
+			recipe = append(recipe, strings.TrimSpace(ln))
+		case in:
+			return recipe
+		}
+	}
+	return recipe
+}
+
+func TestEnvExclusive_TheNotmuxMakeTargetRunsTheBridgeTiersUnderTheFloorTags(t *testing.T) {
+	t.Parallel()
+	raw, err := os.ReadFile(filepath.Join("..", "..", "Makefile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tag, ok := EnvExclusiveTagOf("internal/bridge")
+	if !ok {
+		t.Fatal("internal/bridge names no exclusion tag")
+	}
+	wantTags := strings.Join(append(slices.Clone(covchanged.DefaultTags), tag), ",")
+	recipe := strings.Join(makeRecipe(string(raw), "test-notmux"), "\n")
+	if recipe == "" {
+		t.Fatal("go/Makefile has no test-notmux recipe")
+	}
+	fields := strings.Fields(recipe)
+	if i := slices.Index(fields, "-tags"); i < 0 || i+1 >= len(fields) || fields[i+1] != wantTags {
+		t.Errorf("test-notmux recipe %q does not run under -tags %s", recipe, wantTags)
+	}
+	for _, pkg := range []string{"./internal/bridge/", "./internal/tmuxtest/"} {
+		if !slices.Contains(fields, pkg) {
+			t.Errorf("test-notmux recipe %q does not name %s", recipe, pkg)
+		}
 	}
 }

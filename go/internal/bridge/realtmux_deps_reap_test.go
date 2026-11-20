@@ -5,6 +5,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
 )
@@ -15,7 +16,7 @@ func TestItDeps_APaneThatOutlivesKillSessionIsReapedOnlyThroughTheInjectedSender
 	var events []string
 	host := &hostTable{events: &events, tables: [][]proctree.Process{{hostProc(pane, 1, "")}}}
 	var stderr bytes.Buffer
-	deps := itDeps(0)
+	deps := Deps{Sleep: func(time.Duration) {}, Now: time.Now, SignalProcess: refuseTestSignal}.withDefaults()
 	deps.Tmux = &panePIDTmux{panePIDs: []int{pane}, events: &events}
 	deps.ListProcesses = host.list
 	deps.Stderr = &stderr

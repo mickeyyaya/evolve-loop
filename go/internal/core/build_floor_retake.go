@@ -46,8 +46,8 @@ func withoutEnvExclusive(pkgs []string, warn io.Writer) []string {
 
 func noteEnvExclusive(skipped []string, warn io.Writer) {
 	if len(skipped) > 0 {
-		fmt.Fprintf(warn, "[build-floor] NOTE: env-exclusive package(s) %s are not run at the floor under a live loop, as at the audit tier. Backstop: %s\n",
-			strings.Join(skipped, ", "), ciparity.EnvExclusiveBackstopNote(skipped))
+		fmt.Fprintf(warn, "[build-floor] NOTE: env-exclusive package(s) %s are not run by this lane under a live loop, as at the audit tier; the cover run measures them under -tags %s without their tmux tier. Backstop: %s\n",
+			strings.Join(skipped, ", "), strings.Join(ciparity.EnvExclusiveTags(), ","), ciparity.EnvExclusiveBackstopNote(skipped))
 	}
 }
 
@@ -181,9 +181,14 @@ func goTestFailureLines(output string) (lines, tests []string) {
 	return lines, baseattr.FailedTests(output)
 }
 
-func coverRetakeResult(first, out string, status int) (string, int) {
+type coverRed struct {
+	out  string
+	tags []string
+}
+
+func coverRetakeResult(first, retake coverRed, status int) (coverRed, int) {
 	if status == coverStatusPlumbingError {
-		return first + "\nretake: " + out, coverStatusTestsFailed
+		return coverRed{out: first.out + "\nretake: " + retake.out, tags: first.tags}, coverStatusTestsFailed
 	}
-	return out, status
+	return retake, status
 }
