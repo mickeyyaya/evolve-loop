@@ -1917,11 +1917,6 @@
     },
     {
       "package": "internal/policy",
-      "test": "TestRegressionTIAPolicy_TheBlockIsStrictDecoded",
-      "rule": "error-text-match"
-    },
-    {
-      "package": "internal/policy",
       "test": "TestResumeConfig_UnmarshalJSONRefusesAnUnknownKeyAndANonPositiveAge",
       "rule": "error-text-match"
     },

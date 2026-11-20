@@ -10,7 +10,6 @@ func TestShadowCodes_AreRegisteredUnderTheModuleThatEmitsThem(t *testing.T) {
 		module   Module
 	}{
 		{CodeAuditCascadeShadow, "AUDIT_CASCADE_SHADOW", ModuleAudit},
-		{CodeTIAShadow, "TIA_SHADOW", ModuleTIA},
 		{CodeParallelEvaluateShadow, "PARALLEL_EVALUATE_SHADOW", ModuleParallelEval},
 	} {
 		if string(tc.code) != tc.spelling {
