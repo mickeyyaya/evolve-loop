@@ -31,8 +31,10 @@ const (
 )
 
 var (
-	ErrBrokenChain = errors.New("broken chain")
-	ErrEmptyChain  = errors.New("empty chain")
+	ErrBrokenChain    = errors.New("broken chain")
+	ErrEmptyChain     = errors.New("empty chain")
+	ErrTrailingData   = errors.New("trailing data in policy JSON")
+	ErrMissingPackage = errors.New("missing package in closure")
 )
 
 type BrokenChainError struct {

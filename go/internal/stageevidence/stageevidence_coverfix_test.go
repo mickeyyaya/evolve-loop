@@ -6,7 +6,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gatecontract"
@@ -70,7 +69,7 @@ func TestDecisionVersion_EdgeAndErrorBranches(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(modDir, "go.mod"), []byte("module example.com/m\n\ngo 1.23\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := DecisionVersion(modDir, nil, []byte(`{"k":1} {"extra":2}`), "k"); err == nil || !strings.Contains(err.Error(), "trailing data") {
+	if _, err := DecisionVersion(modDir, nil, []byte(`{"k":1} {"extra":2}`), "k"); !errors.Is(err, ErrTrailingData) {
 		t.Fatalf("DecisionVersion with trailing JSON = %v, want trailing data error", err)
 	}
 	if v, err := DecisionVersion(modDir, []string{"", " ./ "}, []byte(`{"a":1}`), ""); err != nil || v == "" {
@@ -85,7 +84,7 @@ func TestHashListedPackages_ErrorBranches(t *testing.T) {
 	t.Parallel()
 
 	h := sha256.New()
-	if err := hashListedPackages(h, []string{"example.com/missing"}, map[string]listedPkg{}); err == nil || !strings.Contains(err.Error(), "missing package") {
+	if err := hashListedPackages(h, []string{"example.com/missing"}, map[string]listedPkg{}); !errors.Is(err, ErrMissingPackage) {
 		t.Fatalf("hashListedPackages missing package = %v", err)
 	}
 
