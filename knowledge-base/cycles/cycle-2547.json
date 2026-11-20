@@ -1,0 +1,206 @@
+{
+  "schema_version": 2,
+  "cycle": 2547,
+  "run_id": "01M7TWBYY0WQEW8KCNMGJQHVDP",
+  "goal": "Wave 182.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 181 facts (run 20261119T004314Z): 22 of 23 cycles shipped.\n- 3 older cycles are not shown.\n- Cycle 2525: final verdict PASS. It shipped.\n- Cycle 2526: final verdict PASS. It shipped.\n- Cycle 2527: final verdict PASS. It shipped.\n- Cycle 2528: final verdict PASS. It shipped.\n- Cycle 2529: final verdict PASS. It shipped.\n- Cycle 2530: final verdict PASS. It shipped.\n- Cycle 2531: final verdict PASS. It shipped.\n- Cycle 2532: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…nly greps source text proves nothing about behaviour; rewrite it to run the code before build dispatch. BLOCKING at enforce: 1 of the 1 finding(s), listed first. Last phase: aborted. It did not ship.\n- Cycle 2533: final verdict PASS. It shipped.\n- Cycle 2534: final verdict PASS. It shipped.\n- Cycle 2535: final verdict PASS. It shipped.\n- Cycle 2536: final verdict PASS. It shipped.\n- Cycle 2537: final verdict PASS. It shipped.\n- Cycle 2538: final verdict PASS. It shipped.\n- Cycle 2539: final verdict PASS. It shipped.\n- Cycle 2540: final verdict PASS. It shipped.\n- Cycle 2541: final verdict PASS. It shipped.\n- Cycle 2542: final verdict PASS. It shipped.\n- Cycle 2543: final verdict PASS. It shipped.\n- Cycle 2544: final verdict PASS. It shipped.\n- Pull requests merged at this boundary: none.\n\nOperator notes for wave 182:\n- Tests: check an error by errors.Is or errors.As, never by err.Error() text; a fakeclitest.Install call names its path at the call (filepath.Join(dir, \"tool\")), and the tool has a row in go/internal/testaudit/fakes.json. Run go test -count=1 ./internal/testaudit/ before handoff: the tree ratchet turned main red four times in wave 181.\n\nEarlier waves:\n- Wave 178 (run 20261117T101039Z): 10 of 11 cycles shipped.\n- Wave 179 (run 20261117T184146Z): 11 of 22 cycles shipped.\n- Wave 180 (run 20261118T052545Z): 21 of 32 cycles shipped.",
+  "final_verdict": "FAIL",
+  "tasks": [
+    "agy-docs-behind-the-code"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 42083,
+      "started_at": "2026-11-19T21:46:38Z",
+      "ended_at": "2026-11-19T21:47:22Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 10,
+        "output": 2904,
+        "cache_read": 251040,
+        "cache_write": 67334
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 33724,
+      "started_at": "2026-11-19T21:47:57Z",
+      "ended_at": "2026-11-19T21:48:33Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 8,
+        "output": 1211,
+        "cache_read": 273228,
+        "cache_write": 36822
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 234885,
+      "started_at": "2026-11-19T21:48:33Z",
+      "ended_at": "2026-11-19T21:52:31Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 60,
+        "output": 26090,
+        "cache_read": 3213582,
+        "cache_write": 92343
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 3060001,
+      "started_at": "2026-11-19T21:52:31Z",
+      "ended_at": "2026-11-19T23:07:37Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 885122,
+        "output": 73558,
+        "cache_read": 33234628,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "FAIL",
+      "duration_ms": 110294,
+      "started_at": "2026-11-19T23:07:58Z",
+      "ended_at": "2026-11-19T23:34:21Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 34,
+        "output": 9384,
+        "cache_read": 1547205,
+        "cache_write": 72402
+      }
+    },
+    {
+      "name": "retro",
+      "verdict": "PASS",
+      "duration_ms": 97185,
+      "started_at": "2026-11-19T23:34:49Z",
+      "ended_at": "2026-11-19T23:36:28Z",
+      "archetype": "control",
+      "model_source": "profile",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 24,
+        "output": 9386,
+        "cache_read": 863016,
+        "cache_write": 43018
+      }
+    }
+  ],
+  "defects": [
+    {
+      "id": "audit-fail",
+      "severity": "HIGH",
+      "summary": "cycle did not pass audit; see audit-report.md + acs-verdict.json",
+      "fix": "address the audit findings recorded for this cycle"
+    }
+  ],
+  "failure": {
+    "fingerprint": "audit|gate-block|dfd43ea29fbc",
+    "pre_class": "gate-block",
+    "reasons": [
+      "EGPS: red_count=40 [egps/go-lane-incomplete/github.com/mickeyyaya/evolve-loop/go/acs/regression/cycle1270/TestC1270_003_CmdEvolveNoLongerPaysTheRetryLadder egps/go-lane-scope-failed/acs/regression/cyc",
+      "acs-durable (-tags acs) FAILED 6 check(s) — CI acs-durable gate would FAIL (flag-registry / flag-ceiling / skills-drift). Offenders: ok github.com/mickeyyaya/evolve-loop/go/acs/regression/acsnames 1",
+      "verdict-conflict: auditor narrative=PASS but 2 deterministic gate(s) forced FAIL [EGPS red_count\u003e0, acs-durable gate] — the gate outranks the narrative (ship policy unchanged); both readings are rec"
+    ]
+  },
+  "system_failure": {
+    "category": "infra-systemic",
+    "level": "system",
+    "evidence": "orchestrator-classified infra-systemic: acs-verdict.json red_count=40, every red_id egps/go-lane-scope-failed or egps/go-lane-incomplete; acs-red-evidence says the shared 10m0s acs.go_timeout_s budget was spent before the scope started; abnormal-events.jsonl has 4 verify-single-flight-unavailable WARNs; audit-report.md PASS with 3/3 cycle predicates green; sibling cycles 2550 and 2551 carry the same fingerprint and reds",
+    "halt": true
+  },
+  "carryover": [
+    {
+      "id": "address-audit-findings",
+      "action": "resolve the audit findings that failed cycle 2547",
+      "priority": "high"
+    }
+  ],
+  "timing": {
+    "total_ms": 3578172,
+    "phase_count": 6,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 3060001,
+    "by_archetype_ms": {
+      "build": 3060001,
+      "control": 97185,
+      "evaluate": 110294,
+      "plan": 310692
+    },
+    "total_tokens": {
+      "input": 885258,
+      "output": 122533,
+      "cache_read": 39382699,
+      "cache_write": 311919
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 885122,
+        "output": 73558,
+        "cache_read": 33234628,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 24,
+        "output": 9386,
+        "cache_read": 863016,
+        "cache_write": 43018
+      },
+      "evaluate": {
+        "input": 34,
+        "output": 9384,
+        "cache_read": 1547205,
+        "cache_write": 72402
+      },
+      "plan": {
+        "input": 78,
+        "output": 30205,
+        "cache_read": 3737850,
+        "cache_write": 196499
+      }
+    },
+    "wasted_tokens": {
+      "input": 34,
+      "output": 9384,
+      "cache_read": 1547205,
+      "cache_write": 72402
+    },
+    "cache_hit_ratio": 0.9780158203705244,
+    "hot_phase_count": 6,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "tdd",
+      "build",
+      "audit",
+      "retro"
+    ]
+  },
+  "recalled_lessons": [
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "cycle-93-build-report-commit-sha-fabrication",
+    "cycle-1492-remedy-on-disk-in-four-places-reaches-no-agent-with-authority-to-apply-it",
+    "inst-L1549b",
+    "inst-L1565b"
+  ]
+}
