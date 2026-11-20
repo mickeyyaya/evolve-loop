@@ -73,6 +73,7 @@ type Deps struct {
 	Binaries              map[string]string
 	Tmux                  TmuxController
 	Sleep                 func(time.Duration)
+	SubmitResendSchedule  []time.Duration
 	LookPath              func(file string) (string, error)
 	Reviewer              StopReviewer
 	SandboxWrap           SandboxWrapper

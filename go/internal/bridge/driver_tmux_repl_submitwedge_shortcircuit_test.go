@@ -11,7 +11,8 @@ import (
 
 type permanentlyParkedPromptTmux struct {
 	*fakeTmux
-	pasted bool
+	pasted     bool
+	parkedText string
 }
 
 func (p *permanentlyParkedPromptTmux) PasteBuffer(ctx context.Context, session string) error {
@@ -25,7 +26,11 @@ func (p *permanentlyParkedPromptTmux) PasteBuffer(ctx context.Context, session s
 func (p *permanentlyParkedPromptTmux) CapturePane(ctx context.Context, session string, scrollback int) (string, error) {
 	pane, err := p.fakeTmux.CapturePane(ctx, session, scrollback)
 	if p.pasted {
-		return unsubmittedPane("write the artifact"), err
+		text := p.parkedText
+		if text == "" {
+			text = "write the artifact"
+		}
+		return unsubmittedPane(text), err
 	}
 	return pane, err
 }
@@ -41,7 +46,7 @@ func TestTmuxREPL_PromptSubmitWedged_ShortCircuitsSilenceBudget(t *testing.T) {
 	deps.Stderr = &stderr
 	artifactWaitPolls := 0
 	deps.Sleep = func(d time.Duration) {
-		if d == 2*time.Second {
+		if d == artifactWaitInterval && strings.Contains(stderr.String(), "STILL unsubmitted") {
 			artifactWaitPolls++
 		}
 	}
@@ -62,7 +67,45 @@ func TestTmuxREPL_PromptSubmitWedged_ShortCircuitsSilenceBudget(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), artifactTimeoutMarker+"cause=submit_wedged") ||
 		!strings.Contains(stderr.String(), "phase=build") ||
-		!strings.Contains(stderr.String(), fmt.Sprintf("reason=\"prompt submit_wedged (resends=%d)\"", submitVerifyMaxResends)) {
+		!strings.Contains(stderr.String(), fmt.Sprintf("reason=\"prompt submit_wedged (resends=%d)\"", len(defaultSubmitResendSchedule))) {
 		t.Fatalf("early timeout must preserve the classified submit_wedged cause in the artifact-timeout marker; stderr=%s", stderr.String())
+	}
+}
+
+func TestEngineLaunch_SubmitResendScheduleReachesVerifySubmitted(t *testing.T) {
+	t.Parallel()
+	fx := newFixture(t, "claude-tmux", "")
+	tm := &permanentlyParkedPromptTmux{
+		fakeTmux:   &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}},
+		parkedText: "[Pasted text #1 +10 lines]",
+	}
+	var stderr bytes.Buffer
+	var sleeps []time.Duration
+	eng := NewEngine(Deps{
+		Tmux:                 tm,
+		Stderr:               &stderr,
+		LookupEnv:            mapLookup(nil),
+		SubmitResendSchedule: []time.Duration{3 * time.Second, 7 * time.Second},
+		Sleep: func(d time.Duration) {
+			sleeps = append(sleeps, d)
+		},
+	})
+	var stdout bytes.Buffer
+	code := eng.LaunchArgs(context.Background(), fx.args("claude-tmux", "--allow-bypass", "--agent=build", "--cycle=2550"), nil, &stdout, &stderr)
+	if code != ExitArtifactTimeout {
+		t.Fatalf("exit = %d, want ExitArtifactTimeout; stderr=%s", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), `reason="prompt submit_wedged (resends=2)"`) {
+		t.Fatalf("stderr missing custom 2-resend wedge reason; stderr=%s", stderr.String())
+	}
+	var got []time.Duration
+	for _, d := range sleeps {
+		if d == 3*time.Second || d == 3*time.Second+500*time.Millisecond {
+			got = append(got, d)
+		}
+	}
+	want := []time.Duration{3 * time.Second, 3*time.Second + 500*time.Millisecond}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("custom schedule intervals = %v (all sleeps %v), want %v", got, sleeps, want)
 	}
 }

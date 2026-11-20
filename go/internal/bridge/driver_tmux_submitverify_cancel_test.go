@@ -32,15 +32,8 @@ func (c *cancelOnSendTmux) SendKeys(ctx context.Context, session, keys string, e
 	return c.fakeTmux.SendKeys(ctx, session, keys, enter)
 }
 
-func withBackoff(t *testing.T, steps [submitVerifyMaxResends]time.Duration) {
-	t.Helper()
-	saved := submitVerifyBackoff
-	submitVerifyBackoff = steps
-	t.Cleanup(func() { submitVerifyBackoff = saved })
-}
-
-func realClockDeps(tm TmuxController, stderr *bytes.Buffer) Deps {
-	return Deps{Tmux: tm, Stderr: stderr, LookupEnv: mapLookup(nil)}.withDefaults()
+func realClockDeps(tm TmuxController, stderr *bytes.Buffer, schedule []time.Duration) Deps {
+	return Deps{Tmux: tm, Stderr: stderr, LookupEnv: mapLookup(nil), SubmitResendSchedule: schedule}.withDefaults()
 }
 
 type verifyRun struct {
@@ -49,14 +42,14 @@ type verifyRun struct {
 	timeout bool
 }
 
-func runVerifyUntil(ctx context.Context, tm TmuxController, limit time.Duration) verifyRun {
+func runVerifyUntil(ctx context.Context, tm TmuxController, schedule []time.Duration, limit time.Duration) verifyRun {
 	var stderr bytes.Buffer
 	lp := tmuxLaunch{name: "claude-tmux", session: "s",
 		promptMarker: tmuxPromptMarkerDefault, inputLineMarker: tmuxPromptMarkerDefault}
 	done := make(chan verifyRun, 1)
 	start := time.Now()
 	go func() {
-		o := verifySubmitted(ctx, realClockDeps(tm, &stderr), lp, "[claude-tmux]", "nudge",
+		o := verifySubmitted(ctx, realClockDeps(tm, &stderr, schedule), lp, "[claude-tmux]", "nudge",
 			parkedPane(guardNudge), guardNudge)
 		done <- verifyRun{outcome: o, elapsed: time.Since(start)}
 	}()
@@ -69,8 +62,11 @@ func runVerifyUntil(ctx context.Context, tm TmuxController, limit time.Duration)
 }
 
 func TestVerifySubmitted_CancelDuringBackoffEndsTheWaitWithinOnePoll(t *testing.T) {
-	withBackoff(t, [submitVerifyMaxResends]time.Duration{
-		time.Millisecond, time.Millisecond, time.Millisecond, 10 * time.Second, time.Millisecond, time.Millisecond})
+	t.Parallel()
+	schedule := []time.Duration{
+		time.Millisecond, 2 * time.Millisecond, 3 * time.Millisecond, 4 * time.Millisecond,
+		10*time.Second + 4*time.Millisecond,
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	tm := &cancelOnSendTmux{
@@ -78,7 +74,7 @@ func TestVerifySubmitted_CancelDuringBackoffEndsTheWaitWithinOnePoll(t *testing.
 		cancel:   cancel, cancelAt: 4, cancelAfter: 50 * time.Millisecond,
 	}
 
-	got := runVerifyUntil(ctx, tm, artifactWaitInterval)
+	got := runVerifyUntil(ctx, tm, schedule, artifactWaitInterval)
 
 	if got.timeout {
 		t.Fatalf("verifySubmitted still waiting %v after the context was cancelled mid-backoff "+
@@ -91,8 +87,11 @@ func TestVerifySubmitted_CancelDuringBackoffEndsTheWaitWithinOnePoll(t *testing.
 }
 
 func TestVerifySubmitted_CancelDuringFourthBackoffStopsFurtherSendKeys(t *testing.T) {
-	withBackoff(t, [submitVerifyMaxResends]time.Duration{
-		time.Millisecond, time.Millisecond, time.Millisecond, 200 * time.Millisecond, time.Millisecond, time.Millisecond})
+	t.Parallel()
+	schedule := []time.Duration{
+		time.Millisecond, 2 * time.Millisecond, 3 * time.Millisecond, 4 * time.Millisecond,
+		204 * time.Millisecond,
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	tm := &cancelOnSendTmux{
@@ -100,7 +99,7 @@ func TestVerifySubmitted_CancelDuringFourthBackoffStopsFurtherSendKeys(t *testin
 		cancel:   cancel, cancelAt: 4, cancelAfter: 20 * time.Millisecond,
 	}
 
-	got := runVerifyUntil(ctx, tm, 5*time.Second)
+	got := runVerifyUntil(ctx, tm, schedule, 5*time.Second)
 
 	if got.timeout {
 		t.Fatalf("verifySubmitted did not return within %v", got.elapsed)
@@ -114,8 +113,11 @@ func TestVerifySubmitted_CancelDuringFourthBackoffStopsFurtherSendKeys(t *testin
 }
 
 func TestVerifySubmitted_CancelAlreadyPendingWhenTheWaitStartsSendsNothingMore(t *testing.T) {
-	withBackoff(t, [submitVerifyMaxResends]time.Duration{
-		time.Millisecond, time.Millisecond, time.Millisecond, time.Millisecond, time.Millisecond, time.Millisecond})
+	t.Parallel()
+	schedule := []time.Duration{
+		time.Millisecond, 2 * time.Millisecond, 3 * time.Millisecond, 4 * time.Millisecond,
+		5 * time.Millisecond,
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	tm := &cancelOnSendTmux{
@@ -123,7 +125,7 @@ func TestVerifySubmitted_CancelAlreadyPendingWhenTheWaitStartsSendsNothingMore(t
 		cancel:   cancel, cancelAt: 4,
 	}
 
-	got := runVerifyUntil(ctx, tm, 5*time.Second)
+	got := runVerifyUntil(ctx, tm, schedule, 5*time.Second)
 
 	if got.timeout {
 		t.Fatalf("verifySubmitted did not return within %v", got.elapsed)
@@ -202,10 +204,7 @@ func pollsUntilTimeout(t *testing.T, resends int) int {
 func TestNudgeSite_ResendWindowCountsInElapsedWaitTime(t *testing.T) {
 	t.Parallel()
 	const resends = 4
-	var window time.Duration
-	for _, d := range submitVerifyBackoff[:resends] {
-		window += d
-	}
+	window := defaultSubmitResendSchedule[resends-1]
 
 	baseline := pollsUntilTimeout(t, 0)
 	withResends := pollsUntilTimeout(t, resends)

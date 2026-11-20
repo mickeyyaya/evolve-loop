@@ -11,7 +11,6 @@ import (
 )
 
 const (
-	submitVerifyMaxResends   = 6
 	submitVerifyEchoRunes    = 40
 	submitVerifyMinEchoRunes = 8
 	submitVerifySettle       = 500 * time.Millisecond
@@ -75,6 +74,28 @@ func sleepUnlessCancelled(ctx context.Context, deps Deps, d time.Duration) bool 
 	}
 }
 
+func resendEnterAndCapture(ctx context.Context, deps Deps, lp tmuxLaunch, pfx, site string, resends, total int, waited time.Duration) (string, int, time.Duration, bool) {
+	fmt.Fprintf(deps.Stderr, "%s submit-verify: %s still parked at the `%s` input line — re-sending Enter (%d/%d)\n",
+		pfx, site, lp.inputLineMarker, resends+1, total)
+	if err := deps.Tmux.SendKeys(ctx, lp.session, "", true); err != nil {
+		fmt.Fprintf(deps.Stderr, "%s submit-verify: %s re-send %d/%d never reached tmux — the session is unreachable, not wedged: %v\n", pfx, site, resends+1, total, err)
+		return "", resends, waited, false
+	}
+	resends++
+	if !sleepUnlessCancelled(ctx, deps, submitVerifySettle) {
+		return "", resends, waited, false
+	}
+	waited += submitVerifySettle
+	next, err := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
+	if err != nil {
+		fmt.Fprintf(deps.Stderr, "%s submit-verify: %s capture failed after re-send %d/%d — "+
+			"stopping verification, input-line state unknown: %v\n",
+			pfx, site, resends, total, err)
+		return "", resends, waited, false
+	}
+	return next, resends, waited, true
+}
+
 func verifySubmitted(ctx context.Context, deps Deps, lp tmuxLaunch, pfx, site, pane string, echoes ...string) submitVerifyOutcome {
 	if lp.inputLineMarker == "" {
 		fmt.Fprintf(deps.Stderr, "%s submit-verify: %s NOT verified — %s declares no input-line marker, "+
@@ -86,37 +107,29 @@ func verifySubmitted(ctx context.Context, deps Deps, lp tmuxLaunch, pfx, site, p
 			"input-line state unknown\n", pfx, site)
 		return submitVerifyOutcome{Result: interaction.ResultNotVerified}
 	}
+	schedule := submitResendScheduleFor(deps)
 	resends := 0
 	var waited time.Duration
 	for pendingAtInputLine(pane, lp.inputLineMarker, echoes) {
 		if ctx.Err() != nil {
 			return submitVerifyOutcome{Resends: resends, Result: interaction.ResultNotVerified, Waited: waited}
 		}
-		if resends >= submitVerifyMaxResends {
+		if resends >= len(schedule) {
 			fmt.Fprintf(deps.Stderr, "%s submit-verify: %s STILL unsubmitted after %d re-send(s) — giving up; pane looks wedged\n",
 				pfx, site, resends)
 			return submitVerifyOutcome{Resends: resends, Result: interaction.ResultSubmitWedged, Waited: waited}
 		}
-		fmt.Fprintf(deps.Stderr, "%s submit-verify: %s still parked at the `%s` input line — re-sending Enter (%d/%d)\n",
-			pfx, site, lp.inputLineMarker, resends+1, submitVerifyMaxResends)
-		if err := deps.Tmux.SendKeys(ctx, lp.session, "", true); err != nil {
-			fmt.Fprintf(deps.Stderr, "%s submit-verify: %s re-send %d/%d never reached tmux — the session is unreachable, not wedged: %v\n", pfx, site, resends+1, submitVerifyMaxResends, err)
-			return submitVerifyOutcome{Resends: resends, Result: interaction.ResultNotVerified}
+		if delay := schedule[resends] - waited; delay > 0 {
+			if !sleepUnlessCancelled(ctx, deps, delay) {
+				return submitVerifyOutcome{Resends: resends, Result: interaction.ResultNotVerified, Waited: waited}
+			}
+			waited += delay
 		}
-		resends++
-		step := submitVerifyBackoff[resends-1]
-		if !sleepUnlessCancelled(ctx, deps, step) {
+		var ok bool
+		pane, resends, waited, ok = resendEnterAndCapture(ctx, deps, lp, pfx, site, resends, len(schedule), waited)
+		if !ok {
 			return submitVerifyOutcome{Resends: resends, Result: interaction.ResultNotVerified, Waited: waited}
 		}
-		waited += step
-		next, err := deps.Tmux.CapturePane(ctx, lp.session, lp.bootScrollback)
-		if err != nil {
-			fmt.Fprintf(deps.Stderr, "%s submit-verify: %s capture failed after re-send %d/%d — "+
-				"stopping verification, input-line state unknown: %v\n",
-				pfx, site, resends, submitVerifyMaxResends, err)
-			return submitVerifyOutcome{Resends: resends, Result: interaction.ResultNotVerified, Waited: waited}
-		}
-		pane = next
 	}
 	if resends > 0 {
 		return submitVerifyOutcome{Resends: resends, Result: interaction.ResultSubmittedAfterResend, Waited: waited}
@@ -162,4 +175,17 @@ func recordSubmitVerify(rec *interaction.Recorder, phase string, cycle int, site
 	})
 }
 
-var submitVerifyBackoff = [submitVerifyMaxResends]time.Duration{submitVerifySettle, 3 * submitVerifySettle, 5 * submitVerifySettle, 10 * submitVerifySettle, 20 * submitVerifySettle, 30 * submitVerifySettle}
+var defaultSubmitResendSchedule = []time.Duration{
+	2 * time.Second,
+	5 * time.Second,
+	10 * time.Second,
+	20 * time.Second,
+	30 * time.Second,
+}
+
+func submitResendScheduleFor(deps Deps) []time.Duration {
+	if len(deps.SubmitResendSchedule) > 0 {
+		return deps.SubmitResendSchedule
+	}
+	return defaultSubmitResendSchedule
+}

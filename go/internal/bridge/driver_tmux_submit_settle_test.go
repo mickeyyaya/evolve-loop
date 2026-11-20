@@ -101,35 +101,44 @@ func TestVerifySubmitted_BacksOffBetweenResends(t *testing.T) {
 	if out.Result != "submitted_after_resend" || out.Resends != 3 {
 		t.Fatalf("outcome = %+v", out)
 	}
-	if len(sleeps) != 3 {
-		t.Fatalf("one settle per re-send: %v", sleeps)
+	if len(sleeps) != 6 {
+		t.Fatalf("one backoff wait and one settle per re-send: %v", sleeps)
 	}
-	if sleeps[0] < submitVerifySettle || sleeps[1] <= sleeps[0] || sleeps[2] <= sleeps[1] || sleeps[0]+sleeps[1]+sleeps[2] < 4*time.Second {
-		t.Errorf("the settles back off (strictly increasing, ≥ 4 s in total): %v", sleeps)
+	for i := 1; i < len(sleeps); i += 2 {
+		if sleeps[i] != submitVerifySettle {
+			t.Errorf("post-Enter settle #%d = %v, want %v", i/2+1, sleeps[i], submitVerifySettle)
+		}
+	}
+	if sleeps[0] < submitVerifySettle || sleeps[2] <= sleeps[0] || sleeps[4] <= sleeps[2] || sleeps[0]+sleeps[2]+sleeps[4] < 4*time.Second {
+		t.Errorf("the backoff waits strictly increase and total >= 4 s: %v", sleeps)
 	}
 }
 
 func TestVerifySubmitted_OutwaitsALateEnterUnderBootLoad(t *testing.T) {
 	t.Parallel()
 	parked := parkedPane("[Pasted text #1 +291 lines]")
-	tm := &fakeTmux{paneSeq: []string{parked, parked, parked, parked, parked, "● working\n\n" + tmuxPromptMarkerDefault + " "}}
+	tm := &fakeTmux{paneSeq: []string{parked, parked, parked, parked, "● working\n\n" + tmuxPromptMarkerDefault + " "}}
 	var stderr bytes.Buffer
 	var sleeps []time.Duration
 	deps := recordingSleepDeps(tm, &stderr, &sleeps)
 	lp := tmuxLaunch{session: "s", name: "claude-tmux", inputLineMarker: tmuxPromptMarkerDefault}
 	out := verifySubmitted(context.Background(), deps, lp, "[t]", "prompt", parked, tmuxPastePlaceholderEcho)
-	if out.Result != interaction.ResultSubmittedAfterResend || out.Resends != 6 {
-		t.Fatalf("an Enter that lands only on the 6th re-send is a late submission, not a wedge: %+v\n%s", out, stderr.String())
+	wantResends := len(defaultSubmitResendSchedule)
+	if out.Result != interaction.ResultSubmittedAfterResend || out.Resends != wantResends {
+		t.Fatalf("an Enter that lands only on the %dth re-send is a late submission, not a wedge: %+v\n%s", wantResends, out, stderr.String())
 	}
 	var waited time.Duration
 	for i, d := range sleeps {
-		if i > 0 && d <= sleeps[i-1] {
-			t.Errorf("each re-send waits longer than the last: %v", sleeps)
+		if i%2 == 0 && i >= 2 && d < sleeps[i-2] {
+			t.Errorf("each re-send backoff waits at least as long as the last: %v", sleeps)
+		}
+		if i%2 == 1 && d < submitVerifySettle {
+			t.Errorf("each re-send settles at least %v before observation: %v", submitVerifySettle, sleeps)
 		}
 		waited += d
 	}
-	if len(sleeps) != 6 || waited < 30*time.Second {
-		t.Errorf("six re-sends wait at least 30 s in total under boot load, got %d sleeps, %v: %v", len(sleeps), waited, sleeps)
+	if len(sleeps) < 2*wantResends || waited < 30*time.Second+submitVerifySettle {
+		t.Errorf("%d re-sends wait at least 30 s plus one settle to observe the last Enter under boot load, got %d sleeps, %v: %v", wantResends, len(sleeps), waited, sleeps)
 	}
 }
 
@@ -171,11 +180,6 @@ func TestPasteTiming_NeverEqualsTheArtifactWaitInterval(t *testing.T) {
 	for size := 0; size <= 120_000; size += 100 {
 		if d := pasteSettleFor(size); d == artifactWaitInterval {
 			t.Fatalf("pasteSettleFor(%d) = %v == artifactWaitInterval", size, d)
-		}
-	}
-	for i, d := range submitVerifyBackoff {
-		if d == artifactWaitInterval {
-			t.Errorf("submitVerifyBackoff[%d] = %v == artifactWaitInterval", i, d)
 		}
 	}
 	if pasteStabilityPoll == artifactWaitInterval || pasteSettleMax == artifactWaitInterval {

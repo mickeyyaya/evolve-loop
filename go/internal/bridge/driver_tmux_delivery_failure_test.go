@@ -178,7 +178,7 @@ func TestTmuxREPL_ParkedPaneWithDeliveredArtifact_CompletesOK(t *testing.T) {
 	if rerr != nil {
 		t.Fatal(rerr)
 	}
-	tm := &parkedButDeliveringTmux{FakeTmuxController: base, artifact: cfg.Artifact,
+	tm := &parkedDeliveryTmux{FakeTmuxController: base, artifact: cfg.Artifact,
 		parkedText: firstNonEmptyLine(string(promptBody))}
 	deps := fixtureDeps(tm)
 	var stderr bytes.Buffer
@@ -197,21 +197,23 @@ func TestTmuxREPL_ParkedPaneWithDeliveredArtifact_CompletesOK(t *testing.T) {
 	}
 }
 
-type parkedButDeliveringTmux struct {
+type parkedDeliveryTmux struct {
 	*FakeTmuxController
 	artifact   string
 	parkedText string
 	pasted     bool
 }
 
-func (p *parkedButDeliveringTmux) PasteBuffer(ctx context.Context, session string) error {
+func (p *parkedDeliveryTmux) PasteBuffer(ctx context.Context, session string) error {
 	err := p.FakeTmuxController.PasteBuffer(ctx, session)
 	p.pasted = true
-	_ = os.WriteFile(p.artifact, []byte("delivered\n"), 0o644)
+	if p.artifact != "" {
+		_ = os.WriteFile(p.artifact, []byte("delivered\n"), 0o644)
+	}
 	return err
 }
 
-func (p *parkedButDeliveringTmux) CapturePane(ctx context.Context, session string, scrollback int) (string, error) {
+func (p *parkedDeliveryTmux) CapturePane(ctx context.Context, session string, scrollback int) (string, error) {
 	out, err := p.FakeTmuxController.CapturePane(ctx, session, scrollback)
 	if p.pasted {
 		return unsubmittedPane(p.parkedText), err
@@ -233,8 +235,8 @@ func TestTmuxREPL_ParkedPaneWithOnlyStaleArtifact_StillFastFails(t *testing.T) {
 	if rerr != nil {
 		t.Fatal(rerr)
 	}
-	base := &FakeTmuxController{CaptureFrames: append([]string{"❯"}, slices.Repeat([]string{"❯ parked"}, submitVerifyMaxResends+3)...)}
-	tm := &parkedNeverDeliveringTmux{FakeTmuxController: base, parkedText: firstNonEmptyLine(string(promptBody))}
+	base := &FakeTmuxController{CaptureFrames: append([]string{"❯"}, slices.Repeat([]string{"❯ parked"}, len(defaultSubmitResendSchedule)+3)...)}
+	tm := &parkedDeliveryTmux{FakeTmuxController: base, parkedText: firstNonEmptyLine(string(promptBody))}
 	deps := fixtureDeps(tm)
 	deps.CaptureBaseline = captureArtifactBaseline
 	var stderr bytes.Buffer
@@ -248,24 +250,4 @@ func TestTmuxREPL_ParkedPaneWithOnlyStaleArtifact_StillFastFails(t *testing.T) {
 		t.Fatalf("runTmuxREPL = (%d, %v), want (%d, nil) — a stale leftover must not defuse the wedged "+
 			"fast-fail; stderr=%s", code, err, ExitArtifactTimeout, stderr.String())
 	}
-}
-
-type parkedNeverDeliveringTmux struct {
-	*FakeTmuxController
-	parkedText string
-	pasted     bool
-}
-
-func (p *parkedNeverDeliveringTmux) PasteBuffer(ctx context.Context, session string) error {
-	err := p.FakeTmuxController.PasteBuffer(ctx, session)
-	p.pasted = true
-	return err
-}
-
-func (p *parkedNeverDeliveringTmux) CapturePane(ctx context.Context, session string, scrollback int) (string, error) {
-	out, err := p.FakeTmuxController.CapturePane(ctx, session, scrollback)
-	if p.pasted {
-		return unsubmittedPane(p.parkedText), err
-	}
-	return out, err
 }
