@@ -118,14 +118,17 @@ test-component: ## Component tier: several internal packages wired against temp 
 	$(GO) test -race -count=1 ./test/component/...
 
 TEST_TIMEOUT ?= 20m
+TEST_PARALLEL ?=
 INTEGRATION_SET ?=
 DARWIN_SET := .darwin-set
 DARWIN_TEST_TIMEOUT := 30m
+DARWIN_PARALLELISM := 3
 TEST_JSON ?=
 TEST_RUSAGE ?=
 RUSAGE_EXEC = $(if $(strip $(TEST_RUSAGE)),-exec $(abspath $(BIN_DIR))/testrusage,)
+PARALLEL_FLAG = $(if $(strip $(TEST_PARALLEL)),-p $(strip $(TEST_PARALLEL)),)
 BUILD_RUSAGE = if [ -n "$(TEST_RUSAGE)" ]; then $(GO) build -o $(BIN_DIR)/testrusage ./cmd/testrusage || exit $$?; fi
-INTEGRATION_TEST = $(GO) test $(RUSAGE_EXEC) -race -count=1 -timeout $(TEST_TIMEOUT) -tags integration
+INTEGRATION_TEST = $(GO) test $(RUSAGE_EXEC) $(PARALLEL_FLAG) -race -count=1 -timeout $(TEST_TIMEOUT) -tags integration
 
 test-integration: ## Full non-ACS runtime suite with integration, race, and coverage (shared by CI and release); coverage.txt exists only after a green run; TEST_TIMEOUT=20m bounds each package; TEST_JSON=<file> also writes the go test -json stream while the console keeps the plain text; TEST_RUSAGE=1 runs every test binary through bin/testrusage (appends to TESTRUSAGE_OUT); a test package split from the package it tests (go/.cover-split) runs beside the main run with -coverpkg, and its profile and -json stream join the main ones
 	@rm -f coverage.txt coverage.partial.txt coverage.run.*; \
@@ -177,6 +180,7 @@ test-integration: ## Full non-ACS runtime suite with integration, race, and cove
 test-integration-darwin: ## test-integration over the packages of go/.darwin-set only (the macOS CI job); fails when the set file is missing or names no package
 test-integration-darwin: INTEGRATION_SET = $(DARWIN_SET)
 test-integration-darwin: TEST_TIMEOUT = $(DARWIN_TEST_TIMEOUT)
+test-integration-darwin: TEST_PARALLEL = $(DARWIN_PARALLELISM)
 test-integration-darwin: test-integration
 
 print-test-timeout-darwin: ## Print the go test -timeout that test-integration-darwin applies (the macOS CI margin report reads it)

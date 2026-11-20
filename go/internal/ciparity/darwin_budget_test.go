@@ -13,7 +13,27 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 )
 
-const darwinTestTimeoutMinutes = 30
+const (
+	darwinTestTimeoutMinutes = 30
+	darwinParallelism        = 3
+)
+
+func captureGoTestArgs(t *testing.T, target string, vars ...string) string {
+	t.Helper()
+	root := probeFixture(t, false)
+	writeMakeFixture(t, root, DarwinSetFile, "./internal/probe\n")
+	argLog := filepath.Join(root, "go-test-args.txt")
+	wrapper := "#!/bin/sh\nif [ \"$1\" = test ]; then echo \"$*\" > '" + argLog + "'; fi\n" + makeGoBuildRedirect(t) + makeGoRunRedirect(t) + "exec go \"$@\"\n"
+	fakeclitest.Install(t, filepath.Join(root, "probe-go"), wrapper)
+	if out, err := runMakeFixture(t, root, target, vars...); err != nil {
+		t.Fatalf("%s: %v\n%s", target, err, out)
+	}
+	got, err := os.ReadFile(argLog)
+	if err != nil {
+		t.Fatalf("read go test args: %v", err)
+	}
+	return string(got)
+}
 
 func TestMakeIntegrationDarwin_GivesTheSlowerHostItsOwnTimeout(t *testing.T) {
 	t.Parallel()
@@ -37,6 +57,28 @@ func TestMakeIntegrationDarwin_GivesTheSlowerHostItsOwnTimeout(t *testing.T) {
 			got, err := os.ReadFile(argLog)
 			if err != nil || !strings.Contains(string(got), tc.want) {
 				t.Fatalf("go test arguments = %q, %v; want %q", got, err, tc.want)
+			}
+		})
+	}
+}
+
+func TestMakeIntegrationDarwin_FixesParallelismWithoutChangingTheFullSuite(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, target, want, forbid string
+		vars                       []string
+	}{
+		{"the macOS set", "test-integration-darwin", "-p " + strconv.Itoa(darwinParallelism) + " ", "", nil},
+		{"the full suite stays", "test-integration", "", "-p ", nil},
+		{"an override still wins", "test-integration-darwin", "-p 2 ", "", []string{"TEST_PARALLEL=2"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			args := captureGoTestArgs(t, tc.target, tc.vars...)
+			if tc.want != "" && !strings.Contains(args, tc.want) {
+				t.Fatalf("go test arguments = %q; want %q", args, tc.want)
+			}
+			if tc.forbid != "" && strings.Contains(args, tc.forbid) {
+				t.Fatalf("go test arguments = %q; must not contain %q", args, tc.forbid)
 			}
 		})
 	}

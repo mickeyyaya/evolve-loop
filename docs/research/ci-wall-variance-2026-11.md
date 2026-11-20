@@ -272,7 +272,7 @@ Each fix has a filed inbox item in the column Follow-up. The inbox item `ratchet
 |---|---|---|---|---|
 | R1 | Gate on N, not on wall (section 6.2). Keep the wall as a report and as the `TEST_TIMEOUT` cap. | All of ranks 1 and 2 from the verdict | F4.5, section 4.5 | `ratchet-speed-adjusted-cpu`, done in cycle 2360 |
 | R2 | Record the host class in `runner-samples.ndjson`: `hw.ncpu` and `hw.memsize` on macOS, `nproc` on Linux. Keep one baseline series for each OS and class. | Makes rank 1 visible in each report | F4.1, P4.3 | `ci-runner-host-class-recorded` |
-| R3 | Make the macOS schedule equal on both classes: run the darwin set with a fixed `-p 3`, or pin the job to the XLarge label. The XLarge label costs money. | Most of rank 1 in the wall report | F4.2 | `ci-macos-fixed-parallelism` |
+| R3 | Make the macOS schedule equal on both classes: run the darwin set with a fixed `-p 3`, or pin the job to the XLarge label. The XLarge label costs money. | Most of rank 1 in the wall report | F4.2 | `ci-macos-fixed-parallelism`, done in cycle 2548 |
 | R4 | In bridge unit tests, inject fakes for `SandboxReports` and `SandboxFence` in `newTestEngine` (`go/internal/bridge/launch_test.go:121`). Keep the real `log show` only in the sandbox integration tests. | Rank 5: up to 120 s in one test; fewer `log show` starts | F4.8 | `bridge-test-engine-fakes-sandbox-fence` |
 | R5 | Build `./cmd/evolve` once for each bridge test binary, for example with `sync.OnceValue`. Today three tests build it (`sandbox_contract_integration_test.go:278`, `:340`, `:630`). Each build puts the dispatch folder of its test into the binary with `-X …dispatchcred.root` (`:491-493`). Thus a shared build needs one shared dispatch root, or a root that the binary gets at run time. | A part of rank 4 in bridge | section 4.4 | `bridge-tests-build-evolve-once` |
 | R6 | In `cmd/evolve`, read the module once for each test binary and share the file list, the bytes and the ASTs. Today 23 test files walk or parse it again. | Rank 6 | section 4.4 | `cmd-evolve-tests-read-module-once` |
@@ -314,6 +314,13 @@ What changes this decision: a clean run on a new host class with N above 1.35× 
 - A PR that adds real work to a package raises its baseline in the same PR. The reviewers see the raise in the diff of `go/.test-latency.json`. A raise without that change fails by design.
 
 The committed file has no `cpu` value yet, because the artifacts of the runs were not available to the build. Thus the gate judges nothing until R10 seeds the baselines. Until then, the wall check against the `go test` timeout is the only hard fail.
+
+### 6.4 What cycle 2548 implemented
+
+- `test-integration-darwin` in `go/Makefile` sets `TEST_PARALLEL = $(DARWIN_PARALLELISM)` (`-p 3`), while `test-integration` keeps the host default.
+- An operator or CI override with `TEST_PARALLEL=<n>` still wins, and `.github/workflows/go.yml` keeps its `make test-integration-darwin` call.
+
+Cycle 2548 fixes `-p 3` for the darwin set so the 5-core host uses the 3-core package schedule. Two live CI runs are absent here, so no measured span exists yet for a 5-core host against a 3-core host. With `-p 3`, the span ratio cannot reach 1.0 and can exceed 1.3. Each binary still keeps `GOMAXPROCS` at the host CPU count, and the 5-core runner holds 14 GB of memory against 7 GB. Host CPU speed S also varies from 0.90 to 1.46 across runs (F4.4).
 
 ## 7. Limits
 
