@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -299,4 +300,51 @@ func TestApplyWorktrees_ATreeThatTurnsLiveDuringItsSalvageIsKept(t *testing.T) {
 	if n := e.git.callCount("worktree remove"); n != 0 {
 		t.Errorf("%d worktree removals ran for %s after it turned live mid-salvage", n, filepath.Base(wt))
 	}
+}
+
+func TestApplyWorktrees_SalvageRefusalsWrapErrTreeKept(t *testing.T) {
+	t.Run("failed salvage", func(t *testing.T) {
+		e := newWorktreesTestEnv(t)
+		e.addWorktree("cycle-cd3ae73e-1677", "cycle-cd3ae73e-1677", 48*time.Hour, true, false)
+		closeOutCycle(t, e.projectRoot, 1677, e.now.Add(-30*time.Hour))
+		writeFile(t, filepath.Join(e.evolveDir, "operator-salvage"), "a file where the salvage dir must go")
+		o := e.opts()
+		o.Policy.SalvageAfterHours = 24
+		m, err := PlanWorktrees(o)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = ApplyWorktrees(o, m)
+
+		if !errors.Is(err, ErrTreeKept) {
+			t.Errorf("err = %v, want it to wrap ErrTreeKept", err)
+		}
+		if !errors.Is(err, syscall.ENOTDIR) {
+			t.Errorf("err = %v, want it to wrap the salvage failure", err)
+		}
+	})
+	t.Run("turned live", func(t *testing.T) {
+		e := newWorktreesTestEnv(t)
+		e.addWorktree("cycle-cd3ae73e-1677", "cycle-cd3ae73e-1677", 48*time.Hour, true, false)
+		closeOutCycle(t, e.projectRoot, 1677, e.now.Add(-30*time.Hour))
+		o := e.opts()
+		o.Policy.SalvageAfterHours = 24
+		m, err := PlanWorktrees(o)
+		if err != nil {
+			t.Fatal(err)
+		}
+		o.Exec = func(ctx context.Context, name, dir string, args, env []string, in io.Reader, out, errw io.Writer) (int, error) {
+			if len(args) > 0 && args[0] == "ls-files" {
+				e.writeLease(1677, runlease.Lease{RunID: "cycle-1677"}, time.Minute)
+			}
+			return e.git.run(ctx, name, dir, args, env, in, out, errw)
+		}
+
+		err = ApplyWorktrees(o, m)
+
+		if !errors.Is(err, ErrTreeKept) {
+			t.Errorf("err = %v, want it to wrap ErrTreeKept", err)
+		}
+	})
 }
