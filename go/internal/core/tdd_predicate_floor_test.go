@@ -144,8 +144,10 @@ func TestTddPredicateFloor_AnUnreadableRatchetWarnsAndLeavesTheCountToShip(t *te
 const tddFloorKitSource = `package acsassert
 
 import (
-	"os/exec"
+	"context"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 var TestingForms = map[string]string{"ModuleDir": "GoModuleDir"}
@@ -158,7 +160,7 @@ func RepoRoot(t *testing.T) string { return "" }
 
 func ExitedPID(t testing.TB) int {
 	t.Helper()
-	cmd := exec.Command("true")
+	cmd := sysexec.Command(context.Background(), "true")
 	if err := cmd.Run(); err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +173,7 @@ func OutputTail(output string, n int) string { return output }
 const (
 	tddWrapRepoRoot = "package %s\n\nimport (\n\t\"path/filepath\"\n\t\"testing\"\n\n\t\"x/pkg/acsassert\"\n)\n\nfunc %s(t *testing.T) string {\n\tt.Helper()\n\treturn filepath.Join(acsassert.RepoRoot(t), \"go\")\n}\n"
 	tddWrapModule   = "package %s\n\nimport (\n\t\"testing\"\n\n\t\"x/pkg/acsassert\"\n)\n\nfunc %s(t *testing.T) string {\n\tt.Helper()\n\tdir, err := acsassert.ModuleDir(\".\")\n\tif err != nil {\n\t\tt.Fatal(err)\n\t}\n\treturn dir\n}\n"
-	tddWrapExited   = "package %s\n\nimport (\n\t\"os/exec\"\n\t\"testing\"\n)\n\nfunc %s(t *testing.T) int {\n\tt.Helper()\n\tcmd := exec.Command(\"true\")\n\tif err := cmd.Run(); err != nil {\n\t\tt.Fatal(err)\n\t}\n\treturn cmd.ProcessState.Pid()\n}\n"
+	tddWrapExited   = "package %s\n\nimport (\n\t\"context\"\n\t\"testing\"\n\n\t\"github.com/mickeyyaya/evolve-loop/go/internal/sysexec\"\n)\n\nfunc %s(t *testing.T) int {\n\tt.Helper()\n\tcmd := sysexec.Command(context.Background(), \"true\")\n\tif err := cmd.Run(); err != nil {\n\t\tt.Fatal(err)\n\t}\n\treturn cmd.ProcessState.Pid()\n}\n"
 	tddWrapBoth     = "package %s\n\nimport (\n\t\"path/filepath\"\n\t\"testing\"\n\n\t\"x/pkg/acsassert\"\n)\n\nfunc %s(t *testing.T) string {\n\tt.Helper()\n\tdir, err := acsassert.ModuleDir(filepath.Join(acsassert.RepoRoot(t), \"go\"))\n\tif err != nil {\n\t\tt.Fatal(err)\n\t}\n\treturn dir\n}\n"
 )
 
