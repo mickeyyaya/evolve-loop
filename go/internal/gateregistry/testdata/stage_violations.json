@@ -137,18 +137,6 @@
       "rule": "no-emit-site"
     },
     {
-      "key": "regression_tia.stage",
-      "rule": "string-typed-stage"
-    },
-    {
-      "key": "regression_tia.stage",
-      "rule": "no-would-fields"
-    },
-    {
-      "key": "regression_tia.stage",
-      "rule": "no-emit-site"
-    },
-    {
       "key": "catalog.refresh_stage",
       "rule": "string-typed-stage"
     },

@@ -18,7 +18,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditchain"
-	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -27,9 +26,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
-	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
-	"github.com/mickeyyaya/evolve-loop/go/internal/regressiontia"
 	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -313,7 +310,7 @@ func NewDefaultWithStageCompactSpec(br core.Bridge, prm *prompts.Loader, stage c
 		PhaseIO:                stage,
 		CompactPrompts:         compact,
 	}
-	cfg.GenerateVerdict = func(req core.PhaseRequest) error { return generateACSVerdictWith(req, cfg.Signals) }
+	cfg.GenerateVerdict = func(req core.PhaseRequest) error { return generateACSVerdictWith(req) }
 	for _, o := range opts {
 		o(&cfg)
 	}
@@ -362,12 +359,11 @@ func gofmtCheckDefault(req core.PhaseRequest) ([]string, error) {
 	return codequality.UnformattedGoFiles(codequality.ModuleDir(root))
 }
 
-func generateACSVerdictWith(req core.PhaseRequest, sig shadowEmitter) error {
+func generateACSVerdictWith(req core.PhaseRequest) error {
 	root := req.Worktree
 	if root == "" {
 		root = req.ProjectRoot
 	}
-	_ = emitTIADecision(req, root, sig)
 	v, err := acssuite.Run(acssuite.Options{Root: root, ProjectRoot: req.ProjectRoot, Cycle: req.Cycle})
 	if err != nil {
 		return fmt.Errorf("acssuite run: %w", err)
@@ -377,26 +373,6 @@ func generateACSVerdictWith(req core.PhaseRequest, sig shadowEmitter) error {
 		return fmt.Errorf("write verdict: %w", err)
 	}
 	return nil
-}
-
-var tiaCompute = regressiontia.Compute
-
-func emitTIADecision(req core.PhaseRequest, root string, sig shadowEmitter) error {
-	stage := policy.RegressionTIAStageFor(req.ProjectRoot)
-	if stage == "off" {
-		return nil
-	}
-	changed, derivable := changedpkgs.FromGitChecked(root, "HEAD")
-	if !derivable {
-		changed = nil
-	}
-	d := tiaCompute(stage, root, codequality.ModuleDir(root), changed)
-	if d.Stage == "" {
-		return nil
-	}
-	_, err := regressiontia.Emit(req.Workspace, d)
-	sig.emit(tiaShadowEvent(req, d, err))
-	return err
 }
 
 func verdictConflictMessage(narrative string, overrodeBy []string) string {
