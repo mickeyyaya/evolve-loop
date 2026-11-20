@@ -72,11 +72,15 @@ func TestRun_DurationBoundedRunWritesSamples(t *testing.T) {
 func TestRun_StopSignalEndsRunAndClosesFile(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "s.ndjson")
 	stop := make(chan os.Signal, 1)
-	go func() {
-		time.Sleep(80 * time.Millisecond)
-		stop <- syscall.SIGTERM
-	}()
-	if code := run([]string{"-out", out, "-interval", "10ms"}, io.Discard, fakeReader(), stop); code != 0 {
+	var n atomic.Int64
+	stopAfterThirdRead := func() (Counters, error) {
+		i := n.Add(1)
+		if i == 3 {
+			stop <- syscall.SIGTERM
+		}
+		return Counters{At: time.Unix(i, 0), HasCPU: true, CPUBusy: uint64(i) * 10, CPUTotal: uint64(i) * 20, HasMem: true, MemUsedMB: 1}, nil
+	}
+	if code := run([]string{"-out", out, "-interval", "10ms"}, io.Discard, stopAfterThirdRead, stop); code != 0 {
 		t.Fatalf("code=%d", code)
 	}
 	if len(readSamples(t, out)) == 0 {
