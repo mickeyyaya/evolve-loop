@@ -100,16 +100,20 @@ func stubCoverChangedProfiler(t *testing.T, profile, output string, status int) 
 	t.Helper()
 	var calls []profilerCall
 	orig := coverChangedProfiler
-	coverChangedProfiler = func(_ context.Context, _ ReviewInput, moduleDir string, pkgs, tags []string) (string, string, int) {
+	coverChangedProfiler = func(_ context.Context, _ ReviewInput, moduleDir string, pkgs, tags []string) (string, string, int, []string) {
 		calls = append(calls, profilerCall{moduleDir, pkgs, tags})
 		if status == coverStatusPlumbingError {
-			return "", output, status
+			return "", output, status, nil
+		}
+		var failed []string
+		if status == coverStatusTestsFailed {
+			failed = covchanged.DefaultTags
 		}
 		path := filepath.Join(t.TempDir(), "cover.out")
 		if err := os.WriteFile(path, []byte(profile), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		return path, output, status
+		return path, output, status, failed
 	}
 	t.Cleanup(func() { coverChangedProfiler = orig })
 	return &calls

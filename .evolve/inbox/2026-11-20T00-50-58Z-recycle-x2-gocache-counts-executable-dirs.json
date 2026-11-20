@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "Red first: a fixture cache with an executable dir unused past the horizon is trimmed, and its bytes count in the cap",
+    "Red first: a dir with a mapped file in the injected holder snapshot stays",
+    "The report bytes match the sum of the trimmed entries"
+  ],
+  "created_at": "2026-11-20T00:50:58Z",
+  "deps": [],
+  "files": [
+    "go/internal/gc/gocache.go",
+    "go/cmd/evolve/cmd_gc.go"
+  ],
+  "fix": "Treat each `<hash>-d` dir as one entry: its size is the sum of its files, and its use time is the newest mtime inside it. Count it in the cap and the age horizon. Spare a dir that holds a file open or mapped in the LiveHolderProbe snapshot (lsof -F n lists txt and mem fds). Re-check the mtime before each remove.",
+  "id": "recycle-x2-gocache-counts-executable-dirs",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Plan PR #1585, check K7, decision D12, component X2. TrimGoCache skips each directory entry (go/internal/gc/gocache.go:88). On 2026-11-20, 5,038 `<hash>-d` dirs held 35.9 GB (35.8 GB cached evolve binaries), 30.2 GB unused for 24 hours, while gc reported 20 GB remaining.",
+  "title": "The Go cache trim counts and trims the cached executable dirs, and spares a held one",
+  "weight": 0.9
+}

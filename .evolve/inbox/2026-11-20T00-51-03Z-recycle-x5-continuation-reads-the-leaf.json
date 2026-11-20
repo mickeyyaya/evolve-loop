@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Red first: an adoption after the release gets the findings of the failed audit, not none",
+    "Red first: a resume after the release rebuilds the branch from the leaf"
+  ],
+  "created_at": "2026-11-20T00:51:03Z",
+  "deps": [
+    "recycle-x3-archive-leaf-writer"
+  ],
+  "files": [
+    "go/internal/core/continuation_stamp.go",
+    "go/internal/core/resume_execution.go"
+  ],
+  "fix": "When the branch or the run dir is gone, the continuation and the resume restore the manifest, the findings and the branch from the leaf.",
+  "id": "recycle-x5-continuation-reads-the-leaf",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "Plan PR #1585, component X5, finding H1. The continuation writes continuation-manifest.json into the run dir and points FindingsPath at audit-fail-reason.json there (go/internal/core/continuation_stamp.go:70-78); adoption reads the findings from there (:174-177). go/internal/core/resume_execution.go is protected (integrity_surface.go:128).",
+  "title": "The continuation and the resume read the archive leaf when the branch or the run dir is gone",
+  "weight": 0.8
+}

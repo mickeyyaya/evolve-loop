@@ -65,7 +65,7 @@ func TestRun_ZeroPredicatesFailsWithTheReasonInsteadOfAMissingFile(t *testing.T)
 	phase := New(Config{
 		Bridge:          &fakeBridge{writeArtifact: "# Audit Report\n\n## Verdict\n**PASS**\n"},
 		Prompts:         fakePromptsFS("body"),
-		GenerateVerdict: func(req core.PhaseRequest) error { return generateACSVerdictWith(req, nil) },
+		GenerateVerdict: func(req core.PhaseRequest) error { return generateACSVerdictWith(req) },
 	})
 	resp, err := phase.Run(context.Background(), core.PhaseRequest{Cycle: 9, ProjectRoot: root, Worktree: root, Workspace: ws})
 	if err != nil {

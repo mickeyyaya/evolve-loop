@@ -1,4 +1,4 @@
-//go:build integration && darwin
+//go:build integration && darwin && !notmux
 
 package bridge
 

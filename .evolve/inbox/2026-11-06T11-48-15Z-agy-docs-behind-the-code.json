@@ -3,6 +3,14 @@
     "The document and the code state one fact.",
     "A test is red without the fix."
   ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2547",
+    "branch": "cycle-cd3ae73e-2547",
+    "snapshot_sha": "6e7e215349f6af4e594c31a1b07026d0a46b35a4",
+    "base_sha": "f25d49e4ae89c9d1c528d1c4fbc1687743635999",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2547/audit-fail-reason.json",
+    "cycle": 2547
+  },
   "created_at": "2026-11-06T11:48:15Z",
   "files": [
     "docs/reference/model-routing.md"

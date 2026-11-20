@@ -9,7 +9,7 @@
     "go/internal/recurrence/apply.go",
     "go/internal/inboxmover/holder.go",
     "go/internal/core/resume.go",
-    "go/cmd/evolve/cmd_inbox_claims.go"
+    "go/internal/cli/inboxcmd/cmd_inbox_claims.go"
   ],
   "fix": "1: findItem reads open items through lifecycle (the root only) and skips origin-conflicts/ and processed/, with a test. 2: give core.CheckpointResumable a per-run variant, so core owns the whole rule. 3: evolve inbox claims lists the parked origin copies and gives a count. 4: read the goals once per judged item, or accept it and record why.",
   "id": "inbox-claims-delta-followups",

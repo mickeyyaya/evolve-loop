@@ -38,6 +38,17 @@ Why each server option:
 
 A test binary whose tmux server cannot start fails with exit 1 and runs nothing. It never falls back to the shared server. A test binary on a host without tmux still gets its own socket name, and the real-tmux tests skip as before.
 
+## The floor build
+
+`Main` has two steps. The isolate step does the steps 1 and 2: it selects the private socket and closes the inherited descriptors. The serve step does the steps 3 to 6. Two files hold the serve step, and a build tag picks one of them:
+
+- `serve_tmux.go` (`!notmux`) is the serve step above. When tmux is not on `PATH`, it runs the tests with no server and returns.
+- `serve_floor.go` (`notmux`) starts no server. It runs the tests, and then it looks for the socket file of the private socket and for each `<socket>-*` file in the socket directory. The look-up is `strayServers`, behind the `strayCheck` seam. If a test reached tmux, the step stops that own server with `stopFamily`. It prints "tmux reached at the floor" and returns a code that is not zero.
+
+The build floor adds the tag `notmux` to its cover run (see [internal-core.md](internal-core.md)). Thus no tmux test and no server start runs at the floor.
+
+The check sees only the private socket of the test process. The stray check looks only in the socket directory under the `TMUX_TMPDIR` that the process has at that time. A test that names its own socket depends on the marker table of the guard in `internal/bridge` (`TestBridgeTests_EveryTmuxReachIsOutOfTheFloorBuild`). The other packages that adopt `Main` get the same floor behavior. Their tests that need the server must carry the tag `!notmux`.
+
 ## Invariants
 
 - **One server per test process, named by its pid, and killed only by its owner, its guard or the dead-owner GC.** `swarm.ReapOrphanSockets` reaps `evolve-bridge-t<pid>` only when that pid is dead, the same liveness gate it applies to a loop's `evolve-bridge-p<pid>`. A test binary that its timeout panic stops skips step 6. Its guard then stops the server in about 1 s, and the next `evolve gc` or loop preflight removes the socket file. `TestMain_RunsTheTestsOnAFreshServerOwnedByThisProcess` pins the socket, the pane shell, `exit-empty`, the replaced stale server, the exit code and the removed socket. In `internal/swarm`, `TestReapOrphanSockets_ReapsADeadTestProcessSocketAndSparesALiveOne` pins the GC.

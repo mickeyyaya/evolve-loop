@@ -1,6 +1,7 @@
 # ADR-0082 — Regression test-impact selection, staged off → shadow → enforce
 
 - **Status:** Accepted (shadow stage landed cycle-1260; enforce NOT recommended — see Finding)
+- **Retired (2026-11-19):** fix F5b of the [shadow-stage evidence plan](../../plans/shadow-stage-evidence-2026-11.md) retired the `regression_tia` stage, because 0 of 44 predicates are pure. The policy key, `RegressionTIAPolicy` and the tests that this ADR names no longer exist. The names below are a record of the shadow stage.
 - **Date:** 2026-08-04
 - **Supersedes / relates:** ADR-0069 (apicover CI-parity gate), cycle-1250 router/routingtest miss,
   cycle-1253 `changedpkgs.ImporterClosure` (shipped green with zero callers)
