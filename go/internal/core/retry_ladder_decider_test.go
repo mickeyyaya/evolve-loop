@@ -200,16 +200,22 @@ func TestNoDecisionLiteralOutsideDecider(t *testing.T) {
 	}
 }
 
+func parseDecisionTestSnippet(t *testing.T, name, src string) *ast.File {
+	t.Helper()
+	file, err := parser.ParseFile(token.NewFileSet(), name, src, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return file
+}
+
 func TestDecisionGuardSeesEveryShapeAndAlias(t *testing.T) {
 	t.Parallel()
 	src := `package x
 import ladder "` + retryladderImport + `"
 func f() { _ = ladder.Verdict{}; var d ladder.Decision; _ = new(ladder.Verdict); _ = d }
 `
-	file, err := parser.ParseFile(token.NewFileSet(), "x.go", src, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
+	file := parseDecisionTestSnippet(t, "x.go", src)
 	pkg := ladderImportName(file)
 	if pkg != "ladder" {
 		t.Fatalf("alias not resolved: %q", pkg)
@@ -223,19 +229,16 @@ func f() { _ = ladder.Verdict{}; var d ladder.Decision; _ = new(ladder.Verdict);
 		"var _ = []ladder.Decision{{Action: ladder.ActionStop}}",
 		"var _ = map[string]*ladder.Verdict{\"k\": {}}",
 	} {
-		f, perr := parser.ParseFile(token.NewFileSet(), "s.go", "package s\nimport ladder \""+retryladderImport+"\"\n"+shape+"\n", 0)
-		if perr != nil {
-			t.Fatal(perr)
-		}
+		f := parseDecisionTestSnippet(t, "s.go", "package s\nimport ladder \""+retryladderImport+"\"\n"+shape+"\n")
 		if len(decisionBuilds(f, "ladder")) == 0 {
 			t.Errorf("shape escaped the guard: %s", shape)
 		}
 	}
-	plain, _ := parser.ParseFile(token.NewFileSet(), "y.go", "package y\nimport \""+retryladderImport+"\"\nvar _ retryladder.Class\n", 0)
+	plain := parseDecisionTestSnippet(t, "y.go", "package y\nimport \""+retryladderImport+"\"\nvar _ retryladder.Class\n")
 	if ladderImportName(plain) != "retryladder" || len(decisionBuilds(plain, "retryladder")) != 0 {
 		t.Fatal("an unaliased import with no decision type must resolve and report nothing")
 	}
-	none, _ := parser.ParseFile(token.NewFileSet(), "z.go", "package z\n", 0)
+	none := parseDecisionTestSnippet(t, "z.go", "package z\n")
 	if ladderImportName(none) != "" {
 		t.Fatal("no import, no name")
 	}

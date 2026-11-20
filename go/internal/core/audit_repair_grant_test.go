@@ -2,8 +2,6 @@ package core
 
 import (
 	"context"
-	"os"
-	"strings"
 	"testing"
 )
 
@@ -61,18 +59,18 @@ func TestConsumeAuditRepairGrant_IncrementsOnlyOnARepairReason(t *testing.T) {
 	}
 }
 
-func TestAuditRepairReasonPrefix_IsSingleSourced(t *testing.T) {
+func TestAuditRepairGrant_ConsumesReasonEmittedByDecideAfterAuditFail(t *testing.T) {
 	t.Parallel()
 
-	body, err := os.ReadFile("audit_fail_decision.go")
-	if err != nil {
-		t.Fatalf("read audit_fail_decision.go: %v", err)
+	cs := CycleState{CycleID: 1828, WorkspacePath: t.TempDir(), AuditFailReasons: []string{tSkillsDrift1828, tConflict1828}}
+	next, reason, sig := floorOrchestrator(fixedNextStrategy{next: "end"}).decideAfterAuditFail(cs)
+	if next != PhaseBuild || sig != nil {
+		t.Fatalf("decideAfterAuditFail = (next=%s, sig=%+v), want PhaseBuild with nil signal", next, sig)
 	}
-	if strings.Contains(string(body), `"audit-repair: "`) {
-		t.Error("the emitter builds the repair reason from a LITERAL; it must use auditRepairReasonPrefix so emitter and consumer cannot drift")
-	}
-	if !strings.Contains(string(body), "auditRepairReasonPrefix") {
-		t.Error("the emitter does not reference auditRepairReasonPrefix; a granted repair would be unattributable to the consumer")
+
+	consumeAuditRepairGrant(&cs, reason)
+	if cs.AuditRepairAttempts != 1 {
+		t.Errorf("AuditRepairAttempts = %d after consuming emitted reason %q, want 1", cs.AuditRepairAttempts, reason)
 	}
 }
 

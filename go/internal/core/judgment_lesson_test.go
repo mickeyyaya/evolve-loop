@@ -394,27 +394,62 @@ func TestJudgmentLesson_DedupedByID(t *testing.T) {
 	}
 }
 
-func TestJudgmentLesson_WiredInLockstepWithFloorRecorder(t *testing.T) {
+type judgmentFailRunner struct {
+	name    string
+	verdict string
+	diags   []Diagnostic
+}
+
+func (r *judgmentFailRunner) Name() string { return r.name }
+func (r *judgmentFailRunner) Run(_ context.Context, req PhaseRequest) (PhaseResponse, error) {
+	return PhaseResponse{
+		Phase:        r.name,
+		Verdict:      r.verdict,
+		ArtifactsDir: req.Workspace,
+		Diagnostics:  r.diags,
+	}, nil
+}
+
+func TestJudgmentLesson_ResumePathPersistsLessonToState(t *testing.T) {
 	t.Parallel()
 
-	shared, err := os.ReadFile("phase_completion.go")
+	const objection = "resumed premise falsified"
+	ws := t.TempDir()
+	writeRoutingPlan(t, ws, []map[string]any{
+		{"phase": "premise-challenge", "run": true},
+		{"phase": string(PhaseAudit), "run": true},
+		{"phase": string(PhaseShip), "run": true},
+	})
+	st := &fakeStorage{
+		state:      State{LastCycleNumber: 635},
+		cycleState: CycleState{CycleID: 635, WorkspacePath: ws},
+	}
+	runners := fullRunnerSet()
+	runners[Phase("premise-challenge")] = &judgmentFailRunner{
+		name:    "premise-challenge",
+		verdict: VerdictFAIL,
+		diags:   []Diagnostic{{Severity: "error", Message: objection}},
+	}
+	o := NewOrchestrator(st, &fakeLedger{}, runners)
+
+	_, _ = o.RunCycleFromPhase(context.Background(), CycleRequest{ProjectRoot: t.TempDir()},
+		&ResumePoint{Phase: "premise-challenge", CycleID: 635})
+
+	persisted, err := st.ReadState(context.Background())
 	if err != nil {
-		t.Fatalf("read shared phase completion: %v", err)
+		t.Fatalf("ReadState: %v", err)
 	}
-	body := string(shared)
-	for _, call := range []string{"recordJudgmentLesson(", "recordFloorVerdictFailure(", "recordReviewFindings("} {
-		if !strings.Contains(body, call) {
-			t.Errorf("shared phase completion does not call %s", call)
+	lessons := 0
+	for _, td := range persisted.CarryoverTodos {
+		if strings.Contains(td.ID, "premise-challenge") && strings.Contains(td.Action, objection) {
+			lessons++
 		}
 	}
-	for _, path := range []string{"cyclerun_record.go", "resume_execution.go"} {
-		src, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatalf("read %s: %v", path, err)
-		}
-		if !strings.Contains(string(src), "phaseCompletionRecord{") {
-			t.Errorf("%s bypasses the shared phase-completion boundary", path)
-		}
+	if lessons != 1 {
+		t.Fatalf("resumed premise-challenge persisted %d judgment lessons, want 1: %+v", lessons, persisted.CarryoverTodos)
+	}
+	if len(persisted.FailedAt) != 0 {
+		t.Errorf("resumed judgment lesson must not record FailedAt: %+v", persisted.FailedAt)
 	}
 }
 
