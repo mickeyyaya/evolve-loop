@@ -194,7 +194,7 @@ func TestScopedCoverProfile_AGreenRetakeOfANewTestFailsTheCoverPath(t *testing.T
 	signals := signalcenter.New()
 	in := ReviewInput{Phase: string(PhaseBuild), Worktree: repo.Dir, ProjectRoot: t.TempDir(), WorktreeBaseSHA: base, Signals: signals, Stderr: &strings.Builder{}}.withFloorAdded()
 
-	_, out, status := scopedCoverProfile(context.Background(), in, filepath.Join(repo.Dir, "go"), []string{"./q"}, nil)
+	_, out, status, _ := scopedCoverProfile(context.Background(), in, filepath.Join(repo.Dir, "go"), []string{"./q"}, nil)
 
 	if status != coverStatusTestsFailed || !strings.Contains(out, "example.com/m/q") || !strings.Contains(out, "./q.TestFlaky") {
 		t.Fatalf("(%q, %d), want tests failed with the correction", out, status)

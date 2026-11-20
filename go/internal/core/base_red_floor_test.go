@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"github.com/mickeyyaya/evolve-loop/go/internal/covchanged"
 	"os"
 	"path/filepath"
 	"slices"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
-	"github.com/mickeyyaya/evolve-loop/go/internal/covchanged"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -94,8 +94,8 @@ func TestUnitAndCoverFloors_SubtractOnlyKeysRedOnTheBase(t *testing.T) {
 	t.Cleanup(func() { buildSelfCheckRunner, coverChangedProfiler = prev, prevProfiler })
 	failing := goTestRed("TestOld", "TestNew")
 	buildSelfCheckRunner = func(context.Context, string, string) (string, bool) { return failing, false }
-	coverChangedProfiler = func(context.Context, ReviewInput, string, []string, []string) (string, string, int) {
-		return "", failing, coverStatusTestsFailed
+	coverChangedProfiler = func(context.Context, ReviewInput, string, []string, []string) (string, string, int, []string) {
+		return "", failing, coverStatusTestsFailed, covchanged.DefaultTags
 	}
 	writeFile(t, filepath.Join(f.in.Worktree, "go", "q", "q.go"), "package q\n")
 	var flags []string

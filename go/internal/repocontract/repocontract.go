@@ -156,6 +156,7 @@ var treeReadingSelections = []TestSelection{
 	}},
 	{Package: "./internal/ciparity", Tests: []string{
 		"TestEnvExclusive_TheCIJobsTheBridgeBackstopNamesRunTheTmuxTier",
+		"TestEnvExclusive_TheNotmuxMakeTargetRunsTheBridgeTiersUnderTheFloorTags",
 	}},
 	{Package: "./internal/committedset", Tests: []string{
 		"TestDecisionBuckets_TheOneDeclarationOfTheDroppedAndSkipShippedWireTags",
