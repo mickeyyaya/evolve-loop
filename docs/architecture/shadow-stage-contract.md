@@ -5,6 +5,8 @@
 > This file is a design. It has no code. The code follows in later cycles, in the order of §8.
 > This file is the spec of record for the rules that each stage key must obey.
 >
+> **Retired stage (2026-11-19):** fix F5b retired the `regression_tia` stage, because 0 of 44 predicates are pure (D5). The key, the `TIA_SHADOW` code, `emitTIADecision` and the registry row no longer exist. The examples in this file that name them show the shape of an entry. They do not describe live code.
+>
 > **Terms used throughout:**
 > - **Stage key:** a field of the typed policy schema whose type is `Stage`, with the values `off`, `shadow` and `enforce`. Example: `regression_tia.stage`.
 > - **Shadow:** the feature computes its decision and records it. The pipeline acts as if the feature were off.
@@ -450,8 +452,8 @@ Source: report C1.
 - Register `AUDIT_CASCADE_SHADOW`, `TIA_SHADOW` and `PARALLEL_EVALUATE_SHADOW`. Emit each from the one function that builds the record: `recordCascadeShadowWith`, `emitTIADecision` and the branch at `orchestrator.go:624`. The JSON files stay.
 - Fix the dropped error: `_, _ = regressiontia.Emit(req.Workspace, d)` at `audit.go:395` returns its error to the recorder of §10 E2. A failed write marks the cycle `incomplete` and emits a loud signal.
 - `parallel_evaluate` at `shadow` computes the batch, emits the signal and dispatches serially.
-- Red tests: `TestRecordCascadeShadow_EmitsSignal`, `TestEmitTIADecision_EmitsSignal`, `TestEmitTIADecision_WriteErrorIsNotDropped`, `TestOrchestrator_ParallelEvaluateShadowRecordsBatch`.
-- **Decision D5 (open, with a recommendation): retire or split `regression_tia`.** Recommendation: split the corpus into pure predicates and I/O predicates. Apply TIA to the pure ones only, using `regressiontia.Pure`. Retire the stage if fewer than 9 predicates are pure.
+- Red tests: `TestRecordCascadeShadow_EmitsSignal` and `TestOrchestrator_ParallelEvaluateShadowRecordsBatch`. Fix F5b deleted the two `TestEmitTIADecision` tests with `emitTIADecision`.
+- **Decision D5 (closed 2026-11-19: retired by fix F5b, because 0 of 44 predicates are pure): retire or split `regression_tia`.** Recommendation: split the corpus into pure predicates and I/O predicates. Apply TIA to the pure ones only, using `regressiontia.Pure`. Retire the stage if fewer than 9 predicates are pure.
 - *Because:* 35 of 44 predicate directories import an escape hatch, so at most 9 can skip.
 - *Rejected:* allow `os` reads in the closure. A predicate that reads files can depend on a file outside its own package, so a skip can hide a regression.
 - This is a product decision. Until the operator decides, the stage stays at `shadow` and its verdict stays `not ready`.

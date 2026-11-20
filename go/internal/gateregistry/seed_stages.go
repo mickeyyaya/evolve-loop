@@ -40,7 +40,6 @@ var stageSeeds = []stageSeed{
 	{key: "failure_disposition.stage"},
 	{key: "merge_gate.stage"},
 	{key: "parallel_evaluate.stage", signal: "PARALLEL_EVALUATE_SHADOW"},
-	{key: "regression_tia.stage", signal: "TIA_SHADOW", closure: []string{"internal/regressiontia"}},
 	{key: "catalog.refresh_stage"},
 	{key: "docs_floor.stage"},
 	{key: "docs_floor.ste_stage"},

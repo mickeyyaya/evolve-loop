@@ -82,7 +82,6 @@ const (
 	ModuleCI              Module = "ci"
 	ModuleSignal          Module = "signal"
 	ModuleLatency         Module = "latency"
-	ModuleTIA             Module = "tia"
 	ModuleParallelEval    Module = "parallel.evaluate"
 )
 
@@ -90,7 +89,7 @@ var knownModules = map[Module]bool{
 	ModuleOrchestrator: true, ModuleAdvisor: true, ModuleRunner: true, ModuleBridge: true, ModuleLiveness: true,
 	ModuleShip: true, ModuleAudit: true, ModuleTriage: true, ModuleScout: true, ModuleBuild: true, ModuleTDD: true,
 	ModuleGateContract: true, ModuleGateEval: true, ModuleGateRepo: true, ModuleInbox: true, ModuleConfig: true,
-	ModuleLoop: true, ModuleWatchdog: true, ModuleObserver: true, ModuleDashboard: true, ModuleLedger: true, ModuleOutcome: true, ModuleFailureDiag: true, ModuleCarryover: true, ModuleFailureLearning: true, ModuleSignalCenter: true, ModuleReview: true, ModuleQuality: true, ModuleIsolation: true, ModuleCLI: true, ModuleLadder: true, ModuleHealing: true, ModuleControl: true, ModuleRepair: true, ModuleCycle: true, ModuleTokens: true, ModuleConvergence: true, ModuleCI: true, ModuleSignal: true, ModuleLatency: true, ModuleTIA: true, ModuleParallelEval: true,
+	ModuleLoop: true, ModuleWatchdog: true, ModuleObserver: true, ModuleDashboard: true, ModuleLedger: true, ModuleOutcome: true, ModuleFailureDiag: true, ModuleCarryover: true, ModuleFailureLearning: true, ModuleSignalCenter: true, ModuleReview: true, ModuleQuality: true, ModuleIsolation: true, ModuleCLI: true, ModuleLadder: true, ModuleHealing: true, ModuleControl: true, ModuleRepair: true, ModuleCycle: true, ModuleTokens: true, ModuleConvergence: true, ModuleCI: true, ModuleSignal: true, ModuleLatency: true, ModuleParallelEval: true,
 }
 
 func (m Module) Known() bool { return knownModules[m] }
@@ -210,7 +209,6 @@ const CodeCIRunRed Code = "CI_RUN_RED"
 
 const (
 	CodeAuditCascadeShadow     Code = "AUDIT_CASCADE_SHADOW"
-	CodeTIAShadow              Code = "TIA_SHADOW"
 	CodeParallelEvaluateShadow Code = "PARALLEL_EVALUATE_SHADOW"
 )
 
