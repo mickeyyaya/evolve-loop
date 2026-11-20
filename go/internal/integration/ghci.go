@@ -22,6 +22,7 @@ const (
 	redExitCode = 1
 
 	registerTries   = 5
+	runsOfASHA      = 20
 	watchTries      = 720
 	readyLimit      = 100
 	statusCompleted = "completed"
@@ -111,31 +112,73 @@ func (c GhCI) create(ctx context.Context, b Batch) (PR, error) {
 	return PR{Number: n, Tip: b.Tip}, nil
 }
 
-func (c GhCI) runID(ctx context.Context, tip string) (string, error) {
+func (c GhCI) runIDs(ctx context.Context, tip string) ([]string, error) {
 	for attempt := 1; ; attempt++ {
 		var runs []struct {
 			DatabaseID int `json:"databaseId"`
 		}
-		if err := c.decode(ctx, &runs, "run", "list", "--workflow", ciparity.RequiredWorkflow, "--commit", tip, "--limit", "1", "--json", "databaseId"); err != nil {
-			return "", err
+		if err := c.decode(ctx, &runs, "run", "list", "--workflow", ciparity.RequiredWorkflow, "--commit", tip, "--limit", strconv.Itoa(runsOfASHA), "--json", "databaseId"); err != nil {
+			return nil, err
 		}
 		if len(runs) > 0 {
-			return strconv.Itoa(runs[0].DatabaseID), nil
+			ids := make([]string, 0, len(runs))
+			for _, r := range runs {
+				ids = append(ids, strconv.Itoa(r.DatabaseID))
+			}
+			return ids, nil
 		}
 		if c.Settle == nil || attempt >= registerTries {
-			return "", fmt.Errorf("%w of %s for the tip %s", ErrNoRun, ciparity.RequiredWorkflow, tip)
+			return nil, fmt.Errorf("%w of %s for the tip %s", ErrNoRun, ciparity.RequiredWorkflow, tip)
 		}
 		if err := c.Settle(ctx); err != nil {
-			return "", err
+			return nil, err
 		}
 	}
 }
 
-func (c GhCI) Watch(ctx context.Context, pr PR) (Verdict, error) {
-	id, err := c.runID(ctx, pr.Tip)
+func (c GhCI) runID(ctx context.Context, tip string) (string, error) {
+	ids, err := c.runIDs(ctx, tip)
 	if err != nil {
 		return "", err
 	}
+	return ids[0], nil
+}
+
+func (c GhCI) tipVerdict(ctx context.Context, ids []string) (Verdict, error) {
+	newest, err := c.verdict(ctx, ids[0])
+	var ended *RunConclusionError
+	if err != nil && !errors.As(err, &ended) {
+		return "", err
+	}
+	if newest == Red {
+		return Red, nil
+	}
+	settled := c
+	settled.Settle = nil
+	green := newest == Green
+	for _, id := range ids[1:] {
+		v, e := settled.verdict(ctx, id)
+		switch {
+		case v == Red:
+			return Red, nil
+		case v == Green:
+			green = true
+		case e != nil && !errors.Is(e, ErrRunPending) && !errors.As(e, &ended):
+			return "", e
+		}
+	}
+	if green {
+		return Green, nil
+	}
+	return "", err
+}
+
+func (c GhCI) Watch(ctx context.Context, pr PR) (Verdict, error) {
+	ids, err := c.runIDs(ctx, pr.Tip)
+	if err != nil {
+		return "", err
+	}
+	id := ids[0]
 	c.Runs.note(pr.Tip, id)
 	_, code, err := c.Gh(ctx, c.Repo.Dir, "run", "watch", id, "--exit-status")
 	switch {
@@ -144,7 +187,7 @@ func (c GhCI) Watch(ctx context.Context, pr PR) (Verdict, error) {
 	case code != 0 && code != redExitCode:
 		return "", fmt.Errorf("integration: gh run watch %s exit=%d", id, code)
 	}
-	return c.verdict(ctx, id)
+	return c.tipVerdict(ctx, ids)
 }
 
 func (c GhCI) verdict(ctx context.Context, id string) (Verdict, error) {
@@ -197,11 +240,11 @@ type PeekCI struct {
 func (p PeekCI) Watch(ctx context.Context, pr PR) (Verdict, error) {
 	c := p.CI
 	c.Settle = nil
-	id, err := c.runID(ctx, pr.Tip)
+	ids, err := c.runIDs(ctx, pr.Tip)
 	if err != nil {
 		return "", err
 	}
-	return c.verdict(ctx, id)
+	return c.tipVerdict(ctx, ids)
 }
 
 func (c GhCI) Rerun(ctx context.Context, pr PR) error {
