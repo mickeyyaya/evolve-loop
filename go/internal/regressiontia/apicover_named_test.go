@@ -141,3 +141,15 @@ func TestEmit_ReportsAnUnwritableWorkspace(t *testing.T) {
 		t.Error("Emit into a nonexistent workspace returned nil error — the caller cannot distinguish written evidence from lost evidence")
 	}
 }
+
+func TestModuleLocalReach_FollowsModuleImports(t *testing.T) {
+	graph := map[string][]string{
+		"example.com/m/a": {"example.com/m/b", "fmt"},
+		"example.com/m/b": {"os"},
+	}
+	got := ModuleLocalReach(graph, "example.com/m", []string{"example.com/m/a"})
+	want := []string{"example.com/m/b", "os"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ModuleLocalReach = %v, want %v", got, want)
+	}
+}

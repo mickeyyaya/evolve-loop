@@ -891,3 +891,4 @@
 ./internal/incidentbundle
 ./internal/evidencex
 ./internal/incidentkb
+./internal/stageevidence

@@ -168,7 +168,7 @@ func PurePackages(moduleDir string, importPaths []string) map[string]bool {
 		if len(nodes) == 0 || errored[pkg] {
 			continue
 		}
-		reach := moduleLocalReach(graph, modPath, nodes)
+		reach := ModuleLocalReach(graph, modPath, nodes)
 		out[pkg] = !reachesAny(reach, errored)
 	}
 	return out
@@ -280,7 +280,7 @@ func listCorpusDeps(moduleDir string, patterns []string) (map[string][]string, s
 		if errored[owner] {
 			continue
 		}
-		reach := moduleLocalReach(graph, modPath, nodes)
+		reach := ModuleLocalReach(graph, modPath, nodes)
 		if reachesErrored(reach, errored) {
 			continue
 		}
@@ -289,7 +289,7 @@ func listCorpusDeps(moduleDir string, patterns []string) (map[string][]string, s
 	return deps, modPath
 }
 
-func moduleLocalReach(graph map[string][]string, modPath string, starts []string) []string {
+func ModuleLocalReach(graph map[string][]string, modPath string, starts []string) []string {
 	seen := map[string]struct{}{}
 	queue := append([]string(nil), starts...)
 	var reach []string

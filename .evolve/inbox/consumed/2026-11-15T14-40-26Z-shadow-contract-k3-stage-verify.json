@@ -3,6 +3,11 @@
     "Plan §6 K3: stage verify and stage report, the scorer interface, the decision version (digest of the decider closure plus its policy subtree); TestVerdictRecomputesFromFixtureChain, TestVersionDigestStableUnderUnrelatedChange, TestEvidenceOfOtherVersionNotCounted, TestEveryStageHasScorerAndVerdict.",
     "The new tests are red without the change"
   ],
+  "consumed": {
+    "at": "2026-11-20T01:38:57Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-11-15T14:40:26Z",
   "docs": [
     "docs/architecture/shadow-stage-contract.md",

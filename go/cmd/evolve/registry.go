@@ -147,6 +147,7 @@ var commands = []subcommand{
 	{Name: "ladder", Summary: "Retry ladder telemetry: report [--json] [--project-root DIR] prints the tries, fixes and tokens per rung and failure class from each run dir's llm-calls.ndjson; read-only (exit 2 on an absent runs dir, 10 on usage)", Run: runLadderCommand},
 	{Name: "context", Summary: "The cell context index of a phase agent, read-only and agent class A: context index [--layer L1|L2] [--required] [--json] lists the rows of inputs/index.json; context open <id> [--json] prints the body of one row after its sha256 check (both take --workspace W); context stats [--phase P] [--json] [--project-root R] prints the open rate of each kind from the access log (agent class D; exit 0 ok, 1 changed body, 2 no index, 10 usage, 11 unknown id or bad index)", Run: contextcmd.New(contextcmd.Deps{Env: os.Getenv})},
 	{Name: "context-fill", Summary: "Context-window fill telemetry: correlate (peak fill band vs cycle final verdict)", Run: runContextFill},
+	{Name: "stage", Summary: "Shadow stage verification: verify <key> [--chain PATH] [--project-root P] [--json] | report [--chain PATH] [--project-root P] [--json]", Run: runStage},
 }
 
 func lookupCommand(name string) *subcommand {
