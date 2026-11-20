@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 func removalFixture(t *testing.T, report string, present []string) ReviewInput {
@@ -13,11 +15,18 @@ func removalFixture(t *testing.T, report string, present []string) ReviewInput {
 	root := t.TempDir()
 	ws := filepath.Join(root, "workspace")
 	wt := filepath.Join(root, "worktree")
-	for _, d := range []string{ws, wt} {
-		if err := os.MkdirAll(d, 0o755); err != nil {
-			t.Fatalf("mkdir %s: %v", d, err)
-		}
+	if err := os.MkdirAll(ws, 0o755); err != nil {
+		t.Fatalf("mkdir %s: %v", ws, err)
 	}
+	if err := os.MkdirAll(wt, 0o755); err != nil {
+		t.Fatalf("mkdir %s: %v", wt, err)
+	}
+	repo := gittest.At(t, wt)
+	if err := os.WriteFile(filepath.Join(wt, "README"), []byte("base\n"), 0o644); err != nil {
+		t.Fatalf("write README: %v", err)
+	}
+	repo.Git("add", "-A")
+	repo.Git("commit", "-q", "-m", "base")
 	if report != "" {
 		if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte(report), 0o644); err != nil {
 			t.Fatalf("write build-report.md: %v", err)

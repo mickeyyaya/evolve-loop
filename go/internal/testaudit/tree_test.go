@@ -129,7 +129,7 @@ func TestCheckTree_MalformedInputsAndRelativeHelpers(t *testing.T) {
 	badRoot := t.TempDir()
 	mustWrite(t, filepath.Join(badRoot, "pkg", "suite", "bad.go"), "package suite\nfunc {")
 	cfg := Config{Fakes: []Fake{{Tool: "git", SuiteDir: "pkg/suite", RealSide: "x"}}}
-	if _, err := analyzeSingle(badRoot, "pkg/suite", cfg); err == nil {
+	if _, err := packageFindings(badRoot, "pkg/suite", cfg); err == nil {
 		t.Error("analyzeSingle accepted broken suite dir")
 	}
 	if err := CheckTree(badRoot, cfg); err == nil {
@@ -137,7 +137,7 @@ func TestCheckTree_MalformedInputsAndRelativeHelpers(t *testing.T) {
 	}
 	suiteHitRoot := t.TempDir()
 	mustWrite(t, filepath.Join(suiteHitRoot, "pkg", "suite", "ok_test.go"), "package suite\nimport \"testing\"\nfunc TestOK(t *testing.T) { t.Fatal(\"x\") }\n")
-	if got, err := analyzeSingle(suiteHitRoot, "pkg/suite", cfg); err != nil || len(got) != 1 || got[0].Rule != ruleUnverifiedFake {
+	if got, err := packageFindings(suiteHitRoot, "pkg/suite", cfg); err != nil || len(got) != 1 || got[0].Rule != ruleUnverifiedFake {
 		t.Errorf("analyzeSingle unverified fake = %v, %v", got, err)
 	}
 	if _, err := collectTreeBaselines(filepath.Join(t.TempDir(), "absent")); err == nil {

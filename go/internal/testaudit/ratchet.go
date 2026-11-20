@@ -53,6 +53,52 @@ func CheckShard(dir string, cfg Config) error {
 	return diffFindings(found, baseline)
 }
 
+type RowKind int
+
+const (
+	RowMissing RowKind = iota
+	RowStale
+)
+
+var (
+	ErrNoBaselineRow    = errors.New("testaudit: finding has no baseline row")
+	ErrStaleBaselineRow = errors.New("testaudit: baseline row matches no finding")
+)
+
+type RowError struct {
+	Kind    RowKind
+	Finding Finding
+}
+
+func (e *RowError) Error() string {
+	f := e.Finding
+	if e.Kind == RowStale {
+		return fmt.Sprintf("testaudit: baseline row %s %s %s matches no finding", f.Package, f.Test, f.Rule)
+	}
+	return fmt.Sprintf("testaudit: %s %s %s has no baseline row", f.Package, f.Test, f.Rule)
+}
+
+func (e *RowError) Unwrap() error {
+	if e.Kind == RowStale {
+		return ErrStaleBaselineRow
+	}
+	return ErrNoBaselineRow
+}
+
+func Problems(err error) []error {
+	if err == nil {
+		return nil
+	}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		var out []error
+		for _, e := range joined.Unwrap() {
+			out = append(out, Problems(e)...)
+		}
+		return out
+	}
+	return []error{err}
+}
+
 func diffFindings(found, baseline []Finding) error {
 	have := make(map[Finding]bool, len(found))
 	for _, f := range found {
@@ -65,12 +111,12 @@ func diffFindings(found, baseline []Finding) error {
 	var problems []error
 	for _, f := range found {
 		if !want[f] {
-			problems = append(problems, fmt.Errorf("testaudit: %s %s %s has no baseline row", f.Package, f.Test, f.Rule))
+			problems = append(problems, &RowError{Kind: RowMissing, Finding: f})
 		}
 	}
 	for _, f := range baseline {
 		if !have[f] {
-			problems = append(problems, fmt.Errorf("testaudit: baseline row %s %s %s matches no finding", f.Package, f.Test, f.Rule))
+			problems = append(problems, &RowError{Kind: RowStale, Finding: f})
 		}
 	}
 	return errors.Join(problems...)
