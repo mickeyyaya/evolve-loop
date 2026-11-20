@@ -4,6 +4,7 @@
 > **Status:** Revised (2026-11-15) after review round 3 (N1, N2 fixed, patch reviewed).
 > This file is a design. It has no code. The code follows in later cycles, in the order of §8.
 > This file is the spec of record for the rules that each stage key must obey.
+>
 > **Retired stage (2026-11-19):** fix F5b retired the `regression_tia` stage, because 0 of 44 predicates are pure (D5). The key, the `TIA_SHADOW` code, `emitTIADecision` and the registry row no longer exist. The examples in this file that name them show the shape of an entry. They do not describe live code.
 >
 > **Terms used throughout:**
