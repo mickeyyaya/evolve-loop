@@ -248,3 +248,21 @@ func TestWindow_LandingAndConflictUnderACeilingPublishNothingWhileTheAdmittedWid
 		t.Fatalf("window events = %d, want 1 (the ceiling only): a landing or a conflict that leaves the admitted width unchanged publishes nothing", got)
 	}
 }
+
+func TestPublish_HostPressureChangeEmitsOnlyWhenTheCapMoves(t *testing.T) {
+	events := &eventLog{}
+	publish := Publish(events.publish)
+	if publish.HostPressureChange(HostPressureEvent{Old: 8, New: 8, Cause: "hold"}) {
+		t.Fatal("an unchanged cap reported a change")
+	}
+	if got := events.withCode(CodeHostPressure); len(got) != 0 {
+		t.Fatalf("an unchanged cap emitted %d events, want 0", len(got))
+	}
+	if !publish.HostPressureChange(HostPressureEvent{Old: 8, New: 4, Cause: "pressure_high"}) {
+		t.Fatal("a moved cap reported no change")
+	}
+	got := events.withCode(CodeHostPressure)
+	if len(got) != 1 || got[0].Fields["new"] != "4" {
+		t.Fatalf("events = %+v, want one event with new=4", got)
+	}
+}

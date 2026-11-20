@@ -59,16 +59,13 @@ func (s *hostSampler) sample() {
 	loadPerCore := reading.LoadPerCore()
 	s.appendSample(hostSampleLine{TS: s.now().UTC().Format(time.RFC3339), Load1: reading.Load1, CPUs: reading.CPUs, LoadPerCore: loadPerCore,
 		MemAvailablePct: reading.MemAvailablePct, SwapUsedMB: reading.SwapUsedMB, Score: d.Score, Cap: d.Old, Decided: d.New, Stage: s.stage})
-	if d.New == d.Old {
-		return
-	}
 	enforce := s.stage == orchestrator.StageEnforce
-	s.publish.HostPressure(orchestrator.HostPressureEvent{
+	changed := s.publish.HostPressureChange(orchestrator.HostPressureEvent{
 		Old: d.Old, New: d.New, Sized: s.cfg.Ceiling, Cause: d.Cause, Stage: s.stage, Applied: enforce,
 		Load1: reading.Load1, CPUs: reading.CPUs, LoadPerCore: loadPerCore,
 		MemAvailablePct: reading.MemAvailablePct, SwapUsedMB: reading.SwapUsedMB, Score: d.Score,
 	})
-	if enforce {
+	if changed && enforce {
 		s.apply(d.New)
 	}
 }

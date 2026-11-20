@@ -128,3 +128,30 @@ func TestParse_AdaptiveEnforceNeedsTheOrchestratorAtEnforce(t *testing.T) {
 		t.Fatalf("orchestrator enforce with adaptive enforce: err = %v, want nil", err)
 	}
 }
+
+func TestAdaptiveStage_ShadowAndEnforceAreTheOnlyAcceptedValues(t *testing.T) {
+	if policy.AdaptiveStageShadow != "shadow" || policy.AdaptiveStageEnforce != "enforce" {
+		t.Fatalf("stage constants = %q, %q, want the policy.json spellings", policy.AdaptiveStageShadow, policy.AdaptiveStageEnforce)
+	}
+	for stage, wantErr := range map[policy.AdaptiveStage]bool{policy.AdaptiveStageShadow: false, policy.AdaptiveStageEnforce: false, "off": true} {
+		raw := `{"fleet":{"orchestrator":{"stage":"enforce","window":{"adaptive":{"stage":"` + string(stage) + `"}}}}}`
+		_, err := policy.Parse([]byte(raw))
+		if (err != nil) != wantErr || wantErr && !errors.Is(err, policy.ErrFleetAdaptive) {
+			t.Errorf("stage %q: err = %v, want refusal %v wrapping ErrFleetAdaptive", stage, err, wantErr)
+		}
+	}
+}
+
+func TestFleetAdaptivePolicy_StageDefaultsToShadowWhenOmitted(t *testing.T) {
+	p, err := policy.Parse([]byte(`{"fleet":{"count":12,"orchestrator":{"window":{"adaptive":{}}}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var block *policy.FleetAdaptivePolicy = p.Fleet.Orchestrator.Window.Adaptive
+	if block == nil || block.Stage != "" {
+		t.Fatalf("adaptive block = %+v, want present with the stage left empty", block)
+	}
+	if got := p.FleetConfig().Orchestrator.Adaptive.Stage; got != "shadow" {
+		t.Errorf("resolved stage = %q, want shadow", got)
+	}
+}

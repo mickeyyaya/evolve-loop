@@ -100,7 +100,7 @@ func (o FleetOrchestratorPolicy) validate() error {
 	if err := validateFileCells(o.FileCells); err != nil {
 		return err
 	}
-	if o.Window != nil && o.Window.Adaptive != nil && o.Window.Adaptive.Stage == "enforce" && o.Stage != "enforce" {
+	if o.Window != nil && o.Window.Adaptive != nil && o.Window.Adaptive.Stage == AdaptiveStageEnforce && o.Stage != "enforce" {
 		return fmt.Errorf("%w: adaptive stage enforce needs orchestrator stage enforce, because the pool reads the window only then", ErrFleetAdaptive)
 	}
 	return o.Window.validate()

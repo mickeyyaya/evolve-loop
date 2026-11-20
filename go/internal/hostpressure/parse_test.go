@@ -113,3 +113,14 @@ func TestParseMemoryLevel(t *testing.T) {
 		}
 	}
 }
+
+func TestMeminfo_ParsedFieldsKeepTheKilobyteReadings(t *testing.T) {
+	m, err := ParseMeminfo(meminfoFixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Meminfo{TotalKB: 16000000, AvailableKB: 4000000, SwapTotalKB: 2097152, SwapFreeKB: 1048576}
+	if m != want {
+		t.Errorf("Meminfo = %+v, want %+v", m, want)
+	}
+}

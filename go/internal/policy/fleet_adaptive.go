@@ -7,18 +7,25 @@ import (
 
 var ErrFleetAdaptive = errors.New("fleet.orchestrator.window.adaptive")
 
+type AdaptiveStage string
+
+const (
+	AdaptiveStageShadow  AdaptiveStage = "shadow"
+	AdaptiveStageEnforce AdaptiveStage = "enforce"
+)
+
 type FleetAdaptivePolicy struct {
-	Stage              string  `json:"stage,omitempty"`
-	LoadPerCoreHigh    float64 `json:"load_per_core_high,omitempty"`
-	LoadPerCoreLow     float64 `json:"load_per_core_low,omitempty"`
-	MemAvailableMinPct float64 `json:"mem_available_min_pct,omitempty"`
-	SwapUsedMaxMB      float64 `json:"swap_used_max_mb,omitempty"`
-	Step               int     `json:"step,omitempty"`
-	DecreaseFactor     float64 `json:"decrease_factor,omitempty"`
-	CooldownS          int     `json:"cooldown_s,omitempty"`
-	IncreaseCooldownS  int     `json:"increase_cooldown_s,omitempty"`
-	SampleS            int     `json:"sample_s,omitempty"`
-	SmoothSamples      int     `json:"smooth_samples,omitempty"`
+	Stage              AdaptiveStage `json:"stage,omitempty"`
+	LoadPerCoreHigh    float64       `json:"load_per_core_high,omitempty"`
+	LoadPerCoreLow     float64       `json:"load_per_core_low,omitempty"`
+	MemAvailableMinPct float64       `json:"mem_available_min_pct,omitempty"`
+	SwapUsedMaxMB      float64       `json:"swap_used_max_mb,omitempty"`
+	Step               int           `json:"step,omitempty"`
+	DecreaseFactor     float64       `json:"decrease_factor,omitempty"`
+	CooldownS          int           `json:"cooldown_s,omitempty"`
+	IncreaseCooldownS  int           `json:"increase_cooldown_s,omitempty"`
+	SampleS            int           `json:"sample_s,omitempty"`
+	SmoothSamples      int           `json:"smooth_samples,omitempty"`
 }
 
 type AdaptiveConfig struct {
@@ -55,7 +62,7 @@ func (a *FleetAdaptivePolicy) validate() error {
 		return nil
 	}
 	switch {
-	case a.Stage != "" && a.Stage != "shadow" && a.Stage != "enforce":
+	case a.Stage != "" && a.Stage != AdaptiveStageShadow && a.Stage != AdaptiveStageEnforce:
 		return fmt.Errorf("%w: stage %q is not \"shadow\" or \"enforce\"", ErrFleetAdaptive, a.Stage)
 	case a.hasNegative():
 		return fmt.Errorf("%w: no value may be negative", ErrFleetAdaptive)
@@ -86,7 +93,7 @@ func (a *FleetAdaptivePolicy) resolve() AdaptiveConfig {
 	}
 	return AdaptiveConfig{
 		Enabled:           true,
-		Stage:             orString(a.Stage, "shadow"),
+		Stage:             orString(string(a.Stage), string(AdaptiveStageShadow)),
 		LoadHigh:          orFloat(a.LoadPerCoreHigh, defaultAdaptiveLoadHigh),
 		LoadLow:           orFloat(a.LoadPerCoreLow, defaultAdaptiveLoadLow),
 		MemMinPct:         orFloat(a.MemAvailableMinPct, defaultAdaptiveMemMinPct),

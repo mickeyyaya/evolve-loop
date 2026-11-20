@@ -13,6 +13,14 @@ type HostPressureEvent struct {
 	Load1, LoadPerCore, MemAvailablePct, SwapUsedMB, Score float64
 }
 
+func (p Publish) HostPressureChange(e HostPressureEvent) bool {
+	if e.New == e.Old {
+		return false
+	}
+	p.HostPressure(e)
+	return true
+}
+
 func (p Publish) HostPressure(e HostPressureEvent) {
 	p.emit("hostpressure.Decide", CodeHostPressure, signalcenter.SeverityInfo,
 		"host pressure: cap "+strconv.Itoa(e.Old)+" to "+strconv.Itoa(e.New)+": "+e.Cause,

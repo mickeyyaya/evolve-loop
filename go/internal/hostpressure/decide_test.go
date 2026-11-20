@@ -223,3 +223,16 @@ func TestReading_LoadPerCoreCountsZeroCPUsAsOne(t *testing.T) {
 		t.Errorf("LoadPerCore with no CPUs = %v, want 6", got)
 	}
 }
+
+func TestState_AFreshStateStartsAtTheCeilingAndAChangeStampsTheClock(t *testing.T) {
+	cfg := testConfig()
+	fresh := NewState(cfg.Ceiling)
+	if fresh.Cap != cfg.Ceiling || fresh.Blind != 0 || len(fresh.Scores) != 0 {
+		t.Fatalf("NewState = %+v, want cap %d with no blind streak and no scores", fresh, cfg.Ceiling)
+	}
+	var next State = fresh
+	next, d := Decide(next, heavy(), true, cfg, t0)
+	if next.Cap != d.New || !next.Changed.Equal(t0) {
+		t.Errorf("state after a cut = %+v, want cap %d changed at %v", next, d.New, t0)
+	}
+}

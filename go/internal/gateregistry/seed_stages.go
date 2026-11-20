@@ -5,6 +5,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gatecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -57,6 +58,13 @@ var stageSeeds = []stageSeed{
 	{key: "fleet.budget.stage"},
 	{key: "fleet.orchestrator.stage"},
 	{key: "fleet.integration.stage"},
+	{
+		key:     "fleet.orchestrator.window.adaptive.stage",
+		signal:  orchestrator.CodeHostPressure,
+		site:    gatecontract.EmitSite{Path: "internal/orchestrator/host_pressure.go", Func: "HostPressure", Ref: "CodeHostPressure"},
+		fields:  []string{"old", "new", "sized", "cause", "stage", "applied", "cpus", "load1", "load_per_core", "mem_available_pct", "swap_used_mb", "score"},
+		closure: []string{"internal/hostpressure"},
+	},
 	{key: "audit_cascade.stage", signal: "AUDIT_CASCADE_SHADOW", closure: []string{"internal/auditcascade"}},
 	{key: "isolation.i2.stage"},
 	{key: "isolation.i3.stage"},
