@@ -48,7 +48,7 @@ func TestRun_DeadProcessFiresOnceAndKills(t *testing.T) {
 
 	n := strings.Count(events, `"process_dead"`)
 	if n == 0 {
-		t.Fatalf("RED (cycle-274): dead process group produced no process_dead INCIDENT — pane/log echo is the only liveness signal today:\n%s", events)
+		t.Fatalf("expected process_dead INCIDENT for dead process group, got none:\n%s", events)
 	}
 	if n > 2 {
 		t.Errorf("process_dead emitted %d times — must fire ONCE, not per tick:\n%s", n, events)

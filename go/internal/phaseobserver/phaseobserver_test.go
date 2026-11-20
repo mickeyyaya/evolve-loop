@@ -83,7 +83,9 @@ func TestRun_WritesShutdownReport(t *testing.T) {
 		t.Fatalf("report missing: %v", err)
 	}
 	var doc map[string]any
-	_ = json.Unmarshal(report, &doc)
+	if err := json.Unmarshal(report, &doc); err != nil {
+		t.Fatalf("unmarshal report: %v", err)
+	}
 	if doc["agent"] != "builder" || doc["phase"] != "build" {
 		t.Errorf("report fields wrong: %v", doc)
 	}
@@ -196,9 +198,14 @@ func TestRun_TailsStdoutLog(t *testing.T) {
 	if rc != ExitOK {
 		t.Fatalf("rc=%d", rc)
 	}
-	report, _ := os.ReadFile(filepath.Join(ws, "builder-observer-report.json"))
+	report, err := os.ReadFile(filepath.Join(ws, "builder-observer-report.json"))
+	if err != nil {
+		t.Fatalf("report missing: %v", err)
+	}
 	var doc map[string]any
-	_ = json.Unmarshal(report, &doc)
+	if err := json.Unmarshal(report, &doc); err != nil {
+		t.Fatalf("unmarshal report: %v", err)
+	}
 	tc, _ := doc["tool_call_count"].(float64)
 	if int(tc) != 1 {
 		t.Errorf("tool_call_count = %v, want 1\n%s", tc, report)

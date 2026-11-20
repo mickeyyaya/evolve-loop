@@ -31,7 +31,6 @@ func steppedClock(t0 time.Time, hold int, jump time.Duration) func() time.Time {
 type killRecorder struct {
 	mu    sync.Mutex
 	calls int
-	seen  []string
 }
 
 func (k *killRecorder) fn(int, syscall.Signal) error {

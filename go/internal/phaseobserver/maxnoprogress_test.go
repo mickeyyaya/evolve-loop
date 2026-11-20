@@ -131,10 +131,11 @@ func TestRun_MaxNoProgress_ToolUsingAgent_DoesNotFire(t *testing.T) {
 		t.Errorf("tool-using agent killed unexpectedly (%d times)", killCalls)
 	}
 	events, err := os.ReadFile(filepath.Join(ws, "builder-observer-events.ndjson"))
-	if err == nil {
-		if strings.Contains(string(events), "stuck_no_progress") {
-			t.Errorf("stuck_no_progress fired on a healthy tool-using agent:\n%s", events)
-		}
+	if err != nil {
+		t.Fatalf("events file missing: %v", err)
+	}
+	if strings.Contains(string(events), "stuck_no_progress") {
+		t.Errorf("stuck_no_progress fired on a healthy tool-using agent:\n%s", events)
 	}
 }
 
@@ -172,7 +173,10 @@ func TestRun_MaxNoProgress_Disabled_IsLegacyByteIdentical(t *testing.T) {
 	if rc != ExitOK {
 		t.Fatalf("rc=%d", rc)
 	}
-	events, _ := os.ReadFile(filepath.Join(ws, "builder-observer-events.ndjson"))
+	events, err := os.ReadFile(filepath.Join(ws, "builder-observer-events.ndjson"))
+	if err != nil {
+		t.Fatalf("events file missing: %v", err)
+	}
 	if strings.Contains(string(events), "stuck_no_progress") {
 		t.Errorf("MaxNoProgressS=0 must NOT emit stuck_no_progress:\n%s", events)
 	}

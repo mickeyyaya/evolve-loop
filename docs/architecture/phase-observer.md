@@ -22,15 +22,15 @@ The minimum bar: detect a phase that is **stuck** (no output for N seconds) or *
 ORCHESTRATOR (existing LLM)
        ▲ reads
        │
-{phase}-observer-report.json   ← phase-end summary
-{phase}-observer-events.ndjson ← live stream
+{agent}-observer-report.json   ← phase-end summary
+{agent}-observer-events.ndjson ← live stream
        ▲ writes
        │
 PHASE-OBSERVER PROCESS
   ├─ L3: 5 detection rules (rule_stuck_no_output, rule_infinite_loop,
   │      rule_error_spike, rule_cost_anomaly, rule_throttled)
   ├─ L2: In-memory state (event counts, tool histogram, cost, cache, ratelimits)
-  └─ L1: Byte-offset poll of {phase}-stdout.log; parse NDJSON; update L2
+  └─ L1: Byte-offset poll of {agent}-stdout.log; parse NDJSON; update L2
 ```
 
 One observer per subagent invocation. Bounded lifetime: spawned by `run-cycle.sh` immediately before the subagent, signaled with SIGUSR1 when subagent exits, auto-shuts-down after `EVOLVE_OBSERVER_EOF_GRACE_S` quiet polls if no SIGUSR1 arrives.
@@ -108,7 +108,7 @@ the unit-12 doc:
 }
 ```
 
-The orchestrator's directive is one line: "after each phase, read `{phase}-observer-report.json`; if `incident_count` is non-zero, read `incidents[]` (each carries `type`, `severity`, `data.action` / `data.action_reason` under a stall policy) as a decision input." The persona rows that still name `summary.verdict` / `suggested_action` are the unit-12 follow-up F6.
+The orchestrator's directive is one line: "after each phase, read `{agent}-observer-report.json`; if `incident_count` is non-zero, read `incidents[]` (each carries `type`, `severity`, `data.action` / `data.action_reason` under a stall policy) as a decision input." The persona rows that still name `summary.verdict` / `suggested_action` are the unit-12 follow-up F6.
 
 ## Spawning & lifecycle
 
