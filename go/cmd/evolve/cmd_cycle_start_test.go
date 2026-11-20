@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
@@ -136,11 +137,14 @@ func TestCycleStartTrim_ProductionTrimAppliesPolicyCapAndTTL(t *testing.T) {
 
 	var warn bytes.Buffer
 	const total = uint64(100) << 30
-	opts := buildCycleStartOptions(root, evolveDir, &warn, cycleStartHooks{
+	opts, buildErr := buildCycleStartOptions(root, evolveDir, &warn, cycleStartHooks{
 		usage: func(string) (looppreflight.DiskUsage, error) {
 			return looppreflight.DiskUsage{FreeBytes: uint64(50 * float64(total) / 100), TotalBytes: total}, nil
 		},
 	})
+	if buildErr != nil {
+		t.Fatal(buildErr)
+	}
 	if err := looppreflight.RunCycleStart(context.Background(), opts); err != nil {
 		t.Fatalf("RunCycleStart = %v, want nil; warn=%s", err, warn.String())
 	}
@@ -163,19 +167,16 @@ func TestCycleStartTrim_OptionsFallbacksAndErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var warn bytes.Buffer
-	pol := loadCycleStartGCPolicy(evolveDir, &warn)
-	if pol.TestCacheTTLDays != 0 || !strings.Contains(warn.String(), "policy load failed") {
-		t.Fatalf("loadCycleStartGCPolicy = (%+v, %q), want zero policy and WARN", pol, warn.String())
+	if _, err := buildCycleStartOptions("", evolveDir, nil, cycleStartHooks{}); !errors.Is(err, errCycleStartPolicyRefused) {
+		t.Fatalf("buildCycleStartOptions with a malformed policy = %v, want errCycleStartPolicyRefused", err)
 	}
-
-	optsFromEvolveDir := buildCycleStartOptions("", evolveDir, nil, cycleStartHooks{})
-	if optsFromEvolveDir.Guard == nil || optsFromEvolveDir.Trim == nil {
-		t.Fatalf("buildCycleStartOptions with evolveDir only returned nil fields: %+v", optsFromEvolveDir)
+	optsFromEmpty, err := buildCycleStartOptions("", "", nil, cycleStartHooks{})
+	if err != nil || optsFromEmpty.Guard == nil || optsFromEmpty.Trim == nil {
+		t.Fatalf("buildCycleStartOptions with empty paths = (%+v, %v), want a full option set", optsFromEmpty, err)
 	}
-	optsFromEmpty := buildCycleStartOptions("", "", nil, cycleStartHooks{})
-	if optsFromEmpty.Guard == nil || optsFromEmpty.Trim == nil {
-		t.Fatalf("buildCycleStartOptions with empty paths returned nil fields: %+v", optsFromEmpty)
+	optsFromRoot, err := buildCycleStartOptions(t.TempDir(), "", nil, cycleStartHooks{})
+	if err != nil || optsFromRoot.Guard == nil {
+		t.Fatalf("buildCycleStartOptions with a root only = (%+v, %v)", optsFromRoot, err)
 	}
 
 	unreadable := filepath.Join(evolveDir, "landing", "testcache", "locked")
@@ -186,7 +187,7 @@ func TestCycleStartTrim_OptionsFallbacksAndErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(unreadable, 0o755) })
-	if err := cycleStartTrim(evolveDir, &bytes.Buffer{})(); err == nil {
+	if err := cycleStartTrim(evolveDir, gc.Policy{})(); err == nil {
 		t.Fatal("cycleStartTrim on unreadable testcache dir = nil, want error")
 	}
 }
