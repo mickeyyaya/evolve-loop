@@ -43,7 +43,7 @@ func TestDefaultBuildFloorChecks_ARealRedStaysRedBesideAnEnvExclusivePackage(t *
 		"real/r_integration_test.go": "//go:build integration\n\npackage real\n\nimport \"testing\"\n\nfunc TestRedUnderTag(t *testing.T) { t.Fatal(\"red under the tag\") }\n",
 	}, map[string]string{
 		"internal/bridge/b.go":      scopeBridgeSrc,
-		"internal/bridge/b_test.go": "package bridge\n\nimport \"testing\"\n\nfunc TestAlwaysRed(t *testing.T) { _ = Boot(); t.Fatal(\"red\") }\n",
+		"internal/bridge/b_test.go": "//go:build !notmux\n\npackage bridge\n\nimport \"testing\"\n\nfunc TestAlwaysRed(t *testing.T) { _ = Boot(); t.Fatal(\"red\") }\n",
 		"real/r.go":                 strings.Replace(scopeRealSource, "1", "2", 1),
 	})
 	failures := strings.Join(DefaultBuildFloorChecks(context.Background(), in), "\n")
@@ -52,11 +52,11 @@ func TestDefaultBuildFloorChecks_ARealRedStaysRedBesideAnEnvExclusivePackage(t *
 		t.Fatalf("failures = %q, want the real red of ./real named: a real red must never print GREEN", failures)
 	}
 	if strings.Contains(failures, "TestAlwaysRed") || strings.Contains(stderr.String(), "./internal/bridge was RED") {
-		t.Errorf("failures = %q, stderr = %q: internal/bridge is env-exclusive and must not run at any floor entry", failures, stderr.String())
+		t.Errorf("failures = %q, stderr = %q: the tmux tier of internal/bridge is out of the build at every floor entry", failures, stderr.String())
 	}
 }
 
-func TestDefaultBuildFloorChecks_AGreenEnvExclusiveChangeIsNotJudgedByCoverage(t *testing.T) {
+func TestDefaultBuildFloorChecks_AnUntestedBridgeFunctionIsRefusedByCoverage(t *testing.T) {
 	t.Parallel()
 	in, _ := scopeJourneyRepo(t, nil, map[string]string{
 		"internal/bridge/b.go": scopeBridgeSrc,
@@ -66,8 +66,24 @@ func TestDefaultBuildFloorChecks_AGreenEnvExclusiveChangeIsNotJudgedByCoverage(t
 
 	failures := strings.Join(DefaultBuildFloorChecks(context.Background(), in), "\n")
 
+	if !strings.Contains(failures, "internal/bridge.Boot") || strings.Contains(failures, "real.R") {
+		t.Fatalf("failures = %q, want the untested bridge function Boot refused and nothing of ./real", failures)
+	}
+}
+
+func TestDefaultBuildFloorChecks_AHermeticallyTestedBridgeFunctionPassesCoverage(t *testing.T) {
+	t.Parallel()
+	in, _ := scopeJourneyRepo(t, nil, map[string]string{
+		"internal/bridge/b.go":      scopeBridgeSrc,
+		"internal/bridge/b_test.go": "package bridge\n\nimport \"testing\"\n\nfunc TestBoot(t *testing.T) { _ = Boot() }\n",
+		"real/r.go":                 scopeRealSource,
+		"real/r_test.go":            scopeRealCovered,
+	})
+
+	failures := strings.Join(DefaultBuildFloorChecks(context.Background(), in), "\n")
+
 	if strings.Contains(failures, "internal/bridge") {
-		t.Fatalf("failures = %q, want no coverage refusal for a package that no floor run covers", failures)
+		t.Fatalf("failures = %q, want no refusal for a bridge function that a test without tmux covers", failures)
 	}
 }
 

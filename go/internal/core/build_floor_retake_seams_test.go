@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -98,10 +99,10 @@ func TestCoverPlanRetake_APlumbingErrorOnTheRetakeKeepsTheFirstRedAndIsNotRED(t 
 	var stderr strings.Builder
 	in := ReviewInput{ProjectRoot: t.TempDir(), Signals: signals, Stderr: &stderr}
 
-	out, status := plan.retake(context.Background(), in, retakeRedOutput)
+	red, status := plan.retake(context.Background(), in, coverRed{out: retakeRedOutput, tags: []string{"integration", "notmux"}})
 
-	if status != coverStatusTestsFailed || !strings.Contains(out, "--- FAIL: TestFlaky") {
-		t.Fatalf("(%q, %d), want the first red kept", out, status)
+	if status != coverStatusTestsFailed || !strings.Contains(red.out, "--- FAIL: TestFlaky") || !slices.Equal(red.tags, []string{"integration", "notmux"}) {
+		t.Fatalf("(%+v, %d), want the first red and its tags kept", red, status)
 	}
 	if events := retakeEvents(signals); len(events) != 0 {
 		t.Errorf("signals = %+v, want no RED signal for a plumbing error", events)
@@ -120,7 +121,7 @@ func TestScopedCoverProfile_AFirstPassPlumbingErrorIsNotRetaken(t *testing.T) {
 	signals := signalcenter.New()
 	in := ReviewInput{ProjectRoot: t.TempDir(), Signals: signals, Stderr: &strings.Builder{}}
 
-	_, _, status := scopedCoverProfile(context.Background(), in, module, []string{"./p"}, nil)
+	_, _, status, _ := scopedCoverProfile(context.Background(), in, module, []string{"./p"}, nil)
 
 	if status != coverStatusPlumbingError || len(retakeEvents(signals)) != 0 {
 		t.Fatalf("status = %d, signals = %+v, want a plumbing error and no retake", status, retakeEvents(signals))

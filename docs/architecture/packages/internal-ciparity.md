@@ -20,6 +20,12 @@
 - `E2ETestNames` and `E2ERunPattern` build the `-run` pattern of `make test-e2e`. A test belongs to the e2e tier when only the `e2e` tag adds its file to the package. `cmd/e2elist` is the thin command over `E2EMain`.
 - **The darwin set has one writer.** `SyncDarwinSet(moduleDir, write)` derives the set and compares it with `go/.darwin-set`. With `write` it writes the file. Without `write`, a different file returns `ErrDarwinSetStale`. `evolve ci darwin-set <generate|check>` and the `darwin-set` entry of `internal/derived` call it, so `evolve pr refresh` can write the file after a rebase (plan [pr-merge-latency-2026-10](../../plans/pr-merge-latency-2026-10.md) P3). Pinned by `TestSyncDarwinSet_ChecksThenWritesTheSetFile`.
 
+## The exclusion tag
+
+Each entry of the env-exclusive table declares an exclusion tag. For `internal/bridge` it is `notmux`. `EnvExclusiveTags` lists the tags and `EnvExclusiveTagOf` gives the tag of one package. The floor adds these tags to `covchanged.DefaultTags` for its cover run. The test files of the tier carry `!notmux`, so the compiler leaves them out of that run. CI sets no exclusion tag, and the tier builds there as before.
+
+`TestEnvExclusive_EntriesDeclareAnExclusionTag` fails for an entry with no tag.
+
 ## Invariants
 
 - Scope is `./internal/` only, because apicover scopes only that tree. `./cmd/...` entrypoints are never flagged.

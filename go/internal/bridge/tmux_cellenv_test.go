@@ -1,3 +1,5 @@
+//go:build !notmux
+
 package bridge
 
 import (

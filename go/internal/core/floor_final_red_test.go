@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/covchanged"
 )
 
 const finalRedOutput = "--- FAIL: TestRedUnderTag (0.01s)\n    x_test.go:9: open %s: no such file\nFAIL\texample.com/m/p\t0.2s\n"
@@ -37,7 +39,7 @@ func TestFindingIdentity_OneGoTestRedIsOneIdentityOnAllThreeRenderers(t *testing
 		return [3]string{
 			floorLinesFor([]selfCheckFailure{{Pkg: "./p", Output: out}}, nil, nil)[0],
 			fmt.Sprintf("enforced package tests FAIL (coverage run doubles as their selfcheck):\n%s", out),
-			coverChangedTestsFailedHeadline + ":\n    " + floorFailureDiagnostic(out),
+			coverChangedTestsFailedHeadline(covchanged.DefaultTags) + ":\n    " + floorFailureDiagnostic(out),
 		}
 	}
 	first, second := render("/var/folders/aa/T/TestX1/001"), render("/var/folders/bb/T/TestX2/001")

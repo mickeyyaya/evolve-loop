@@ -46,7 +46,7 @@ export GIT_CONFIG_VALUE_1 := 0
 export GORACE := $(strip $(GORACE) atexit_sleep_ms=0)
 
 .PHONY: build test test-component test-integration test-e2e test-acs-durable test-all \
-        test-latency test-budget cover apicover lint tidy clean help dist dist-clean \
+        test-notmux test-latency test-budget cover apicover lint tidy clean help dist dist-clean \
         cover-strict cover-changed apicover-enforce apicover-check \
         test-integration-darwin print-test-timeout-darwin cover-changed-darwin cover-strict-darwin darwin-set \
         dist-darwin-amd64 dist-darwin-arm64 dist-linux-amd64 dist-linux-arm64 \
@@ -110,6 +110,9 @@ test: ## FAST layer: co-located unit/functional/component tests, race on (exclud
 	$(GO) test -race -count=1 -cover -timeout $(TEST_TIMEOUT) $(FAST_PKGS); status=$$?; \
 	$(GO) run ./cmd/evolve treewalk check --root . --baseline "$$base" || status=1; \
 	rm -f "$$base"; exit $$status
+
+test-notmux: ## The notmux build of internal/tmuxtest and internal/bridge under -tags integration,notmux: the floor build, which needs no tmux
+	$(GO) test -count=1 -tags integration,notmux ./internal/tmuxtest/ ./internal/bridge/
 
 test-component: ## Component tier: several internal packages wired against temp FS (no subprocess)
 	$(GO) test -race -count=1 ./test/component/...
