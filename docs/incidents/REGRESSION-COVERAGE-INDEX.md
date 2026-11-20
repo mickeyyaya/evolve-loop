@@ -13,15 +13,15 @@
 | ❌ none | No regression test pins this mode. |
 | ⛔ untestable | Depends on external infra/CLI behavior (vendor rate limit, interactive modal) a unit test cannot reproduce; mitigate by design + docs, not a unit test. |
 
-## Summary (counts moved 2026-11-19 for the records of waves 180 and 181)
+## Summary (counts moved 2026-11-20 for the records of waves 180 to 182)
 
 | | Count |
 |---|---|
-| Incidents mapped | 67 |
-| Distinct failure modes (coverage-map rows) | 111 |
+| Incidents mapped | 68 |
+| Distinct failure modes (coverage-map rows) | 113 |
 | ✅ covered (a test fails if the bug comes back) | 83 |
 | 🟡 partial (related test, doesn't pin the exact mode) | 11 |
-| ❌ none (no regression test) | 17 |
+| ❌ none (no regression test) | 19 |
 | ⛔ untestable (external infra / live CLI) | 0 |
 
 These counts are tallies of the coverage map's rows, so they move with it: a new
@@ -158,6 +158,8 @@ not the coverage map, which is the hand-maintained per-incident record.
 | [2026-11-19 — agent run deleted the reverted patch of two builder seats](2026-11-19-agent-run-deleted-the-reverted-patch-of-two-builder-seats.md) | the fence saved `fence-reverted.patch` in the run workspace, and `evolve agent run` removed the workspace on exit, so the patch that the WARN named did not exist | `cli/agentcmd/run.go` (`removeWorkspace`), `treefence/fence.go` (`savePatch`) | ❌ | inbox item `agent-run-deletes-the-fence-reverted-patch` |
 | [2026-11-19 — the console applied the backlog dispositions with two errors](2026-11-19-the-console-applied-the-backlog-dispositions-with-two-errors.md) | a console zsh loop named a variable `path`, which is tied to `PATH`. Thus 18 `inbox consume` calls ran with a resolution that had no claim and no evidence | console practice (no code) | ❌ | none: a console shell defect; the control is to print the arguments of a state-changing loop first |
 | 2026-11-19 — the console applied the backlog dispositions with two errors | 9 of 31 items routed to lanes on an unchecked first-pass claim were not lane work. `inbox route-lane` does not check a prerequisite that the item names in prose | `inboxmover` (route-lane) | ❌ | none: the adversarial pass before a route batch is the control; corrections wait for the boundary |
+| [2026-11-20 — salvage bundles filled the disk and hung a loop test](2026-11-20-salvage-bundles-filled-the-disk-and-hung-a-loop-test.md) | each gc salvage leaf bundled the full history (1.1 GB), and no sweep removed a leaf. The store grew to 187 GB, and the host disk had 2.6% free | `gc/salvage.go` (`writeSalvageLeaf`) | ❌ | inbox item `gc-salvage-bundles-hold-the-whole-history-with-no-retention` |
+| 2026-11-20 — salvage bundles filled the disk and hung a loop test | `TestLoop_MaxCyclesExit_ClearsCompletedMarker` reads the host disk through the production disk guard. On a full host it waited without end. It spent the ACS Go lane budget of cycles 2547, 2548, 2550 and 2551 | `cmd/evolve` loop tests, `looppreflight/cyclestart.go` (`RunCycleStart`) | ❌ | inbox item `loop-tests-read-the-real-host-disk-through-the-disk-guard` |
 
 ## Prioritized gap backlog (13-agent sweep; agent confidence in parens)
 
