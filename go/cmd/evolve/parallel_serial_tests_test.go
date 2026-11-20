@@ -1,6 +1,10 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestPoolLane_LowDiskEmitsHostDiskLowOnTheCoordinatorCenter":                                                 "replaces the process-wide cycleStartDiskUsageFn seam",
+	"main.TestBuildCycleStartOptions_HookWinsOverTheSeam":                                                             "replaces the process-wide cycleStartDiskUsageFn seam",
+	"main.TestBuildCycleStartOptions_UsesTheSeamWhenNoHookIsSet":                                                      "replaces the process-wide cycleStartDiskUsageFn seam",
+	"main.TestLoop_MaxCyclesExit_ClearsCompletedMarker_WhenHostDiskIsLow":                                             "replaces the process-wide cycleStartDiskUsageFn seam",
 	"main.TestAgentRunBridge_AnUnreadableCatalogStillBuildsABridge":                                                   "agentRunBridge puts the evolve binary directory on the process PATH",
 	"main.TestAgentRunBridge_TheSeatPromptHoldsTheRequiredSectionsOfThePhaseContract":                                 "agentRunBridge puts the evolve binary directory on the process PATH",
 	"main.TestSelectorFlags_ARelaunchedLaunchIsNotCheckedAgainstItemsItAlreadyShipped":                                "drives runLoop or parseLoopArgs, which read the process arguments and the re-exec handoff",

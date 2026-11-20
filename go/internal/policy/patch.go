@@ -46,6 +46,9 @@ func Parse(raw []byte) (Policy, error) {
 	if err := p.ExpectedSignal.validate(); err != nil {
 		return Policy{}, fmt.Errorf("expected_signal: %w", err)
 	}
+	if err := p.Preflight.validate(); err != nil {
+		return Policy{}, fmt.Errorf("preflight.%w", err)
+	}
 	return p, nil
 }
 

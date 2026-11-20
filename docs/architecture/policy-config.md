@@ -392,6 +392,16 @@ The loop warns when a stage emits its start signal and its end signal does not f
 
 A key that is 0 or absent keeps its default. The block refuses each other key.
 
+## Disk pause limit (`preflight.disk_guard`)
+
+The cycle start waits when free disk space is below 5%. This block sets how long it waits before it gives up.
+
+| Key | Meaning | Default | Refused |
+|---|---|---|---|
+| `max_pause_s` | the longest wait, in seconds, before the cycle start stops with the signal `HOST_DISK_LOW` (outcome `gave_up`) | 1800 | 0, below 0, or not a number |
+
+An absent key keeps its default. The block refuses each other key.
+
 ## Context-fill telemetry (`context_fill`)
 
 The token telemetry of every launch carries a derived **fill reading**. It is the prompt-side

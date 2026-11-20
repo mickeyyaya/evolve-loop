@@ -236,6 +236,12 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `HEALING_INCIDENT_REOPENED` | the incident detector reopened a closed incident, because its signal fired again after the close; the same fields as HEALING_INCIDENT_OPENED (llm-isolation.md §18, §22) |
 | `HEALING_PROPOSAL_REFUSED` | the catalog validator refused a proposal of the orchestrator agent; fields incident, class, tier, action, verdict, precondition, reason, stage (llm-isolation.md §19, §19.2, §24) |
 
+### host
+
+| Code | Meaning |
+|---|---|
+| `HOST_DISK_LOW` | free disk space on the host volume is below the pause line, so the cycle start waits before it dispatches. fields.free_pct, pause_pct and path give the reading, and fields.outcome is paused (the first wait) or gave_up (the maximum pause from preflight.disk_guard.max_pause_s passed and the cycle start stopped) |
+
 ### inbox
 
 | Code | Meaning |

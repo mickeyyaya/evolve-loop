@@ -34,6 +34,9 @@ func TestMain(m *testing.M) {
 		}
 	}
 	disableWorkspaceGuardForTest = true
+	cycleStartDiskUsageFn = func(string) (looppreflight.DiskUsage, error) {
+		return looppreflight.DiskUsage{FreeBytes: 90 << 30, TotalBytes: 100 << 30}, nil
+	}
 	runLoopPreflightFn = func(loopConfig, io.Writer) looppreflight.Result {
 		return looppreflight.Result{}
 	}

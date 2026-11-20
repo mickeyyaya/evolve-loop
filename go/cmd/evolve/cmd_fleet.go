@@ -16,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -158,6 +159,7 @@ type cycleLaunch struct {
 	Stderr     io.Writer
 	Pool       int
 	startHooks cycleStartHooks
+	Signals    *signalcenter.Center
 }
 
 func execCycleLaunch(binPath string, simulate bool, projectRoot, goalHash, goalText string, stdout, stderr io.Writer) fleet.LaunchFn {
@@ -172,7 +174,13 @@ func (l cycleLaunch) LaunchFn() fleet.LaunchFn {
 		ew := &prefixLineWriter{w: l.Stderr, prefix: prefix, mu: &logMu}
 		defer func() { ow.Flush(); ew.Flush() }()
 		if !l.Simulate || l.startHooks.trim != nil || l.startHooks.usage != nil {
-			if err := looppreflight.RunCycleStart(ctx, buildCycleStartOptions(l.Root, "", ew, l.startHooks)); err != nil {
+			hooks := l.startHooks
+			hooks.signals = l.Signals
+			startOpts, err := buildCycleStartOptions(l.Root, "", ew, hooks)
+			if err == nil {
+				err = looppreflight.RunCycleStart(ctx, startOpts)
+			}
+			if err != nil {
 				return -1, err
 			}
 		}
