@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "A test with a fake git and gh where refs/pull/N/head is one commit behind the head branch: record-pr does not write a record with the old commit list; red on main, where it records the stale list with rc 0",
+    "When the pull ref catches up inside the bound, record-pr records the full commit list",
+    "When it does not catch up, record-pr exits 1 and names the pull-ref SHA and the head-branch SHA"
+  ],
+  "created_at": "2026-11-20T20:37:14Z",
+  "files": [
+    "go/internal/integration/train.go",
+    "go/cmd/evolve/cmd_integration_batch.go"
+  ],
+  "fix": "Before it lists the commits, record-pr compares refs/evolve/pr/N with the tip of the PR head branch on origin (fetch the head branch by the name that gh pr view gives, or compare with the headRefOid that the gh call returns). When they differ, it fetches again for a bounded time from policy data, and then refuses with rc 1 and a message that names both SHAs. Red first.",
+  "id": "record-pr-refuses-a-pull-ref-behind-the-pushed-branch",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Boundary 183 (2026-11-20): the console pushed a second commit 1c4007943 to PR #1605 with evolve ship and ran `evolve integration record-pr --pr 1605 --reviewed` seconds later. The verb printed 'recorded PR #1605' with rc 0, but the record (.evolve/waves/integration-console/deliverable-pr-1605.json) listed only the first commit 8bcd89ea5. The batch then refused with 'PR #1605 head moved since its review was recorded: record the review again'. Cause: record-pr fetches +refs/pull/N/head into refs/evolve/pr/N (go/internal/integration/train.go:207) and lists its commits (train.go:526 prCommits); GitHub updates refs/pull/N/head some seconds after a push to the head branch, so the fetch can return the old head. Nothing compares the fetched pull ref with the head branch tip, so the verb records a stale commit list and reports success.",
+  "title": "integration record-pr records the commits of a stale pull ref right after a push, and the batch then refuses the PR",
+  "weight": 0.5
+}

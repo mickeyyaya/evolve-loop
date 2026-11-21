@@ -1,0 +1,41 @@
+{
+  "acceptance": [
+    "evolve wave latency --check reports the newest wave ok or left out",
+    "The cause has a regression test that fails before the fix and passes after it"
+  ],
+  "consumed": {
+    "at": "2026-11-20T23:54:09Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "split, not built by a lane: both acceptance criteria moved to the console parts latency-wave-breach-from-wave-159-ac-1-console and -ac-2-console. The cause (the serial scope loop in go/internal/acssuite/golane.go) is on the protected surface, and cycle 2579 FAILED on an empty diff after 4 build rounds (audit H1). The console builds ac-2 now in dev/cl-b078."
+  },
+  "created_at": "2026-11-20T20:43:25Z",
+  "failure_count": 1,
+  "fix": "Run evolve wave latency --wave 181, find where the live lanes or the host gate time went, and fix the cause at its source.",
+  "id": "latency-wave-breach-from-wave-159",
+  "kind": "fix",
+  "last_failure_class": "capability",
+  "last_failure_cycle": 2579,
+  "last_failure_reason": "cycle-failure-release",
+  "last_failure_rung": "R3",
+  "origin": "cycle",
+  "priority": "high",
+  "priority_class": "performance",
+  "released_continuations": [
+    {
+      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2579",
+      "branch": "cycle-cd3ae73e-2579",
+      "snapshot_sha": "d114136e0e3457aa7c813e6bc2552524d3c4afb6",
+      "base_sha": "5badf79df3dcdab8b63e85ad8bd64dbdf64221d6",
+      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2579/audit-fail-reason.json",
+      "cycle": 2579,
+      "released_at": "2026-11-20T23:54:09Z",
+      "reason": "inbox-consume",
+      "released_by": "operator (evolve inbox consume)"
+    }
+  ],
+  "source": "wave-latency-check",
+  "summary": "evolve wave latency --check found waves 159, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 181 in breach in a row: host gate share 47.5%, above the ceiling of 25.0%. A wave with a quota pause, a loop stop_reason or an operator brake does not count. The bounds are wave_latency.min_live_share and wave_latency.max_gate_share in policy.json.",
+  "title": "Wave latency budget exceeded in waves 159, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 181",
+  "weight": 0.7
+}

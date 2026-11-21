@@ -4,6 +4,12 @@
     "The requireTmux tests still do not run at the floor under a live loop.",
     "The floor names each changed bridge function that it could not measure, instead of a silent skip."
   ],
+  "consumed": {
+    "at": "2026-11-20T23:54:32Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "done on main (verified by triage and 2 adversarial checks, origin/main 5badf79df): packageCoverTags in go/internal/core/cover_changed_floor.go adds the notmux tag for internal/bridge, so the floor measures a bridge change during a wave and refuses a new or partly covered function (TestCoverChangedFailures_ABridgeChangeIsMeasuredUnderTheFloorTags); landed through integrate PR #1583."
+  },
   "created_at": "2026-11-08T16:32:40Z",
   "files": [
     "go/internal/core/cover_changed_floor.go",

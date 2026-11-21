@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "evolve wave latency --check reports the newest wave ok or left out. The audit host gate share is the cause. It falls only when the audit ACS suite stops running its predicate scopes one after another (the fix of AC 2). The check reads live wave data, so it is verified after the next closed wave."
+  ],
+  "created_at": "2026-11-20T23:12:55Z",
+  "files": [
+    "go/internal/acssuite/golane.go"
+  ],
+  "fix": "Make the change that AC 1 needs on the protected path(s) go/internal/acssuite/golane.go, then prove the criterion with a test.",
+  "id": "latency-wave-breach-from-wave-159-ac-1-console",
+  "kind": "fix",
+  "origin": "cycle",
+  "priority_class": "performance",
+  "route": "console-manual",
+  "source": "cycle 2579, tdd test-report.md AC 1 (console-followup)",
+  "summary": "The TDD phase of cycle 2579 gave AC 1 of latency-wave-breach-from-wave-159 the console-followup disposition. A lane builder can never change the paths it needs (go/internal/acssuite/golane.go). The lane part ships without it, so the console owns this part.",
+  "title": "Console part of latency-wave-breach-from-wave-159: AC 1, which needs a protected path changed",
+  "weight": 0.7
+}
