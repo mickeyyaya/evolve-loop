@@ -228,3 +228,76 @@ verified_at: ""
 		t.Errorf("list non-dir docs/incidents = %d\n%s", code, out)
 	}
 }
+
+func TestRunIssue_RenderTurnsATemplateRecordFromFailingCheckToPassing(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	id := "2026-11-21-template-cuj"
+	doc := strings.NewReplacer(
+		"<yyyy-mm-dd-slug>", id,
+		"<what broke, as a sentence>", "a template record",
+		"<cycle:N:S>", "cycle:1:1",
+	).Replace(incidentTemplateForCUJ(t))
+	path := incidentkb.RecordPath(root, id)
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(doc), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, code := runIssueArgs("check", "--project-root", root, id)
+	if code != 1 || strings.Count(out, "does not match frontmatter") != 3 {
+		t.Fatalf("check before render: exit %d, want 1 with 3 rendered-part FAILs\n%s", code, out)
+	}
+	if out, code := runIssueArgs("render", "--project-root", root, id); code != 0 || !strings.Contains(out, "rendered "+id) {
+		t.Fatalf("render: exit %d, want 0 saying rendered %s\n%s", code, id, out)
+	}
+	if out, code := runIssueArgs("check", "--project-root", root, id); code != 0 || !strings.Contains(out, "ok "+id) {
+		t.Fatalf("check after render: exit %d\n%s", code, out)
+	}
+	first, _ := os.ReadFile(path)
+	if _, code := runIssueArgs("render", "--project-root", root, id); code != 0 {
+		t.Fatalf("second render: exit %d", code)
+	}
+	if second, _ := os.ReadFile(path); string(first) != string(second) {
+		t.Errorf("a second render changed the bytes")
+	}
+}
+
+func TestRunIssue_RenderExitCodes(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	for _, args := range [][]string{{"render"}, {"render", "a", "b"}} {
+		if out, code := runIssueArgs(args...); code != 10 {
+			t.Errorf("runIssue(%v) = %d, want 10\n%s", args, code, out)
+		}
+	}
+	if out, code := runIssueArgs("render", "--project-root", root, "2026-11-21-absent"); code != 1 || !strings.Contains(out, "evolve issue render") {
+		t.Errorf("render of a missing record: exit %d, want 1 naming the verb\n%s", code, out)
+	}
+}
+
+func incidentTemplateForCUJ(t *testing.T) string {
+	t.Helper()
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for {
+		raw, err := os.ReadFile(filepath.Join(dir, "skills", "docs-write", "references", "templates.md"))
+		if err == nil {
+			_, after, found := strings.Cut(string(raw), "\n## Incident\n")
+			_, open, fenced := strings.Cut(after, "````markdown\n")
+			block, _, closed := strings.Cut(open, "\n````\n")
+			if !found || !fenced || !closed {
+				t.Fatal("the Incident template block is missing from templates.md")
+			}
+			return block + "\n"
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Fatal("templates.md not found above the test directory")
+		}
+		dir = parent
+	}
+}

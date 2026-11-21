@@ -54,10 +54,10 @@ The session log has one table:
 | 2. Trim and redact | Keep 20 lines or fewer for each log block. Remove each token, key, password, account name, email address and person name. | No secret in the text. |
 | 3. Analyze | Run [issue-analyze](../issue-analyze/SKILL.md) on the evidence. | A causal chain, the escape and the class fix. |
 | 4. Fix | Write the regression test first and prove it red without the fix. Then fix the root cause through its owner: a PR, a lane item or an inbox item. | The test is red without the fix and green with it. |
-| 5. Write | Write the record with [docs-write](../docs-write/SKILL.md) and its §Incident template. Put the key logs in fenced blocks under the timeline. | The five sections exist. |
+| 5. Write | Write the record with [docs-write](../docs-write/SKILL.md) and its §Incident template. The template lists the sections. Put the key logs in fenced blocks under Key logs. Then run `evolve issue render <id>`. | `evolve issue check <id>` reports no section problem. |
 | 6. Index | Add one row for each failure mode to [REGRESSION-COVERAGE-INDEX.md](../../docs/incidents/REGRESSION-COVERAGE-INDEX.md). Change the summary counts in the same edit. | The row names the pinning test, or ❌ and the item that tracks it. |
 | 7. Link | Name the self-heal incident id, the signal code, the PR and the inbox item in the record. | Each id is in the record. |
-| 8. Check | Run `evolve docs ste-lint --strict --changed refs/remotes/origin/main --added` and resolve each relative link. Then run the [docs-review](../docs-review/SKILL.md) pass. | 0 findings. |
+| 8. Check | Run `evolve issue check <id>`. Run `evolve docs ste-lint --strict --changed refs/remotes/origin/main --added` and resolve each relative link. Then run the [docs-review](../docs-review/SKILL.md) pass. | 0 findings. |
 
 The record holds these parts. The template of docs-write gives the section order.
 
@@ -76,7 +76,7 @@ A WARN or INCIDENT event on the lossless channels `errors` and `selfheal.inciden
 evolve events watch --channel errors,selfheal.incident --filter 'severity>=WARN' --since new
 ```
 
-Start the skill for each new code and cycle pair. Do not start it again for a repeat of one code in one cycle. Add the new evidence to the open record instead. The later verb `evolve issue stub` (plan component K4) writes the header and the timeline from the signal. Until it exists, step 1 is by hand.
+Start the skill for each new code and cycle pair. Do not start it again for a repeat of one code in one cycle. Add the new evidence to the open record instead. The later verb `evolve issue open` (plan component I4) writes the header and the timeline from the signal. Until it exists, step 1 is by hand.
 
 ## Worked example: tests leaked ledgers under go/ (2026-11-16)
 
