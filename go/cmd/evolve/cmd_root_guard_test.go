@@ -128,19 +128,123 @@ func seamDefaultsTo(file *ast.File, name, value string) bool {
 	return false
 }
 
-func TestRootSignalCenter_EveryRootRunsUnderARoleOfTheClosedSet(t *testing.T) {
-	t.Parallel()
-	roles := []string{roleCycle, roleLoop, roleLoopChain, roleShip, roleSubagent, roleSimulate, roleDispatch}
-
-	for _, role := range roles {
-		if !slices.Contains(publisher.Roles(), role) {
-			t.Errorf("role %q is not one of publisher.Roles() %v", role, publisher.Roles())
+func evolveMainSources(t *testing.T) map[string]*ast.File {
+	t.Helper()
+	main := map[string]*ast.File{}
+	for _, f := range sourceFilesInDir(t, ".") {
+		if !strings.Contains(f.Rel, "/") {
+			main["cmd/evolve/"+f.Rel] = f.AST(t)
 		}
 	}
-	distinct := slices.Clone(roles)
-	slices.Sort(distinct)
-	if len(slices.Compact(distinct)) != len(roles) {
-		t.Errorf("roles %v repeat: each Center of a process needs its own role, because the reader keys gaps on (source, pid)", roles)
+	return main
+}
+
+func stringConstants(files map[string]*ast.File) map[string]string {
+	consts := map[string]string{}
+	for _, file := range files {
+		for _, decl := range file.Decls {
+			gen, ok := decl.(*ast.GenDecl)
+			if !ok || gen.Tok != token.CONST {
+				continue
+			}
+			for _, spec := range gen.Specs {
+				vs := spec.(*ast.ValueSpec)
+				lit, isLit := firstValue(vs).(*ast.BasicLit)
+				if len(vs.Names) != 1 || !isLit || lit.Kind != token.STRING {
+					continue
+				}
+				if value, err := strconv.Unquote(lit.Value); err == nil {
+					consts[vs.Names[0].Name] = value
+				}
+			}
+		}
+	}
+	return consts
+}
+
+func isParameterOf(fd *ast.FuncDecl, name string) bool {
+	for _, field := range fd.Type.Params.List {
+		for _, id := range field.Names {
+			if id.Name == name {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func roleArgumentsOf(files map[string]*ast.File, consts map[string]string, callees ...string) (roles map[string][]string, dynamic []string) {
+	roles = map[string][]string{}
+	for rel, file := range files {
+		for _, fd := range functionsOf(file) {
+			ast.Inspect(fd.Body, func(n ast.Node) bool {
+				call, ok := n.(*ast.CallExpr)
+				if !ok || len(call.Args) == 0 || !slices.Contains(callees, calleeName(call.Fun)) {
+					return true
+				}
+				site := rel + ":" + fd.Name.Name
+				switch arg := call.Args[0].(type) {
+				case *ast.BasicLit:
+					if role, err := strconv.Unquote(arg.Value); err == nil {
+						roles[role] = append(roles[role], site)
+						return true
+					}
+				case *ast.Ident:
+					if role, ok := consts[arg.Name]; ok {
+						roles[role] = append(roles[role], site)
+						return true
+					}
+					if isParameterOf(fd, arg.Name) {
+						return true
+					}
+				}
+				dynamic = append(dynamic, site)
+				return true
+			})
+		}
+	}
+	slices.Sort(dynamic)
+	return roles, slices.Compact(dynamic)
+}
+
+func TestRootSignalCenter_EveryCallSiteRoleIsAPublisherRole(t *testing.T) {
+	t.Parallel()
+	files := evolveMainSources(t)
+
+	roles, dynamic := roleArgumentsOf(files, stringConstants(files), "newRoleSignalCenter", "newRoleSignalCenterWithAttach")
+
+	if len(roles) == 0 {
+		t.Fatal("no call site of newRoleSignalCenter or newRoleSignalCenterWithAttach passes a role that the guard can read: the derivation is broken")
+	}
+	for _, role := range slices.Sorted(maps.Keys(roles)) {
+		if !slices.Contains(publisher.Roles(), role) {
+			sites := slices.Clone(roles[role])
+			slices.Sort(sites)
+			t.Errorf("role %q passed at %v is not one of publisher.Roles() %v: Config.check refuses it, and rootwire.Attach drops every event of that root", role, slices.Compact(sites), publisher.Roles())
+		}
+	}
+	if want := []string{"cmd/evolve/cmd_cycle.go:wireOrchestratorDeps"}; !slices.Equal(dynamic, want) {
+		t.Errorf("call sites whose role the guard cannot read = %v, want exactly %v: give a new root a named constant or a literal role", dynamic, want)
+	}
+}
+
+func TestRootSignalCenter_EveryRootRunsUnderARoleOfTheClosedSet(t *testing.T) {
+	t.Parallel()
+	owners := map[string]string{}
+	for name, role := range stringConstants(evolveMainSources(t)) {
+		if !strings.HasPrefix(name, "role") {
+			continue
+		}
+		if !slices.Contains(publisher.Roles(), role) {
+			t.Errorf("role constant %s = %q is not one of publisher.Roles() %v", name, role, publisher.Roles())
+		}
+		if other, taken := owners[role]; taken {
+			t.Errorf("constants %s and %s both name the role %q: each Center of a process needs its own role, because the reader keys gaps on (source, pid)", other, name, role)
+		}
+		owners[role] = name
+	}
+	if len(owners) == 0 {
+		t.Fatal("no role constant found: the derivation is broken")
 	}
 }
 

@@ -5,13 +5,18 @@
     "An integration-root emit reaches the root bus: a test attaches rootwire to a center of role integration in a temp evolve dir and reads the record back with source integration",
     "evolve signals codes check passes"
   ],
+  "consumed": {
+    "at": "2026-11-21T21:10:30Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "continuation": {
-    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2586",
-    "branch": "cycle-cd3ae73e-2586",
-    "snapshot_sha": "a57fbe2efce5d8858ea85a2fb693791edef0158b",
     "base_sha": "cfdb5f97dc2857ec9b4541fb6bd4d17194ac4d56",
+    "branch": "cycle-cd3ae73e-2586",
+    "cycle": 2586,
     "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2586/audit-fail-reason.json",
-    "cycle": 2586
+    "snapshot_sha": "a57fbe2efce5d8858ea85a2fb693791edef0158b",
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2586"
   },
   "created_at": "2026-11-20T14:33:53Z",
   "files": [
@@ -26,6 +31,18 @@
   "kind": "bug",
   "origin": "console",
   "priority_class": "debuggability",
+  "released_continuations": [
+    {
+      "base_sha": "cfdb5f97dc2857ec9b4541fb6bd4d17194ac4d56",
+      "branch": "cycle-cd3ae73e-2586",
+      "cycle": 2586,
+      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2586/audit-fail-reason.json",
+      "reason": "ship-consume-",
+      "released_at": "2026-11-21T21:10:30Z",
+      "snapshot_sha": "a57fbe2efce5d8858ea85a2fb693791edef0158b",
+      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2586"
+    }
+  ],
   "summary": "publisher.Roles() (go/internal/events/publisher/publisher.go:55-57) lists 15 roles. The CLI builds signal centers under 5 more: integration (cmd_integration_stop.go:19), auth (cmd_auth_seat_token.go:20), queue (cli_queue.go:33), latency (cmd_wave_latency_check.go:119) and retire (cmd_cycle_retire.go:66). Config.check (publisher.go:83-85) refuses each one, and rootwire.attach (go/internal/events/rootwire/rootwire.go:24-27) prints one stderr WARN and drops every event. Evidence on 2026-11-20: the 266 MB bus under .evolve/events/ch holds 0 records with source integration, auth, queue, latency or retire (wave 68, ship 18, quality 7387). The batch of PR #1600 printed '[events] WARN: role integration publishes no events', so the main-red stop release (GATE_REPO main-red release) and the batch hold signal were lost. The guard TestRootSignalCenter_EveryRootRunsUnderARoleOfTheClosedSet (go/cmd/evolve/cmd_root_guard_test.go:131-145) checks a hand-written list of 7 roles, not the roles that the call sites pass, so it stayed green when the 5 roots were added.",
   "title": "five signal roots run under roles that the publisher refuses, so their events never reach the bus",
   "weight": 0.9

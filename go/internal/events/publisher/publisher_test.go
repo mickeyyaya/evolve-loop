@@ -3,6 +3,8 @@ package publisher
 import (
 	"errors"
 	"io/fs"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -205,7 +207,7 @@ func TestNew_BuildsAPublisherOverTheChannelLogs(t *testing.T) {
 
 func TestRoles_IsTheClosedSetOfTheSpecRoots(t *testing.T) {
 	t.Parallel()
-	want := []string{"cycle", "loop", "loop-chain", "ship", "subagent", "simulate", "phase-observer", "wave", "inbox", "ci", "subscriber", "quality", "dispatch", "agent", "selfheal"}
+	want := []string{"cycle", "loop", "loop-chain", "ship", "subagent", "simulate", "phase-observer", "wave", "inbox", "ci", "subscriber", "quality", "dispatch", "agent", "selfheal", "integration", "auth", "queue", "latency", "retire"}
 
 	got := Roles()
 	got[0] = "changed"
@@ -221,6 +223,37 @@ func TestRoles_IsTheClosedSetOfTheSpecRoots(t *testing.T) {
 			t.Fatalf("newPublisher(role %q) = %v, want it accepted", role, err)
 		}
 		p.Close(time.Minute)
+	}
+}
+
+func specRolesBullet(t *testing.T) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "docs", "architecture", "event-channels.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, afterLead, found := strings.Cut(string(raw), "names the root:")
+	if !found {
+		t.Fatal("event-channels.md has no roles bullet that starts with `names the root:`")
+	}
+	roleList, _, found := strings.Cut(afterLead, "`. ")
+	if !found {
+		t.Fatal("the roles bullet of event-channels.md does not end its role list with a backticked name and a full stop")
+	}
+	return roleList + "`"
+}
+
+func TestRoles_AreTheRolesTheEventChannelsSpecLists(t *testing.T) {
+	t.Parallel()
+	var documented []string
+	for i, part := range strings.Split(specRolesBullet(t), "`") {
+		if i%2 == 1 {
+			documented = append(documented, part)
+		}
+	}
+
+	if got := Roles(); !reflect.DeepEqual(documented, got) {
+		t.Fatalf("event-channels.md §1 lists the roles %q, want the %d roles of Roles() %q in the same order", documented, len(got), got)
 	}
 }
 
