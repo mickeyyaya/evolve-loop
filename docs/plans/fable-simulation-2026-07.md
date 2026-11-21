@@ -1,6 +1,6 @@
 # Design: Fable 5 Simulation — ONE general fable across all LLMs, capability-class scaled (evidence from Opus 4.8 / GPT-5.5 / Gemini 3.5 Flash profiling)
 
-> **Status:** partly built, 2026-11-21 (the authored layers and 1 of 5 slices partial; the other 4 slices not started). Earlier status: authored by Fable 5 on its final availability day (2026-07-07). The content layers only Fable can author (thinking.md, COMPACT.md, the universal-rule folds) ship immediately; mechanical slices are loop-implemented from this doc.
+> **Status:** built, 2026-07-07 (the authored layers are on main; the operator dropped slices F1 to F5 on 2026-11-21). Earlier status: authored by Fable 5 on its final availability day (2026-07-07). The content layers only Fable can author (thinking.md, COMPACT.md, the universal-rule folds) ship immediately; mechanical slices are loop-implemented from this doc.
 > Research base: `docs/research/fable-simulation-2026/{model-profiles,behavior-transfer}.md` + the live-session extraction embedded in `skills/fable/references/*`.
 
 ## Goal & honest ceiling
@@ -73,10 +73,10 @@ Bait-scenario evals, ACS-style, run per model×projection:
 |---|---|---|---|
 | Layer 1: thinking layer (`references/thinking.md`) | done | [#319](https://github.com/mickeyyaya/evolve-loop/pull/319), [`8150235`](https://github.com/mickeyyaya/evolve-loop/commit/815023518); renamed in [`be25d5b`](https://github.com/mickeyyaya/evolve-loop/commit/be25d5b08) (`skills/fable/`) | none |
 | Layer 2: universal rules and `COMPACT.md` (hand-authored) | done | [#319](https://github.com/mickeyyaya/evolve-loop/pull/319); `skills/fable/COMPACT.md` (18 lines) | none |
-| F1 COMPACT generator and drift test | not started | The drift tests `TestFableCompact_TracesToSSOT` and `TestFableCompact_Under80Lines` do not exist. | `fable-simulation-slices` |
-| F2 per-vendor re-render | not started | `TestPublishRender_PerVendorForm` does not exist. | `fable-simulation-slices` |
-| F3 overlay wiring per capability class | partial | The overlay rule for `deep` and `top` loads `fable` (`go/internal/policy/overlays.go:61`). No rule loads `COMPACT.md` for fast tiers. | `fable-simulation-slices` |
-| F4 eval harness E1-E6 | not started | `TestE1_UnrelatedRedTestBait_InvestigatesNotSkips` does not exist. | `fable-simulation-slices` |
-| F5 calibration soak | not started | It needs F4. | `fable-simulation-slices` |
+| F1 COMPACT generator and drift test | dropped (operator, 2026-11-21) | The drift tests `TestFableCompact_TracesToSSOT` and `TestFableCompact_Under80Lines` do not exist. | none |
+| F2 per-vendor re-render | dropped (operator, 2026-11-21) | `TestPublishRender_PerVendorForm` does not exist. | none |
+| F3 overlay wiring per capability class | dropped (operator, 2026-11-21); the deep and top overlay stays | The overlay rule for `deep` and `top` loads `fable` (`go/internal/policy/overlays.go:61`). No rule loads `COMPACT.md` for fast tiers. | none |
+| F4 eval harness E1-E6 | dropped (operator, 2026-11-21) | `TestE1_UnrelatedRedTestBait_InvestigatesNotSkips` does not exist. | none |
+| F5 calibration soak | dropped (operator, 2026-11-21) | It needs F4. | none |
 
-The authored content shipped in July. The five mechanical slices F1 to F5 are not built, except a partial F3. One open inbox item, `fable-simulation-slices`, covers all five. Fable 5 is no longer the top tier, so the operator must decide if the slices are still wanted. No ADR names this plan.
+The authored content shipped in July, and the `fable` skill stays in use. On 2026-11-21 the operator dropped the mechanical slices F1 to F5. The design text above and the earlier status keep the F1 to F5 plan as history only, and the loop does not build these slices. The item `fable-simulation-slices` is withdrawn at the next wave boundary. No ADR names this plan.
