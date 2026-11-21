@@ -377,7 +377,7 @@ The operator said on 2026-10-27: "the CLI is the service interface and must be i
 |---|---|---|---|
 | D8 | A `queued` verb under a live lease writes one request file and exits 4. At stage `shadow` it refuses with exit 3 and names the file that `enforce` writes. Inside a phase pane it refuses with exit 3. | F9.1 | A lease for each item: a lane reads the item, so a write during a wave changes the input of a lane. |
 | D9 | The boundary step `queue-apply` runs right after `sync-main`, not before it. | F9.2 | Before `sync-main`: an applied edit stops `sync-main`. A boundary commit of the applied files: `.evolve/policy.json` is not a path that a boundary commit can hold. |
-| D10 | `gc` takes the `gc` lease (`.evolve/gc.lock`, a `flock`). The boundary step waits up to 2 minutes for it (`--lease-wait 2m`); a call with no wait refuses at once. While a run lease is live, `gc` skips the sessions, sockets, cycle processes and dispatch processes. The other sweeps run. | F9.3 | Only the `cache` scope while lanes run: the file sweeps already skip each live resource. |
+| D10 | `gc` takes the `gc` lease (`.evolve/gc.lock`, a `flock`). The boundary step waits up to 2 minutes for it (`--lease-wait 2m`); a call with no wait refuses at once. While a run lease is live, `gc` skips the sessions, sockets, cycle processes and dispatch processes. The other sweeps run. The loop sentinel runs only the `cache` scope in process, under the same lease with no wait. Sessions, sockets and sealed-cycle processes have their own live sweeps. | F9.3 | Only the `cache` scope while lanes run: the file sweeps already skip each live resource. |
 
 The request file:
 

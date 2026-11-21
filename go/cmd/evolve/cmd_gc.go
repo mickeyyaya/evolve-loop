@@ -145,6 +145,7 @@ type gcRun struct {
 	abs            func(string) (string, error)
 	exec           sysexec.RunFunc
 	liveRuns       []string
+	cancellable    bool
 }
 
 func newGCRun(ctx context.Context, dryRun bool, stdout, stderr io.Writer) gcRun {
@@ -163,7 +164,11 @@ func newGCRun(ctx context.Context, dryRun bool, stdout, stderr io.Writer) gcRun 
 }
 
 func (r gcRun) step(run func(gcRun) bool) bool {
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.ctx), orphanGCTimeout)
+	parent := context.WithoutCancel(r.ctx)
+	if r.cancellable {
+		parent = r.ctx
+	}
+	ctx, cancel := context.WithTimeout(parent, orphanGCTimeout)
 	defer cancel()
 	r.ctx = ctx
 	return run(r)
