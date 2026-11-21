@@ -1,29 +1,36 @@
 {
   "acceptance": [
     "Red test first: a guard counts the git starts of the core test binary and fails above the recorded count.",
-    "Core system_s divided by user_s on macOS falls below 1.2.",
     "Docs in STE."
   ],
   "continuation": {
-    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2560",
-    "branch": "cycle-cd3ae73e-2560",
-    "snapshot_sha": "38b98a115749bce9d6397e35e5b85917ef7a16e0",
-    "base_sha": "499c111b5f3a1ddb8e30fec6de050faf4d5233ce",
-    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2560/audit-fail-reason.json",
-    "cycle": 2560
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2577",
+    "branch": "cycle-cd3ae73e-2577",
+    "snapshot_sha": "6d3af3554ca9baa83697189c1999dc14e474c3da",
+    "base_sha": "63f36a9357898ca756cd09e7f945ceb628905b29",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2577/audit-fail-reason.json",
+    "cycle": 2577
   },
   "created_at": "2026-11-14T09:00:00Z",
   "deps": [],
+  "failure_count": 1,
   "files": [
     "go/internal/core"
   ],
   "fix": "Move git-backed fixtures onto gittest templates and drop the git calls that a fake repository can answer.",
   "id": "core-tests-cut-git-starts",
   "kind": "pipeline-repair",
+  "last_failure_class": "capability",
+  "last_failure_cycle": 2577,
+  "last_failure_findings": "review gate: phase \"build\" deliverable rejected after 2 correction(s): build handoff floor: 2 deterministic check failure(s) — fix these exactly before handoff:\n  ./acs/cycle2577 (-tags acs): unit tests FAIL\n--- FAIL: TestC2577_002_TheWholeCoreTestBinaryStaysInsideItsRecordedGitStartCount (232.58s)\n--- FAIL: TestC2577_003_TheCoreTestBinaryOnMacOSSpendsLessThanOnePointTwoTimesItsUserTimeInTheKernel (0.00s)\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/acs/cycle2577\t277.667s\n…nt below 1.2: cut the process starts that cost kernel time\nFAIL\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/acs/cycle2577\t277.667s\nFAIL\n\n  enforced package tests FAIL (coverage run doubles as their selfcheck):\nok  \tgithub.com/mickeyyaya/evolve-loop/go/internal/codequality\t0.292s\tcoverage: 88.9% of statements\n[orchestrator] WARN worktree provisioning failed (source phases will be blocked): git worktree add -B cycle-5cbceadf-10 /var/folders/11/n1_42bt961s29wjcr9qxj45m0000gn/T/TestPhaseBoundaryCheckpointer_FiresDuringRunCycle3449092635/001/.evolve/worktrees/cycle-5cbceadf-10 HEAD: rc=128 err=<nil>: fatal: not a git repository (or any of the parent directories): .git\n\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git…",
+  "last_failure_fingerprint": "codes:orchestrator",
+  "last_failure_reason": "cycle-failure-release",
+  "last_failure_rung": "R3",
   "notes": "Console route: CI gate and test system. Fix R8 of docs/research/ci-wall-variance-2026-11.md.",
   "origin": "console",
   "priority": "P2",
   "priority_class": "stability",
+  "retry_plan": "fresh-deep-plan",
   "route": "lane",
   "routed_at": "2026-11-19T20:47:20Z",
   "routed_reason": "backlog review D6 (PR #1571): a lane can build it; no protected path in files[] (first-pass LANE claim, F5.2)",

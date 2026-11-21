@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Red first: with remote.origin.fetch narrowed so it omits main, SyncToOrigin still sees the new origin/main; red on main",
+    "No production call outside internal/mainsync runs a bare fetch of origin main (a structure test)",
+    "100% coverage on each changed function, zero code comments, and the integration and mainsync package notes in STE"
+  ],
+  "created_at": "2026-11-21T05:33:23Z",
+  "deps": [
+    "lane-ship-fast-forwards-local-main-to-origin-in-the-ship-window"
+  ],
+  "files": [
+    "go/internal/integration/sync.go",
+    "docs/architecture/packages/internal-integration.md"
+  ],
+  "fix": "Route SyncToOrigin through mainsync (or at least its fetch helper with the explicit refspec), so the train and the plane read the same origin/main. Red test first: a fetch config that omits main still refreshes origin/main for the train.",
+  "id": "integration-sync-to-origin-uses-the-mainsync-fetch",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "PR #1616 made go/internal/mainsync the one home of fetch-classify-fast-forward and its explicit refspec +refs/heads/main:refs/remotes/origin/main; the ship window and the wave boundary both call it. go/internal/integration/sync.go SyncToOrigin still runs git fetch origin main, which leaves refs/remotes/origin/main stale when remote.origin.fetch is narrowed or unset (proven by the #1616 architecture review probe). The internal-mainsync package note's one-home claim is therefore not yet true for the integration train.",
+  "title": "integration.SyncToOrigin still runs a plain fetch origin main, a fourth copy of the fetch rule that can leave origin/main stale",
+  "weight": 0.5
+}

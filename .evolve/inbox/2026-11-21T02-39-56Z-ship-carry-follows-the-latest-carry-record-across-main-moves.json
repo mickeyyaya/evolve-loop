@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Red first: a second main move after a rebind takes the rebind path again with no audit dispatch (test through recoverFromShipError and the real ship phase on real git)",
+    "A hop whose carried tree is not identical, or a fourth hop, re-audits as today",
+    "The wave report counts carries and re-audits caused by a moved main",
+    "100% coverage on each changed function, zero code comments, and the ADR note and the core and ship package notes in STE"
+  ],
+  "created_at": "2026-11-21T02:39:56Z",
+  "deps": [
+    "ship-window-lease-heartbeat-held-sections-outlive-the-ttl"
+  ],
+  "files": [
+    "go/internal/core/head_moved_rebind.go",
+    "go/internal/phases/ship/carry.go",
+    "docs/architecture/packages/internal-core.md"
+  ],
+  "fix": "Design first (an ADR note, because the audit binding is a protected guarantee): make the carry follow the latest identity-carry record. Re-prove each hop with treedelta.Identical plus the patch-id plus the composed gates, and cap the chain at 3 hops; past the cap, or on any non-identical hop, the cycle re-audits as today.",
+  "id": "ship-carry-follows-the-latest-carry-record-across-main-moves",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "In wave 184 cycles 2563 and 2575 passed audit, were carried over one moved main, then met a second main move and re-ran a deep-tier audit (AUDIT_BINDING_HEAD_MOVED, reason 'not pending on the audited base X (HEAD Y, cycle base Y)'). pendingAuditedChange in go/internal/core/head_moved_rebind.go compares the lane HEAD with auditledger.AuditedBase(), which never advances after a rebind, and carryReboundHead in go/internal/phases/ship/carry.go needs the carry record to name the exact current main. The refusal is a stale base pointer, not a file overlap: a byte-identical carry can be proven again over any descendant of main. Trace: scratchpad ship-race-report.md section 6, approach B.",
+  "title": "The audited-change carry works for one main move only, so a second move sends a passed cycle back to a full re-audit",
+  "weight": 0.6
+}

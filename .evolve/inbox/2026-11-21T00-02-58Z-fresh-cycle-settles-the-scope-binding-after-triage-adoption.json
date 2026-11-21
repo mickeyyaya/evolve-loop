@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Red first: a fresh cycle on a bound scope whose ancestor has no ledger reaches audit with a manifest or a recorded release, and defectledger.arm does not block it.",
+    "A deleted or rewritten manifest of an adopting cycle still blocks (the tamper test stays green).",
+    "The resumed path and the fresh path call one settler; a test fails when either path skips it.",
+    "100% coverage on each changed function, zero code comments, and the continuation and defect-ledger docs name the change in STE."
+  ],
+  "created_at": "2026-11-21T00:02:58Z",
+  "files": [
+    "go/internal/core/orchestrator.go",
+    "go/cmd/evolve/cmd_cycle.go",
+    "go/cmd/evolve/cmd_cycle_lane_resume.go",
+    "go/internal/core/defectledger/lineage.go"
+  ],
+  "fix": "Rebuild the cl-c6 fresh-path change on origin/main as a new linear branch: after triage adoption returns with no error, the orchestrator calls one binding settler, the same one the resumed path uses, so both paths write the manifest or record the release before audit. Keep the defect-ledger tamper block.",
+  "id": "fresh-cycle-settles-the-scope-binding-after-triage-adoption",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "Item fresh-cycle-on-a-bound-scope-adopts-or-releases-the-binding was closed by the curator on commit b15fbc710, but that commit fixed only the resumed lane path (scopeBinding.settle called from laneResume.adopt in go/cmd/evolve/cmd_cycle_lane_resume.go). A fresh cycle whose triage adopts a bound scope still writes no continuation manifest before audit, so defectledger.arm blocks it and the audit fails with no failure class. Main has no WithBindingSettler or freshBindingSettler. An uncommitted console build of the fresh path exists in dev/cl-c6 (base 16bf6ff08: core.WithBindingSettler, cr.settleBinding after triage adoption, settle(cycle, ws) returning the continuation, tests cmd_cycle_fresh_binding_test.go and orchestrator_binding_settle_test.go).",
+  "title": "A fresh cycle that triage binds to a bound scope settles the continuation binding, as a resumed lane cycle does",
+  "weight": 0.6
+}
