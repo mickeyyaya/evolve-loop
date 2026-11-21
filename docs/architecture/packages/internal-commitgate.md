@@ -133,6 +133,13 @@
   - An unreadable HEAD or an unlistable change is ExitGitFatal.
   - Pinned by `TestRun_ARewrittenHistoryPageIsRefusedEvenWhenTheChangeIsWaived` and `TestRefuseRewrittenHistory_AnUnreadableArchiveIsAFault`.
 
+- **A change never removes a journey row.**
+  - `refuseRemovedJourneyRows` (`journey_rows.go`) runs in the same chain as the history refusals. When `go/test/journeys/journeys.json` is in the change, it reads the file at `HEAD` and on disk through `changeAgainstHead`.
+  - It gives `journeys.Removed` the two row lists. A row that is gone, or that lost its `retired` reason, is refused by id with ExitFail. A file that is new has no row to lose. A file that is deleted on disk loses all its rows.
+  - A registry that does not load, at `HEAD` or on disk, is ExitFail. An unlistable change is ExitGitFatal.
+  - Only the console edits the registry, and each console change passes this gate. So the gate is the real entry point of this rule.
+  - Pinned by `TestRefuseRemovedJourneyRows_NamesEachRowThatLeftWithoutItsReason`, `TestRun_ADeletedJourneyRowIsRefusedBeforeAnyLaneRuns` and, through the CLI, `TestRunCommitGate_ARegistryChangeThatDeletesAJourneyRowIsRefusedByName`.
+
 - **The attestation binds to sha256(`git diff HEAD`).** `TestGolden_GoPipelineWritesByteExactAttestation` runs the real pipeline over a real repo, computes the SHA independently and checks both the binding and the ts-normalized byte layout. `TestRun_AttestationStableBytes` and `TestRun_EmptyArraysMarshalInline` pin the layout from the writer side.
 - **The gate never mutates the host.** Without a test seam, a missing auto-installable tool is reported as ExitToolMissing with the manual install hint; `Run` never shells out an installer (`TestEnsureTool_ForceMissingSeam`, `TestEnsureTool_NotAutoInstallable`).
 - **Only a proven comment removal waives review, and nothing can hide a path from the proof.** A `--files` selection and a git rename cannot narrow the listing. A symlink or a deletion is refused, since a symlink can point a docs- or Go-looking path at content the proof never saw. A `testdata/` fixture is refused because tests read it. Pinned by `TestRun_AProvenCommentOnlyChangeNeedsNoReviewers`, `TestRun_AnyChangeBeyondCommentRemovalStillNeedsReviewers`, `TestRun_ADeniedWaiverSaysWhy` and `TestRun_ARealGitRenameCannotHideItsSourceFromTheWaiver`.

@@ -11,6 +11,7 @@
 - **`Trailer`.** `Phase` and `Challenge` are load-bearing for completion verification. The artifact fields are forensic provenance: which deliverable the commit evidences.
 - **`Build`.** It renders a leading blank line, then one `Key: Value` line for each non-empty field, in a stable order. Deterministic output gives reproducible commits and is cache friendly. `Cycle` is emitted when it is above 0.
 - **`Parse`.** It reads the trailing block of the message: the contiguous run of trailer lines at the end. It walks backward from the end. Unknown keys are ignored, and missing keys leave the zero value. A message without a trailer block gives a zero `Trailer`.
+- **`TrailerValues`.** It returns the values of one key in the same trailing block that `Parse` reads (`trailerBlock`, the one home of the scan). A key above the block, in the body, is not a trailer. The `Fix-Journey` reader of `internal/journeys` uses it.
 - **Key grammar.** A key is a non-empty run of `[A-Za-z0-9-]` (`cutTrailer`, `isKeyByte`). `isTrailerLine` accepts prose such as `see: http://...` only loosely. The backward contiguous-run scan in `Parse` is what bounds the block.
 
 ## Invariants
