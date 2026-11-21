@@ -47,6 +47,8 @@ type waveStatusReport struct {
 	Benched       []clihealth.Entry       `json:"benched,omitempty"`
 	Seats         []waveSeat              `json:"seats"`
 	Health        *pipelinerates.WaveView `json:"health,omitempty"`
+	Blockers      []waveBlocker           `json:"blockers"`
+	BlockerCounts map[string]int          `json:"blocker_counts"`
 }
 
 func parseWaveReadArgs(args []string) (projectRoot string, asJSON bool, err error) {
@@ -102,7 +104,7 @@ func runWaveStatus(env waveEnv, args []string, stdout, stderr io.Writer) int {
 }
 
 func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) waveStatusReport {
-	report := waveStatusReport{ProjectRoot: plane.root, Cycles: []wave.Cycle{}, Runs: []waveRunMeasures{}, LoopLive: len(waveLiveRuns(plane.evolveDir, env.now())) > 0}
+	report := waveStatusReport{ProjectRoot: plane.root, Cycles: []wave.Cycle{}, Blockers: []waveBlocker{}, BlockerCounts: map[string]int{}, Runs: []waveRunMeasures{}, LoopLive: len(waveLiveRuns(plane.evolveDir, env.now())) > 0}
 	if notes, err := plane.store.Notes(); err == nil {
 		report.NotesQueued = len(notes)
 	}
@@ -137,6 +139,7 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 	report.Runs, report.Measures = runs, runs[len(runs)-1].Measures
 	report.Warnings = append(report.Warnings, measureWarnings...)
 	report.Health, report.Warnings = waveHealth(plane.root, env.now(), report.Warnings)
+	report.Blockers, report.BlockerCounts, report.Warnings = waveBlockers(plane.evolveDir, cyclesAboveFloor(cycles, cur.CycleFloor), report.Warnings)
 	if over := len(cycles) - waveStatusMaxCycles; over > 0 {
 		cycles, report.CyclesOmitted = cycles[over:], over
 	}
@@ -188,7 +191,7 @@ func writeWaveStatusText(w io.Writer, r waveStatusReport) {
 		fmt.Fprintf(w, "  (%d older cycle(s) not shown)\n", r.CyclesOmitted)
 	}
 	for _, c := range r.Cycles {
-		fmt.Fprintf(w, "  %s\n", waveCycleText(c))
+		fmt.Fprintf(w, "  %s%s\n", waveCycleText(c), blockerText(r.Blockers, c.ID))
 	}
 	if r.LastWave != nil {
 		fmt.Fprintf(w, "last:    wave %d: %s\n", r.LastWave.Wave, r.LastWave.Outcome)

@@ -644,6 +644,13 @@ The cycle's production composition root, `wireOrchestratorDeps` in `cmd_cycle.go
 - **Test harness reasons.** `cmd_fleet_soak_test.go` and `cmd_cycle_projroot_test.go` stay serial: the first assigns the package-level `soakLaunchFn` and `soakKiller` variables, the second calls `os.Chdir`. The `waitForFollow` style tests re-append on each tick, because the follow loop seeds its offset asynchronously and skips an earlier append. A fixture that makes a path a directory, or a file where a directory belongs, provokes a read or mkdir fault that differs from absence.
 - **`cycle resume --all` grants every paused cycle** (`cmd_cycle_resume_all.go`). It starts no cycle, and `--dry-run` grants nothing. The pool plan puts each ready paused scope before the triage todos (`pausedPlan.order` in `cmd_loop_pool_paused.go`). The scope keeps the files of its triage todo or of its inbox items.
 
+## The blocker of a cycle in `wave status`
+
+- **One reader.** `waveBlockers` (`cmd_wave_blocker.go`) names the blocker of each cycle above the floor of the wave with [internal-cycleblocker](internal-cycleblocker.md). `wave.ReadCycles` is unchanged.
+- **The threshold.** It loads `workflow.blocker_attribution.wait_share_pct` once. A policy that cannot be read gives the default of 50. `readWaveOf` already warns about that policy.
+- **Shipped and failed cycles.** A shipped cycle gets `Attribute` from its LLM verdict, its wall time and `QuotaPauses > 0`. A failed cycle gets its seal-time record from `paths.BlockerRecordPath`. A missing record gives `none`. A record that cannot be read gives `none` and a warning.
+- **The output.** Text rows add `blocker <name> (<minutes> min)` for a named blocker. `--json` adds `blockers` and `blocker_counts`. Pinned by `TestWaveStatus_TextPrintsTheBlockerOfACycle` and `TestWaveStatus_JSONCountsBlockersByKind`.
+
 ## The ship count of a wave (B5)
 
 - **One reader.** `buildWaveStatus`, `waveWatcher.poll`, `lastWaveFacts` and `zeroShipHalt` read a wave through `wave.ReadWave` (`readWaveOf` in `cmd_wave_status.go`). A wave is a time window with a floor. The first `From` of the status entries is `wave.RunFrom(rec)`. The stage comes from `shipStageOf`, and a bad policy gives the shadow stage with a warning.
