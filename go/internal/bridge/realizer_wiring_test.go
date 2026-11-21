@@ -91,7 +91,7 @@ func TestRealizerWiring_NoCrossCLILeak(t *testing.T) {
 				t.Fatalf("seed artifact: %v", err)
 			}
 			tmux := &fakeTmux{paneSeq: []string{tc.marker}}
-			eng := NewEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), CaptureBaseline: zeroBaselineCapture})
+			eng := newTestEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), CaptureBaseline: zeroBaselineCapture})
 
 			resp, err := eng.Launch(context.Background(), core.BridgeRequest{
 				CLI:          tc.cli,
@@ -131,7 +131,7 @@ func TestEngineLaunch_EnablesBypassForInProcessPath(t *testing.T) {
 	}
 	tmux := &fakeTmux{paneSeq: []string{agyFooterGeminiFast}}
 	var stderr bytes.Buffer
-	eng := NewEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), Stderr: &stderr, CaptureBaseline: zeroBaselineCapture})
+	eng := newTestEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), Stderr: &stderr, CaptureBaseline: zeroBaselineCapture})
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "agy-tmux", Profile: profile, Model: "sonnet", Prompt: "x",
 		Workspace: ws, ArtifactPath: artifact, Agent: "agent",

@@ -12,7 +12,7 @@ func TestRecordTokenUsage_PassesDriverToResolver(t *testing.T) {
 	t.Parallel()
 	start := time.Date(2026, 7, 13, 10, 0, 0, 0, time.UTC)
 	var got tokenusage.Window
-	e := NewEngine(Deps{
+	e := newTestEngine(Deps{
 		Now: func() time.Time { return start.Add(90 * time.Second) },
 		TokenResolver: func(w tokenusage.Window) (tokenusage.Result, error) {
 			got = w

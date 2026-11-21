@@ -86,7 +86,7 @@ func (f *fakeTmux) sentContains(sub string) bool {
 
 func runTmux(t *testing.T, fx launchFixture, tmux *fakeTmux, lookup map[string]string, extra ...string) (int, string) {
 	t.Helper()
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux:            tmux,
 		Sleep:           func(time.Duration) {},
 		LookupEnv:       mapLookup(lookup),

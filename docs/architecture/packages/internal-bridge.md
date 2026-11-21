@@ -277,6 +277,20 @@ The spec is [llm-isolation.md](../llm-isolation.md) §8.5 and §9.
 - `SandboxWrapRequest.Tag` carries `Config.DispatchID`. The profile puts it in the message of each guarded rule.
 - `launchSwept` calls `Deps.reportReadViolations` after the launch. On macOS it reads the sandbox reports of the tag through `Deps.SandboxReports` (`NewEngine` sets `logShowReports`, which runs `/usr/bin/log show --style ndjson`). `parseReadReports` keeps one report for each rule, target and process name, at most 20. It keeps the process name and the process id of each report line, and an absent name or id stays empty. `emitReadViolation` emits `ISOLATION_I4_VIOLATION` or `ISOLATION_I5_VIOLATION` with `action=logged` for an allowed read and `action=refused` for a denied read, and `source=sbpl-report`. The `process` and `pid` fields name the program that made the read, so the operator can find the source of a secret read.
 
+### Test engines (`launch_test.go`, `sandbox_fakes_guard_test.go`)
+
+Every test in this package must build its engine with `newTestEngine`, not `NewEngine`.
+
+`NewEngine` fills nil `SandboxReports` and `SandboxFence` fields with the real `log show` and `sandbox-exec` runners. On macOS, the real fence and the real report reader make `cellReports` poll for up to 60 seconds. The reason is that `log show` never sees the fence line of a test cell.
+
+`newTestEngine` sets `SandboxFence` to a no-op fake and sets `SandboxReports` to a fake that returns the cell fence line on the first read. It also sets `LookupEnv` to an empty map when nil.
+
+`TestBridgeTestEnginesInjectSandboxFakes` scans every test file in this package, with or without a build tag. It fails when `newTestEngine` misses either sandbox fake or when a test calls `NewEngine` without both fields set. The tests that assert the default fields of `NewEngine` are exempt. The map `defaultAssertingTests` in the guard file lists them.
+
+`TestNewTestEngine_SandboxFakesAnswerWithoutStartingAProcess` calls both fakes with a cancelled context. A real runner returns the context error before it starts a process, so the test tells a fake from a real runner without a spawn.
+
+The guard covers package `bridge` only. Callers of `bridge.NewEngine` in other packages either fail before the launch for a missing profile or live in `acs`-tagged packages that CI does not run.
+
 ### The driver factory (`resolve.go`)
 
 *Added 2026-10-17 by component F1 of [bridge-factory-2026-10](../../plans/bridge-factory-2026-10.md) ([ADR-0137](../adr/0137-one-bridge-factory-resolves-every-llm-cli-and-the-manifest-holds-its-facts.md)). The spec of record is [agent-bridge-factory](../agent-bridge-factory.md) §2 and §3.*

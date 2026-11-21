@@ -19,7 +19,7 @@ func amplifyEngine(t *testing.T, ws string, usage cyclestate.TokenUsage, source 
 	prof := writeProfile(t, ws, "eng-tokens-amp", "")
 	artifact := filepath.Join(ws, "artifact.md")
 	fr := &fakeRunner{writeArtifactPath: artifact, writeArtifactBody: "OK\n"}
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Runner:    fr.runner(),
 		LookupEnv: mapLookup(nil),
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) {
@@ -54,7 +54,7 @@ func TestEngineLaunch_NilResolver_RecordsUnavailableAttempt(t *testing.T) {
 	artifact := filepath.Join(ws, "artifact.md")
 	fr := &fakeRunner{writeArtifactPath: artifact, writeArtifactBody: "OK\n"}
 
-	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
 
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-p", Profile: prof, Model: "auto", Prompt: "do the thing",

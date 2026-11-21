@@ -39,7 +39,7 @@ func TestResolveTier(t *testing.T) {
 
 func TestEngineProbe_NoBinaries_AllNone(t *testing.T) {
 	t.Parallel()
-	eng := NewEngine(Deps{LookPath: func(string) (string, error) { return "", errNoBin }})
+	eng := newTestEngine(Deps{LookPath: func(string) (string, error) { return "", errNoBin }})
 	p, err := eng.Probe(context.Background())
 	if err != nil {
 		t.Fatalf("Probe err: %v", err)
@@ -56,7 +56,7 @@ func TestEngineProbe_NoBinaries_AllNone(t *testing.T) {
 
 func TestEngineProbe_ClaudeTmuxAvailable(t *testing.T) {
 	t.Parallel()
-	eng := NewEngine(Deps{LookPath: func(b string) (string, error) {
+	eng := newTestEngine(Deps{LookPath: func(b string) (string, error) {
 		if b == "claude" || b == "tmux" {
 			return "/usr/bin/" + b, nil
 		}

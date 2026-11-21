@@ -36,7 +36,7 @@ func TestTmuxREPL_CancelAfterDeliverable_CompletesNotTimeout(t *testing.T) {
 			cancel()
 		}
 	}
-	eng := NewEngine(Deps{Tmux: tmux, Sleep: sleep, LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Tmux: tmux, Sleep: sleep, LookupEnv: mapLookup(nil)})
 
 	var stdout bytes.Buffer
 	code := eng.LaunchArgs(ctx, fx.args("claude-tmux", "--allow-bypass", "--agent=build", "--cycle=17"), nil, &stdout, &stderr)
@@ -75,7 +75,7 @@ func TestTmuxREPL_CancelWithoutDeliverable_StillTimesOut(t *testing.T) {
 			cancel()
 		}
 	}
-	eng := NewEngine(Deps{Tmux: tmux, Sleep: sleep, LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Tmux: tmux, Sleep: sleep, LookupEnv: mapLookup(nil)})
 
 	var stdout bytes.Buffer
 	code := eng.LaunchArgs(ctx, fx.args("claude-tmux", "--allow-bypass", "--agent=build", "--cycle=17"), nil, &stdout, &stderr)

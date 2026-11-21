@@ -12,7 +12,7 @@ import (
 )
 
 func doctorEngine(env map[string]string, present map[string]bool, runnerRC int, runnerErr error) *Engine {
-	return NewEngine(Deps{
+	return newTestEngine(Deps{
 		LookupEnv: mapLookup(env),
 		LookPath: func(b string) (string, error) {
 			if present[b] {
@@ -49,7 +49,7 @@ func TestDoctorHome_Fallback(t *testing.T) {
 	if h := doctorEngine(map[string]string{"HOME": "/x"}, nil, 0, nil).doctorHome(); h != "/x" {
 		t.Fatalf("HOME from env = %q", h)
 	}
-	e := NewEngine(Deps{LookupEnv: mapLookup(nil)})
+	e := newTestEngine(Deps{LookupEnv: mapLookup(nil)})
 	if e.doctorHome() != os.Getenv("HOME") {
 		t.Fatal("doctorHome should fall back to os.Getenv")
 	}
@@ -97,7 +97,7 @@ func TestDoctorAuth_ClaudeKeychain(t *testing.T) {
 	t.Parallel()
 	home := t.TempDir()
 
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		LookupEnv:     mapLookup(map[string]string{"HOME": home}),
 		KeychainProbe: func(service string) bool { return service == "Claude Code-credentials" },
 	})
@@ -105,7 +105,7 @@ func TestDoctorAuth_ClaudeKeychain(t *testing.T) {
 		t.Fatalf("claude keychain auth = %+v, want Configured via keychain", a)
 	}
 
-	eng2 := NewEngine(Deps{
+	eng2 := newTestEngine(Deps{
 		LookupEnv:     mapLookup(map[string]string{"HOME": home}),
 		KeychainProbe: func(string) bool { return false },
 	})
@@ -189,7 +189,7 @@ func TestDoctorDeep_ManifestLoadError(t *testing.T) {
 
 func TestDoctorVersion_Error(t *testing.T) {
 	t.Parallel()
-	e := NewEngine(Deps{Runner: func(context.Context, string, string, []string, []string, io.Reader, io.Writer, io.Writer) (int, error) {
+	e := newTestEngine(Deps{Runner: func(context.Context, string, string, []string, []string, io.Reader, io.Writer, io.Writer) (int, error) {
 		return -1, errNoBin
 	}})
 	if v := doctorVersion(context.Background(), e.deps, "x"); v != "unknown" {
