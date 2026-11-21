@@ -8,10 +8,12 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/addedtests"
+	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
@@ -160,4 +162,24 @@ func writeBuildSelfCheckArtifact(worktree string, fails []selfCheckFailure) {
 	if err := os.WriteFile(dst, append(data, '\n'), 0o644); err != nil {
 		fmt.Fprintf(os.Stderr, "[selfcheck] WARN could not write build-selfcheck artifact %s: %v\n", dst, err)
 	}
+}
+
+func floorChangedPackages(paths []string) []string {
+	pkgs := append(changedGoTestPackages(paths), changedDataPackages(paths)...)
+	sort.Strings(pkgs)
+	return slices.Compact(pkgs)
+}
+
+func changedDataPackages(paths []string) []string {
+	var pkgs []string
+	for _, p := range paths {
+		if strings.HasSuffix(p, ".go") {
+			continue
+		}
+		pattern, ok := changedpkgs.PatternOf(p)
+		if ok && pattern != "./..." {
+			pkgs = append(pkgs, strings.TrimSuffix(pattern, "/..."))
+		}
+	}
+	return pkgs
 }
