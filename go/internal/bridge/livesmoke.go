@@ -21,6 +21,19 @@ type LiveSmokeResult struct {
 	Pattern     string
 	Scrollback  string
 	ServedModel string
+	EvolveEntry string
+	EvolveFound string
+}
+
+func (r LiveSmokeResult) EvolveMismatch() bool {
+	return r.EvolveEntry != "" && r.EvolveFound != r.EvolveEntry
+}
+
+func cellBinEntry(cfg *Config) string {
+	if cfg.cellBin == "" {
+		return ""
+	}
+	return filepath.Join(cfg.cellBin, cellBinEntryName)
 }
 
 func LiveSmokeTest(ctx context.Context, driverName string, cfg *Config, deps Deps) LiveSmokeResult {
@@ -41,7 +54,7 @@ func LiveSmokeTest(ctx context.Context, driverName string, cfg *Config, deps Dep
 	applyScratchCwd(cfg)
 	cfg.Artifact = filepath.Join(cfg.Workspace, LiveSmokeArtifact)
 	if cfg.PromptFile == "" {
-		prompt := fmt.Sprintf("Health probe. Write the single word OK to %s and do nothing else.\n", cfg.Artifact)
+		prompt := fmt.Sprintf("Health probe. Run `command -v evolve` in your shell, write its single output line to %s and do nothing else.\n", cfg.Artifact)
 		pf := filepath.Join(cfg.Workspace, "live-smoke-prompt.txt")
 		if err := os.WriteFile(pf, []byte(prompt), 0o644); err != nil {
 			return LiveSmokeResult{RC: ExitBadFlags}
@@ -56,7 +69,10 @@ func LiveSmokeTest(ctx context.Context, driverName string, cfg *Config, deps Dep
 	if rc == ExitOK {
 		clearAuthBench(cfg.ProjectRoot, driverName, clihealth.SourceSmoke, deps)
 	}
-	result := LiveSmokeResult{RC: rc, Pattern: EscalationPattern(cfg.Workspace)}
+	result := LiveSmokeResult{RC: rc, Pattern: EscalationPattern(cfg.Workspace), EvolveEntry: cellBinEntry(cfg)}
+	if b, err := os.ReadFile(cfg.Artifact); err == nil {
+		result.EvolveFound = strings.TrimSpace(string(b))
+	}
 	if b, err := os.ReadFile(filepath.Join(cfg.Workspace, "tmux-final-scrollback.txt")); err == nil {
 		result.Scrollback = string(b)
 	}

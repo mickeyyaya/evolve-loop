@@ -47,6 +47,8 @@ type Deps struct {
 	Env                   map[string]string
 	EnvStage              string
 	ExecStage             string
+	ExecutablePath        func() (string, error)
+	CellBinRoot           func() (string, error)
 	DispatchStore         func() (dispatchcred.Store, error)
 	ReadStage             string
 	GuaranteeStage        string
@@ -227,6 +229,7 @@ type Config struct {
 	Decision             seatlogin.Decision
 	SeatTokenFile        string
 	credentials          *ipcenv.CredentialSet
+	cellBin              string
 }
 
 type Engine struct {

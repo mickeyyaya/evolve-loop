@@ -47,7 +47,7 @@ var retiredControls = []RetiredControl{
 	{"EVOLVE_*_PERMISSION_MODE", "the permission_mode of the agent profile"},
 	{"EVOLVE_PROFILE_DIR", "the --profile-dir parameter of evolve phases"},
 	{"EVOLVE_PERSONA_OVERRIDE", "the --persona-override parameter of evolve phases"},
-	{"EVOLVE_GO_BIN", "go/bin/evolve or evolve on PATH"},
+	{"EVOLVE_GO_BIN", "the cell PATH holds evolve first, see llm-isolation section 6.1"},
 	{"EVOLVE_SANDBOX", "policy.json sandbox.mode, or the audited --sandbox-off=<reason> parameter of evolve loop and evolve cycle run"},
 	{"EVOLVE_USE_PHASE_REGISTRY", "nothing: the phase registry is always on"},
 	{"EVOLVE_OPERATOR_CONFIRM", "the -operator parameter of evolve continuation"},

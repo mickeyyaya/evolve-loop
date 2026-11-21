@@ -2,6 +2,8 @@ package bridge
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"maps"
 	"os"
@@ -13,11 +15,13 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/channel"
+	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchcred"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/isolation"
 	evolog "github.com/mickeyyaya/evolve-loop/go/internal/log"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/selfsha"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -156,7 +160,139 @@ func sortedEnvNames(env []string) []string {
 	return slices.Compact(names)
 }
 
-func (deps Deps) cellEnv(cfg *Config) ([]string, bool) {
+func (deps Deps) cellEnv(cfg *Config) ([]string, bool, error) {
+	env, hermetic := deps.stageEnv(cfg)
+	dir, err := deps.cellBinDir(cfg)
+	if err != nil {
+		return nil, false, err
+	}
+	return prependPath(env, dir), hermetic, nil
+}
+
+const (
+	cellBinDirName         = "cell-bin"
+	cellBinEntryName       = "evolve"
+	cellBinTempName        = ".stage-"
+	cellBinAsideName       = ".aside-"
+	cellBinMode            = 0o700
+	cellBinDigestLen       = 16
+	cellBinPublishAttempts = 8
+	fallbackPath           = "/usr/bin:/bin"
+)
+
+var cellBinRootDefault = func() (string, error) { return cellBinRootOf(dispatchcred.PasswdHome) }
+
+func cellBinRootOf(passwdHome func() (string, error)) (string, error) {
+	home, err := passwdHome()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".evolve", cellBinDirName), nil
+}
+
+func (deps Deps) cellBinDir(cfg *Config) (string, error) {
+	if cfg.cellBin != "" {
+		return cfg.cellBin, nil
+	}
+	executable := deps.ExecutablePath
+	if executable == nil {
+		executable = selfsha.Path
+	}
+	target, err := executable()
+	if err != nil {
+		return "", fmt.Errorf("cell bin directory: %w", err)
+	}
+	resolveRoot := deps.CellBinRoot
+	if resolveRoot == nil {
+		resolveRoot = cellBinRootDefault
+	}
+	root, err := resolveRoot()
+	if err != nil {
+		return "", fmt.Errorf("cell bin directory: %w", err)
+	}
+	dir, err := ensureCellBin(root, target)
+	if err != nil {
+		return "", fmt.Errorf("cell bin directory: %w", err)
+	}
+	cfg.cellBin = dir
+	return dir, nil
+}
+
+func ensureCellBin(root, target string) (string, error) {
+	sum := sha256.Sum256([]byte(target))
+	dir := filepath.Join(root, hex.EncodeToString(sum[:])[:cellBinDigestLen])
+	if cellBinExact(dir, target) {
+		return dir, nil
+	}
+	staged, err := stageCellBin(root, target)
+	if err != nil {
+		return "", err
+	}
+	return dir, installCellBin(staged, dir, target)
+}
+
+func cellBinExact(dir, target string) bool {
+	entries, err := os.ReadDir(dir)
+	if err != nil || len(entries) != 1 || entries[0].Name() != cellBinEntryName {
+		return false
+	}
+	got, err := os.Readlink(filepath.Join(dir, cellBinEntryName))
+	return err == nil && got == target
+}
+
+func stageCellBin(root, target string) (string, error) {
+	if err := os.MkdirAll(root, cellBinMode); err != nil {
+		return "", err
+	}
+	staged := filepath.Join(root, cellBinTempName+randomStamp())
+	if err := os.Mkdir(staged, cellBinMode); err != nil {
+		return "", err
+	}
+	if err := os.Symlink(target, filepath.Join(staged, cellBinEntryName)); err != nil {
+		_ = os.RemoveAll(staged)
+		return "", err
+	}
+	return staged, nil
+}
+
+func installCellBin(staged, dir, target string) error {
+	defer func() { _ = os.RemoveAll(staged) }()
+	var err error
+	for range cellBinPublishAttempts {
+		if err = publishCellBin(staged, dir, target); err == nil {
+			return nil
+		}
+	}
+	return err
+}
+
+func publishCellBin(staged, dir, target string) error {
+	if os.Rename(staged, dir) == nil || cellBinExact(dir, target) {
+		return nil
+	}
+	aside := filepath.Join(filepath.Dir(dir), cellBinAsideName+randomStamp())
+	_ = os.Rename(dir, aside)
+	defer func() { _ = os.RemoveAll(aside) }()
+	return os.Rename(staged, dir)
+}
+
+func prependPath(env []string, dir string) []string {
+	parent := ""
+	out := make([]string, 0, len(env)+1)
+	for _, kv := range env {
+		if value, ok := strings.CutPrefix(kv, "PATH="); ok {
+			parent = value
+			continue
+		}
+		out = append(out, kv)
+	}
+	if parent == "" {
+		parent = fallbackPath
+	}
+	return append(out, "PATH="+dir+":"+parent)
+}
+
+func (deps Deps) stageEnv(cfg *Config) ([]string, bool) {
 	deps = deps.withCellMarkers(cfg)
 	seat := cfg.Decision.SeatToken != ""
 	stage := envStageEnforce
@@ -286,18 +422,26 @@ func (deps Deps) reportDroppedEnv(cfg *Config, stage string, names []string) {
 	}
 }
 
-func (deps Deps) paneEnv(cfg *Config) []string {
-	env, hermetic := deps.cellEnv(cfg)
-	if !hermetic {
-		return nil
+func (deps Deps) startPaneSession(ctx context.Context, cfg *Config, session, workingDir string) error {
+	env, err := deps.paneEnv(cfg)
+	if err != nil {
+		return fmt.Errorf("cell env: %w", err)
 	}
-	return env
+	return deps.startSession(ctx, session, workingDir, env)
+}
+
+func (deps Deps) paneEnv(cfg *Config) ([]string, error) {
+	env, hermetic, err := deps.cellEnv(cfg)
+	if err != nil || !hermetic {
+		return nil, err
+	}
+	return env, nil
 }
 
 func (deps Deps) checkReusedSessionEnv(ctx context.Context, cfg *Config, session string) error {
-	env := deps.paneEnv(cfg)
-	if env == nil {
-		return nil
+	env, err := deps.paneEnv(cfg)
+	if err != nil || env == nil {
+		return err
 	}
 	starter, ok := deps.Tmux.(envSessionStarter)
 	if !ok {

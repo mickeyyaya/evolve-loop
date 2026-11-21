@@ -15,7 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-var smokeArtifactPath = regexp.MustCompile(`OK to (\S+) and`)
+var smokeArtifactPath = regexp.MustCompile(`line to (\S+) and`)
 
 type answeringTmux struct {
 	*bridge.FakeTmuxController

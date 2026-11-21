@@ -40,7 +40,7 @@ func bootTmuxREPL(
 		}
 	}()
 
-	if err := deps.startSession(ctx, lp.session, prep.workingDir, deps.paneEnv(cfg)); err != nil {
+	if err := deps.startPaneSession(ctx, cfg, lp.session, prep.workingDir); err != nil {
 		return nil, ExitBadFlags, fmt.Errorf("%s new-session: %w", prep.prefix, err)
 	}
 
@@ -135,7 +135,12 @@ func primePaneShell(ctx context.Context, deps Deps, cfg *Config, session, workin
 	if err := deps.Tmux.SendKeys(ctx, session, paneTmuxDetachLine, true); err != nil {
 		return fmt.Errorf("detach the pane shell from the run tmux server: %w", err)
 	}
+	binDir, err := deps.cellBinDir(cfg)
+	if err != nil {
+		return err
+	}
 	lines := append([]string{dispatchTagLine(cfg.DispatchID)}, exportLines(cfg.Realization.Env)...)
+	lines = append(lines, "export PATH="+shellQuotePOSIX(binDir)+`:"$PATH"`)
 	lines = append(lines, exportLines(deps.cellMarkers(cfg))...)
 	creds := deps.credentialSet(cfg)
 	lines = append(lines, exportLines(creds.Set)...)

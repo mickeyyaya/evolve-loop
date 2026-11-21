@@ -106,6 +106,7 @@ type liveOutcome struct {
 	pattern, scrollback string
 	servedModel         string
 	usage               *usageprobe.Evidence
+	evolve              bridge.LiveSmokeResult
 }
 
 const servedModelUnreported = "unreported"
@@ -145,6 +146,9 @@ func reportDoctorLiveResult(o liveOutcome, stdout, stderr io.Writer) int {
 	}
 
 	switch {
+	case rc == bridge.ExitOK && o.evolve.EvolveMismatch():
+		fmt.Fprintf(stderr, "[doctor] LIVE NO EVOLVE: %s answered the probe, but command -v evolve gave %q, want %q: the cell shell does not resolve evolve to the cell-bin entry\n", target, o.evolve.EvolveFound, o.evolve.EvolveEntry)
+		return exitFail
 	case rc == bridge.ExitOK:
 		fmt.Fprintf(stderr, "[doctor] LIVE OK: %s answered the probe\n", target)
 		return exitOK
@@ -213,5 +217,5 @@ func runDoctorLiveWith(args []string, stdout io.Writer, deps bridge.Deps) int {
 	probe := bridge.LiveSmokeTest(ctx, target.driver, &bridge.Config{Workspace: ws, ProjectRoot: cwd, Model: target.model}, deps)
 
 	usage := doctorUsage(doctorRun{projectRoot: cwd, driver: target.driver, deps: deps}, probe.RC)
-	return reportDoctorLiveResult(liveOutcome{target: target, asJSON: asJSON, rc: probe.RC, pattern: probe.Pattern, scrollback: probe.Scrollback, servedModel: probe.ServedModel, usage: usage}, stdout, stderr)
+	return reportDoctorLiveResult(liveOutcome{target: target, asJSON: asJSON, rc: probe.RC, pattern: probe.Pattern, scrollback: probe.Scrollback, servedModel: probe.ServedModel, usage: usage, evolve: probe}, stdout, stderr)
 }

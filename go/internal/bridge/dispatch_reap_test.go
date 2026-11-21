@@ -181,7 +181,7 @@ func TestDispatchEnv_CarriesExactlyTheTagOfThisDispatch(t *testing.T) {
 	deps := Deps{Env: map[string]string{ipcenv.DispatchIDKey: "overlay/1/build/p1n2t1"}}
 	cfg := &Config{DispatchID: thisDispatch}
 
-	env := dispatchEnv(deps, cfg)
+	env := mustDispatchEnv(deps, cfg)
 
 	var tags []string
 	for _, kv := range env {

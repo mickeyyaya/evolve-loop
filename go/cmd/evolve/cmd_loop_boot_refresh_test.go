@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseintegrity"
+	"github.com/mickeyyaya/evolve-loop/go/internal/selfsha"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
 
@@ -588,5 +590,40 @@ func TestBootBinaryRefresh_AnUnverifiableDeltaBootsAsIsAndRetiresNothing(t *test
 	}
 	if !strings.Contains(errBuf.String(), "unverifiable") {
 		t.Errorf("stderr = %q, want the unverifiable delta named", errBuf.String())
+	}
+}
+
+func TestDefaultBootRefreshExecTarget_ComparesTheRunningBinaryWithThePlaneBinary(t *testing.T) {
+	t.Parallel()
+	self, err := selfsha.Path()
+	if err != nil {
+		t.Fatal(err)
+	}
+	plane := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(plane, "go", "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got, target, err := defaultBootRefreshExecTarget(plane); err == nil || got || target != self {
+		t.Errorf("a plane with no binary gave %v, %q, %v; want false, %q and an error", got, target, err, self)
+	}
+	if err := os.Symlink(self, filepath.Join(plane, "go", "bin", "evolve")); err != nil {
+		t.Fatal(err)
+	}
+	if got, target, err := defaultBootRefreshExecTarget(plane); err != nil || !got || target != self {
+		t.Errorf("a plane binary that links to the running binary gave %v, %q, %v; want true, %q, nil", got, target, err, self)
+	}
+	boom := errors.New("no executable")
+	if got, target, err := bootRefreshExecTargetOf(func() (string, error) { return "", boom }, plane); !errors.Is(err, boom) || got || target != "" {
+		t.Errorf("a resolver failure gave %v, %q, %v; want false, no target and the error", got, target, err)
+	}
+	other := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(other, "go", "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(other, "go", "bin", "evolve"), []byte("x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got, _, err := defaultBootRefreshExecTarget(other); err != nil || got {
+		t.Errorf("a different plane binary gave %v, %v; want false, nil", got, err)
 	}
 }

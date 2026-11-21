@@ -89,13 +89,13 @@ func (claudePDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, e
 	selection = modelDispatchFromRealization("claude-p", selection, cfg.Realization)
 	selection = modelDispatchFromExtraArgs("claude-p", selection, cfg.ExtraFlags)
 	observeModelDispatch(deps, selection)
-	env := dispatchEnv(deps, cfg)
+	var pidfileEnv []string
 	if pidFile := core.BridgePIDFile(cfg.StdoutLog); pidFile != "" {
-		env = append(env, bridgePidfileEnv+"="+pidFile)
+		pidfileEnv = []string{bridgePidfileEnv + "=" + pidFile}
 	}
-	rc, err := deps.Runner(ctx, name, cfg.Worktree, args, env, nil, stdoutF, stderrF)
+	rc, err := deps.runDispatch(ctx, cfg, dispatchRun{name: name, args: args, stdout: stdoutF, stderr: stderrF, extraEnv: pidfileEnv})
 	if err != nil {
-		return ExitMissingBinary, fmt.Errorf("[claude-p] %w", err)
+		return rc, fmt.Errorf("[claude-p] %w", err)
 	}
 	fmt.Fprintf(deps.Stderr, "[claude-p] claude exited rc=%d\n", rc)
 	return rc, nil

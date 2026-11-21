@@ -148,7 +148,7 @@ func cloudTaskArgument(prompt string) string {
 
 func (l cloudLaunch) start(ctx context.Context, promptFile string) (cloudConfirmation, int, error) {
 	session, _ := resolveSession(&Config{Agent: l.cfg.Agent, RunID: l.cfg.RunID, Cycle: l.cfg.Cycle}, l.deps, cloudSessionPrefix)
-	if err := l.deps.startSession(ctx, session, l.dir, l.deps.paneEnv(l.cfg)); err != nil {
+	if err := l.deps.startPaneSession(ctx, l.cfg, session, l.dir); err != nil {
 		return cloudConfirmation{}, ExitBadFlags, fmt.Errorf("%s new-session: %w", l.prefix, err)
 	}
 	defer tmuxCleanup(ctx, l.deps, l.m.CLI, session, paneCapture{shared: filepath.Join(l.cfg.Workspace, cloudPaneFile), lines: cloudScrollback}, false)

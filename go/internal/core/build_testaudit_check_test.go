@@ -19,7 +19,7 @@ const (
 	auditFakesJSON   = `{"rows":[]}`
 	auditGuardsJSON  = `{"max_rows":1,"rows":[]}`
 	auditNewRowHint  = "remove the weak pattern"
-	auditStaleRowFix = "evolve test audit --rebaseline"
+	auditStaleRowFix = "delete the stale row of"
 )
 
 func seedTestAuditConfig(t *testing.T, worktree string) {

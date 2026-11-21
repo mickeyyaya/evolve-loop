@@ -220,7 +220,7 @@ func TestReusedSession_AtEnforceOnlyASessionBornWithThisCellEnvIsReused(t *testi
 	if err := deps.checkReusedSessionEnv(ctx, cfg, "old"); err == nil || !strings.Contains(err.Error(), "not born with this cell environment") {
 		t.Fatalf("a session born at shadow must not be reused at enforce; got %v", err)
 	}
-	_ = fake.NewSessionEnv(ctx, "same", 1, 1, "", append(deps.paneEnv(cfg), "BAD-NAME=1"))
+	_ = fake.NewSessionEnv(ctx, "same", 1, 1, "", append(mustPaneEnv(deps, cfg), "BAD-NAME=1"))
 	if err := deps.checkReusedSessionEnv(ctx, cfg, "same"); err != nil {
 		t.Fatalf("a session born with this cell env can be reused: %v", err)
 	}

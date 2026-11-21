@@ -344,7 +344,7 @@ The environment of a child is the union of three closed sets, and nothing else:
 
 | Set | Names | Source |
 |---|---|---|
-| Base allowlist | `PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`, `LANG`, `LC_*`, `TERM`, `TMPDIR`, `TMP`, `TEMP`, `TZ` | compiled data in the bridge |
+| Base allowlist | `PATH` (the host value, with the `cell-bin` directory first, §6.1), `HOME`, `USER`, `LOGNAME`, `SHELL`, `LANG`, `LC_*`, `TERM`, `TMPDIR`, `TMP`, `TEMP`, `TZ` | compiled data in the bridge |
 | Manifest passthrough | the names in `env_passthrough` (proposed field, §11), for example a proxy or an auth variable that the CLI needs | the manifest of the family |
 | Manifest and pipeline values | `default_env` of the manifest, and the pipeline's own `EVOLVE_*` markers (§7) | the manifest and the launcher |
 
@@ -367,12 +367,22 @@ The builder is `Deps.cellEnv` in `go/internal/bridge/hermetic_env.go`. Each LLM 
 | `shadow` | today's environment, one `ISOLATION_I2_VIOLATION` for each dropped name, `action=logged` |
 | `enforce` | the union only, one INFO `ISOLATION_ENV_REFUSED` event for each dispatch with new names, `action=refused` |
 | Base allowlist | the names of the table above and each `LC_*` name |
+| `PATH` rule | `cellEnv` puts the `cell-bin` directory first on `PATH` at each stage. The list below the table gives the rule. |
 | Pipeline markers | the cell part of the marker list, `ipcenv.CellMarkers()` (X18b): `EVOLVE_PROJECT_ROOT`, `EVOLVE_WORKTREE_ROOT`, `EVOLVE_CYCLE_STATE_FILE`, `EVOLVE_TMUX_SOCKET`, the four `EVOLVE_FLEET*` keys, `EVOLVE_DISPATCH_DEPTH` and `EVOLVE_PHASE`. It applies to the launcher and to `Deps.Env`. A gate or bypass name (`EVOLVE_BYPASS_*`, `EVOLVE_SANDBOX*`, `EVOLVE_MSG_TOKEN`, `BRIDGE_*`) never reaches a child at `enforce`. |
 | Operator opt-ins | The policy key `bridge.allow_anthropic_base_url` passes `ANTHROPIC_BASE_URL`, and `bridge.allow_openai_api_key` passes `OPENAI_API_KEY` (X18d). So the route that the operator opted into stays the route of the child. Each opt-in that is on emits `CONTROL_BYPASS_USED` at each start of the bridge adapter of a cycle. |
 | Excluded always | `EVOLVE_DISPATCH_ID` (the dispatch adds its own tag), and each name that is not a shell identifier |
 | Filter | `ipcenv.Keep`, the allowlist twin of the `ipcenv.Scrub` deny list |
 | Report once | `Deps.EnvDrops` (`EnvDropLog`) keeps the family and name pairs that it reported. The in-process adapter shares one log for its process. An engine with no log gets its own. |
 | Bare execs | `LaunchLLM` (§5.1) gives `probeEnv(bin)` to the doctor, the updater, the version inventory and the model queries. It follows the stage of the policy, with no signal. |
+
+The `PATH` rule of `cellEnv`:
+
+- `cellEnv` applies `prependPath` once, on the environment that its stage returns. So `off`, `shadow` and `enforce` give the same `PATH` rule.
+- The value is `<home>/.evolve/cell-bin/<digest of the real binary path>`, then the host `PATH`. The fallback for a host with no `PATH` is `/usr/bin:/bin`.
+- The directory holds one symlink, `evolve`, to the real path of the running binary (`selfsha.Path`). A new binary path gets a new directory.
+- The write is atomic. The bridge makes the link under a temporary name in the `cell-bin` root, and renames it to `<digest>/evolve`.
+- A failure of the resolver or of the write stops the launch.
+- A pane that does not start hermetic gets the same directory from `export PATH=<dir>:"$PATH"` in `primePaneShell`.
 
 The manifest field `env_passthrough` is built (§11). The parser refuses a name that is not a shell identifier, and it refuses each loop, bridge and credential name, as for `default_env`. So `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL` and `OPENAI_API_KEY` cannot pass through.
 
