@@ -58,7 +58,7 @@ func TestInboxEdit_DuringAWaveQueuesAndExitsFour(t *testing.T) {
 	before, _ := os.ReadFile(item)
 	var stdout, stderr bytes.Buffer
 
-	rc := runInbox([]string{"edit", "cli-inbox-show", "--set", "weight=0.4", "--project-root", root}, nil, &stdout, &stderr)
+	rc := runInbox([]string{"edit", "cli-inbox-show", "--set", "weight=0.4", "--reason", "operator review", "--project-root", root}, nil, &stdout, &stderr)
 
 	if rc != cliExitQueued || !strings.Contains(stdout.String(), "queued") {
 		t.Fatalf("rc %d stdout %q stderr %q, want exit 4 and the queue file named", rc, stdout.String(), stderr.String())
@@ -67,7 +67,7 @@ func TestInboxEdit_DuringAWaveQueuesAndExitsFour(t *testing.T) {
 		t.Errorf("a queued edit changed the item now: %s", after)
 	}
 	reqs := queuedRequests(t, root)
-	if len(reqs) != 1 || reqs[0].Schema != queueRequestSchema || reqs[0].Verb != "inbox edit" || strings.Join(reqs[0].Args, " ") != "cli-inbox-show --set weight=0.4" {
+	if len(reqs) != 1 || reqs[0].Schema != queueRequestSchema || reqs[0].Verb != "inbox edit" || strings.Join(reqs[0].Args, " ") != "cli-inbox-show --set weight=0.4 --reason operator review" {
 		t.Errorf("queue = %+v, want one inbox edit request with the edit arguments", reqs)
 	}
 }
@@ -77,7 +77,7 @@ func TestQueuedVerbs_TheShadowStageRefusesAndNamesTheFileItWouldWrite(t *testing
 	root, _ := queuedItemRoot(t, "")
 	liveLaneLease(t, root, 0)
 	for _, args := range [][]string{
-		{"edit", "cli-inbox-show", "--set", "weight=0.4"},
+		{"edit", "cli-inbox-show", "--set", "weight=0.4", "--reason", "operator review"},
 		{"withdraw", "cli-inbox-show", "mistake"},
 		{"verify", "cli-inbox-show", "--evidence", "checked"},
 		{"route-console", "cli-inbox-show", "operator owns it", "0"},
@@ -100,7 +100,7 @@ func TestQueuedVerbs_InsideAPhasePaneStillRefuse(t *testing.T) {
 	liveLaneLease(t, root, 0)
 	var stdout, stderr bytes.Buffer
 
-	rc := runInbox([]string{"edit", "cli-inbox-show", "--set", "weight=0.4", "--project-root", root}, nil, &stdout, &stderr)
+	rc := runInbox([]string{"edit", "cli-inbox-show", "--set", "weight=0.4", "--reason", "operator review", "--project-root", root}, nil, &stdout, &stderr)
 
 	if rc != cliExitRefused || !strings.Contains(stderr.String(), "inside a phase") || len(queuedRequests(t, root)) != 0 {
 		t.Fatalf("rc %d stderr %q, want exit 3, the phase refusal and no queue file", rc, stderr.String())
@@ -144,7 +144,7 @@ func TestQueueApply_AppliesTheRequestsInTimeOrderAndEmitsOneSignalEach(t *testin
 	root, item := queuedItemRoot(t, queueEnforcePolicy)
 	at := time.Date(2026, 10, 27, 1, 0, 0, 0, time.UTC)
 	for i, weight := range []string{"0.3", "0.4"} {
-		req := queuedRequest{Schema: queueRequestSchema, Verb: "inbox edit", Args: []string{"cli-inbox-show", "--set", "weight=" + weight}, QueuedAt: at.Add(-time.Duration(i) * time.Minute).Format(time.RFC3339Nano)}
+		req := queuedRequest{Schema: queueRequestSchema, Verb: "inbox edit", Args: []string{"cli-inbox-show", "--set", "weight=" + weight, "--reason", "operator review"}, QueuedAt: at.Add(-time.Duration(i) * time.Minute).Format(time.RFC3339Nano)}
 		if _, err := writeQueuedRequest(root, req); err != nil {
 			t.Fatal(err)
 		}
@@ -237,12 +237,12 @@ func TestQueuedVerbs_AnUnwritableQueueOrAnUnreadablePolicyIsLoud(t *testing.T) {
 	liveLaneLease(t, root, 0)
 	contractUnitWrite(t, root, ".evolve/queue", "a file\n")
 	var stdout, stderr bytes.Buffer
-	if rc := runInbox([]string{"edit", "cli-inbox-show", "--set", "weight=0.4", "--project-root", root}, nil, &stdout, &stderr); rc != cliExitIO || !strings.Contains(stderr.String(), "write the queue request") {
+	if rc := runInbox([]string{"edit", "cli-inbox-show", "--set", "weight=0.4", "--reason", "operator review", "--project-root", root}, nil, &stdout, &stderr); rc != cliExitIO || !strings.Contains(stderr.String(), "write the queue request") {
 		t.Errorf("an unwritable queue: rc %d stderr %q, want exit 2", rc, stderr.String())
 	}
 	contractUnitWrite(t, root, ".evolve/policy.json", "{bad")
 	stderr.Reset()
-	if rc := runInbox([]string{"edit", "cli-inbox-show", "--set", "weight=0.4", "--project-root", root}, nil, &stdout, &stderr); rc != cliExitRefused || !strings.Contains(stderr.String(), "the policy is unreadable, so the queue stays at stage shadow") {
+	if rc := runInbox([]string{"edit", "cli-inbox-show", "--set", "weight=0.4", "--reason", "operator review", "--project-root", root}, nil, &stdout, &stderr); rc != cliExitRefused || !strings.Contains(stderr.String(), "the policy is unreadable, so the queue stays at stage shadow") {
 		t.Errorf("an unreadable policy: rc %d stderr %q, want the shadow refusal and the WARN", rc, stderr.String())
 	}
 }
@@ -316,7 +316,7 @@ func TestQueueApply_WaitsWhileARunLeaseIsLive(t *testing.T) {
 	root, item := queuedItemRoot(t, queueEnforcePolicy)
 	liveLaneLease(t, root, 0)
 	var stdout, stderr bytes.Buffer
-	if rc := runInbox([]string{"edit", "cli-inbox-show", "--set", "weight=0.4", "--project-root", root}, nil, &stdout, &stderr); rc != cliExitQueued {
+	if rc := runInbox([]string{"edit", "cli-inbox-show", "--set", "weight=0.4", "--reason", "operator review", "--project-root", root}, nil, &stdout, &stderr); rc != cliExitQueued {
 		t.Fatalf("queue the edit: rc %d %s", rc, stderr.String())
 	}
 	before, _ := os.ReadFile(item)
@@ -375,7 +375,7 @@ func TestQueueApply_NamesTheTrackedChangesThatTheNextSyncMainRefuses(t *testing.
 	contractUnitWrite(t, root, ".evolve/inbox/2026-10-27T00-00-00Z-cli-inbox-show.json", cliInboxItem)
 	repo.Git("add", "-A")
 	repo.Git("commit", "-q", "-m", "an item")
-	req := queuedRequest{Schema: queueRequestSchema, Verb: "inbox edit", Args: []string{"cli-inbox-show", "--set", "weight=0.4"}, QueuedAt: "2026-10-27T01:00:00.000000000Z"}
+	req := queuedRequest{Schema: queueRequestSchema, Verb: "inbox edit", Args: []string{"cli-inbox-show", "--set", "weight=0.4", "--reason", "operator review"}, QueuedAt: "2026-10-27T01:00:00.000000000Z"}
 	if _, err := writeQueuedRequest(root, req); err != nil {
 		t.Fatal(err)
 	}

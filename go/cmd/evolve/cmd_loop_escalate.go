@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispositionrouter"
-	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -27,41 +26,20 @@ func applyEscalationBoundary(evolveDir string, cycle int, stderr io.Writer, sign
 		ReportPath:      filepath.Join(evolveDir, "escalation-apply-report.json"),
 		Cycle:           cycle,
 		Shadow:          !cfg.Enforce(),
-		Policy: recurrence.EscalationPolicy{
-			Threshold: cfg.Threshold,
-			Step:      cfg.Step,
-			Cap:       cfg.Cap,
-		},
-		Now:      time.Now().UTC(),
-		Reweight: moverReweight(evolveDir, signals),
+		Now:             time.Now().UTC(),
 	})
 	if err != nil {
 		fmt.Fprintf(stderr, "[loop] WARN: escalation boundary: %v\n", err)
 		return
 	}
-	if len(res.Bumped)+len(res.Filed)+len(res.Planned)+len(res.Refused) == 0 {
+	if len(res.Escalated)+len(res.Filed)+len(res.Planned)+len(res.Refused) == 0 {
 		return
 	}
 	for _, id := range res.Refused {
 		fmt.Fprintf(stderr, "[loop] WARN escalation boundary: refused %s: no priority_class\n", id)
 	}
 	emitLoopEscalation(signals, cycle, "applyEscalationBoundary",
-		fmt.Sprintf("escalation boundary staged %d item(s)", len(res.Bumped)+len(res.Filed)+len(res.Planned)),
-		map[string]string{"stage": string(cfg.Stage), "bumped": strconv.Itoa(len(res.Bumped)), "filed": strconv.Itoa(len(res.Filed)),
+		fmt.Sprintf("escalation boundary staged %d item(s)", len(res.Escalated)+len(res.Filed)+len(res.Planned)),
+		map[string]string{"stage": string(cfg.Stage), "escalated": strconv.Itoa(len(res.Escalated)), "filed": strconv.Itoa(len(res.Filed)),
 			"skipped": strconv.Itoa(len(res.Skipped)), "planned": strconv.Itoa(len(res.Planned)), "refused": strconv.Itoa(len(res.Refused))})
-}
-
-func moverReweight(evolveDir string, signals *signalcenter.Center) func(id string, weight float64) error {
-	opts := inboxmover.Options{
-		ProjectRoot: filepath.Dir(evolveDir),
-		InboxDir:    filepath.Join(evolveDir, "inbox"),
-		LedgerPath:  filepath.Join(evolveDir, "ledger.jsonl"),
-		Signals:     signals,
-	}
-	return func(id string, weight float64) error {
-		_, err := inboxmover.Edit(opts, id, []inboxmover.FieldEdit{
-			{Op: inboxmover.EditSet, Field: "weight", Value: strconv.FormatFloat(weight, 'f', -1, 64)},
-		})
-		return err
-	}
 }

@@ -40,7 +40,7 @@ func TestMover_Edit_SetsOnlyTheNamedFieldAndRecordsIt(t *testing.T) {
 	before := readItem(t, path)
 	rec := &recordingAppender{}
 
-	got, err := New(inbox, rec).Edit("curated", []FieldEdit{{Op: EditSet, Field: "weight", Value: "0.4"}})
+	got, err := New(inbox, rec).EditBecause("curated", "why", []FieldEdit{{Op: EditSet, Field: "weight", Value: "0.4"}})
 
 	if err != nil || got != path {
 		t.Fatalf("Edit = (%q, %v), want (%q, nil)", got, err, path)
@@ -53,7 +53,7 @@ func TestMover_Edit_SetsOnlyTheNamedFieldAndRecordsIt(t *testing.T) {
 		t.Errorf("an edit of weight changed another field:\nbefore %v\nafter  %v", before, after)
 	}
 	if len(rec.records) != 1 || rec.records[0].Action != "edit" || rec.records[0].TaskID != "curated" ||
-		rec.records[0].Message != "set weight=0.4" {
+		rec.records[0].Message != "set weight=0.4; reason: why" {
 		t.Errorf("ledger = %+v, want one edit line naming the change", rec.records)
 	}
 }
@@ -148,7 +148,7 @@ func TestMover_Edit_RefusesAResultInboxAddWouldRefuse(t *testing.T) {
 			before, _ := os.ReadFile(path)
 			rec := &recordingAppender{}
 
-			_, err := New(inbox, rec).Edit("curated", []FieldEdit{tc.edit})
+			_, err := New(inbox, rec).EditBecause("curated", "why", []FieldEdit{tc.edit})
 
 			if !errors.Is(err, ErrInvalidItem) || !strings.Contains(err.Error(), tc.why) {
 				t.Errorf("err = %v, want ErrInvalidItem naming %q", err, tc.why)
@@ -164,9 +164,9 @@ func TestMover_Edit_JudgesOnlyTheFieldsItWrites(t *testing.T) {
 	inbox := newInbox(t)
 	path := filepath.Join(inbox, "legacy.json")
 	writeItem(t, path, `{"id":"legacy","title":"`+strings.Repeat("t", 200)+`","weight":0.2}`)
-	m := New(inbox, nil)
+	m := New(inbox, &recordingAppender{})
 
-	if _, err := m.Edit("legacy", []FieldEdit{{Op: EditSet, Field: "weight", Value: "0.3"}}); err != nil {
+	if _, err := m.EditBecause("legacy", "why", []FieldEdit{{Op: EditSet, Field: "weight", Value: "0.3"}}); err != nil {
 		t.Errorf("a weight edit on an item with a long title and no summary: %v, want it written", err)
 	}
 	if _, err := m.Edit("legacy", []FieldEdit{{Op: EditAdd, Field: "acceptance", Value: strings.Repeat("a", 700)}}); !errors.Is(err, ErrInvalidItem) {
@@ -245,7 +245,7 @@ func TestMover_Edit_ARewriteFaultIsNeitherARefusalNorAMissingItem(t *testing.T) 
 	}
 	t.Cleanup(func() { _ = os.Chmod(inbox, 0o755) })
 
-	_, err := New(inbox, rec).Edit("curated", []FieldEdit{{Op: EditSet, Field: "weight", Value: "0.4"}})
+	_, err := New(inbox, rec).Edit("curated", []FieldEdit{{Op: EditSet, Field: "title", Value: "retitled"}})
 
 	if err == nil || errors.Is(err, ErrInvalidItem) || errors.Is(err, ErrNotFound) || errors.Is(err, ErrBadArgs) {
 		t.Errorf("err = %v, want the rewrite fault itself", err)
@@ -264,7 +264,7 @@ func TestMover_Edit_RefusesAnItemItsReadersCannotLoad(t *testing.T) {
 	if _, err := m.Edit("x", []FieldEdit{{Op: EditAdd, Field: "files", Value: "go/b.go"}}); !errors.Is(err, ErrInvalidItem) || !strings.Contains(err.Error(), "not a list") {
 		t.Errorf("an add to a field that is no list: err = %v, want ErrInvalidItem", err)
 	}
-	if _, err := m.Edit("x", []FieldEdit{{Op: EditSet, Field: "weight", Value: "0.3"}}); !errors.Is(err, ErrInvalidItem) || !strings.Contains(err.Error(), "does not load") {
+	if _, err := m.EditBecause("x", "why", []FieldEdit{{Op: EditSet, Field: "weight", Value: "0.3"}}); !errors.Is(err, ErrInvalidItem) || !strings.Contains(err.Error(), "does not load") {
 		t.Errorf("an edit that leaves the item unloadable: err = %v, want ErrInvalidItem", err)
 	}
 	if _, err := m.Edit("x", []FieldEdit{{Op: EditSet, Field: "files", Value: `["go/a.go"]`}, {Op: EditSet, Field: "acceptance", Value: `["one"]`}}); err != nil {
@@ -279,15 +279,15 @@ func TestMover_Edit_AScanOrStatFaultIsNotARefusal(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
-	m := New(inbox, nil)
+	m := New(inbox, &recordingAppender{})
 
 	if _, err := m.Edit("curated", []FieldEdit{{Op: EditAdd, Field: "deps", Value: "done"}}); err == nil || errors.Is(err, ErrInvalidItem) || errors.Is(err, ErrNotFound) {
 		t.Errorf("a deps edit over an unreadable tree: err = %v, want the scan fault", err)
 	}
-	if _, err := m.Edit(filepath.Join(locked, "x.json"), []FieldEdit{{Op: EditSet, Field: "weight", Value: "0.4"}}); err == nil || errors.Is(err, ErrNotFound) {
+	if _, err := m.EditBecause(filepath.Join(locked, "x.json"), "why", []FieldEdit{{Op: EditSet, Field: "weight", Value: "0.4"}}); err == nil || errors.Is(err, ErrNotFound) {
 		t.Errorf("a path the edit cannot stat: err = %v, want the stat fault", err)
 	}
-	if _, err := m.Edit("curated", []FieldEdit{{Op: EditSet, Field: "weight", Value: "0.4"}}); err != nil {
+	if _, err := m.EditBecause("curated", "why", []FieldEdit{{Op: EditSet, Field: "weight", Value: "0.4"}}); err != nil {
 		t.Errorf("a weight edit needs no identity scan: %v", err)
 	}
 }
@@ -311,7 +311,7 @@ func TestMover_Edit_NeverOpensAConsoleOwnedItemToLanes(t *testing.T) {
 			before, _ := os.ReadFile(path)
 			rec := &recordingAppender{}
 
-			_, err := New(inbox, rec, WithProtectedPath(isProtected)).Edit("x", []FieldEdit{tc.edit})
+			_, err := New(inbox, rec, WithProtectedPath(isProtected)).EditBecause("x", "why", []FieldEdit{tc.edit})
 
 			if !tc.open {
 				if err != nil {

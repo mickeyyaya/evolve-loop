@@ -25,19 +25,17 @@ type ApplyOptions struct {
 	ReportPath      string
 	Cycle           int
 	Shadow          bool
-	Policy          EscalationPolicy
 	Now             time.Time
-	Reweight        func(id string, weight float64) error
 }
 
 type ApplyResult struct {
-	Bumped  []string `json:"bumped"`
-	Filed   []string `json:"filed"`
-	Skipped []string `json:"skipped"`
-	Refused []string `json:"refused,omitempty"`
-	Planned []string `json:"planned,omitempty"`
-	Shadow  bool     `json:"shadow"`
-	Cycle   int      `json:"cycle"`
+	Escalated []string `json:"escalated"`
+	Filed     []string `json:"filed"`
+	Skipped   []string `json:"skipped"`
+	Refused   []string `json:"refused,omitempty"`
+	Planned   []string `json:"planned,omitempty"`
+	Shadow    bool     `json:"shadow"`
+	Cycle     int      `json:"cycle"`
 }
 
 func ApplyBoundary(opts ApplyOptions) (ApplyResult, error) {
@@ -89,20 +87,11 @@ func applyIntent(opts ApplyOptions, in dispositionrouter.Intent, res *ApplyResul
 		return autofileIntent(opts, in, res)
 
 	case dispositionrouter.ActionEscalate:
-		weight, state := findItem(opts.InboxDir, id)
-		if state != itemOpen || opts.Reweight == nil {
+		if findItem(opts.InboxDir, id) != itemOpen {
 			res.Skipped = append(res.Skipped, id)
 			return false, nil
 		}
-		target := opts.Policy.Target(in.Weight, in.Recurrence)
-		if target <= weight {
-			res.Skipped = append(res.Skipped, id)
-			return true, nil
-		}
-		if err := opts.Reweight(id, target); err != nil {
-			return false, fmt.Errorf("recurrence: reweight %s to %v: %w", id, target, err)
-		}
-		res.Bumped = append(res.Bumped, id)
+		res.Escalated = append(res.Escalated, id)
 		return true, nil
 
 	default:
@@ -150,7 +139,7 @@ const (
 	itemClaimed
 )
 
-func findItem(inboxDir, id string) (weight float64, state itemState) {
+func findItem(inboxDir, id string) (state itemState) {
 	_ = filepath.Walk(inboxDir, func(p string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() || filepath.Ext(p) != ".json" || state != itemAbsent {
 			return nil //nolint:nilerr // an absent tree is a legitimate "not found"
@@ -160,13 +149,11 @@ func findItem(inboxDir, id string) (weight float64, state itemState) {
 			return nil
 		}
 		var it struct {
-			ID     string  `json:"id"`
-			Weight float64 `json:"weight"`
+			ID string `json:"id"`
 		}
 		if json.Unmarshal(raw, &it) != nil || inboxbatch.ItemID(it.ID, p) != id {
 			return nil
 		}
-		weight = it.Weight
 		rel, relErr := filepath.Rel(inboxDir, p)
 		if relErr == nil && strings.HasPrefix(rel, "processing"+string(filepath.Separator)) {
 			state = itemClaimed
@@ -175,7 +162,7 @@ func findItem(inboxDir, id string) (weight float64, state itemState) {
 		state = itemOpen
 		return nil
 	})
-	return weight, state
+	return state
 }
 
 func intentID(in dispositionrouter.Intent) string {

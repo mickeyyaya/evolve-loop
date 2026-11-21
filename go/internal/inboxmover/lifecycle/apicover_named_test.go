@@ -46,7 +46,7 @@ func TestAPI_EveryExportIsNamed(t *testing.T) {
 
 func TestAPI_ResultTypesCarryTheMove(t *testing.T) {
 	inbox := newInbox(t)
-	m := New(inbox, nil)
+	m := New(inbox, &recordingAppender{})
 	writeItem(t, filepath.Join(inbox, "t1.json"), `{"id":"t1"}`)
 
 	var claimed ClaimResult
@@ -75,7 +75,7 @@ func TestAPI_ResultTypesCarryTheMove(t *testing.T) {
 	}
 
 	var op EditOp = EditSet
-	if _, err := m.Edit("orphan", []FieldEdit{{Op: op, Field: "weight", Value: "0.3"}}); err != nil {
+	if _, err := m.EditBecause("orphan", "why", []FieldEdit{{Op: op, Field: "weight", Value: "0.3"}}); err != nil {
 		t.Fatalf("Edit with %q: %v", op, err)
 	}
 }

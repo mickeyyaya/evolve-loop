@@ -12,10 +12,8 @@ func TestFindItem_FindsAnIDLessItemByItsFileName(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	weight, state := findItem(dir, "no-id")
-
-	if state != itemOpen || weight != 0.4 {
-		t.Errorf("findItem = %v, %v; want the id-less item open at weight 0.4", weight, state)
+	if state := findItem(dir, "no-id"); state != itemOpen {
+		t.Errorf("findItem = %v; want the id-less item open", state)
 	}
 }
 
@@ -25,7 +23,7 @@ func TestFindItem_SkipsAnItemItCannotRead(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, state := findItem(dir, "dangling"); state != itemAbsent {
+	if state := findItem(dir, "dangling"); state != itemAbsent {
 		t.Errorf("an unreadable file is no item, got state %v", state)
 	}
 }
