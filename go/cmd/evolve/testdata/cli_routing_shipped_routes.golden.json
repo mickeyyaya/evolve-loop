@@ -1316,6 +1316,35 @@
       ]
     },
     {
+      "agent": "handoff-judge",
+      "rule": "agents:handoff-judge",
+      "chain": [
+        "agy-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, claude takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
       "agent": "idempotency-check",
       "phase": "idempotency-check",
       "rule": "default",

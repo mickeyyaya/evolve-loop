@@ -184,22 +184,22 @@ func TestHandoffPolicy_EnforceOnOnePairLeavesTheOthersAtShadow(t *testing.T) {
 
 func TestHandoffPolicy_EveryPairTakesItsOwnStageAndJudgeTier(t *testing.T) {
 	p, err := loadPolicyText(t, `{"handoff": {
-		"scout-triage": {"stage": "shadow", "judge_tier": "fast"},
+		"scout-triage": {"stage": "shadow"},
 		"triage-tdd": {"stage": "enforce", "judge_tier": "balanced"},
-		"tdd-build": {"stage": "enforce", "judge_tier": "deep"},
+		"tdd-build": {"stage": "enforce"},
 		"build-audit": {"stage": "shadow"},
-		"intent-scout": {"judge_tier": "deep"}
+		"intent-scout": {}
 	}}`)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
 
 	want := policy.HandoffConfig{
-		"scout-triage": {Stage: "shadow", JudgeTier: "fast"},
+		"scout-triage": {Stage: "shadow"},
 		"triage-tdd":   {Stage: "enforce", JudgeTier: "balanced"},
-		"tdd-build":    {Stage: "enforce", JudgeTier: "deep"},
+		"tdd-build":    {Stage: "enforce"},
 		"build-audit":  {Stage: "shadow"},
-		"intent-scout": {Stage: "shadow", JudgeTier: "deep"},
+		"intent-scout": {Stage: "shadow"},
 	}
 	if got := p.HandoffConfig(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("HandoffConfig() = %+v, want %+v", got, want)
@@ -277,5 +277,66 @@ func TestHandoffPolicy_TheCheckedInPolicyFileCarriesNoHandoffBlock(t *testing.T)
 
 	if _, present := blocks["handoff"]; present {
 		t.Fatal("the checked-in .evolve/policy.json must leave the handoff block to the compiled defaults")
+	}
+}
+
+func TestHandoffPolicy_UnknownJudgeTierIsRejected(t *testing.T) {
+	for _, tier := range []string{"Deep", "fast", "opus"} {
+		if _, err := loadPolicyText(t, `{"handoff": {"triage-tdd": {"judge_tier": "`+tier+`"}}}`); err == nil {
+			t.Fatalf("judge_tier %q must fail the load", tier)
+		}
+	}
+	if _, err := loadPolicyText(t, `{"handoff": {"triage-tdd": {"stage": "enforce"}}}`); err != nil {
+		t.Fatalf("the same pair with no judge_tier must load, so the refusal above is the tier: %v", err)
+	}
+}
+
+func TestHandoffPolicy_AKnownJudgeTierIsKeptAndEmptyDisablesTheJudge(t *testing.T) {
+	for _, tier := range []string{"balanced", "deep", "top", ""} {
+		p, err := loadPolicyText(t, `{"handoff": {"triage-tdd": {"judge_tier": "`+tier+`"}}}`)
+		if err != nil {
+			t.Fatalf("judge_tier %q: %v", tier, err)
+		}
+		if got := p.HandoffConfig()["triage-tdd"].JudgeTier; got != tier {
+			t.Errorf("judge tier = %q; want %q", got, tier)
+		}
+	}
+}
+
+func TestHandoffPolicy_JudgeTierOnAPairWithNoJudgeIsRejected(t *testing.T) {
+	for _, pair := range []string{"tdd-build", "build-audit", "scout-triage", "intent-scout"} {
+		if _, err := loadPolicyText(t, `{"handoff": {"`+pair+`": {"stage": "enforce"}}}`); err != nil {
+			t.Fatalf("pair %s without judge_tier must load: %v", pair, err)
+		}
+		if _, err := loadPolicyText(t, `{"handoff": {"`+pair+`": {"judge_tier": "deep"}}}`); err == nil {
+			t.Fatalf("pair %s has no judge that the reviewer checks; judge_tier must fail the load", pair)
+		}
+	}
+}
+
+func TestJudgedHandoffPairs_AreTheSpecPairsThatHaveAJudge(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "architecture", "phase-handoff-contract.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	specJudged := map[string]bool{}
+	for _, line := range strings.Split(string(raw), "\n") {
+		cells := strings.Split(line, "|")
+		if len(cells) != 7 || !strings.HasPrefix(strings.TrimSpace(cells[1]), "`") {
+			continue
+		}
+		pair := strings.Trim(strings.TrimSpace(cells[1]), "`")
+		specJudged[pair] = strings.TrimSpace(cells[5]) != "none"
+	}
+	if len(specJudged) != 5 {
+		t.Fatalf("the spec table lists %d pairs: %v", len(specJudged), specJudged)
+	}
+	for _, pair := range policy.JudgedHandoffPairs() {
+		if !specJudged[pair] {
+			t.Errorf("pair %s is judged by the policy but the spec declares no judge for it", pair)
+		}
+	}
+	if got := policy.JudgedHandoffPairs(); len(got) != 1 || got[0] != "triage-tdd" {
+		t.Errorf("JudgedHandoffPairs() = %v; the reviewer checks only triage-tdd with a spec judge", got)
 	}
 }

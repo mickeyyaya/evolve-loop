@@ -9,7 +9,8 @@ import (
 
 func TestDeepTierFamilyArrangement(t *testing.T) {
 	exceptions := map[string]string{
-		"router": "agy-claude-tmux",
+		"router":        "agy-claude-tmux",
+		"handoff-judge": "agy-tmux",
 	}
 	loader, names := profiles.RealTreeProfiles(t)
 	floors := policy.DefaultFloors()

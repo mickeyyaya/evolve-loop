@@ -3,6 +3,7 @@ package policy
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -13,6 +14,10 @@ var knownHandoffPairs = []string{
 	"tdd-build",
 	"triage-tdd",
 }
+
+var judgedHandoffPairs = []string{"triage-tdd"}
+
+func JudgedHandoffPairs() []string { return slices.Clone(judgedHandoffPairs) }
 
 type HandoffPairConfig struct {
 	Stage     string
@@ -64,6 +69,9 @@ func (h *HandoffPolicy) UnmarshalJSON(raw []byte) error {
 		if decoded.JudgeTier != nil {
 			judgeTier = *decoded.JudgeTier
 		}
+		if err := checkJudgeTier(pairName, judgeTier); err != nil {
+			return err
+		}
 
 		pairs[pairName] = HandoffPairConfig{
 			Stage:     stage,
@@ -72,6 +80,19 @@ func (h *HandoffPolicy) UnmarshalJSON(raw []byte) error {
 	}
 
 	h.pairs = pairs
+	return nil
+}
+
+func checkJudgeTier(pair, tier string) error {
+	judgeTierNames := slices.DeleteFunc(TierNames(), func(name string) bool { return name == "fast" })
+	switch {
+	case tier == "":
+		return nil
+	case !slices.Contains(judgedHandoffPairs, pair):
+		return fmt.Errorf("handoff: pair %q: judge_tier is set but the pair has no judge that the reviewer checks; judged pairs are %s", pair, strings.Join(judgedHandoffPairs, ", "))
+	case !slices.Contains(judgeTierNames, tier):
+		return fmt.Errorf("handoff: pair %q: judge_tier %q must be one of %s", pair, tier, strings.Join(judgeTierNames, ", "))
+	}
 	return nil
 }
 

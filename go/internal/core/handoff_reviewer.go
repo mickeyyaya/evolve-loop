@@ -24,6 +24,8 @@ type HandoffReviewer struct {
 	config policy.HandoffConfig
 	check  HandoffChecker
 	tree   func(ReviewInput) string
+
+	judgeRun HandoffJudgeRunner
 }
 
 var errHandoffLedgerNotObject = errors.New("the ledger is not a JSON object, so it is kept as written")
@@ -77,13 +79,24 @@ func (r HandoffReviewer) Review(ctx context.Context, in ReviewInput) ReviewResul
 	}
 	check := staleOutputCheck(r.check(in, pair), stale)
 	check.Stage = r.config[pair].Stage
-	if err := recordHandoffCheck(in.Workspace, pair, check); err != nil {
+	in.recordHandoff(pair, check, nil)
+	judgement, asks := r.judge(ctx, in, pair, check)
+	if judgement != nil {
+		in.recordHandoff(pair, check, judgement)
+	}
+	switch {
+	case check.Stage != config.StageEnforce.String():
+		return ReviewResult{Approve: true}
+	case check.Outcome != string(handoff.ExitPass):
+		return enforcedHandoffRejection(in.Phase, pair, check)
+	}
+	return judgeRejection(pair, judgement, asks)
+}
+
+func (in ReviewInput) recordHandoff(pair string, check handoff.Check, judgement *handoff.Judgement) {
+	if err := recordHandoffCheck(in.Workspace, pair, check, judgement); err != nil {
 		fmt.Fprintf(in.errOut(), "[orchestrator] WARN handoff %s: the check record was not written: %v\n", pair, err)
 	}
-	if check.Stage != config.StageEnforce.String() || check.Outcome == string(handoff.ExitPass) {
-		return ReviewResult{Approve: true}
-	}
-	return enforcedHandoffRejection(in.Phase, pair, check)
 }
 
 func enforcedHandoffRejection(phase, pair string, check handoff.Check) ReviewResult {
@@ -104,8 +117,12 @@ func enforcedHandoffRejection(phase, pair string, check handoff.Check) ReviewRes
 	return ReviewResult{Retry: true, Reason: reason, Remediation: remedy.String()}
 }
 
-func recordHandoffCheck(workspace, pair string, check handoff.Check) error {
-	path := filepath.Join(workspace, "handoff-"+pair+".json")
+func handoffLedgerPath(workspace, pair string) string {
+	return filepath.Join(workspace, "handoff-"+pair+".json")
+}
+
+func recordHandoffCheck(workspace, pair string, check handoff.Check, judgement *handoff.Judgement) error {
+	path := handoffLedgerPath(workspace, pair)
 	doc := map[string]any{}
 	raw, err := ReadHandoffLedger(path)
 	switch {
@@ -124,6 +141,10 @@ func recordHandoffCheck(workspace, pair string, check handoff.Check) error {
 		}
 	}
 	doc["check"] = check
+	delete(doc, "judge")
+	if judgement != nil {
+		doc["judge"] = judgement
+	}
 	return atomicwrite.JSON(path, doc)
 }
 
