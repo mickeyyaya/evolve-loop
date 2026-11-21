@@ -35,7 +35,7 @@ func bindScope(t *testing.T, root, id string, cycle int) {
 func TestReconcileConsumedBindings_NoConsumedDirReleasesNothing(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	if got := ReconcileConsumedBindings(Options{ProjectRoot: root, Stderr: os.Stderr}); len(got) != 0 {
+	if got := mustReconcile(t, Options{ProjectRoot: root, Stderr: os.Stderr}); len(got) != 0 {
 		t.Fatalf("released = %v, want none when consumed/ does not exist", got)
 	}
 }
@@ -51,7 +51,7 @@ func TestReconcileConsumedBindings_SkipsEntriesThatAreNotItems(t *testing.T) {
 	writeConsumed(t, consumed, "unbound.json", `{"id":"unbound"}`)
 	bindScope(t, root, "txt", 3)
 
-	got := ReconcileConsumedBindings(Options{ProjectRoot: root, Stderr: os.Stderr})
+	got := mustReconcile(t, Options{ProjectRoot: root, Stderr: os.Stderr})
 	if len(got) != 0 {
 		t.Fatalf("released = %v, want none: dirs, non-json files, id-less and unbound items release nothing", got)
 	}
@@ -67,7 +67,7 @@ func TestReconcileConsumedBindings_UnreadableRegistryLeavesBindingsAlone(t *test
 	if err := os.WriteFile(continuation.RegistryPath(root), []byte("{not json"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if got := ReconcileConsumedBindings(Options{ProjectRoot: root, Stderr: os.Stderr}); len(got) != 0 {
+	if got := mustReconcile(t, Options{ProjectRoot: root, Stderr: os.Stderr}); len(got) != 0 {
 		t.Fatalf("released = %v, want none when the registry cannot be parsed", got)
 	}
 	raw, _ := os.ReadFile(continuation.RegistryPath(root))
@@ -90,7 +90,7 @@ func TestReconcileConsumedBindings_FailedReleaseIsNotReported(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(evolveDir, 0o755) })
 
-	if got := ReconcileConsumedBindings(Options{ProjectRoot: root, Stderr: os.Stderr}); len(got) != 0 {
+	if got := mustReconcile(t, Options{ProjectRoot: root, Stderr: os.Stderr}); len(got) != 0 {
 		t.Fatalf("released = %v, want none when the registry delete fails", got)
 	}
 	if _, ok, _ := continuation.ReadRegistryEntry(root, "a"); !ok {

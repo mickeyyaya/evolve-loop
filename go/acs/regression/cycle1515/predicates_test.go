@@ -14,6 +14,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxtest"
 )
 
 const scopeID = "context-fill-telemetry-and-cap"
@@ -108,56 +109,6 @@ func binding(cycle int) continuation.Continuation {
 	}
 }
 
-func newProject(t *testing.T) string {
-	t.Helper()
-	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, ".evolve", "inbox"), 0o755); err != nil {
-		t.Fatalf("fixture inbox dir: %v", err)
-	}
-	return root
-}
-
-func writeItem(t *testing.T, dir, id string) string {
-	t.Helper()
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatalf("fixture dir %s: %v", dir, err)
-	}
-	path := filepath.Join(dir, "2026-08-16T15-10-00Z-"+id+".json")
-	doc := map[string]any{
-		"id":       id,
-		"kind":     "bug",
-		"title":    "fixture item " + id,
-		"priority": "high",
-	}
-	body, err := json.MarshalIndent(doc, "", "  ")
-	if err != nil {
-		t.Fatalf("fixture marshal: %v", err)
-	}
-	if err := os.WriteFile(path, append(body, '\n'), 0o644); err != nil {
-		t.Fatalf("fixture write %s: %v", path, err)
-	}
-	return path
-}
-
-func bind(t *testing.T, root, id string, c continuation.Continuation) {
-	t.Helper()
-	if err := continuation.WriteRegistryEntry(root, id, c); err != nil {
-		t.Fatalf("fixture bind %s: %v", id, err)
-	}
-	if _, ok, err := continuation.ReadRegistryEntry(root, id); err != nil || !ok {
-		t.Fatalf("fixture bind %s did not take (ok=%v err=%v)", id, ok, err)
-	}
-}
-
-func bound(t *testing.T, root, id string) bool {
-	t.Helper()
-	_, ok, err := continuation.ReadRegistryEntry(root, id)
-	if err != nil {
-		t.Fatalf("read registry %s: %v", id, err)
-	}
-	return ok
-}
-
 func preservedPointers(t *testing.T, path string) string {
 	t.Helper()
 	raw, err := os.ReadFile(path)
@@ -187,13 +138,13 @@ func preservedPointers(t *testing.T, path string) string {
 }
 
 func TestC1515_001_ParkReleasesBindingAndPreservesPointer(t *testing.T) {
-	root := newProject(t)
+	root := inboxtest.EmptyRoot(t)
 	inbox := filepath.Join(root, ".evolve", "inbox")
-	writeItem(t, inbox, scopeID)
-	writeItem(t, inbox, liveSibling)
+	inboxtest.WriteItem(t, inbox, scopeID)
+	inboxtest.WriteItem(t, inbox, liveSibling)
 	c := binding(1484)
-	bind(t, root, scopeID, c)
-	bind(t, root, liveSibling, binding(1490))
+	inboxtest.Bind(t, root, scopeID, c)
+	inboxtest.Bind(t, root, liveSibling, binding(1490))
 
 	var errBuf bytes.Buffer
 	res, err := inboxmover.Promote(
@@ -206,10 +157,10 @@ func TestC1515_001_ParkReleasesBindingAndPreservesPointer(t *testing.T) {
 		t.Fatalf("Promote(quarantine) was a no-op: %+v (stderr: %s)", res, errBuf.String())
 	}
 
-	if bound(t, root, scopeID) {
+	if inboxtest.Bound(t, root, scopeID) {
 		t.Errorf("RED: parking %q left its continuation-registry binding intact — the parked scope is re-dispatched as an adopted continuation forever (cycle-1487 burn)", scopeID)
 	}
-	if !bound(t, root, liveSibling) {
+	if !inboxtest.Bound(t, root, liveSibling) {
 		t.Errorf("RED: parking %q also released the UNRELATED live scope %q — release must be scoped to the retired item", scopeID, liveSibling)
 	}
 	joined := preservedPointers(t, res.DestPath)
@@ -221,9 +172,9 @@ func TestC1515_001_ParkReleasesBindingAndPreservesPointer(t *testing.T) {
 }
 
 func TestC1515_002_ParkOfUnboundItemInventsNoAnnotation(t *testing.T) {
-	root := newProject(t)
+	root := inboxtest.EmptyRoot(t)
 	inbox := filepath.Join(root, ".evolve", "inbox")
-	writeItem(t, inbox, scopeID)
+	inboxtest.WriteItem(t, inbox, scopeID)
 
 	var errBuf bytes.Buffer
 	res, err := inboxmover.Promote(
@@ -246,41 +197,47 @@ func TestC1515_002_ParkOfUnboundItemInventsNoAnnotation(t *testing.T) {
 }
 
 func TestC1515_003_ScopeResolveRefusesRetiredBinding(t *testing.T) {
-	root := newProject(t)
+	root := inboxtest.EmptyRoot(t)
 	inbox := filepath.Join(root, ".evolve", "inbox")
-	writeItem(t, filepath.Join(inbox, "quarantine"), scopeID)
-	bind(t, root, scopeID, binding(1484))
+	inboxtest.WriteItem(t, filepath.Join(inbox, "quarantine"), scopeID)
+	inboxtest.Bind(t, root, scopeID, binding(1484))
 
 	var errBuf bytes.Buffer
 	opts := inboxmover.Options{ProjectRoot: root, Stderr: &errBuf}
-	got := inboxmover.ResolveContinuationForScope(opts, 1515, []string{scopeID})
+	got, err := inboxmover.ResolveContinuationForScope(opts, 1515, []string{scopeID})
+	if err != nil {
+		t.Fatalf("ResolveContinuationForScope: %v", err)
+	}
 	if got != nil {
 		t.Errorf("RED: ResolveContinuationForScope adopted a binding for parked scope %q (snapshot %s) — the parked scope is re-dispatched with no live item behind it", scopeID, got.SnapshotSHA)
 	}
 	if !strings.Contains(errBuf.String(), scopeID) {
 		t.Errorf("RED: refusing the dead binding for %q was SILENT — the operator gets a vanished lane with no explanation. stderr: %q", scopeID, errBuf.String())
 	}
-	if bound(t, root, scopeID) {
+	if inboxtest.Bound(t, root, scopeID) {
 		t.Errorf("RED: the ghost binding for %q survived the refusal — it re-arms on the very next wave", scopeID)
 	}
 
-	writeItem(t, inbox, liveSibling)
+	inboxtest.WriteItem(t, inbox, liveSibling)
 	live := binding(1490)
-	bind(t, root, liveSibling, live)
+	inboxtest.Bind(t, root, liveSibling, live)
 	var errBuf2 bytes.Buffer
 	optsLive := inboxmover.Options{ProjectRoot: root, Stderr: &errBuf2}
-	resolved := inboxmover.ResolveContinuationForScope(optsLive, 1515, []string{liveSibling})
+	resolved, err := inboxmover.ResolveContinuationForScope(optsLive, 1515, []string{liveSibling})
+	if err != nil {
+		t.Fatalf("ResolveContinuationForScope: %v", err)
+	}
 	if resolved == nil || resolved.SnapshotSHA != live.SnapshotSHA {
 		t.Errorf("RED: the guard also refused LIVE scope %q (got %+v) — preserved work for a pending item must still resume", liveSibling, resolved)
 	}
 }
 
 func TestC1515_004_ContinuationListShowsBindings(t *testing.T) {
-	root := newProject(t)
+	root := inboxtest.EmptyRoot(t)
 	c := binding(1484)
 	sib := binding(1490)
-	bind(t, root, scopeID, c)
-	bind(t, root, liveSibling, sib)
+	inboxtest.Bind(t, root, scopeID, c)
+	inboxtest.Bind(t, root, liveSibling, sib)
 
 	stdout, stderr, code := runCLI(t, root, "continuation", "list")
 	if code != 0 {
@@ -294,7 +251,7 @@ func TestC1515_004_ContinuationListShowsBindings(t *testing.T) {
 }
 
 func TestC1515_005_ContinuationListOnEmptyRegistryIsCleanExit(t *testing.T) {
-	root := newProject(t)
+	root := inboxtest.EmptyRoot(t)
 
 	stdout, stderr, code := runCLI(t, root, "continuation", "list")
 	if code != 0 {
@@ -306,22 +263,22 @@ func TestC1515_005_ContinuationListOnEmptyRegistryIsCleanExit(t *testing.T) {
 }
 
 func TestC1515_006_ContinuationReleaseReleasesAndAnnotates(t *testing.T) {
-	root := newProject(t)
+	root := inboxtest.EmptyRoot(t)
 	inbox := filepath.Join(root, ".evolve", "inbox")
-	itemPath := writeItem(t, inbox, scopeID)
-	writeItem(t, inbox, liveSibling)
+	itemPath := inboxtest.WriteItem(t, inbox, scopeID)
+	inboxtest.WriteItem(t, inbox, liveSibling)
 	c := binding(1484)
-	bind(t, root, scopeID, c)
-	bind(t, root, liveSibling, binding(1490))
+	inboxtest.Bind(t, root, scopeID, c)
+	inboxtest.Bind(t, root, liveSibling, binding(1490))
 
 	stdout, stderr, code := runCLI(t, root, "continuation", "release", "-operator", scopeID)
 	if code != 0 {
 		t.Fatalf("RED: `evolve continuation release -operator %s` exited %d — authority was granted, so the release path itself is broken.\nstdout: %s\nstderr: %s", scopeID, code, stdout, stderr)
 	}
-	if bound(t, root, scopeID) {
+	if inboxtest.Bound(t, root, scopeID) {
 		t.Errorf("RED: `evolve continuation release %s` reported success but the binding is still in the registry", scopeID)
 	}
-	if !bound(t, root, liveSibling) {
+	if !inboxtest.Bound(t, root, liveSibling) {
 		t.Errorf("RED: releasing %q also dropped the UNRELATED binding for %q — release must name exactly one scope", scopeID, liveSibling)
 	}
 	joined := preservedPointers(t, itemPath)
@@ -333,8 +290,8 @@ func TestC1515_006_ContinuationReleaseReleasesAndAnnotates(t *testing.T) {
 }
 
 func TestC1515_007_ContinuationReleaseRejectsUnknownScope(t *testing.T) {
-	root := newProject(t)
-	bind(t, root, liveSibling, binding(1490))
+	root := inboxtest.EmptyRoot(t)
+	inboxtest.Bind(t, root, liveSibling, binding(1490))
 
 	stdout, stderr, code := runCLI(t, root, "continuation", "release", "no-such-scope-id")
 	if code == 0 {
@@ -343,14 +300,14 @@ func TestC1515_007_ContinuationReleaseRejectsUnknownScope(t *testing.T) {
 	if !strings.Contains(stdout+stderr, "no-such-scope-id") {
 		t.Errorf("RED: the unknown-scope failure never named the scope, so the operator cannot see what was rejected.\nstdout: %s\nstderr: %s", stdout, stderr)
 	}
-	if !bound(t, root, liveSibling) {
+	if !inboxtest.Bound(t, root, liveSibling) {
 		t.Errorf("RED: a failed release of an unknown scope collaterally dropped %q's binding", liveSibling)
 	}
 }
 
 func TestC1515_008_ContinuationRejectsMalformedInvocations(t *testing.T) {
-	root := newProject(t)
-	bind(t, root, scopeID, binding(1484))
+	root := inboxtest.EmptyRoot(t)
+	inboxtest.Bind(t, root, scopeID, binding(1484))
 
 	if stdout, stderr, code := runCLI(t, root, "continuation", "list"); code != 0 {
 		t.Fatalf("RED: precondition — `evolve continuation list` exited %d, so the subcommand is not registered and the malformed-input edges below would pass vacuously.\nstdout: %s\nstderr: %s", code, stdout, stderr)
@@ -367,7 +324,7 @@ func TestC1515_008_ContinuationRejectsMalformedInvocations(t *testing.T) {
 			t.Errorf("RED: `evolve %s` exited 0 — a malformed invocation must fail loudly.\nstdout: %s\nstderr: %s", strings.Join(args, " "), stdout, stderr)
 		}
 	}
-	if !bound(t, root, scopeID) {
+	if !inboxtest.Bound(t, root, scopeID) {
 		t.Errorf("RED: a malformed invocation mutated the registry — %q's binding was dropped without an explicit scope argument", scopeID)
 	}
 }

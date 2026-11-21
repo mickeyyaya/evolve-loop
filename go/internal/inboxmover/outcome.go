@@ -39,7 +39,10 @@ type OutcomeResult struct {
 const shipUnbackedReason = "ship-promote-processed: no inbox item backs the id"
 
 func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
-	opts.resolveOpts()
+	opts, err := opts.resolved()
+	if err != nil {
+		return OutcomeResult{}, err
+	}
 	res := OutcomeResult{}
 	committed := dedupeIDs(oc.CommittedIDs)
 

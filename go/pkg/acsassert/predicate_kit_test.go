@@ -436,3 +436,14 @@ func TestExitedPID_FailsTheTBWhenTheProgramCannotRun(t *testing.T) {
 		t.Fatalf("Fatal calls = %q, want one when the program is missing", fake.fatals)
 	}
 }
+
+func TestPathExists_IsTrueOnlyForAPathThatCanBeStatted(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if !PathExists(dir) {
+		t.Errorf("PathExists(%q) = false for a directory that exists", dir)
+	}
+	if PathExists(filepath.Join(dir, "absent")) {
+		t.Error("PathExists is true for a path that does not exist")
+	}
+}

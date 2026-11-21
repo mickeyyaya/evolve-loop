@@ -19,6 +19,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/apicover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxtest"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
@@ -39,7 +40,7 @@ func newInboxFixture(t *testing.T) inboxFixture {
 	t.Helper()
 	root := t.TempDir()
 	inbox := filepath.Join(root, ".evolve", "inbox")
-	mkdirAll(t, inbox)
+	inboxtest.MkdirAll(t, inbox)
 	return inboxFixture{root: root, inbox: inbox, opts: inboxmover.Options{ProjectRoot: root, Stderr: io.Discard}}
 }
 
@@ -55,7 +56,7 @@ func (f inboxFixture) fileItem(t *testing.T, rel, id string, deps ...string) str
 func (f inboxFixture) fileDoc(t *testing.T, rel, id string, doc map[string]any) string {
 	t.Helper()
 	dir := filepath.Join(f.inbox, rel)
-	mkdirAll(t, dir)
+	inboxtest.MkdirAll(t, dir)
 	body, err := json.Marshal(doc)
 	if err != nil {
 		t.Fatal(err)
@@ -211,11 +212,11 @@ type stampFixture struct {
 
 func newStampFixture(t *testing.T, worktree func(home string) string) stampFixture {
 	t.Helper()
-	home := realDir(t, t.TempDir())
+	home := inboxtest.RealDir(t, t.TempDir())
 	t.Setenv("HOME", home)
 	root := filepath.Join(home, "proj")
 	ws := filepath.Join(root, ".evolve", "runs", "cycle-41")
-	mkdirAll(t, ws)
+	inboxtest.MkdirAll(t, ws)
 	wt := filepath.Join(home, "wt", "cycle-41")
 	if worktree != nil {
 		wt = worktree(home)
@@ -345,7 +346,10 @@ func TestC1781_007_NextCycleResolverHandsBuilderAnOpenableFindingsPath(t *testin
 		t.Errorf("RED: the item the next cycle claimed carries the absolute home path %s:\n%s", fx.home, claimed)
 	}
 
-	c := inboxmover.ResolveContinuationForScope(fx.opts, nextCycle, []string{stampedID})
+	c, err := inboxmover.ResolveContinuationForScope(fx.opts, nextCycle, []string{stampedID})
+	if err != nil {
+		t.Fatalf("ResolveContinuationForScope: %v", err)
+	}
 	if c == nil {
 		t.Fatalf("the next cycle resolved no continuation from its claimed, stamped item")
 	}
@@ -452,25 +456,9 @@ func stampOf(t *testing.T, raw []byte) continuation.Continuation {
 	return *doc.Continuation
 }
 
-func realDir(t *testing.T, dir string) string {
-	t.Helper()
-	real, err := filepath.EvalSymlinks(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return real
-}
-
-func mkdirAll(t *testing.T, dir string) {
-	t.Helper()
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func writeFile(t *testing.T, path string, body []byte) {
 	t.Helper()
-	mkdirAll(t, filepath.Dir(path))
+	inboxtest.MkdirAll(t, filepath.Dir(path))
 	if err := os.WriteFile(path, body, 0o644); err != nil {
 		t.Fatal(err)
 	}
