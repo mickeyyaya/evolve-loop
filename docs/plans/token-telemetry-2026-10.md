@@ -241,3 +241,4 @@ The data decides each cut. No cut starts before its metric has one wave of data.
 | 2026-10-27 | The operator approved design A (§5). | Status is approved. Design B stays a later stage under the conditions of §5.3. |
 | 2026-10-27 | T1 to T9 are filed in the runtime inbox (`.evolve/inbox/` of the runtime tree, 06:07Z). The inbox id of each item is the id in the §7 table. The routes are those of §7: T2, T5 and T8 go to the console, and the other six go to a lane. | The lane and the console build the items in the order of §8. |
 | 2026-10-27 | Q5: the ADR comes after one `shadow` wave of T1 and T7 data. | The ADR cites the measured data of that wave. |
+| 2026-11-21 | T8 needs no edit of `strict_keys.go`: the reflection walk covers the new `Telemetry` field. T8 touches no fence path. | The console keeps the route, because it already builds the item. |
