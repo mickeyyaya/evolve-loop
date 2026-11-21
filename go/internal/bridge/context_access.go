@@ -63,7 +63,7 @@ func (deps Deps) recordContextAccess(cfg *Config, targets []string, source strin
 		return
 	}
 	if source == inputindex.AccessSourceSandbox && len(unopened) > 0 {
-		deps.emitContext(cfg, signalcenter.SeverityInfo, isolation.CodeContextRequiredUnopened,
+		deps.emitContext(cfg, contextSignal{origin: recordContextOrigin, severity: signalcenter.SeverityInfo, code: isolation.CodeContextRequiredUnopened},
 			"the cell "+cfg.Agent+" closed without a read of the required entries "+strings.Join(unopened, ", "),
 			map[string]string{"unopened": strings.Join(unopened, ","), "source": source})
 	}
@@ -80,17 +80,25 @@ func (deps Deps) emitBudgetOverflow(cfg *Config, idx inputindex.Index) {
 		if b.Over == 0 {
 			continue
 		}
-		deps.emitContext(cfg, signalcenter.SeverityWarn, isolation.CodeContextBudgetOver,
+		deps.emitContext(cfg, contextSignal{origin: recordContextOrigin, severity: signalcenter.SeverityWarn, code: isolation.CodeContextBudgetOver},
 			fmt.Sprintf("%d required entries of %s passed the budget of %d tokens and lost the flag", b.Over, layer, b.LimitTokens),
 			map[string]string{"layer": layer, "limit_tokens": strconv.Itoa(b.LimitTokens), "over": strconv.Itoa(b.Over)})
 	}
 }
 
-func (deps Deps) emitContext(cfg *Config, severity signalcenter.Severity, code signalcenter.Code, reason string, fields map[string]string) {
+const recordContextOrigin = "bridge.recordContextAccess"
+
+type contextSignal struct {
+	origin   string
+	severity signalcenter.Severity
+	code     signalcenter.Code
+}
+
+func (deps Deps) emitContext(cfg *Config, sig contextSignal, reason string, fields map[string]string) {
 	id := configIdentity(cfg)
 	fields["cell"], fields["family"] = cfg.Agent, cfg.CLI
 	deps.Signals.Emit(signalcenter.Event{
-		Cycle: id.cycle, RunID: id.runID, Phase: id.phase, Module: signalcenter.ModuleIsolation, Origin: "bridge.recordContextAccess",
-		Kind: signalcenter.KindIsolationContext, Severity: severity, Code: code, Reason: reason, Fields: fields,
+		Cycle: id.cycle, RunID: id.runID, Phase: id.phase, Module: signalcenter.ModuleIsolation, Origin: sig.origin,
+		Kind: signalcenter.KindIsolationContext, Severity: sig.severity, Code: sig.code, Reason: reason, Fields: fields,
 	})
 }

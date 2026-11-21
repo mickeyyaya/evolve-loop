@@ -86,8 +86,20 @@ func TestReportReads_ACellWithNoReportSourceWritesASummaryWithSourceNone(t *test
 		center := signalcenter.New()
 		deps.Signals = center
 		deps.reportReadViolations(context.Background(), &Config{Agent: "build", Cycle: 7, Workspace: c.ws, ProjectRoot: c.root, Worktree: "/wt", DispatchID: "run1/7/build/p1n" + name[:1]}, time.Now())
-		if len(contextEvents(center)) != 0 {
+		var unopened, unmeasured int
+		for _, e := range contextEvents(center) {
+			switch e.Code {
+			case isolation.CodeContextRequiredUnopened:
+				unopened++
+			case isolation.CodeReadUnmeasured:
+				unmeasured++
+			}
+		}
+		if unopened != 0 {
 			t.Errorf("%s: a cell with no report source emits no unopened signal", name)
+		}
+		if wantUnmeasured := name == "unreadable reports"; (unmeasured == 1) != wantUnmeasured {
+			t.Errorf("%s: %d unmeasured signal(s), want one only when the reports cannot be read", name, unmeasured)
 		}
 	}
 	records, _ := inputindex.ReadAccess(c.root)

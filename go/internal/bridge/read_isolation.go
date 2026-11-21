@@ -171,26 +171,58 @@ func parseReadReports(raw []byte) []readReport {
 	return out
 }
 
+type readCause string
+
+const (
+	causeFenceDeadline readCause = "fence-deadline"
+	causeCancelled     readCause = "cancelled"
+	causeFenceWrite    readCause = "fence-write"
+	causeReportRead    readCause = "report-read"
+)
+
+var causeSeverity = map[readCause]signalcenter.Severity{
+	causeFenceDeadline: signalcenter.SeverityWarn,
+	causeCancelled:     signalcenter.SeverityInfo,
+	causeFenceWrite:    signalcenter.SeverityWarn,
+	causeReportRead:    signalcenter.SeverityWarn,
+}
+
+type readGap struct {
+	cause   readCause
+	elapsed time.Duration
+}
+
 func (deps Deps) reportReadViolations(ctx context.Context, cfg *Config, since time.Time) {
 	stage := deps.readStage()
 	if !deps.readReportsApply(cfg) || stage == envStageOff {
 		deps.recordContextAccess(cfg, nil, inputindex.AccessSourceNone)
 		return
 	}
-	raw, complete, err := deps.cellReports(ctx, cfg.DispatchID, since)
+	raw, gap, err := deps.cellReports(ctx, cfg.DispatchID, since)
 	if err != nil {
 		deps.warnReports("%v", err)
+		deps.emitReadUnmeasured(cfg, stage, readGap{cause: causeReportRead})
 		deps.recordContextAccess(cfg, nil, inputindex.AccessSourceNone)
 		return
 	}
 	for _, r := range parseReadReports(raw) {
 		deps.emitReadViolation(cfg, stage, r)
 	}
-	source := inputindex.AccessSourceNone
-	if complete {
-		source = inputindex.AccessSourceSandbox
+	source := inputindex.AccessSourceSandbox
+	if gap.cause != "" {
+		source = inputindex.AccessSourceNone
+		deps.emitReadUnmeasured(cfg, stage, gap)
 	}
 	deps.recordContextAccess(cfg, parseGrantReports(raw), source)
+}
+
+func (deps Deps) emitReadUnmeasured(cfg *Config, stage string, gap readGap) {
+	fields := map[string]string{"stage": stage, "cause": string(gap.cause)}
+	if gap.cause == causeFenceDeadline || gap.cause == causeCancelled {
+		fields["elapsed"] = gap.elapsed.Round(time.Second).String()
+	}
+	deps.emitContext(cfg, contextSignal{origin: reportReadOrigin, severity: causeSeverity[gap.cause], code: isolation.CodeReadUnmeasured},
+		"the cell "+cfg.Agent+" has an incomplete read report ("+string(gap.cause)+"); its reads count as unmeasured", fields)
 }
 
 func (deps Deps) warnReports(format string, args ...any) {
@@ -199,26 +231,31 @@ func (deps Deps) warnReports(format string, args ...any) {
 	}
 }
 
-func (deps Deps) cellReports(parent context.Context, tag string, since time.Time) ([]byte, bool, error) {
+func (deps Deps) cellReports(parent context.Context, tag string, since time.Time) ([]byte, readGap, error) {
 	ctx := context.WithoutCancel(parent)
 	if deps.SandboxFence == nil {
 		raw, err := deps.SandboxReports(ctx, tag, since)
-		return raw, true, err
+		return raw, readGap{}, err
 	}
 	if err := deps.SandboxFence(ctx, tag); err != nil {
 		deps.warnReports("write the fence: %v", err)
 		raw, err := deps.SandboxReports(ctx, tag, since)
-		return raw, false, err
+		return raw, readGap{cause: causeFenceWrite}, err
 	}
 	start, deadline := deps.Now(), cmp.Or(deps.ReportFenceDeadline, reportFenceDeadline)
 	for {
 		raw, err := deps.SandboxReports(ctx, tag, since)
 		if err != nil || fenced(raw, tag) {
-			return raw, true, err
+			return raw, readGap{}, err
 		}
-		if elapsed := deps.Now().Sub(start); elapsed >= deadline || parent.Err() != nil {
+		cancelled := parent.Err() != nil
+		if elapsed := deps.Now().Sub(start); elapsed >= deadline || cancelled {
 			deps.warnReports("no fence of the cell after %s; its reads count as unmeasured", elapsed.Round(time.Second))
-			return raw, false, nil
+			cause := causeFenceDeadline
+			if cancelled {
+				cause = causeCancelled
+			}
+			return raw, readGap{cause: cause, elapsed: elapsed}, nil
 		}
 		deps.Sleep(reportPollInterval)
 	}
@@ -277,7 +314,7 @@ func (deps Deps) emitReadViolation(cfg *Config, stage string, r readReport) {
 	target := relToProject(cfg.ProjectRoot, r.target)
 	n, _ := strconv.Atoi(strings.TrimPrefix(r.invariant, "I"))
 	deps.Signals.Emit(signalcenter.Event{
-		Cycle: id.cycle, RunID: id.runID, Phase: id.phase, Module: signalcenter.ModuleIsolation, Origin: "bridge.reportReadViolations",
+		Cycle: id.cycle, RunID: id.runID, Phase: id.phase, Module: signalcenter.ModuleIsolation, Origin: reportReadOrigin,
 		Kind: signalcenter.KindIsolationViolation, Severity: signalcenter.SeverityWarn, Code: isolation.ViolationCode(n),
 		Reason: "the cell " + cfg.Agent + " read " + target + " outside its grants",
 		Fields: map[string]string{
@@ -295,3 +332,5 @@ func logShowReports(binary string) func(context.Context, string, time.Time) ([]b
 		return sysexec.Command(ctx, binary, "show", "--style", "ndjson", "--start", since.Local().Format(time.DateTime), "--predicate", predicate).Output()
 	}
 }
+
+const reportReadOrigin = "bridge.reportReadViolations"

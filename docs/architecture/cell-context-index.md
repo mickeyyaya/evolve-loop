@@ -277,8 +277,11 @@ It also writes one summary record for each cell. The record holds the listed ids
 
 - On Linux, `bwrap` has no report. The summary has `source: none`, and no reading counts the cell.
 - The unified log can lag the end of the cell by many seconds on a loaded host. A read of `log show` at once can then miss a report, and the cell loses an access record. Row N16 failed so after 12.66 s on the macOS runner of the CI of PR #1152 (2026-10-26).
+- A host can also stop to write the Sandbox report: `sandbox-exec` denies the read, but `log show` shows no report. The N16 failures of 2026-11-06 were such a host log fault, not a load flake. A missing fence, a fence-write failure or a read error emits `ISOLATION_READ_UNMEASURED` with its cause, so the loop log shows the fault.
 - So the bridge first writes a fence (`sandboxFence`): one reported read of `/dev/null` under the tag of the cell, with the message `rule=cell.fence`. Then it reads the log each second until the fence appears, or until 60 s pass (`cellReports`). The kernel writes the reports of one host in order, and `log show` returns them in time order. So a fence in the log makes a lost report of the cell unlikely, but it is no proof: `logd` buffers each process. Row N16 guards the path on macOS. A cancelled run reads the log once and does not wait.
 - A fence that does not appear before the deadline prints a WARN with the elapsed time. A fence that cannot be written prints a WARN with the error. The cell record then has `source: none`, so an incomplete read never lowers an open rate.
+- Each such cell also emits one `ISOLATION_READ_UNMEASURED`. Its `cause` field is `fence-deadline`, `cancelled`, `fence-write` or `report-read`. Its `elapsed` field is set only for `fence-deadline` and `cancelled`. The severity is WARN, except for `cancelled`, which is INFO because an operator stop causes it.
+- Row N16 names the cause and the elapsed time in its failure note. When the log holds the fence and no grant report of the read path, it reports a missing record.
 - The kernel can merge repeated reports, so a record means "opened at least once", never a count.
 - A verb entry has no path, so it gets no record. The `evolve code` usage log is in the workspace, which the cell can write, so it is not a source.
 - A required entry that the cell did not open emits `ISOLATION_CONTEXT_REQUIRED_UNOPENED` (INFO) with the ids. It never fails the phase, because the report reader is best effort.
@@ -337,7 +340,7 @@ The stage key is `isolation.context.stage`. The compiled default is `shadow`. Th
 
 | Stage | The builder | The prompt | Signals |
 |---|---|---|---|
-| `shadow` | writes `/2` with the layers, the budgets and the required flags; the grants report; the moved bodies of §5 are not listed | unchanged: the tail keeps its bodies | `ISOLATION_CONTEXT_BUDGET_OVER` and `ISOLATION_CONTEXT_REQUIRED_UNOPENED` (kind `isolation.context`) |
+| `shadow` | writes `/2` with the layers, the budgets and the required flags; the grants report; the moved bodies of §5 are not listed | unchanged: the tail keeps its bodies | `ISOLATION_CONTEXT_BUDGET_OVER`, `ISOLATION_CONTEXT_REQUIRED_UNOPENED` and `ISOLATION_READ_UNMEASURED` (kind `isolation.context`) |
 | `enforce` | the same, plus the moved bodies of §5 | the persona and the L0 block only | the same, and `ISOLATION_CONTEXT_PRELOAD_BYTES` with the bytes that the move saves (CX5) |
 
 The flip to `enforce` is an operator decision. It needs one clean wave at `shadow`, and the rows N15 to N17 of the guards green. The persona text of §11 is true at both stages, so it lands with CX2. The open rates of a `shadow` wave cover the listed kinds only. `enforce` lands with component CX5. Until then, `policy.Parse` refuses `enforce` and names the inbox item of CX5, `context-index-l0-prompt-enforce`.
@@ -355,7 +358,7 @@ CX1 to CX3 landed in one change at `shadow`. This table names each part and its 
 | Grant reports | each indexed grant, and each indexed path in the repo (`ReportOnly`), is an `allow` with a report and the message `rule=grant.index` ([internal-adapters-sandbox](packages/internal-adapters-sandbox.md)). |
 | Access log | after the cell, `Deps.reportReadViolations` writes the fence and polls the log until the fence appears (`Deps.cellReports`). It emits the violations and calls `recordContextAccess`, which maps each reported path to its entry and calls `inputindex.RecordAccess`. A cell with no report source writes a cell record with `source: none`. A dispatch whose agent is not the phase of the index writes no record. |
 | Write refusal | `refuseRunDirsReach` also refuses a write grant that covers `.evolve/context-access/`. |
-| Signals | `ISOLATION_CONTEXT_REQUIRED_UNOPENED` (INFO) and `ISOLATION_CONTEXT_BUDGET_OVER` (WARN), kind `isolation.context` ([internal-isolation](packages/internal-isolation.md)). |
+| Signals | `ISOLATION_CONTEXT_REQUIRED_UNOPENED` (INFO), `ISOLATION_CONTEXT_BUDGET_OVER` (WARN) and `ISOLATION_READ_UNMEASURED` (WARN or INFO), kind `isolation.context` ([internal-isolation](packages/internal-isolation.md)). |
 | Persona | `agents/agent-templates.md` §"The input index". |
 
 Differences from the design:
