@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "TestExplanationCorrection_AnInPlaceFixReSealsTheSnapshot",
+    "TestExplanationCorrection_TheRebindRecordAllowsOnlyTheDocument",
+    "TestExplanationCorrection_ACodeFindingStillGoesToBuild"
+  ],
+  "created_at": "2026-11-21T11:19:27Z",
+  "deps": [
+    "gate-ship-s4-binding-first-receipt"
+  ],
+  "files": [
+    "go/internal/explanationdocs/rebind.go",
+    "go/internal/phases/ship/"
+  ],
+  "fix": "Apply the small prescribed fix in place (ADR-0158). Re-seal the snapshot with explanationdocs.SealResult. Write a typed rebind record. It proves the new tree differs from the audited tree only in the explanation document and its handoff. Start after the Stage 1 measures of plan section 8 hold for two waves.",
+  "id": "gate-ship-s5-explanation-fix-in-place",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "performance",
+  "summary": "A passing audit with only an explanation-doc finding goes back to Build, then a full re-audit. That cost 3.34 hours in wave 174. Plan gate-ship-retry-waste S5 has no code: no TestExplanationCorrection_ test exists. go/internal/explanationdocs has RebindIdenticalRebase only (rebind.go:21).",
+  "title": "Fix an explanation-doc finding in place with a re-seal and a rebind record (plan S5)",
+  "weight": 0.5
+}

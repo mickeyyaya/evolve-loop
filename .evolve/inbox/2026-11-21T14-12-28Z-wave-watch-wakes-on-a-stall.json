@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "A replay of the wave 185 signal log and abnormal events wakes the watch before 10:00Z.",
+    "A replay of wave 184 and earlier waves does not wake it on normal volume.",
+    "The wake signal names the trigger, the lanes and the evidence paths.",
+    "wave-operations.md names the zero-ship first look."
+  ],
+  "created_at": "2026-11-21T14:12:28Z",
+  "files": [
+    "go/cmd/evolve/cmd_wave_watch_events.go",
+    "go/internal/orchestrator/orchestrator.go",
+    "go/internal/policy/policy.go",
+    "docs/operations/wave-operations.md"
+  ],
+  "fix": "Design review first. Add a stall trigger to evolve wave watch: it emits one signal when the wave is older than a bound with live lanes and no ship, or when one abnormal event kind passes a rate in a window across lanes. The signal is a lossless channel event that the console listener takes like ORCHESTRATOR_BLOCKER_ROUTED. Bounds live in policy. Start with stage shadow. Add the zero-ship first look to docs/operations/wave-operations.md: read lane stall signals and abnormal events before you wait.",
+  "id": "wave-watch-wakes-on-a-stall",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Wave 185 ran 5.7 hours with 8 live lanes and 0 of 9 cycles shipped. The console watches woke only on failure codes. LOOP_ORCH_LANE_STALLED fired 9 times and abnormal events verify-single-flight-unavailable fired 75 times, and nothing woke on them. The console read zero ships at about 10:00Z and waited until 13:50Z.",
+  "title": "The wave watch and the console wake on a stall: no ship against wave age, and a repeated abnormal event kind",
+  "weight": 0.8
+}

@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "An item at the ceiling is not quarantined",
+    "A quota wall and a logout add nothing to the count",
+    "No lane claims the subject; a passed card returns it"
+  ],
+  "created_at": "2026-11-21T11:19:16Z",
+  "deps": [
+    "pipeline-blockers-r1-one-block-count"
+  ],
+  "files": [
+    "go/internal/cycleoutcome/",
+    "go/internal/inboxbatch/"
+  ],
+  "fix": "Let cycle failure events raise the block count in go/internal/cycleoutcome. A quota wall and a logout add nothing. An item at the ceiling routes to the console with a digest of its findings. No lane claims it. A passed card returns it.",
+  "id": "pipeline-blockers-r4-failure-events-feed-the-count",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Plan pipeline-blockers R4 and R5 are not built. Failed cycles do not raise the block count. A lane can claim an item that already failed past the ceiling. That is a wasted cycle.",
+  "title": "Failure events feed the block count; an item at the ceiling routes to the console and leaves the lane queue",
+  "weight": 0.5
+}

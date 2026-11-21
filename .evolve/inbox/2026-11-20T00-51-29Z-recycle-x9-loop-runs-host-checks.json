@@ -4,7 +4,8 @@
     "Red first: a cycle with a stale heartbeat and a live pid stays",
     "Red first: an unreadable fresh lease and an absent lease with a young run dir stay",
     "A cycle with a dead owner pid and no holder is recycled",
-    "gc.wave_end.scope takes full or lanes: at full the batch-end hook runs each sweep of evolve gc; at lanes it runs the sweeps of today (red test first)"
+    "gc.wave_end.scope takes full or lanes: at full the batch-end hook runs each sweep of evolve gc; at lanes it runs the sweeps of today (red test first)",
+    "Add the policy key gc.wave_end.scope (lanes or full) to the strict schema; the batch-end hook runs every sweep at full and the lane sweeps at lanes (no code reads this key today, although internal-gc.md names it)."
   ],
   "created_at": "2026-11-20T00:51:29Z",
   "deps": [

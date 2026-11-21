@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "A red-first test through the real tier gate: with width 8 and the tier lock held, the argv of the retake carries the chosen budget, not -p 1.",
+    "A test that the timeout of a package run follows the share of the run.",
+    "One measured wave at the same width shows fewer audit FAIL signals of the 601 s timeout than wave 185 (8)."
+  ],
+  "created_at": "2026-11-21T15:24:19Z",
+  "files": [
+    "go/internal/phases/audit/ciparitygate/tier.go",
+    "go/internal/phases/audit/ciparitygate/tierlock.go",
+    "go/internal/ciparity/tierscope.go",
+    "go/internal/core/build_floor_retake.go",
+    "go/internal/lanebudget/lanebudget.go"
+  ],
+  "fix": "Design review first. Decide one budget over the verify lock and the tier lock, so that two holders do not ask for more than the host. Candidates: the tier retake holder takes lanebudget.ShareFor(true) while the verify lock is free; a per-package test timeout that scales with the share (cmd/evolve took 568 s at GOMAXPROCS=3 on 2026-11-14); the first attempt of cmd/evolve moves under a lock. Keep the rule in lanebudget.",
+  "id": "integration-tier-retake-budget",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "performance",
+  "summary": "Wave 185 had eight audit FAIL signals (10:46Z to 13:41Z) with the same text: go/cmd/evolve hit the 10 minute test timeout (601 s), four in cycles 2582, 2585, 2588, 2589. The tier ran 'go test -race -p 1 -parallel 1 -tags integration' as 'lane env, contended' (go/internal/phases/audit/ciparitygate/tier.go:95-101). The retake lock integration-tier.lock (go/internal/ciparity/tierscope.go:13) timed out in cycles 2586 and 2589, so those retakes ran unserialized. The first attempt takes no lock, so the holder budget of docs/plans/verify-lock-holder-budget-2026-11.md does not reach it. The retake holder (audit gate and build floor retake) keeps the lane share.",
+  "title": "The audit integration tier runs at -p 1 under -race and hits the 10 minute test timeout of go/cmd/evolve",
+  "weight": 0.8
+}

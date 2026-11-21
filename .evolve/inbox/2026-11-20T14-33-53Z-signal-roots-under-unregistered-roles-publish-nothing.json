@@ -5,6 +5,14 @@
     "An integration-root emit reaches the root bus: a test attaches rootwire to a center of role integration in a temp evolve dir and reads the record back with source integration",
     "evolve signals codes check passes"
   ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2586",
+    "branch": "cycle-cd3ae73e-2586",
+    "snapshot_sha": "a57fbe2efce5d8858ea85a2fb693791edef0158b",
+    "base_sha": "cfdb5f97dc2857ec9b4541fb6bd4d17194ac4d56",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2586/audit-fail-reason.json",
+    "cycle": 2586
+  },
   "created_at": "2026-11-20T14:33:53Z",
   "files": [
     "go/internal/events/publisher/publisher.go",

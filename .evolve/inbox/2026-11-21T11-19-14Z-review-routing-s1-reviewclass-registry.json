@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "A table test: one path set per class gives the expected seats and checks",
+    "A mixed diff takes the union",
+    "An unmatched path is C13",
+    "The doc region equals evolve review-class --json"
+  ],
+  "created_at": "2026-11-21T11:19:14Z",
+  "files": [
+    "go/internal/reviewclass/",
+    "go/cmd/evolve/",
+    "go/internal/guards/integrity_surface.go",
+    "docs/architecture/review-routing.md"
+  ],
+  "fix": "Add go/internal/reviewclass with one table of path classes and the seats and checks of each. Add evolve review-class. A mixed diff takes the union. An unmatched path is class C13. Generate the table region of docs/architecture/review-routing.md from the verb (plan S8). Add the registry to the integrity surface.",
+  "id": "review-routing-s1-reviewclass-registry",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Plan review-routing S1 is not built: no go/internal/reviewclass exists. The operator approved the registry on 2026-11-03. Today the console picks review seats by hand per change, so risky paths can land with too few seats.",
+  "title": "A reviewclass registry maps changed paths to review seats and checks, with an evolve review-class verb and a generated doc",
+  "weight": 0.5
+}

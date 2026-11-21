@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "A live launch shows each of the two Neon names verbatim in agy's footer",
+    "The message of TestAgyTierModelsPinnedToVerifiedNames cites the run and no longer says the launch proof is pending"
+  ],
+  "created_at": "2026-11-21T00:00:00Z",
+  "files": [
+    "go/internal/bridge/agy_model_names_test.go"
+  ],
+  "fix": "After the Gemini weekly quota resets (about 2026-11-25), run evolve doctor live agy-tmux once with each Neon name (High at deep, XHigh at top) and record the model label in agy's footer for each run. If a name is refused or the footer shows another model, correct the model_tier_map in go/internal/bridge/manifests/agy-tmux.json and the pin tests.",
+  "id": "agy-neon-names-launch-proof",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "routed_at": "2026-11-21T19:02:45Z",
+  "routed_by": "operator",
+  "routed_cycle": 2590,
+  "routed_reason": "needs a live agy launch of each Neon name after the Gemini quota resets; the console runs evolve doctor live agy-tmux",
+  "summary": "Gemini 4 Neon (High) and Gemini 4 Neon (XHigh) are set for agy deep and top on the evidence of the live picker listing only (evolve models refresh --source live, 2026-11-21); neither name was launched, because the Gemini quota is 100% used until about 2026-11-25. agy silently serves Flash on a bad name; launch_model_verification (exit 87) is the runtime guard that kills such a seat before the prompt.",
+  "title": "Launch-prove the agy Gemini 4 Neon (High) and Neon (XHigh) model names",
+  "weight": 0.6
+}

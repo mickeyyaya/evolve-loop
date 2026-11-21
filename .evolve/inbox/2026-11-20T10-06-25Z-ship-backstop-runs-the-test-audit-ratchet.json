@@ -3,7 +3,8 @@
     "TestPackages_IncludesTheTestAuditRatchet",
     "A landing with an error-text test and no baseline row is refused at ship",
     "repocontract.Packages() includes internal/testaudit, internal/gateregistry and internal/sysexec, so a ship runs their whole-tree guards (PR CI of #1597, #1598 and #1601 failed on these three after green local runs on 2026-11-20)",
-    "The ship backstop runs apicover-enforce on the changed packages (PR CI of #1597 and #1599 failed on apicover on 2026-11-20)"
+    "The ship backstop runs apicover-enforce on the changed packages (PR CI of #1597 and #1599 failed on apicover on 2026-11-20)",
+    "Recurrence 2026-11-21: console PRs #1623, #1634, #1646 and #1654 shipped error-text-match tests and #1652 a sleep-sync test; only CI caught them. evolve ship refuses each such change locally."
   ],
   "created_at": "2026-11-20T10:06:25Z",
   "deps": [
@@ -18,7 +19,12 @@
   "kind": "bug",
   "origin": "console",
   "priority_class": "correctness",
+  "route": "console-manual",
+  "routed_at": "2026-11-21T19:02:46Z",
+  "routed_by": "operator",
+  "routed_cycle": 2590,
+  "routed_reason": "recurred 2026-11-21 across 5 console PRs; per the 2026-11-20 incident lesson the class fix goes to the first build of the next wave; ship is a protected surface",
   "summary": "repocontract.Packages() (go/internal/repocontract/repocontract.go:21) lists the whole-tree ratchets the ship gate runs; it holds rawgitratchet and sizeratchet but not internal/testaudit. The build floor now runs the scoped test-audit check (PR #1597); the ship backstop is the second line.",
   "title": "the ship backstop runs rawgit and size ratchets but not the test-audit ratchet",
-  "weight": 0.6
+  "weight": 0.9
 }
