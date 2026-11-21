@@ -510,7 +510,7 @@ func TestEngineLaunch_ClaudeCloudDispatchRecordsTheLaunchedRow(t *testing.T) {
 	prof := writeProfile(t, ws, "cloud-test", "")
 	artifact := filepath.Join(ws, "builder-report.md")
 	tmux := &FakeTmuxController{CaptureFrames: []string{cloudCreatedFrame, "$ ", "$ "}}
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), EnvStage: envStageOff,
 		CloudRepo:       func(context.Context, string) (cloudlaunch.Repo, error) { return pushedGitHubRepo, nil },
 		CloudRemoteHead: func(context.Context, string, cloudlaunch.Repo) error { return nil },

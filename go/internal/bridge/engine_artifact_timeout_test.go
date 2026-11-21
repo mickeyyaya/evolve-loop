@@ -14,7 +14,7 @@ func TestEngineLaunch_ArtifactTimeout_WrapsSentinel(t *testing.T) {
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-test", "")
 	fr := &fakeRunner{exit: ExitArtifactTimeout}
-	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
 
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-p", Profile: prof, Model: "auto", Prompt: "x",
@@ -36,7 +36,7 @@ func TestEngineLaunch_OtherExit_NoSentinel(t *testing.T) {
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-test", "")
 	fr := &fakeRunner{exit: ExitSafetyGate}
-	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
 
 	_, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-p", Profile: prof, Model: "auto", Prompt: "x",

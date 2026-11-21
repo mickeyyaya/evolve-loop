@@ -96,7 +96,7 @@ func TestEngineLaunchThreadsRunID(t *testing.T) {
 
 	ws := t.TempDir()
 	prof := writeJSON(t, filepath.Join(ws, "p.json"), `{"name":"n","model":"haiku"}`)
-	eng := NewEngine(Deps{LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{LookupEnv: mapLookup(nil)})
 	if _, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "cb5-runid-pin", Profile: prof, Prompt: "x",
 		Workspace: ws, ArtifactPath: filepath.Join(ws, "a.md"),

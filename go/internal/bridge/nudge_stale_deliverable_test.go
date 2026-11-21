@@ -103,7 +103,7 @@ func launchWithLeftover(t *testing.T, tm func(fx launchFixture) TmuxController) 
 	if err := os.WriteFile(fx.artifact, []byte("<!-- challenge-token: "+fx.token+" -->\nfrom the earlier attempt\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux:            tm(fx),
 		Sleep:           func(time.Duration) {},
 		LookupEnv:       mapLookup(nil),

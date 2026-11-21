@@ -11,7 +11,7 @@ func TestLaunchArgs_ValidateOnly(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{}
-	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
 	var stdout, stderr strings.Builder
 	code := eng.LaunchArgs(context.Background(), fx.args("claude-p", "--validate-only"), nil, &stdout, &stderr)
 	if code != ExitOK {
@@ -32,7 +32,7 @@ func TestLaunchArgs_DryRun(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{}
-	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
 	var stdout, stderr strings.Builder
 	code := eng.LaunchArgs(context.Background(), fx.args("claude-p", "--dry-run"), nil, &stdout, &stderr)
 	if code != ExitOK {
@@ -53,7 +53,7 @@ func TestLaunchArgs_DryRun(t *testing.T) {
 func TestLaunchArgs_RequireFull_Unmet(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Runner:    (&fakeRunner{}).runner(),
 		LookupEnv: mapLookup(nil),
 		LookPath:  func(string) (string, error) { return "", errNoBin },
@@ -72,7 +72,7 @@ func TestLaunchArgs_RequireFull_Met(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "ok"}
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Runner:    fr.runner(),
 		LookupEnv: mapLookup(nil),
 		LookPath:  func(b string) (string, error) { return "/usr/bin/" + b, nil },

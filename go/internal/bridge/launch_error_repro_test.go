@@ -23,7 +23,7 @@ func TestLaunchErrorIncludesCapturedStderrCause(t *testing.T) {
 		PermissionMode: "definitely-invalid",
 	}
 
-	resp, err := NewEngine(Deps{}).Launch(context.Background(), req)
+	resp, err := newTestEngine(Deps{}).Launch(context.Background(), req)
 	if err == nil {
 		t.Fatal("Launch returned nil error for invalid permission mode")
 	}
@@ -52,7 +52,7 @@ func TestLaunchFailurePersistsLaunchErrorFile(t *testing.T) {
 		ArtifactPath: filepath.Join(ws, "artifact.md"),
 	}
 
-	resp, err := NewEngine(Deps{}).Launch(context.Background(), req)
+	resp, err := newTestEngine(Deps{}).Launch(context.Background(), req)
 	if err == nil {
 		t.Fatal("Launch returned nil error for missing profile")
 	}

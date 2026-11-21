@@ -13,7 +13,7 @@ import (
 
 func TestEngine_ConcurrentLaunch_OnBootRaceFree(t *testing.T) {
 	t.Parallel()
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		LookupEnv: mapLookup(nil),
 		Now:       func() time.Time { return time.Unix(0, 0) },
 	})

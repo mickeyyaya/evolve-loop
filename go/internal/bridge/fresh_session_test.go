@@ -18,7 +18,7 @@ const deadShellPaneLine = "zsh: command not found: Please"
 
 func TestFreshSessionAllowed_TheGate(t *testing.T) {
 	t.Parallel()
-	e := NewEngine(Deps{})
+	e := newTestEngine(Deps{})
 	canceled, cancel := context.WithCancel(context.Background())
 	cancel()
 	tight, cancelTight := context.WithTimeout(context.Background(), 30*time.Second)

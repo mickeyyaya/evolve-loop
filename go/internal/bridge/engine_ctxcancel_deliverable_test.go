@@ -21,7 +21,7 @@ func TestEngineLaunch_CtxCancelSignalKill_WrapsTransient(t *testing.T) {
 		cancel()
 		return -1, nil
 	}
-	eng := NewEngine(Deps{Runner: runner, LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Runner: runner, LookupEnv: mapLookup(nil)})
 
 	resp, err := eng.Launch(ctx, core.BridgeRequest{
 		CLI: "claude-p", Profile: prof, Model: "auto", Prompt: "x",
@@ -50,7 +50,7 @@ func TestEngineLaunch_StartFailure_MinusOne_StaysPlain(t *testing.T) {
 		_ io.Reader, _, _ io.Writer) (int, error) {
 		return -1, nil
 	}
-	eng := NewEngine(Deps{Runner: runner, LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Runner: runner, LookupEnv: mapLookup(nil)})
 
 	_, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-p", Profile: prof, Model: "auto", Prompt: "x",

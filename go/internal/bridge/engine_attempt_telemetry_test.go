@@ -35,7 +35,7 @@ func TestEngineLaunch_DurationStopsBeforeTokenResolution(t *testing.T) {
 		nowCalls++
 		return got
 	}
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Runner: fr.runner(), LookupEnv: mapLookup(nil), Now: now,
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) {
 			_ = now()
@@ -64,7 +64,7 @@ func TestEngineLaunch_RecordsFinalCodexSelectorAfterLateOverride(t *testing.T) {
 	prof := writeProfile(t, ws, "dispatch-selector", "")
 	artifact := filepath.Join(ws, "artifact.md")
 	fr := &fakeRunner{writeArtifactPath: artifact, writeArtifactBody: "OK\n"}
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Runner: fr.runner(), LookupEnv: mapLookup(nil),
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) {
 			return tokenusage.Result{Source: tokenusage.SourceNone}, nil
@@ -93,7 +93,7 @@ func TestEngineLaunch_ModelLikePositionalTextIsNotDispatchIdentity(t *testing.T)
 	prof := writeProfile(t, ws, "dispatch-boundary", "")
 	artifact := filepath.Join(ws, "artifact.md")
 	fr := &fakeRunner{writeArtifactPath: artifact, writeArtifactBody: "OK\n"}
-	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
 
 	if _, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "codex", Profile: prof, Model: "gpt-5.6-sol", Prompt: "work",
@@ -136,7 +136,7 @@ func TestEngineLaunch_ProfileFlagsPreserveDispatchProvenance(t *testing.T) {
 			prof := writeProfileWithRawFlags(t, ws, "codex", tc.profileRaw)
 			artifact := filepath.Join(ws, "artifact.md")
 			fr := &fakeRunner{writeArtifactPath: artifact, writeArtifactBody: "OK\n"}
-			eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
+			eng := newTestEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
 
 			if _, err := eng.Launch(context.Background(), core.BridgeRequest{
 				CLI: "codex", Profile: prof, Model: "gpt-5.6-sol", Prompt: "work",
@@ -159,7 +159,7 @@ func TestEngineLaunch_RepeatedCodexDedicatedSelectorsAreUnknown(t *testing.T) {
 	prof := writeProfileWithRawFlags(t, ws, "codex", []string{"-m", "gpt-5.6-terra"})
 	artifact := filepath.Join(ws, "artifact.md")
 	fr := &fakeRunner{exit: 2}
-	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
 
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "codex", Profile: prof, Model: "gpt-5.6-sol", Prompt: "work",
@@ -191,7 +191,7 @@ func TestEngineLaunch_IdenticalCodexSelectorIsDeduplicatedBeforeAttribution(t *t
 		t.Fatal(err)
 	}
 	tmux := &fakeTmux{paneSeq: []string{"›"}}
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil),
 		CaptureBaseline: zeroBaselineCapture,
 	})
@@ -248,7 +248,7 @@ func TestEngineLaunch_DispatchMatchesMixedFormClamp(t *testing.T) {
 				t.Fatal(err)
 			}
 			tmux := &fakeTmux{paneSeq: []string{"›"}}
-			eng := NewEngine(Deps{
+			eng := newTestEngine(Deps{
 				Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil),
 				CaptureBaseline: zeroBaselineCapture,
 			})
@@ -311,7 +311,7 @@ func TestEngineLaunch_OmittedModelRecordsUnknownCLIDefault(t *testing.T) {
 	prof := writeProfile(t, ws, "dispatch-default", "")
 	artifact := filepath.Join(ws, "artifact.md")
 	fr := &fakeRunner{writeArtifactPath: artifact, writeArtifactBody: "OK\n"}
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Runner: fr.runner(), LookupEnv: mapLookup(nil),
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) {
 			return tokenusage.Result{Source: tokenusage.SourceNone}, nil
@@ -343,7 +343,7 @@ func TestEngineLaunch_FailedDispatchStillRecordsSelectorAndCause(t *testing.T) {
 	prof := writeProfile(t, ws, "failed-dispatch", "")
 	artifact := filepath.Join(ws, "artifact.md")
 	fr := &fakeRunner{exit: ExitMissingBinary, err: errors.New("binary absent")}
-	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
 
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-p", Profile: prof, Model: "claude-opus-4-1", Prompt: "work",
@@ -365,7 +365,7 @@ func TestEngineLaunch_ResolverWarningCarriesAttemptContext(t *testing.T) {
 	artifact := filepath.Join(ws, "artifact.md")
 	fr := &fakeRunner{writeArtifactPath: artifact, writeArtifactBody: "OK\n"}
 	var stderr strings.Builder
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Runner: fr.runner(), LookupEnv: mapLookup(nil), Stderr: &stderr, Signals: sinkDeps(&stderr),
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) {
 			return tokenusage.Result{}, errors.New("collector offline")
@@ -390,7 +390,7 @@ func TestEngineLaunch_ResolverWarningCannotInjectDiagnosticLines(t *testing.T) {
 	artifact := filepath.Join(ws, "artifact.md")
 	fr := &fakeRunner{writeArtifactPath: artifact, writeArtifactBody: "OK\n"}
 	var stderr strings.Builder
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Runner: fr.runner(), LookupEnv: mapLookup(nil), Stderr: &stderr, Signals: sinkDeps(&stderr), EnvStage: "off",
 		ListProcesses: func(context.Context) ([]proctree.Process, error) { return withSelf(nil), nil },
 		ListCwds:      func(context.Context) ([]proctree.Cwd, error) { return nil, nil },
@@ -444,7 +444,7 @@ func TestEngineLaunch_InvalidResolverMeasurementsRemainRecordable(t *testing.T) 
 			prof := writeProfile(t, ws, "invalid-measurement", "")
 			artifact := filepath.Join(ws, "artifact.md")
 			fr := &fakeRunner{writeArtifactPath: artifact, writeArtifactBody: "OK\n"}
-			eng := NewEngine(Deps{
+			eng := newTestEngine(Deps{
 				Runner: fr.runner(), LookupEnv: mapLookup(nil),
 				TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) { return tc.result, nil },
 			})
@@ -476,7 +476,7 @@ func TestEngineLaunch_AgyLogOpenFailureDoesNotClaimProcessDispatch(t *testing.T)
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "agy-log-open", "")
 	artifact := filepath.Join(ws, "artifact.md")
-	eng := NewEngine(Deps{Runner: (&fakeRunner{}).runner(), LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Runner: (&fakeRunner{}).runner(), LookupEnv: mapLookup(nil)})
 
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "agy", Profile: prof, Model: "auto", Prompt: "work",
@@ -503,7 +503,7 @@ func TestEngineLaunch_WarmNamedSessionDoesNotClaimGeneratedSelector(t *testing.T
 	}
 	base := &FakeTmuxController{Existing: map[string]bool{NamedSessionName("warm"): true}, CaptureFrames: frames}
 	tmux := &artifactOnPasteTmux{FakeTmuxController: base, artifact: artifact}
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil),
 	})
 
@@ -611,7 +611,7 @@ func TestLaunchArgs_DirectDiagnosticEntryDoesNotClaimAttemptLedgerCoverage(t *te
 	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
 	fr := &fakeRunner{writeArtifactPath: fx.artifact, writeArtifactBody: "OK\n"}
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Runner: fr.runner(), LookupEnv: mapLookup(nil),
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) {
 			return tokenusage.Result{Source: tokenusage.SourceTranscript}, nil

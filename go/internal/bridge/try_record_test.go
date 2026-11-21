@@ -40,7 +40,7 @@ func launchClaudeTmuxTry(t *testing.T, resolver func(tokenusage.Window) (tokenus
 	prof := writeProfile(t, ws, "try-record", "")
 	artifact := filepath.Join(ws, "artifact.md")
 	tmux := &artifactOnPasteTmux{FakeTmuxController: &FakeTmuxController{CaptureFrames: slices.Repeat([]string{"working ❯"}, 20)}, artifact: artifact}
-	eng := NewEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), TokenResolver: resolver})
+	eng := newTestEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), TokenResolver: resolver})
 	if _, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-tmux", Profile: prof, Model: "deep", Prompt: "work",
 		Workspace: ws, Worktree: ws, ProjectRoot: ws, ArtifactPath: artifact, Agent: "builder", Attempt: 3,
@@ -95,7 +95,7 @@ func TestTryRecord_ServedModelIsTheVerifiedFooterLabel(t *testing.T) {
 	prof := writeProfile(t, ws, "try-record-agy", "")
 	artifact := filepath.Join(ws, "artifact.md")
 	tmux := &artifactOnPasteTmux{FakeTmuxController: &FakeTmuxController{CaptureFrames: slices.Repeat([]string{agyFooterClaudeOpus}, 60)}, artifact: artifact}
-	eng := NewEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(map[string]string{"EVOLVE_PHASE_RECOVERY": "off"})})
+	eng := newTestEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(map[string]string{"EVOLVE_PHASE_RECOVERY": "off"})})
 
 	if _, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "agy-claude-tmux", Profile: prof, Model: "deep", Prompt: "work",

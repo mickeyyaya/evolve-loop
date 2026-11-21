@@ -21,7 +21,7 @@ func tokenLaunchFixture(t *testing.T, withEventsLog bool) (*Engine, core.BridgeR
 		}
 	}
 	start := time.Date(2026, 7, 13, 10, 0, 0, 0, time.UTC)
-	e := NewEngine(Deps{
+	e := newTestEngine(Deps{
 		Now:           func() time.Time { return start.Add(90 * time.Second) },
 		TokenResolver: tokenusage.DefaultResolver(t.TempDir()),
 	})

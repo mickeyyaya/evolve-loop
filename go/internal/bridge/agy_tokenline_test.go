@@ -30,7 +30,7 @@ func TestRecordTokenUsage_AgyThoughtLineMeasuresTheAttempt(t *testing.T) {
 	var errBuf bytes.Buffer
 	signals := signalcenter.New()
 	signals.Subscribe(signalcenter.Filter(signalcenter.StderrSink(&errBuf), signalcenter.SeverityWarn))
-	e := NewEngine(Deps{Now: func() time.Time { return end }, Stderr: io.Discard, Signals: signals,
+	e := newTestEngine(Deps{Now: func() time.Time { return end }, Stderr: io.Discard, Signals: signals,
 		TokenResolver: tokenusage.DefaultResolver(t.TempDir())})
 	req := core.BridgeRequest{CLI: "agy-tmux", Agent: "router", Workspace: ws, Cycle: 1806}
 	var resp core.BridgeResponse

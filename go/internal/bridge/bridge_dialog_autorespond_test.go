@@ -86,7 +86,7 @@ func (n *nudgeRecordingTmux) deliveriesNaming(sub string) int {
 
 func runTmuxNudge(t *testing.T, fx launchFixture, tmux *nudgeRecordingTmux) (int, string) {
 	t.Helper()
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux:            tmux,
 		Sleep:           func(time.Duration) {},
 		LookupEnv:       mapLookup(nil),

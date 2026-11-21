@@ -28,7 +28,7 @@ func TestEngineLaunch_ClearsALeftoverPaneWatchSnapshotBeforeEachAttempt(t *testi
 		_, sawLeftover, _ = panewatch.Read(ws, "build")
 		return inner(ctx, name, dir, args, env, in, out, errw)
 	}
-	eng := NewEngine(Deps{Runner: runner, LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Runner: runner, LookupEnv: mapLookup(nil)})
 	if _, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-p", Profile: prof, Model: "auto", Prompt: "p", Workspace: ws, ArtifactPath: artifact, Agent: "build",
 	}); err != nil {

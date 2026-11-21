@@ -73,7 +73,7 @@ func (n *nudgeCaptureFailureTmux) CapturePane(ctx context.Context, session strin
 
 func runTelemetryLaunch(t *testing.T, fx launchFixture, tm TmuxController, lookup map[string]string) int {
 	t.Helper()
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux:      tm,
 		Sleep:     func(time.Duration) {},
 		LookupEnv: mapLookup(lookup),

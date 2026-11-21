@@ -21,7 +21,7 @@ func runLookup(t *testing.T, fr *fakeRunner, args []string, lookup map[string]st
 
 func runLookupWith(t *testing.T, deps Deps, args []string) (int, string) {
 	t.Helper()
-	eng := NewEngine(deps)
+	eng := newTestEngine(deps)
 	var stdout, stderr bytes.Buffer
 	code := eng.LaunchArgs(context.Background(), args, nil, &stdout, &stderr)
 	return code, stderr.String()

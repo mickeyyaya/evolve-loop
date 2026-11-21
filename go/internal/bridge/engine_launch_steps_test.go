@@ -51,7 +51,7 @@ func recordingDeps(t *testing.T) (Deps, *[]signalcenter.Event, *strings.Builder)
 func TestRecordModelAttempt_ReturnsTheAttemptContext(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
-	e := NewEngine(Deps{Stderr: new(strings.Builder)})
+	e := newTestEngine(Deps{Stderr: new(strings.Builder)})
 	req := core.BridgeRequest{CLI: "codex", Agent: "build", Cycle: 7, RunID: "run-7", Workspace: ws}
 	start := time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC)
 	c := e.recordModelAttempt(req, "auto", ExitOK, start, start.Add(time.Second), modelDispatch{}, "", &core.BridgeResponse{})
