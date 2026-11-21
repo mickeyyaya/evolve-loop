@@ -21,6 +21,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover/lifecycle"
 	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -72,18 +73,45 @@ type Options struct {
 	CurrentGoal string
 }
 
-const (
-	planeDirName = ".evolve"
-	inboxDirName = "inbox"
-)
+const inboxDirName = "inbox"
 
 func planeRootOf(inboxDir string) string {
 	inboxDir = filepath.Clean(inboxDir)
-	plane := filepath.Dir(inboxDir)
-	if filepath.Base(inboxDir) != inboxDirName || filepath.Base(plane) != planeDirName {
+	if filepath.Base(inboxDir) != inboxDirName {
 		return ""
 	}
-	return filepath.Dir(plane)
+	root, _ := paths.ProjectRootOf(filepath.Dir(inboxDir))
+	return root
+}
+
+var (
+	errNoProjectRoot     = errors.New("inboxmover: no absolute project root")
+	errRootInboxMismatch = errors.New("inboxmover: the project root and the inbox name different planes")
+)
+
+func (o Options) resolved() (Options, error) {
+	if o.ProjectRoot == "" {
+		o.ProjectRoot = planeRootOf(o.InboxDir)
+	}
+	if o.ProjectRoot == "" || !filepath.IsAbs(o.ProjectRoot) {
+		return o, fmt.Errorf("%w (root %q, inbox %q): pass --project-root <absolute plane root> or an inbox at <root>/.evolve/inbox", errNoProjectRoot, o.ProjectRoot, o.InboxDir)
+	}
+	plane := paths.EvolveDirOf(o.ProjectRoot)
+	planeInbox := filepath.Join(plane, inboxDirName)
+	if o.InboxDir == "" {
+		o.InboxDir = planeInbox
+	}
+	if filepath.Clean(o.InboxDir) != planeInbox {
+		return o, fmt.Errorf("%w: --project-root %s has its inbox at %s, not %s", errRootInboxMismatch, o.ProjectRoot, planeInbox, o.InboxDir)
+	}
+	if o.LedgerPath != "" && o.Ledger == nil && filepath.Dir(o.LedgerPath) != plane {
+		return o, fmt.Errorf("%w: --project-root %s has its ledger in %s, not %s", errRootInboxMismatch, o.ProjectRoot, plane, o.LedgerPath)
+	}
+	if err := cycleWorktreeRefusal(o.InboxDir); err != nil {
+		return o, err
+	}
+	o.resolveOpts()
+	return o, nil
 }
 
 func (o *Options) resolveOpts() {
@@ -91,10 +119,10 @@ func (o *Options) resolveOpts() {
 		o.ProjectRoot = planeRootOf(o.InboxDir)
 	}
 	if o.InboxDir == "" {
-		o.InboxDir = filepath.Join(o.ProjectRoot, planeDirName, inboxDirName)
+		o.InboxDir = filepath.Join(paths.EvolveDirOf(o.ProjectRoot), inboxDirName)
 	}
 	if o.LedgerPath == "" {
-		o.LedgerPath = filepath.Join(o.ProjectRoot, ".evolve", "ledger.jsonl")
+		o.LedgerPath = filepath.Join(paths.EvolveDirOf(o.ProjectRoot), "ledger.jsonl")
 	}
 	if o.Ledger == nil {
 		o.Ledger = ledger.New(filepath.Dir(o.LedgerPath))
@@ -107,7 +135,7 @@ func (o *Options) resolveOpts() {
 	}
 	if o.ActiveCycleFn == nil {
 		o.ActiveCycleFn = func() (string, error) {
-			return readActiveCycle(filepath.Join(o.ProjectRoot, ".evolve", "cycle-state.json"))
+			return readActiveCycle(filepath.Join(paths.EvolveDirOf(o.ProjectRoot), "cycle-state.json"))
 		}
 	}
 	if o.IsLandedFn == nil {
@@ -180,12 +208,12 @@ func cycleWorktreeRefusal(inboxDir string) error {
 		target = filepath.Join(filepath.Dir(inboxDir), target)
 	}
 	plane := filepath.Dir(filepath.Dir(target))
-	return fmt.Errorf("%w %s; the plane root is %s: run the command with EVOLVE_PROJECT_ROOT=%s", errCycleWorktreeInbox, inboxDir, plane, plane)
+	return fmt.Errorf("%w %s; the plane root is %s: run the command with --project-root %s", errCycleWorktreeInbox, inboxDir, plane, plane)
 }
 
 func (o Options) mover() (*lifecycle.Mover, error) {
-	o.resolveOpts()
-	if err := cycleWorktreeRefusal(o.InboxDir); err != nil {
+	o, err := o.resolved()
+	if err != nil {
 		return nil, err
 	}
 	return o.reader(), nil

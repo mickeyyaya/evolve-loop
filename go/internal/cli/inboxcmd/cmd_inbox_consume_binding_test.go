@@ -174,3 +174,12 @@ func TestReleaseConsumedItemBinding_ReleasesNothingItCannotName(t *testing.T) {
 		t.Errorf("an unreadable registry releases nothing and WARNs; stderr=%q", errb.String())
 	}
 }
+
+func TestReconcileConsumedBindings_ARelativeRootIsRefusedAndReported(t *testing.T) {
+	t.Parallel()
+	var errb bytes.Buffer
+	ReconcileConsumedBindings("relative-root", "relative-root/.evolve", &errb)
+	if !strings.Contains(errb.String(), "[inbox] WARN: binding release") {
+		t.Errorf("stderr = %q, want the refusal reported as a WARN", errb.String())
+	}
+}

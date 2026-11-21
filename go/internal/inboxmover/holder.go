@@ -62,11 +62,7 @@ type holderJudge struct {
 
 func newHolderJudge(opts Options) holderJudge {
 	evolveDir := filepath.Dir(opts.InboxDir)
-	projectRoot := opts.ProjectRoot
-	if projectRoot == "" {
-		projectRoot = filepath.Dir(evolveDir)
-	}
-	j := holderJudge{evolveDir: evolveDir, projectRoot: projectRoot, currentGoal: opts.CurrentGoal, now: opts.Now()}
+	j := holderJudge{evolveDir: evolveDir, projectRoot: opts.ProjectRoot, currentGoal: opts.CurrentGoal, now: opts.Now()}
 	j.goals = j.readGoals()
 	return j
 }

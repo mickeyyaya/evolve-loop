@@ -110,7 +110,9 @@ func FailureDigestRecordPath(evolveDir string, cycle int) string {
 	return filepath.Join(evolveDir, FailureDigestsDir, "cycle-"+strconv.Itoa(cycle)+".json")
 }
 
-func EvolveDirOf(projectRoot string) string { return filepath.Join(projectRoot, ".evolve") }
+const evolveDirName = ".evolve"
+
+func EvolveDirOf(projectRoot string) string { return filepath.Join(projectRoot, evolveDirName) }
 
 func EventChannelsRoot(evolveDir string) string { return filepath.Join(evolveDir, "events", "ch") }
 
@@ -121,3 +123,11 @@ func RunWorkspace(projectRoot string, cycle int) string {
 const PolicyFile = "policy.json"
 
 func PolicyPath(evolveDir string) string { return filepath.Join(evolveDir, PolicyFile) }
+
+func ProjectRootOf(evolveDir string) (string, bool) {
+	clean := filepath.Clean(evolveDir)
+	if filepath.Base(clean) != evolveDirName {
+		return "", false
+	}
+	return filepath.Dir(clean), true
+}

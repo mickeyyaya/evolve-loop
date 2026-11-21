@@ -11,7 +11,7 @@ import (
 )
 
 func TestCycle308_InboxReleaseAPIExists(t *testing.T) {
-	res, err := inboxmover.ReleaseCycleProcessing(inboxmover.Options{}, 0)
+	res, err := inboxmover.ReleaseCycleProcessing(inboxmover.Options{ProjectRoot: t.TempDir()}, 0)
 	if err != nil {
 		t.Fatalf("ReleaseCycleProcessing: unexpected error on absent dir: %v", err)
 	}
