@@ -105,6 +105,7 @@
     - `runRepoContractSteps` calls `changedFilesTwice` one time, before `runFixedPack`. It gives the files to the pack, the added-test backstop and the importer backstop.
     - A discovery failure is the `REPO_CONTRACT_INFRA` refusal before the pack runs. Ship has no fallback.
     - A lane with a path that is not a `.go` file runs the coarse set. A Go-only lane runs the always set.
+    - A tree-scan guard such as `tmuxtest.TestEveryTmuxTestPackageUsesTheOrphanGuard` imports none of the packages it reads, so the importer backstop cannot select it. It is a by-name row of `repocontract.TreeReadingTests()` and runs on every ship. `TestRepoContractGate_AnAddedTmuxTestRunsTheOrphanGuardByName` and `TestRepoContractGate_ARedOrphanGuardBlocksShipAndNamesItself` pin it.
     - `TestRunRepoContractPack_AWorkflowOnlyChangeRunsTheTestsThatReadIt`, `TestRunRepoContractPack_AGoOnlyChangeLeavesOutTheDataSet`, `TestRunRepoContractGate_AWorkflowOnlyChangeRunsTheTestsThatReadIt` and `TestRunRepoContractGate_ADiscoveryFailureRefusesBeforeThePackRuns` pin the call.
     - `TestRepoContractSelections_LeaveOutEnvExclusiveRows` and `TestRepoContractSelections_CarryNoDataOnlyTestOfAnEnvExclusivePackage` pin the filter.
 - A named failure in a package that ends `pass` is not a red. Thus the `--- FAIL` line of a nested `testing.RunTests` fixture does not fail the gate. An example is `TestInnerRunCycleErrorF4` in `internal/routingtest`, which caused false reds in cycles 2041 and 2045.

@@ -62,6 +62,8 @@ var serialTests = map[string]string{
 	"ship.TestRunRepoContractTestsAlone_KeepsTheUnprovenAndTheStillRed":              seamGoTestJSON,
 	"ship.TestRunRepoContractPack_AWorkflowOnlyChangeRunsTheTestsThatReadIt":         seamGoTestJSON,
 	"ship.TestRunRepoContractPack_ADocsOnlyLaneGetsTheSameByNameCallAsAWorkflowLane": seamGoTestJSON,
+	"ship.TestRepoContractGate_AnAddedTmuxTestRunsTheOrphanGuardByName":              seamGoTestJSON,
+	"ship.TestRepoContractGate_ARedOrphanGuardBlocksShipAndNamesItself":              seamGoTestJSON,
 	"ship.TestRunRepoContractGate_AWorkflowOnlyChangeRunsTheTestsThatReadIt":         seamGoTestJSON,
 	"ship.TestRunRepoContractPack_AGoOnlyChangeLeavesOutTheDataSet":                  seamGoTestJSON,
 	"ship.TestRunRepoContractGate_AGoOnlyChangeLogsAndRunsTheAlwaysSet":              seamGoTestJSON,
