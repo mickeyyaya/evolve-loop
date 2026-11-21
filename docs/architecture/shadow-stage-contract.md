@@ -207,6 +207,7 @@ At HEAD, the seeds of `gateregistry` are the floors, `rawgitratchet`, `sizeratch
 | `audit_cascade.stage` | `AUDIT_CASCADE_SHADOW` | proposed, no signal exists | `auditcascade.Decide` | `stage-feature` (not a gate) |
 | `regression_tia.stage` | `TIA_SHADOW` | proposed, no signal exists | `regressiontia.Compute` | `stage-feature` (not a gate) |
 | `parallel_evaluate.stage` | `PARALLEL_EVALUATE_SHADOW` | proposed, no signal exists | `parallelevaluate.Decide` (new package, moved out of the unexported `core.cycleRun.evaluateBatchAt`) | `stage-feature` (not a gate) |
+| `workflow.convergence.audit_rereview.stage` | `AUDIT_REREVIEW_SHADOW` | exists (`core/audit_rereview.go`) and is emitted | the late test of `AuditRoundScope.Late` | `stage-feature` (not a gate) |
 | `workflow.retry_ladder.stage` | `LADDER_DECISION` | exists (`retryladder/tryrecord.go:25`) and is emitted | `retryladder.Next` | `stage-feature` (not a gate) |
 | `gates.main_red_stop` | `SHIP_MAIN_RED_STOP_SHADOW` | proposed | the stop check of the ship | `ship-check` |
 | `held_proposals.stage` | `SHIP_HOLD_SHADOW` | exists (`phases/ship/held_proposal_gate.go:20`) | `heldproposal.Decide` | `ship-check` (the builder confirms the kind) |

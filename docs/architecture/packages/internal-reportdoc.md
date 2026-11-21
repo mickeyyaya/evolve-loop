@@ -29,3 +29,9 @@
 - A prose line without a colon is not a verdict, and the verdict grammar matches the audit gate's fallback. Pinned by `TestVerdict_MatchesTheAuditGatesProseFallback`.
 - The title key joins the same defect across rounds. Pinned by `TestFindingKey_*` in `findings_test.go`.
 - The safe-path rule and the no-follow open have one home each. Pinned by `TestValidReference_SingleSourcedStrictness` and `TestOpenRegularNoFollow_RefusesFinalSymlink`.
+
+## Finding locations and the Filed (late) section (ADR-0168)
+
+- **Location.** `Finding.Location` is the first `path:line` that the heading names, or that the body names before the next heading. A range keeps its first line. A finding with no `path:line` has an empty location and is never late. `Location` is the one reader of that form.
+- **Filed (late).** The section `## Filed (late)` holds the findings that the auditor files from round 2 on. `Findings` skips the section, so a filed entry is never an open finding. `FiledLate` reads only that section.
+- **Pinned by** `TestProjectionKeepsLine`, `TestFindings_ExcludesTheFiledLateSection` and `TestFiledLate_ReadsOnlyTheFiledSectionWithItsLocation`.

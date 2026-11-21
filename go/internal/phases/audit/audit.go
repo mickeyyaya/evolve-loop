@@ -46,6 +46,7 @@ type hooks struct {
 	integrationTierCheck          func(req core.PhaseRequest) ([]string, error)
 	apicoverNewPkgGraduationCheck func(req core.PhaseRequest) ([]string, error)
 	phaseIO                       config.Stage
+	auditTree                     func(core.PhaseRequest) string
 	ledger                        *defectledger.Ledger
 	signals                       shadowEmitter
 }
@@ -76,6 +77,7 @@ func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	}
 	b.WriteString(inheritedDefectsPromptBlockVia(h.defectLedger(), req))
 	b.WriteString(chainExamplePromptBlock())
+	b.WriteString(roundScopePromptBlock(req))
 	b.WriteString(auditRulesPromptBlock(req))
 	return b.String()
 }
@@ -92,6 +94,7 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 	classification := newAuditClassification(h, artifact, req)
 	classification.prepareEvidence()
 	classification.executeRepositoryGates()
+	classification.checkLateFiling()
 	classification.reconcileContinuation()
 	classification.finalize()
 
@@ -281,6 +284,7 @@ func newHooks(c Config) hooks {
 		apicoverEnforceCheck:          c.CheckApicoverEnforce,
 		apicoverNewPkgGraduationCheck: c.CheckApicoverNewPkgGraduation,
 		phaseIO:                       c.PhaseIO,
+		auditTree:                     defaultAuditTree,
 		ledger:                        wiredDefectLedger(c.Signals),
 		signals:                       c.Signals,
 	}
@@ -383,6 +387,7 @@ func verdictConflictMessage(narrative string, overrodeBy []string) string {
 }
 
 func init() {
+	core.RoundEvidenceResolver = resolveEvidence
 	registry.Register(string(core.PhaseAudit), func(req core.PhaseRequest) core.PhaseRunner {
 		return NewDefault(bridge.NewDefault(req.ProjectRoot, nil), prompts.NewForProject(req.ProjectRoot))
 	})
