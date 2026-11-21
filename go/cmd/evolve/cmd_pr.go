@@ -7,13 +7,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 )
 
+var prRefreshWorktree = core.DerivedWorktree
+
 func landDeps() landcmd.Deps {
 	return landcmd.Deps{
 		ResolveRoot:     loopStopRoot,
 		PrintVerbJSON:   printVerbJSON,
 		NewSignalCenter: newRoleSignalCenter,
 		DarwinSet:       darwinSetVerb.run,
-		RefreshWorktree: core.DerivedWorktree,
+		RefreshWorktree: prRefreshWorktree,
 	}
 }
 

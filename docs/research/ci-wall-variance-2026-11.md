@@ -171,7 +171,7 @@ The table compares the PR #1226 pair on macOS (run 40582532714, then run 4061156
 | bridge | `TestSelfMatchGuard_ThePrefilterGivesTheExhaustiveVerdictForEveryRule` | 14.1 s, 35.0 s | CPU under contention | test body |
 | bridge | `TestDriverNames_AreBuiltOnlyByResolve` (runs 40526866678 and 40576371034) | 298 s, 390 s | CPU: the quadratic parse, fixed by PR #1223 | F4.6 |
 | bridge | `TestTryRecord_AnR1TryStartsANewSessionAndRecordsTheDecision` (all runs) | 2.5, 63.3, 121.7, 4.6, 3.6 s | a real 60 s deadline: the poll of `/usr/bin/log show` for the sandbox fence | F4.8 |
-| `cmd/evolve` | `TestPRRefresh_TheRealGeneratorsOfACloneCommitOnlyTheStaleIndex` | 61.1 s, 156.2 s | process starts and I/O: a local `git clone` of the repository, then the generators. Git hardlinks the objects, so the checkout probably costs more than the clone (not measured) | `go/cmd/evolve/cmd_pr_refresh_integration_test.go:21` |
+| `cmd/evolve` | `TestPRRefresh_TheRealGeneratorsOfACloneCommitOnlyTheStaleIndex` | 61.1 s, 156.2 s | process starts and I/O: on macOS (48.2 s), `git clone` takes 0.8%, the checkout takes 15.6%, and eight `go run` generator calls take 83.6% | `go/cmd/evolve/cmd_pr_refresh_integration_test.go:22` |
 | `cmd/evolve` | `TestInboxWriters_EveryAutofiledItemCarriesAKnownClass` | 7.5 s, 92.7 s | CPU: a scan of the Go tree, in the parallel queue | `go/cmd/evolve/inbox_writers_contract_test.go:80` |
 | `cmd/evolve` | `TestRatchet_CheckPassesOnTheRealModuleAndRejectsOtherVerbs` | 31.4 s, 70.1 s | CPU: a size check over the real module | `go/cmd/evolve/cmd_ratchet_test.go:35` |
 | `cmd/evolve` | `TestUnobservedLedgerRootsArePinned` and the other "pinned" tests | 3 s to 12 s, then 21 s to 37 s each | CPU and I/O: each test walks and reads the module again | `go/cmd/evolve/cmd_cycle_ledger_roots_test.go:16`, its walk at `:30` |
@@ -276,7 +276,7 @@ Each fix has a filed inbox item in the column Follow-up. The inbox item `ratchet
 | R4 | In bridge unit tests, inject fakes for `SandboxReports` and `SandboxFence` in `newTestEngine` (`go/internal/bridge/launch_test.go:121`). Keep the real `log show` only in the sandbox integration tests. | Rank 5: up to 120 s in one test; fewer `log show` starts | F4.8 | `bridge-test-engine-fakes-sandbox-fence` |
 | R5 | Build `./cmd/evolve` once for each bridge test binary, for example with `sync.OnceValue`. Today three tests build it (`sandbox_contract_integration_test.go:278`, `:340`, `:630`). Each build puts the dispatch folder of its test into the binary with `-X …dispatchcred.root` (`:491-493`). Thus a shared build needs one shared dispatch root, or a root that the binary gets at run time. | A part of rank 4 in bridge | section 4.4 | `bridge-tests-build-evolve-once` |
 | R6 | In `cmd/evolve`, read the module once for each test binary and share the file list, the bytes and the ASTs. Today 23 test files walk or parse it again. | Rank 6 | section 4.4 | `cmd-evolve-tests-read-module-once` |
-| R7 | In `TestPRRefresh_*`, first measure the checkout and the generators apart. `gittest.Clone` (`go/internal/gittest/fixture.go:73`) clones a local path, so git ignores `--depth 1` and hardlinks the objects. Then reuse a `gittest.FromTemplate` fixture, or run fewer generators. | A part of 61 s to 156 s of serial time in `cmd/evolve` | section 4.4 | `pr-refresh-test-measure-checkout` |
+| R7 | In `TestPRRefresh_*`, first measure the checkout and the generators apart. `gittest.Clone` (`go/internal/gittest/fixture.go:73`) clones a local path, so git ignores `--depth 1` and hardlinks the objects. Then reuse a `gittest.FromTemplate` fixture, or run fewer generators. | A part of 61 s to 156 s of serial time in `cmd/evolve` | section 4.4 | `pr-refresh-test-measure-checkout`, done in cycle 2590 |
 | R8 | Cut the git process starts of core, as PR #1225 did for ship. | A part of rank 4; ship N fell 22% | F4.7, F4.9 | `core-tests-cut-git-starts` |
 | R9 | Give the macOS ship row its own record, or class it `medium`. | Removes the ship failure of every macOS run | F4.10 | `ratchet-speed-adjusted-cpu`, closed: the CPU judgment drops the class wall limits |
 | R10 | Seed the CPU baselines of both OSes from one clean main run. The gate fails nothing until the file has them. | The gate bites | section 6.3 | `ratchet-cpu-baseline-seed` |
@@ -321,6 +321,20 @@ The committed file has no `cpu` value yet, because the artifacts of the runs wer
 - An operator or CI override with `TEST_PARALLEL=<n>` still wins, and `.github/workflows/go.yml` keeps its `make test-integration-darwin` call.
 
 Cycle 2548 fixes `-p 3` for the darwin set so the 5-core host uses the 3-core package schedule. Two live CI runs are absent here, so no measured span exists yet for a 5-core host against a 3-core host. With `-p 3`, the span ratio cannot reach 1.0 and can exceed 1.3. Each binary still keeps `GOMAXPROCS` at the host CPU count, and the 5-core runner holds 14 GB of memory against 7 GB. Host CPU speed S also varies from 0.90 to 1.46 across runs (F4.4).
+
+### 6.5 What cycle 2590 measured and changed
+
+A split run of `TestPRRefresh_TheRealGeneratorsOfACloneCommitOnlyTheStaleIndex` on macOS (48.18 s total) measured each step apart:
+
+| Step | Wall | Share | Notes |
+|---|---|---|---|
+| `git clone --no-checkout` | 0.41 s | 0.8% | Local hardlinks keep the object clone small |
+| `git checkout HEAD` | 7.50 s | 15.6% | Checks out 18,823 tracked files |
+| `signals codes check` (2 runs) | 21.80 s | 45.2% | First `go run ./cmd/evolve` build takes 20.53 s; second run takes 1.27 s |
+| `ci darwin-set check` (2 runs) | 13.52 s | 28.1% | Each `go run` call takes 6.76 s |
+| `docs index` (4 runs) | 4.96 s | 10.3% | Three checks and one generation average 1.24 s each |
+
+The checkout takes 15.6% of the wall time, and the eight `go run` generator calls take 83.6%. `TestPRRefresh_TheRealGeneratorsOfACloneCommitOnlyTheStaleIndex` now reuses a `gittest.FromTemplate` fixture with only the signal-codes and research-index files. It runs the real `signals codes` and `docs index` commands in-process and skips `darwin-set`. `TestDarwinSetFile_MatchesTheSetDerivedFromTheTree` (`go/internal/ciparity/darwin_set_test.go:115`) still verifies `go/.darwin-set` against the full tree.
 
 ## 7. Limits
 
