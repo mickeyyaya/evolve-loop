@@ -23,7 +23,7 @@ func stubCoverPass(t *testing.T) *[]passCall {
 	var mu sync.Mutex
 	var calls []passCall
 	orig := coverPass
-	coverPass = func(_ context.Context, _ string, profile string, args, tags []string) (string, int) {
+	coverPass = func(_ context.Context, _ int, _ string, profile string, args, tags []string) (string, int) {
 		mu.Lock()
 		defer mu.Unlock()
 		calls = append(calls, passCall{slices.Clone(args), slices.Clone(tags)})
@@ -115,7 +115,7 @@ func TestPackageCoverTags_AreTheDefaultsPlusThePackageExclusionTag(t *testing.T)
 func stubFailingCoverPass(t *testing.T, failing string) {
 	t.Helper()
 	orig := coverPass
-	coverPass = func(_ context.Context, _ string, profile string, args, _ []string) (string, int) {
+	coverPass = func(_ context.Context, _ int, _ string, profile string, args, _ []string) (string, int) {
 		if slices.Contains(args, failing) {
 			return "FAIL\texample.com/m/internal/bridgex\t0.1s\n", coverStatusTestsFailed
 		}
@@ -156,5 +156,29 @@ func TestScopedCoverProfile_AGreenRunNamesNoFailedTags(t *testing.T) {
 
 	if status != coverStatusOK || failed != nil {
 		t.Errorf("status %d, failed tags %v, want green and none", status, failed)
+	}
+}
+
+func TestScopedCoverProfile_SplitPartsOfDifferentModesArePlumbingErrors(t *testing.T) {
+	orig := coverPass
+	t.Cleanup(func() { coverPass = orig })
+	var calls int
+	coverPass = func(_ context.Context, _ int, _ string, profile string, _, _ []string) (string, int) {
+		calls++
+		mode := "mode: atomic\n"
+		if calls == 2 {
+			mode = "mode: set\n"
+		}
+		if err := os.WriteFile(profile, []byte(mode), 0o644); err != nil {
+			return err.Error(), coverStatusPlumbingError
+		}
+		return "", coverStatusOK
+	}
+	in := ReviewInput{ProjectRoot: t.TempDir(), Stderr: &strings.Builder{}}
+
+	_, out, status, _ := scopedCoverProfile(context.Background(), in, coverTierModule(t), []string{"./internal/bridge", "./cmd/evolve"}, []string{"integration"})
+
+	if status != coverStatusPlumbingError || !strings.Contains(out, "want") {
+		t.Errorf("status %d, out %q, want a plumbing error that names the mode mismatch", status, out)
 	}
 }

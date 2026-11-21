@@ -24,6 +24,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verifylock"
 )
@@ -96,6 +97,7 @@ type Options struct {
 	ProjectRoot string
 	GoModuleDir string
 	GoTimeout   time.Duration
+	Signals     *signalcenter.Center
 	GoExec      func(ctx context.Context, moduleDir, pkgPattern string, env []string) (rawJSON string, err error)
 }
 
@@ -104,11 +106,11 @@ func Run(opts Options) (Verdict, error) {
 	if err != nil {
 		return Verdict{}, err
 	}
-	release := acquireSuiteLock(opts)
+	release, share := acquireSuiteLock(opts)
 	defer release()
 
 	cfg, refusals := loadLaneConfig(opts.stateRoot())
-	results := runGoTest(opts, cfg)
+	results := runGoTest(opts, share, cfg)
 	demoteWarnings := demoteOutOfScope(results, opts)
 	writeRedEvidence(opts, results)
 	v := Verdict{SchemaVersion: "1.0", Cycle: opts.Cycle, SuiteRoot: opts.Root, ProjectRoot: opts.ProjectRoot}
@@ -155,13 +157,14 @@ func (o Options) stateRoot() string {
 	return o.Root
 }
 
-func acquireSuiteLock(opts Options) func() {
-	release, lockErr := verifylock.AcquireWithin(context.Background(), opts.Root, suiteLockWait, os.Stderr)
+func acquireSuiteLock(opts Options) (release func(), share int) {
+	observer := verifylock.Observer{Signals: opts.Signals, Cycle: opts.Cycle, Source: "acs-suite"}
+	release, lockErr := observer.AcquireWithin(context.Background(), opts.Root, suiteLockWait, os.Stderr)
 	if lockErr != nil {
 		recordUnserializedSuite(opts, lockErr)
-		return func() {}
+		return func() {}, lanebudget.ShareFor(false)
 	}
-	return release
+	return release, lanebudget.ShareFor(true)
 }
 
 func recordUnserializedSuite(opts Options, lockErr error) {

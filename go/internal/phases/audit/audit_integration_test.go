@@ -104,7 +104,7 @@ func TestGenerateACSVerdict_EmptyWorktree_FallsBackToProjectRoot(t *testing.T) {
 
 	err := generateACSVerdictWith(core.PhaseRequest{
 		Cycle: 5, ProjectRoot: projectRoot, Worktree: "", Workspace: ws,
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("generateACSVerdict: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestGenerateACSVerdict_WriteVerdictError_Propagates(t *testing.T) {
 
 	err := generateACSVerdictWith(core.PhaseRequest{
 		Cycle: 3, ProjectRoot: root, Worktree: root, Workspace: ws,
-	})
+	}, nil)
 	if err == nil {
 		t.Fatal("err=nil, want write-verdict error (evolveDir is a file)")
 	}

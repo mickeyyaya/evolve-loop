@@ -19,7 +19,7 @@ func TestAcquireWithin_AWaiterBehindAHeldLockGivesUpAtTheBoundAndSaysSo(t *testi
 	defer hold()
 
 	start := time.Now()
-	release, err := AcquireWithin(context.Background(), root, 100*time.Millisecond, nil)
+	release, err := acquireWithin(context.Background(), root, 100*time.Millisecond, nil)
 	waited := time.Since(start)
 
 	if err == nil {
@@ -36,12 +36,12 @@ func TestAcquireWithin_AWaiterBehindAHeldLockGivesUpAtTheBoundAndSaysSo(t *testi
 
 func TestAcquireWithin_AFreeLockIsTakenAndReleased(t *testing.T) {
 	root := t.TempDir()
-	release, err := AcquireWithin(context.Background(), root, MaxWait, nil)
+	release, err := acquireWithin(context.Background(), root, MaxWait, nil)
 	if err != nil {
 		t.Fatalf("a free lock must be taken: %v", err)
 	}
 	release()
-	again, err := AcquireWithin(context.Background(), root, 100*time.Millisecond, nil)
+	again, err := acquireWithin(context.Background(), root, 100*time.Millisecond, nil)
 	if err != nil {
 		t.Fatalf("the lock must be free again after release: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestAcquireWithin_TheCallersOwnDeadlineIsNotReportedAsTheBound(t *testing.T
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	_, err = AcquireWithin(ctx, root, MaxWait, nil)
+	_, err = acquireWithin(ctx, root, MaxWait, nil)
 
 	if err == nil || strings.Contains(err.Error(), "wait bound") {
 		t.Errorf("a caller whose own deadline passed must get its own deadline error, not a claim that the %s wait bound passed; got %v", MaxWait, err)
@@ -84,7 +84,7 @@ func TestAcquireWithin_ResolvesTheLockAsAcquireDoes(t *testing.T) {
 	defer hold()
 	var warn bytes.Buffer
 
-	_, _ = AcquireWithin(context.Background(), root, 100*time.Millisecond, &warn)
+	_, _ = acquireWithin(context.Background(), root, 100*time.Millisecond, &warn)
 
 	if !strings.Contains(warn.String(), "PER-WORKTREE") {
 		t.Errorf("AcquireWithin must resolve the lock exactly as Acquire does (a temp dir has no hub, so Acquire warns PER-WORKTREE); warn = %q", warn.String())

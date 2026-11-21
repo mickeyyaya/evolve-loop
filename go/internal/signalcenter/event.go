@@ -217,6 +217,8 @@ const CodeLatencyBudgetExceeded Code = "LATENCY_BUDGET_EXCEEDED"
 
 const CodeHostDiskLow Code = "HOST_DISK_LOW"
 
+const CodeHostVerifyLockWait Code = "HOST_VERIFY_LOCK_WAIT"
+
 var codeRE = regexp.MustCompile(`^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$`)
 
 func (c Code) Valid() bool { return codeRE.MatchString(string(c)) }
