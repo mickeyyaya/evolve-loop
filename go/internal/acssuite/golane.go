@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
-	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -29,8 +28,8 @@ type goLane struct {
 	budget    laneBudget
 }
 
-func runGoTest(opts Options, cfg policy.ACSConfig) []Result {
-	lane, noScope := discoverGoLane(opts)
+func runGoTest(opts Options, share int, cfg policy.ACSConfig) []Result {
+	lane, noScope := discoverGoLane(opts, share)
 	if noScope != "" {
 		return []Result{noPredicatesRed(noScope)}
 	}
@@ -64,11 +63,11 @@ func loadLaneConfig(stateRoot string) (policy.ACSConfig, []string) {
 	return cfg, refusals
 }
 
-func discoverGoLane(opts Options) (goLane, string) {
+func discoverGoLane(opts Options, share int) (goLane, string) {
 	lane := goLane{exec: opts.GoExec, moduleDir: moduleRoot(opts), cycle: opts.Cycle}
 	if lane.exec != nil {
 		lane.patterns = []string{CyclePackage(opts.Cycle), "./acs/regression/...", "./acs/redteam"}
-		lane.slots, _ = scopeShare(len(lane.patterns), lanebudget.Current())
+		lane.slots, _ = scopeShare(len(lane.patterns), share)
 		return lane, ""
 	}
 	if !hasGoACSTree(lane.moduleDir) {
@@ -79,7 +78,7 @@ func discoverGoLane(opts Options) (goLane, string) {
 		return lane, fmt.Sprintf("no active predicate scope under %s for cycle %d", filepath.Join(lane.moduleDir, "acs"), opts.Cycle)
 	}
 	var procs int
-	lane.slots, procs = scopeShare(len(lane.patterns), lanebudget.Current())
+	lane.slots, procs = scopeShare(len(lane.patterns), share)
 	lane.exec = completeScopeExec(procs)
 	return lane, ""
 }

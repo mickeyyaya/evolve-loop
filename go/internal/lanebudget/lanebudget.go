@@ -52,15 +52,34 @@ func Procs(hostCPUs, width int) int {
 	return max(1, hostCPUs/width)
 }
 
-func Current() int {
+func laneWidth() int {
 	spawn, err := strconv.Atoi(strings.TrimSpace(os.Getenv(ipcenv.FleetWidthKey)))
 	if err != nil {
 		return 0
 	}
 	if width, ok := readLiveWidth(); ok {
-		return Procs(hostCPUs(), width)
+		return width
 	}
-	return Procs(hostCPUs(), spawn)
+	return spawn
+}
+
+func Current() int { return Procs(hostCPUs(), laneWidth()) }
+
+func HolderProcs(hostCPUs, width int) int {
+	share := Procs(hostCPUs, width)
+	if share == 0 {
+		return 0
+	}
+	return max(share, hostCPUs-(width-1)*share)
+}
+
+func Holder() int { return HolderProcs(hostCPUs(), laneWidth()) }
+
+func ShareFor(held bool) int {
+	if held {
+		return Holder()
+	}
+	return Current()
 }
 
 func Args(args []string) []string { return ArgsFor(Current(), args) }

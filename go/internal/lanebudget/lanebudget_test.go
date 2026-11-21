@@ -345,3 +345,69 @@ func TestEnvFor_ASharedEnvWithSpareCapacityIsNeverWrittenThrough(t *testing.T) {
 		t.Errorf("EnvFor wrote %q into the caller's spare capacity, concurrent children would race", spare)
 	}
 }
+
+func TestHolderProcs_TheHolderGetsTheHostLessTheShareOfTheOtherLanes(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		cpus, width, want int
+	}{
+		{14, 8, 7},
+		{14, 4, 5},
+		{14, 2, 7},
+		{14, 1, 14},
+		{2, 8, 1},
+		{14, 0, 0},
+		{14, -2, 0},
+	}
+	for _, c := range cases {
+		if got := HolderProcs(c.cpus, c.width); got != c.want {
+			t.Errorf("HolderProcs(%d, %d) = %d, want %d", c.cpus, c.width, got, c.want)
+		}
+	}
+}
+
+func TestHolderProcs_NeverFallsBelowTheLaneShare(t *testing.T) {
+	t.Parallel()
+	for cpus := 1; cpus <= 64; cpus++ {
+		for width := 1; width <= 16; width++ {
+			if got, floor := HolderProcs(cpus, width), Procs(cpus, width); got < floor || got > cpus {
+				t.Errorf("HolderProcs(%d, %d) = %d, want within [%d, %d]", cpus, width, got, floor, cpus)
+			}
+		}
+	}
+}
+
+func TestShareFor_AHolderGetsTheHolderShareAndAnyOtherRunTheLaneShare(t *testing.T) {
+	inLane(t, 14, "8")
+	if got := ShareFor(false); got != 1 {
+		t.Errorf("ShareFor(false) = %d, want the lane share 1", got)
+	}
+	if got := ShareFor(true); got != 7 {
+		t.Errorf("ShareFor(true) = %d, want the holder share 7", got)
+	}
+}
+
+func TestShareFor_AHolderOnTheConsoleStaysUnbudgeted(t *testing.T) {
+	inLane(t, 14, "")
+	if got := ShareFor(true); got != 0 {
+		t.Errorf("ShareFor(true) on the console = %d, want 0", got)
+	}
+}
+
+func TestHolder_ReadsTheLiveWidthLikeCurrent(t *testing.T) {
+	inLane(t, 14, "8")
+	path := filepath.Join(t.TempDir(), LiveWidthFile)
+	prev := processAlive
+	processAlive = func(int) bool { return true }
+	t.Cleanup(func() { processAlive = prev })
+	if err := WriteLiveWidth(path, 1, 2); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(ipcenv.FleetLiveWidthKey, path)
+	if got := Holder(); got != 7 {
+		t.Errorf("Holder() at live width 2 = %d, want 7", got)
+	}
+	if got := Current(); got != 7 {
+		t.Errorf("Current() at live width 2 = %d, want 7", got)
+	}
+}

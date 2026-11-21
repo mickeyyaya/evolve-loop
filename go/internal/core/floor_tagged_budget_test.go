@@ -36,7 +36,7 @@ func TestCoverTestArgs_RunTheCoveragePassUnderTheSharedBudget(t *testing.T) {
 	t.Setenv(ipcenv.FleetWidthKey, "")
 	t.Setenv(ipcenv.FleetLiveWidthKey, "")
 
-	got := coverTestArgs("/tmp/cover.out", []string{"./cmd/evolve", "./internal/core"}, nil)
+	got := coverTestArgs(0, "/tmp/cover.out", []string{"./cmd/evolve", "./internal/core"}, nil)
 
 	want := []string{"test", "-count=1", "-timeout", addedtests.PackageTimeout, "-coverprofile", "/tmp/cover.out", "./cmd/evolve", "./internal/core"}
 	if !slices.Equal(got, want) {
