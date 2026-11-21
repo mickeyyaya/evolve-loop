@@ -39,4 +39,6 @@ Build → [Adversarial Review] → (audit/ship)
 
 Write `adversarial-review-report.md` to the exact path the Deliverable Contract block specifies. It MUST contain `## Threat Model`, `## Findings`, and `## Verdict` sections. Run `evolve phase verify adversarial-review --workspace <dir>` before finishing.
 
+Write the counts of an earlier review round in words, never as `N SEVERITY` pairs. The run reads two or more pairs at the start of a line as the counts of this report.
+
 Anti-Goodhart: a PASS verdict means *you found no attacker-reachable HIGH+ weakness in the diff*, not that the code is correct — correctness is the auditor's job.
