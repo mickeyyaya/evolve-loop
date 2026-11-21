@@ -239,9 +239,9 @@ func TestRun_Cycle1951AnAgyExit85AtDeepBenchesOnlyTheArgonModelGroup(t *testing.
 		t.Fatal(err)
 	}
 	if _, family := benches["agy"]; family {
-		t.Fatalf("benches %v; an exit 85 on agy at deep benched all of agy, not the Argon model group (cycle 1951)", benches)
+		t.Fatalf("benches %v; an exit 85 on agy at deep benched all of agy, not the Neon model group (cycle 1951)", benches)
 	}
-	if _, scoped := benches["agy@Gemini 4 Argon"]; !scoped {
-		t.Fatalf("benches %v; want the wall benched on the Argon model group", benches)
+	if _, scoped := benches["agy@Gemini 4 Neon"]; !scoped {
+		t.Fatalf("benches %v; want the wall benched on the Neon model group", benches)
 	}
 }
