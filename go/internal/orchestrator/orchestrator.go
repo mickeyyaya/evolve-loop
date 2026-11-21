@@ -21,6 +21,7 @@ const (
 	CodePoolIdle                  signalcenter.Code = "LOOP_ORCH_POOL_IDLE"
 	CodePoolHeld                  signalcenter.Code = "LOOP_ORCH_POOL_HELD"
 	CodePoolResupplied            signalcenter.Code = "LOOP_ORCH_POOL_RESUPPLIED"
+	CodePoolFloorHold             signalcenter.Code = "LOOP_ORCH_POOL_FLOOR_HOLD"
 	CodeLaneStalled               signalcenter.Code = "LOOP_ORCH_LANE_STALLED"
 	CodeLaneDeadline              signalcenter.Code = "LOOP_ORCH_LANE_DEADLINE"
 	CodeLaneLateExit              signalcenter.Code = "LOOP_ORCH_LANE_LATE_EXIT"
@@ -53,6 +54,7 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLaneBackfilled, "the orchestrator pool gave a freed slot to the next admissible todo at once; INFO; fields.todo, live, target")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodePoolIdle, "an orchestrator pool slot stays free after a lane exit: no admissible todo, empty supply, operator stop, or run_max_lanes reached; INFO. Fields: fields.live, target, cause ("+idleCauseList+")")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodePoolResupplied, "an orchestrator pool slot stayed free after a lane exit, so the pool re-ran the plan source and added a ready todo. One event per added todo; INFO. Fields: fields.todo, live, target")
+	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodePoolFloorHold, "the pool started or ended a hold on new lanes because free disk is under gc.disk_floor_gb. Running lanes continue and a held pool is never reported as underfilled. One event at each change; INFO. Fields: fields.held (true or false), live, target")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLaneStalled, "a lane had no live signal (cycle signals, pane-watch, events, or stdout) for fleet.orchestrator.stall_minutes (ADR-0139 O5). Published once per lane; missing cycles have unknown heartbeats and keep their slot. Fields: fields.todo, stage, last_heartbeat, stall_minutes")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLaneDeadline, "a lane passed its lease deadline (p95 of last 50 cycles without max, min deadline_floor_minutes, ADR-0139 O5). Shadow records action; enforce cancels context, reaps dispatches, releases claim, and frees cells. Fields: fields.todo, stage, action, deadline_minutes")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLaneLateExit, "a lane exited after its lease deadline passed (shadow measure of ADR-0139 O5). status ok means a deadline stop stops a passing lane. Fields: fields.todo, stage, status, rc, stopped")
