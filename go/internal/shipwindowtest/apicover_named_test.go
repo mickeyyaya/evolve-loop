@@ -2,6 +2,7 @@ package shipwindowtest
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -56,8 +57,73 @@ func TestProbe_CountsPollsThatAWaiterMakes(t *testing.T) {
 			t.Fatal("Alive = false, want true")
 		}
 	}
+	p.Drain()
 	go pollTwice(p)
 	p.WaitPolls(t, 2)
+}
+
+func TestProbe_KeepsPollsMadeBeforeWaitPollsIsCalled(t *testing.T) {
+	p := NewProbe()
+	p.Drain()
+	done := make(chan struct{})
+	go func() {
+		pollTwice(p)
+		close(done)
+	}()
+	<-done
+	p.WaitPolls(t, 2)
+}
+
+func TestLanes_StepMovesTheClockTicksTheHolderAndWaitsForTwoFreshPolls(t *testing.T) {
+	c, b, p := NewClock(), NewBeats(), NewProbe()
+	ch, _ := b.Ticker(time.Minute)
+	start := c.Now()
+	ticked := make(chan time.Time, 1)
+	early := make(chan bool, 1)
+	stepped := make(chan struct{})
+	go func() {
+		for c.Now().Equal(start) {
+			runtime.Gosched()
+		}
+		p.Alive(1)
+		p.Alive(1)
+		ticked <- <-ch
+		for i := 0; i < 2; i++ {
+			select {
+			case <-stepped:
+				early <- true
+				return
+			case <-time.After(100 * time.Millisecond):
+			}
+			p.Alive(1)
+		}
+		early <- false
+	}()
+	Lanes{Clock: c, Holder: b, Waiter: p}.Step(t, 5*time.Minute)
+	close(stepped)
+	if <-early {
+		t.Fatal("Step returned before two fresh polls")
+	}
+	if got := c.Now().Sub(start); got != 5*time.Minute {
+		t.Fatalf("clock moved %v, want 5m", got)
+	}
+	if at := <-ticked; !at.Equal(c.Now()) {
+		t.Fatalf("tick = %v, want %v", at, c.Now())
+	}
+}
+
+func TestProbe_DrainDiscardsEarlierPolls(t *testing.T) {
+	p := NewProbe()
+	p.Alive(1)
+	p.Drain()
+	if got := failure(t, func(tb testing.TB) {
+		prev := waitLimit
+		waitLimit = 10 * time.Millisecond
+		defer func() { waitLimit = prev }()
+		p.WaitPolls(tb, 1)
+	}); !strings.Contains(got, "polled 0 time(s)") {
+		t.Fatalf("message = %q, want a drained probe to see no poll", got)
+	}
 }
 
 type recordingTB struct {

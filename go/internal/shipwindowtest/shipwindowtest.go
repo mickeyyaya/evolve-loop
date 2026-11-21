@@ -101,11 +101,14 @@ func (p *Probe) Alive(int) bool {
 	return true
 }
 
-func (p *Probe) WaitPolls(tb testing.TB, n int) {
-	tb.Helper()
+func (p *Probe) Drain() {
 	for len(p.polls) > 0 {
 		<-p.polls
 	}
+}
+
+func (p *Probe) WaitPolls(tb testing.TB, n int) {
+	tb.Helper()
 	for i := 0; i < n; i++ {
 		select {
 		case <-p.polls:
@@ -113,4 +116,18 @@ func (p *Probe) WaitPolls(tb testing.TB, n int) {
 			tb.Fatalf("the waiter polled %d time(s), want %d", i, n)
 		}
 	}
+}
+
+type Lanes struct {
+	Clock  *Clock
+	Holder *Beats
+	Waiter *Probe
+}
+
+func (l Lanes) Step(tb testing.TB, d time.Duration) {
+	tb.Helper()
+	l.Clock.Advance(d)
+	l.Holder.Tick(tb, l.Clock.Now())
+	l.Waiter.Drain()
+	l.Waiter.WaitPolls(tb, 2)
 }

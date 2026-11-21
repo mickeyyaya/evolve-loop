@@ -103,15 +103,18 @@ func TestEnterShipWindow_TwoLanesWithSectionsLongerThanTTLNeverOverlap(t *testin
 	_, releaseA := enterShipWindow(context.Background(), laneA, &RunResult{})
 
 	enteredB := make(chan func())
+	resB := &RunResult{}
+	probeB.Drain()
 	go func() {
-		_, releaseB := enterShipWindow(context.Background(), laneB, &RunResult{})
+		_, releaseB := enterShipWindow(context.Background(), laneB, resB)
 		enteredB <- releaseB
 	}()
 
+	lanes := shipwindowtest.Lanes{Clock: clock, Holder: beatsA, Waiter: probeB}
 	for range 4 {
-		clock.Advance(5 * time.Minute)
-		beatsA.Tick(t, clock.Now())
+		lanes.Step(t, 5*time.Minute)
 	}
+	probeB.Drain()
 	probeB.WaitPolls(t, 3)
 	select {
 	case <-enteredB:
@@ -124,6 +127,10 @@ func TestEnterShipWindow_TwoLanesWithSectionsLongerThanTTLNeverOverlap(t *testin
 		releaseB()
 	case <-time.After(5 * time.Second):
 		t.Fatal("lane B never entered after lane A released")
+	}
+	broken, _, _ := strings.Cut(shipwindow.StaleHolder{OwnerPID: 101}.Reason(), " (heartbeat")
+	if strings.Contains(strings.Join(resB.Logs, "\n"), broken) {
+		t.Fatalf("lane B broke a lease it should have waited for: %v", resB.Logs)
 	}
 	if _, err := os.Stat(shipwindow.PathIn(filepath.Join(root, ".evolve"))); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("the lease outlived both lanes (stat err=%v)", err)

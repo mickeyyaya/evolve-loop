@@ -28,15 +28,17 @@ func TestShipWindow_TwoLanesWithSectionsLongerThanTTLNeverOverlap(t *testing.T) 
 	laneA.holdShipWindow(context.Background(), root, 1, "run-1")
 
 	enteredB := make(chan struct{})
+	probeB.Drain()
 	go func() {
 		laneB.holdShipWindow(context.Background(), root, 2, "run-2")
 		close(enteredB)
 	}()
 
+	lanes := shipwindowtest.Lanes{Clock: clock, Holder: beatsA, Waiter: probeB}
 	for range 4 {
-		clock.Advance(5 * time.Minute)
-		beatsA.Tick(t, clock.Now())
+		lanes.Step(t, 5*time.Minute)
 	}
+	probeB.Drain()
 	probeB.WaitPolls(t, 3)
 	select {
 	case <-enteredB:
