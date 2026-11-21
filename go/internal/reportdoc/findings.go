@@ -9,6 +9,19 @@ type Finding struct {
 	ID       string `json:"id"`
 	Severity string `json:"severity"`
 	Title    string `json:"title"`
+	Location string `json:"location,omitempty"`
+}
+
+const filedLateHeading = "## Filed (late)"
+
+var locationRE = regexp.MustCompile(`([\w./-]+\.[A-Za-z0-9]+):(\d+)`)
+
+func Location(text string) string {
+	m := locationRE.FindStringSubmatch(text)
+	if m == nil {
+		return ""
+	}
+	return m[1] + ":" + m[2]
 }
 
 const severities = `CRITICAL|HIGH|MEDIUM|LOW`
@@ -39,6 +52,39 @@ var verdictCanonicalRE = regexp.MustCompile(`(?m)^##[^\S\n]*Verdict[^\S\n]*\n\s*
 var verdictInlineRE = regexp.MustCompile(`(?m)^[^\S\n]*(?:##[^\S\n]*)?\*{0,2}Verdict\*{0,2}[^\S\n]*:[^\S\n]*\*{0,2}[^\S\n]*(PASS|FAIL|WARN|SKIPPED)\b`)
 
 func Findings(markdown string) []Finding {
+	rest, _ := splitFiledLate(markdown)
+	return findingsIn(rest)
+}
+
+func FiledLate(markdown string) []Finding {
+	_, filed := splitFiledLate(markdown)
+	if filed == "" {
+		return nil
+	}
+	return findingsIn("## Issues\n" + filed)
+}
+
+func splitFiledLate(markdown string) (rest, filed string) {
+	lines := strings.Split(markdown, "\n")
+	var kept, held []string
+	inFiled := false
+	for _, line := range lines {
+		switch {
+		case strings.HasPrefix(strings.TrimSpace(line), filedLateHeading):
+			inFiled = true
+		case inFiled && strings.HasPrefix(line, "## "):
+			inFiled = false
+			kept = append(kept, line)
+		case inFiled:
+			held = append(held, line)
+		default:
+			kept = append(kept, line)
+		}
+	}
+	return strings.Join(kept, "\n"), strings.Join(held, "\n")
+}
+
+func findingsIn(markdown string) []Finding {
 	visible, rawIdx := visibleLinesIdx(markdown)
 	start, end, ok := issuesBounds(visible)
 	if !ok {
@@ -72,9 +118,20 @@ func issuesBounds(visible []string) (start, end int, ok bool) {
 
 func scanFindings(visible []string, inIssues bool) []Finding {
 	var out []Finding
+	inBody := false
 	for _, line := range visible {
-		if f, ok := parseFindingLine(strings.TrimRight(line, " \t\r"), inIssues); ok {
+		line = strings.TrimRight(line, " \t\r")
+		if f, ok := parseFindingLine(line, inIssues); ok {
+			f.Location = Location(f.Title)
 			out = append(out, f)
+			inBody = strings.HasPrefix(line, "#")
+			continue
+		}
+		if strings.HasPrefix(line, "#") {
+			inBody = false
+		}
+		if last := len(out) - 1; inBody && out[last].Location == "" {
+			out[last].Location = Location(line)
 		}
 	}
 	return out
@@ -116,7 +173,8 @@ func tsvFindings(issues []string) []Finding {
 			inTSV = false
 		case inTSV:
 			if m := findingTSV.FindStringSubmatch(line); m != nil {
-				out = append(out, Finding{Severity: m[1], Title: cleanTitle(m[2])})
+				title := cleanTitle(m[2])
+				out = append(out, Finding{Severity: m[1], Title: title, Location: Location(title)})
 			}
 		}
 	}

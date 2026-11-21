@@ -42,7 +42,7 @@ func splitLocation(location string) (string, int) {
 	return location[:i], line
 }
 
-func insideHunks(location string, hunks []Hunk) bool {
+func InsideHunks(location string, hunks []Hunk) bool {
 	file, line := splitLocation(location)
 	return line > 0 && slices.ContainsFunc(hunks, func(h Hunk) bool {
 		return h.File == file && h.From <= line && line <= h.To
@@ -54,17 +54,23 @@ type view struct {
 	rules loopRules
 }
 
+func LateFileBar(loop Loop) Severity { return rulesByLoop[loop].lateFileBar }
+
+func LateFiled(loop Loop, f Finding) bool {
+	return view{rules: rulesByLoop[loop]}.filedByRule(f)
+}
+
 func (v view) filedByRule(f Finding) bool {
-	if !v.rules.filesByRule || f.Status != StatusOpen {
+	if f.Status != StatusOpen {
 		return false
 	}
 	switch {
-	case f.Severity == SeverityInfo:
+	case v.rules.filesByRule && f.Severity == SeverityInfo:
 		return true
-	case f.Kind == KindCapability && f.Severity != SeverityCritical:
+	case v.rules.filesByRule && f.Kind == KindCapability && f.Severity != SeverityCritical:
 		return true
-	case f.Late:
-		return !f.Severity.atLeast(SeverityHigh) || f.Falsification == FalsificationRefuted
+	case v.rules.lateFileBar != "" && f.Late:
+		return !f.Severity.atLeast(v.rules.lateFileBar) || f.Falsification == FalsificationRefuted
 	}
 	return false
 }
@@ -116,7 +122,7 @@ func (v view) effectOf(k int) repairEffect {
 			e.repairs++
 		case seen && prev == StatusFixed && f.Status == StatusOpen:
 			e.damage++
-		case !seen && f.Status == StatusOpen && insideHunks(f.Location, v.in.Rounds[k].FixHunks):
+		case !seen && f.Status == StatusOpen && InsideHunks(f.Location, v.in.Rounds[k].FixHunks):
 			e.damage++
 		}
 	}

@@ -83,7 +83,7 @@ Integrity) are NEVER skipped.**
 ~20% of the time. When true, run ALL sections regardless of streak. Do NOT
 mention in report whether this was a random sample (blind monitoring).
 
-**Always run full checklist when:**
+Unless the host gives a Round scope block, always run full checklist when:
 - `strategy` is `harden` or `repair`
 - Task modifies agent/skill files or `.claude-plugin/`
 - Build report flags risks

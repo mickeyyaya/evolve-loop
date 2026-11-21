@@ -68,7 +68,7 @@ See [agent-templates.md](agent-templates.md) for shared strategy definitions. Ad
 
 Default: run FULL Single-Pass Review Checklist. Skip section C (Pipeline Integrity) ONLY when `auditorProfile.<task-type>.consecutiveClean` is 3–7 AND no agent/skill files modified. Sections A (Code Quality), B (Security), B2 (Hallucination), D (Eval Integrity) NEVER skipped.
 
-Always run full checklist when: `strategy` is `harden`/`repair`, task touches agent/skill/`.claude-plugin/` files, build report flags risks, `forceFullAudit: true` passed, OR `consecutiveClean >= 8`.
+Run the full checklist unless the host gives a Round scope block. Unless the host gives a Round scope block, always run full checklist when: `strategy` is `harden`/`repair`, task touches agent/skill/`.claude-plugin/` files, build report flags risks, `forceFullAudit: true` passed, OR `consecutiveClean >= 8`.
 
 [agents/evolve-auditor-reference.md](agents/evolve-auditor-reference.md) `adaptive-strictness` — streak-by-checklist table, cross-session decay rule, profile-update conditions.
 

@@ -171,3 +171,9 @@
 - **Validation.** `Parse` refuses these cases: an unknown key, a stage that is not `shadow` or `enforce`, and a negative value. It also refuses these cases: a `decrease_factor` of 1 or more, and a `mem_available_min_pct` of 100 or more. The low threshold must be under the high threshold. Each refusal wraps `ErrFleetAdaptive`. Pinned by `TestParse_FleetAdaptiveStrictAndValidated` and `TestParse_FleetAdaptiveRefusalsWrapTheAdaptiveError`.
 - **The window rule stays.** `window.start` must not exceed `fleet.count` (`TestParse_WindowStartAboveCountIsStillRefusedWithAdaptive`).
 - **Adaptive enforce needs orchestrator enforce.** The pool reads the window only at orchestrator stage `enforce`. So `Parse` refuses an adaptive stage of `enforce` when the orchestrator stage is `shadow` or absent (`TestParse_AdaptiveEnforceNeedsTheOrchestratorAtEnforce`). Without this rule, a signal can report `applied=true` when the pool does not apply the cap.
+
+## workflow.convergence.audit_rereview (ADR-0168)
+
+- **Stage.** `workflow.convergence.audit_rereview.stage` is `shadow` by default. It has its own named type, `AuditRereviewStage`, and its own signal `AUDIT_REREVIEW_SHADOW`. A flip of `workflow.convergence.stage` never moves it.
+- **One home.** `ConvergencePolicy.AuditRereview` holds the key, because the strict policy refuses an unknown key. An unknown word warns and resolves to `shadow`.
+- **Pinned by** `TestAuditRereviewStage_DefaultsToShadowAndNeverFollowsTheConvergenceStage` and `TestAuditRereviewStage_ItsOwnKeyFlipsItAlone`.

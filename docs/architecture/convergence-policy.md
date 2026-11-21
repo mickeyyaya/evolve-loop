@@ -282,7 +282,7 @@ A halt keeps its ceiling and still stops the loop. The item it files carries the
 
 ### 4. Rules for judges
 
-These bind the **code-review judge and console delta checks**. The audit keeps its full verdict rules (§11).
+These bind the **code-review judge and console delta checks**. The audit keeps its full verdict rules in round 1. From round 2, [ADR-0168](adr/0168-from-round-2-the-audit-re-reviews-the-repair-diff-and-a-late-finding-is-filed.md) adds a repair-diff scope and the filing of a late MEDIUM or LOW (§11).
 
 1. **`J_0` is a full judgment.** Every finding carries severity, kind, `blocking`, `component` (when the judge can name it), a certificate and a fix (CR6). Probe and mutant quotas belong to `J_0` only.
 2. **`J_1` and later are verify-only, with a fixed scope (CR4).** The scope is the previous findings plus fix *r*'s own hunks:
@@ -306,7 +306,7 @@ These bind the **code-review judge and console delta checks**. The audit keeps i
 
 | Loop | Calls `Decide`? | Rungs it uses | Notes |
 |---|---|---|---|
-| Audit repair (ADR-0092/0093/0096) | yes. *N* = the try budget of the envelope (default 2). So round 2 is its final round. ADR-0146 raises *N* to 3 when F2 lands. It combines the judge effort raise of rung 1 with the fresh-context fixer of rung 2(a). | rung 1 (the judge effort raise; no verify-only, since the audit keeps full rules), rung 2(a) (the fresh-context fixer), Stop | **No deferrals and no split or accept**: no deferral overrides the audit's FAIL. ADR-0096's raise stays at the first repair. The retry envelope stays the budget's home. |
+| Audit repair (ADR-0092/0093/0096) | yes. *N* = the try budget of the envelope (default 2). So round 2 is its final round. ADR-0146 raises *N* to 3 when F2 lands. It combines the judge effort raise of rung 1 with the fresh-context fixer of rung 2(a). | rung 1 (the judge effort raise; no verify-only), rung 2(a) (the fresh-context fixer), Stop | **No deferrals and no split or accept**: no deferral overrides the audit's FAIL. From round 2 a late MEDIUM or LOW is filed (§11). ADR-0096's raise stays at the first repair. The retry envelope stays the budget's home. |
 | Code-review ↔ build (ADR-0124, landing 2, Q3) | yes | all | `max_fix_rounds` 3 equals `max_rounds` 4 of ADR-0124 (4 reviews, 3 fix builds), so the **budget is unchanged**. Mass is U(n). **Amends ADR-0124 §6.2:** a code-review row that the policy DEFERRED at rung 2 (MEDIUM/LOW, with a filed follow-up) no longer counts as strict OPEN. Accept-with-limits rows go to audit adjudication. |
 | Explanation re-author | yes | as audit repair | It inherits the envelope. |
 | Console lane | yes, through the verb | all, with split = unstage | The console follows the decision from the start. |
@@ -373,6 +373,7 @@ Today's tier tables have **no** deep→top headroom in any family:
     "concentration_window": 2,
     "concentration_min_findings": 5,
     "max_backward_edges": 3,
+    "audit_rereview": {"stage": "shadow"},
     "max_blocks": 3,
     "max_redesigns": 1
   }
@@ -384,6 +385,7 @@ Today's tier tables have **no** deep→top headroom in any family:
 - **`stage`:**
   - `shadow`: loops compute and signal the decision.
   - `enforce`: loops act on it.
+- **`audit_rereview.stage`:** the audit re-review of ADR-0168 has its own stage, `shadow` by default. A flip of `stage` never moves it. At `shadow` the prompt and the verdict do not change, and `AUDIT_REREVIEW_SHADOW` records what `enforce` does.
 - **The console follows the decision from the start.** There are no flags.
 
 ### 9. Signals (module `convergence`)
@@ -416,6 +418,7 @@ Today's tier tables have **no** deep→top headroom in any family:
   - A split or accept never exempts a CRITICAL from keep-best. Every landing (Land, Split, AcceptWithLimits) re-checks the round that it lands and stops if that round holds an open CRITICAL.
   - A late CRITICAL or HIGH whose falsification check has not run blocks; only a `refuted` one is filed (§4 rule 3).
   - A CRITICAL that arrives DEFERRED or FILED is malformed input and is refused.
-- **It never turns an audit FAIL into a PASS.** The audit's verdict rules and the kernel cross-checks ([ADR-0124](adr/0124-code-review-phase.md), [ADR-0125](adr/0125-audit-publishes-its-evaluation-contract.md)) are unchanged. The audit records `kind`, and verify-only does not bind it. The one changed input is which *code-review rows* the cross-check counts (§6), and accept-with-limits rows still face the audit's adjudication.
+- **From round 2, the audit files a late MEDIUM or LOW (ADR-0168).** A late finding has a new id and lies outside the repair hunks. It does not decide the verdict. A late CRITICAL or HIGH still blocks.
+- **It never turns an audit FAIL into a PASS.** The host check of the late filing can only force FAIL. The audit's verdict rules and the kernel cross-checks ([ADR-0124](adr/0124-code-review-phase.md), [ADR-0125](adr/0125-audit-publishes-its-evaluation-contract.md)) are unchanged. The audit records `kind`, and verify-only does not bind it. The one changed input is which *code-review rows* the cross-check counts (§6), and accept-with-limits rows still face the audit's adjudication.
 - **It does not replace any loop's budget home.**
 - **It does not add a phase.**

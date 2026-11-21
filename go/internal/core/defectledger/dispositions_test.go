@@ -95,3 +95,20 @@ func TestPreflight_MissingAndIncompleteMarkers_SilentWhenCoveredOrNothingOwed(t 
 		t.Fatalf("origin/reason: %+v", e)
 	}
 }
+
+func TestParseClaims_ReadsTheDispositionShapeWithoutAWorkspace(t *testing.T) {
+	t.Parallel()
+	claims, err := ParseClaims([]byte(`{"dispositions":[{"id":"d1","status":"FIXED","evidence":["a.go:1","b.go:2"]},{"id":"d2","status":"DEFERRED","reason":"later"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := claims["d1"]; got.Status != StatusFixed || got.Evidence != "a.go:1; b.go:2" {
+		t.Errorf("d1 = %+v", got)
+	}
+	if got := claims["d2"]; got.Status != StatusDeferred || got.Reason != "later" {
+		t.Errorf("d2 = %+v", got)
+	}
+	if _, err := ParseClaims([]byte(`{"dispositions": 7}`)); err == nil {
+		t.Error("a malformed document parsed")
+	}
+}

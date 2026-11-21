@@ -5,6 +5,7 @@
 - **Relates to:**
   - [ADR-0126](0126-every-iterative-loop-converges-or-escalates.md): a loop converges or escalates. This ADR escalates at once when convergence is not possible.
   - [ADR-0142](0142-a-capability-failure-climbs-one-bounded-retry-ladder.md): the ladder keeps the climb. `audit_fix` is a rung of its decider, and its handler plugs into `core.RungHandler` ([#1173](https://github.com/mickeyyaya/evolve-loop/pull/1173)).
+  - [ADR-0168](0168-from-round-2-the-audit-re-reviews-the-repair-diff-and-a-late-finding-is-filed.md): decision 4 stands. A late CRITICAL or HIGH blocks, and only a late MEDIUM or LOW is filed.
   - [ADR-0155](0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md): I-11 stays. The auditor that writes a patch does not judge it.
   - [ADR-0157](0157-the-loop-works-its-own-code-a-narrow-fence-and-held-proposals.md): a patch on a fence path is a held proposal.
 - **Evidence:**

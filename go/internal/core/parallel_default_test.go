@@ -54,9 +54,12 @@ const (
 	swapsWorktreeAddRetrySleep      = "test swaps package variable worktreeAddRetrySleep"
 	swapsResumedLadderStore         = "test writes package variable resumedLadderStore"
 	swapsGitOnPath                  = "test puts a faulting git shim on the process PATH"
+	swapsRoundEvidenceResolver      = "test swaps package variable RoundEvidenceResolver"
 )
 
 var serialRequiredTests = map[string]string{
+	"core.TestClaimsFix_AsksTheWiredResolverAboutTheWorktree":                                                     swapsRoundEvidenceResolver,
+	"core.TestClaimsFix_WithNoResolverWiredNoClaimIsFixed":                                                        swapsRoundEvidenceResolver,
 	"core.TestCoverChangedFailures_ABridgeChangeIsMeasuredUnderTheFloorTags":                                      swapsCoverChangedProfiler,
 	"core.TestCoverChangedFailures_AFailingTieredRunNamesItsTagsInTheHeadlineAndTheReproFlags":                    swapsCoverChangedProfiler,
 	"core.TestCoverChangedFailures_AMixedChangeJudgesEachGroupOnlyOnItsOwnPackages":                               swapsCoverChangedProfiler,

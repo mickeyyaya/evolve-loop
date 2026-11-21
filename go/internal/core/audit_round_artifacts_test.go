@@ -289,3 +289,20 @@ func (r *retirementProbeRunner) Run(_ context.Context, req PhaseRequest) (PhaseR
 	r.sawRetirement = os.IsNotExist(err)
 	return PhaseResponse{Phase: string(PhaseAudit), Verdict: VerdictPASS, ArtifactsDir: req.Workspace}, nil
 }
+
+func TestRetireSupersededAuditArtifacts_ArchivesTheRoundDispositionsSoARoundNeverReadsItsPredecessorsClaims(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	claims := `{"dispositions":[{"id":"d1","status":"FIXED","evidence":"a.go:1"}]}`
+	mustWriteRoundArtifact(t, filepath.Join(dir, AuditRoundDispositionsFile), claims)
+
+	retireSupersededAuditArtifacts(dir, 2, io.Discard)
+
+	if _, err := os.Stat(filepath.Join(dir, AuditRoundDispositionsFile)); !os.IsNotExist(err) {
+		t.Errorf("the live round dispositions survive the supersede: stat err=%v", err)
+	}
+	if got := mustReadRoundArtifact(t, filepath.Join(dir, "audit-round-dispositions.round2.json")); got != claims {
+		t.Errorf("archived round dispositions = %q, want %q", got, claims)
+	}
+}
