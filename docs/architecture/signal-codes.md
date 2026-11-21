@@ -241,6 +241,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | Code | Meaning |
 |---|---|
 | `HOST_DISK_LOW` | free disk space on the host volume is below the pause line, so the cycle start waits before it dispatches. fields.free_pct, pause_pct and path give the reading, and fields.outcome is paused (the first wait) or gave_up (the maximum pause from preflight.disk_guard.max_pause_s passed and the cycle start stopped) |
+| `HOST_VERIFY_LOCK_WAIT` | a verification run asked for the host verification lock. fields.source names the caller (build-floor or acs-suite), fields.wait_ms the time that it waited, and fields.outcome is acquired or unserialized (the wait bound passed or the lock failed, so the run went on without the lock) |
 
 ### inbox
 

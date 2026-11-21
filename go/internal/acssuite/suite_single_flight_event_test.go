@@ -26,7 +26,8 @@ func TestAcquireSuiteLock_ALostSingleFlightIsAnAbnormalEventBesideTheVerdict(t *
 		t.Fatal(err)
 	}
 
-	acquireSuiteLock(Options{Root: root, ProjectRoot: root, Cycle: 7})()
+	release, _ := acquireSuiteLock(Options{Root: root, ProjectRoot: root, Cycle: 7})
+	release()
 
 	raw, _ := os.ReadFile(filepath.Join(root, ".evolve", "runs", "cycle-7", "abnormal-events.jsonl"))
 	if !strings.Contains(string(raw), `"verify-single-flight-unavailable"`) || !strings.Contains(string(raw), lock) || !strings.Contains(string(raw), `"source_phase":"acs-suite"`) {

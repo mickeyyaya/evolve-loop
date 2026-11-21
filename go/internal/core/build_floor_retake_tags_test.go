@@ -22,7 +22,7 @@ func scriptCoverPass(t *testing.T, script []scriptedPass) {
 	var mu sync.Mutex
 	next := 0
 	orig := coverPass
-	coverPass = func(_ context.Context, _ string, profile string, _, _ []string) (string, int) {
+	coverPass = func(_ context.Context, _ int, _ string, profile string, _, _ []string) (string, int) {
 		mu.Lock()
 		step := script[next]
 		next++
