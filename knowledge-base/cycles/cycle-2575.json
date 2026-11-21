@@ -1,0 +1,339 @@
+{
+  "schema_version": 2,
+  "cycle": 2575,
+  "run_id": "01M7XBCV92W28D73HQ7PCXF1FD",
+  "goal": "Wave 184.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 183 facts (run 20261120T094708Z): 9 of 15 cycles shipped.\n- Cycle 2558: final verdict PASS. It shipped.\n- Cycle 2559: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=….com/mickeyyaya/evolve-loop/go/internal/bridge\",\"Elapsed\":0.274}                  stderr: FAIL FAIL github.com/mickeyyaya/evolve-loop/go/acs/cycle-N 6.487s FAIL. Last phase: aborted. It did not ship.\n- Cycle 2560: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…(user 98.86s, sys 129.60s), want below 1.2: cut the process starts that cost kernel time FAIL FAIL github.com/mickeyyaya/evolve-loop/go/acs/cycle-N 96.421s FAIL. Last phase: aborted. It did not ship.\n- Cycle 2561: final verdict PASS. It shipped.\n- Cycle 2562: final verdict PASS. It shipped.\n- Cycle 2563: no final verdict. Last phase: ship. It did not ship.\n- Cycle 2564: final verdict PASS. It shipped.\n- Cycle 2565: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…ted the push of a06497b32871300aeb69f5afd432a3c9b82b8824 because origin/main diverged; Audit must run again on the new base (ship does not rebase or force-push). Last phase: aborted. It did not ship.\n- Cycle 2566: final verdict PASS. It shipped.\n- Cycle 2567: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…acs/cycle-N/predicates_test.go:finishedPID = internal/ledgerartifacts/store_test.go:exitedPID — a test helper in another package cannot be imported: inline it. Last phase: aborted. It did not ship.\n- Cycle 2568: final verdict PASS. It shipped.\n- Cycle 2569: final verdict PASS. It shipped.\n- Cycle 2570: final verdict SKIPPED_UNKNOWN. Termination: triage-empty-commitment. Last phase: triage. It did not ship.\n- Cycle 2571: final verdict PASS. It shipped.\n- Cycle 2572: final verdict PASS. It shipped.\n- Pull requests merged at this boundary: none.\n\nOperator notes for wave 184:\n- Cycle 2563 (ci-macos-fixed-parallelism) was parked at ship by the wave 183 main-red stop and never resumed: the pool known set drops the resumed lead todo (inbox item pool-relaunches-a-parked-lane-after-the-main-red-stop-releases). A fresh pool resumes it; its base 45272e44 is behind main, so its ship must rebase and re-audit.\n- Boundary 183 landed #1597 (floor test-audit ratchet), #1598 (host-adaptive fleet window, off until the shadow policy #1606 lands), #1599 (disk guard: tests never read the host disk), #1601 (TDD floor helper copy) and the inbox review (#1605).\n\nEarlier waves:\n- Wave 180 (run 20261118T052545Z): 21 of 32 cycles shipped.\n- Wave 181 (run 20261119T004314Z): 22 of 23 cycles shipped.\n- Wave 182 (run 20261119T213950Z): 7 of 11 cycles shipped.",
+  "final_verdict": "PASS",
+  "commit_sha": "e776d6e4a821499d26f2eddebd99353806179656",
+  "tree_sha": "d1625566e69a4aed0bd1e7ead100faa05dbed44e",
+  "tasks": [
+    "claude-cloud-driver-launch-confirmation-hardening"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 41892,
+      "started_at": "2026-11-20T20:47:43Z",
+      "ended_at": "2026-11-20T20:48:27Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 12,
+        "output": 2917,
+        "cache_read": 323853,
+        "cache_write": 67826
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 36689,
+      "started_at": "2026-11-20T20:49:02Z",
+      "ended_at": "2026-11-20T20:49:41Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 8,
+        "output": 1381,
+        "cache_read": 277270,
+        "cache_write": 35765
+      }
+    },
+    {
+      "name": "fault-localization",
+      "verdict": "PASS",
+      "duration_ms": 43608,
+      "started_at": "2026-11-20T20:49:41Z",
+      "ended_at": "2026-11-20T20:50:26Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 14,
+        "output": 3375,
+        "cache_read": 138901,
+        "cache_write": 31822
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 299461,
+      "started_at": "2026-11-20T20:50:26Z",
+      "ended_at": "2026-11-20T20:55:30Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 46,
+        "output": 33357,
+        "cache_read": 2551534,
+        "cache_write": 110970
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 2465477,
+      "started_at": "2026-11-20T20:55:30Z",
+      "ended_at": "2026-11-20T21:48:38Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 98,
+        "output": 38181,
+        "cache_read": 6813847,
+        "cache_write": 135373
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "FAIL",
+      "duration_ms": 256499,
+      "started_at": "2026-11-20T21:49:03Z",
+      "ended_at": "2026-11-20T21:59:53Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 42,
+        "output": 13944,
+        "cache_read": 2055953,
+        "cache_write": 75343
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 90960,
+      "started_at": "2026-11-20T22:00:21Z",
+      "ended_at": "2026-11-20T22:01:55Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 18,
+        "output": 8937,
+        "cache_read": 807967,
+        "cache_write": 68291
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 1048280,
+      "started_at": "2026-11-20T22:01:55Z",
+      "ended_at": "2026-11-20T22:47:16Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 40,
+        "output": 4474,
+        "cache_read": 1574835,
+        "cache_write": 61385
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 130131,
+      "started_at": "2026-11-20T22:47:38Z",
+      "ended_at": "2026-11-20T22:54:00Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 28,
+        "output": 9880,
+        "cache_read": 1190526,
+        "cache_write": 105271
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 801931,
+      "started_at": "2026-11-20T22:54:19Z",
+      "ended_at": "2026-11-20T23:17:59Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 22,
+        "output": 3991,
+        "cache_read": 803260,
+        "cache_write": 48050
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 95188,
+      "started_at": "2026-11-20T23:18:20Z",
+      "ended_at": "2026-11-20T23:24:00Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 18,
+        "output": 6442,
+        "cache_read": 679355,
+        "cache_write": 49889
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 449,
+      "started_at": "2026-11-20T23:24:18Z",
+      "ended_at": "2026-11-20T23:57:08Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 881567,
+      "started_at": "2026-11-20T23:57:09Z",
+      "ended_at": "2026-11-21T00:11:56Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 438167,
+      "started_at": "2026-11-21T00:11:56Z",
+      "ended_at": "2026-11-21T00:29:08Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 32,
+        "output": 9350,
+        "cache_read": 1478854,
+        "cache_write": 69633
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 1539,
+      "started_at": "2026-11-21T00:29:39Z",
+      "ended_at": "2026-11-21T01:07:12Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 1177444,
+      "started_at": "2026-11-21T01:07:12Z",
+      "ended_at": "2026-11-21T01:26:52Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "explanation_corrections": [
+    "docs/explain/builds/cycle-2575-01m7xbcv92w28d73hq7pcxf1fd.md:34 claims that the scrub removes only the known paths and that a path in the task text stays. But go/internal/bridge/driver_claudecloud.go:165 and :185 cut each absolute path of two or more segments to its base name. The limit is now a lone single-segment path or a path with a space. docs/explain/builds/cycle-2575-01m7xbcv92w28d73hq7pcxf1fd.md:28 names only predicates 001-013, but 014-019 also pass. docs/explain/builds/cycle-2575-01m7xbcv92w28d73hq7pcxf1fd.md:16 does not name `challengeCommentLine`, `absolutePathToken` and `baseOfAbsolutePath` (go/internal/bridge/driver_claudecloud.go:164-185). docs/explain/builds/cycle-2575-01m7xbcv92w28d73hq7pcxf1fd.md:25 says the scrub is \"a single ordered replacer\", but two regex passes now come with it. The other entries are accurate: docs/explain/builds/cycle-2575-01m7xbcv92w28d73hq7pcxf1fd.md:14 matches go/internal/bridge/manifest_cloud.go:92; docs/explain/builds/cycle-2575-01m7xbcv92w28d73hq7pcxf1fd.md:15 matches go/internal/bridge/manifests/claude-cloud.json:35; docs/explain/builds/cycle-2575-01m7xbcv92w28d73hq7pcxf1fd.md:17 matches go/internal/bridge/driver_common.go:76; docs/explain/builds/cycle-2575-01m7xbcv92w28d73hq7pcxf1fd.md:18 matches go/internal/bridge/engine.go:109; docs/explain/builds/cycle-2575-01m7xbcv92w28d73hq7pcxf1fd.md:19 matches go/internal/cloudlaunch/repo.go:55. The SHA256 that I computed matches the handoff."
+  ],
+  "timing": {
+    "total_ms": 7809282,
+    "phase_count": 16,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 2465477,
+    "by_archetype_ms": {
+      "build": 4315688,
+      "control": 2060999,
+      "evaluate": 919985,
+      "plan": 512610
+    },
+    "total_tokens": {
+      "input": 378,
+      "output": 136229,
+      "cache_read": 18696155,
+      "cache_write": 859618
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 160,
+        "output": 46646,
+        "cache_read": 9191942,
+        "cache_write": 244808
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 120,
+        "output": 39616,
+        "cache_read": 5404688,
+        "cache_write": 300136
+      },
+      "plan": {
+        "input": 98,
+        "output": 49967,
+        "cache_read": 4099525,
+        "cache_write": 314674
+      }
+    },
+    "wasted_tokens": {
+      "input": 42,
+      "output": 13944,
+      "cache_read": 2055953,
+      "cache_write": 75343
+    },
+    "cache_hit_ratio": 0.9999797823478823,
+    "hot_phase_count": 12,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "fault-localization",
+      "tdd",
+      "build",
+      "audit",
+      "tdd",
+      "build",
+      "audit",
+      "build",
+      "audit",
+      "audit"
+    ]
+  },
+  "recalled_lessons": [
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "cycle-1254-driver-tests-inherit-ambient-fleet-env-gate-only-red",
+    "cycle-93-build-report-commit-sha-fabrication",
+    "cycle-1448-minted-phase-persona-evaporates-when-its-phase-json-lands",
+    "inst-L1544b"
+  ]
+}
