@@ -373,7 +373,7 @@ func TestIntegrationTier_EndToEndThroughFakes(t *testing.T) {
 	if off, err := g.IntegrationTier(req); off != nil || err == nil || err.Error() != g1["tier.exec_failed"] {
 		t.Fatalf("attempt 1 start failure: (%v, %v)", off, err)
 	}
-	if e = only(t, *events, CodeGateStepFailed); e.Fields["step"] != "tier_attempt" || !strings.HasPrefix(e.Fields["cmd"], "go test -race -count=1 -p 4 -parallel 4 -tags integration") {
+	if e = only(t, *events, CodeGateStepFailed); e.Fields["step"] != "tier_attempt" || !strings.HasPrefix(e.Fields["cmd"], "go test -race -count=1 -timeout 14m0s -p 4 -parallel 4 -tags integration") {
 		t.Errorf("GATE_STEP_FAILED: %+v", e)
 	}
 }

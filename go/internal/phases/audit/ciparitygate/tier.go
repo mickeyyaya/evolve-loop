@@ -23,9 +23,18 @@ func tierProcs() int {
 	return tierParallelism
 }
 
-func tierArgs(pkgs []string) []string {
+const tierTimeoutMargin = time.Minute
+
+func tierTimeout(budget time.Duration) time.Duration {
+	if budget <= tierTimeoutMargin {
+		return budget
+	}
+	return budget - tierTimeoutMargin
+}
+
+func tierArgs(pkgs []string, budget time.Duration) []string {
 	p := strconv.Itoa(tierProcs())
-	return append([]string{"test", "-race", "-count=1", "-p", p, "-parallel", p, "-tags", "integration"}, pkgs...)
+	return append([]string{"test", "-race", "-count=1", "-timeout", tierTimeout(budget).String(), "-p", p, "-parallel", p, "-tags", "integration"}, pkgs...)
 }
 
 type attempt struct {
@@ -56,7 +65,7 @@ func (g *Gates) IntegrationTier(req Request) ([]string, error) {
 	if len(pkgs) == 0 {
 		return nil, nil
 	}
-	args := tierArgs(pkgs)
+	args := tierArgs(pkgs, g.timeouts.TierAttempt)
 	scrubbed := sysexec.WithEnv(lanebudget.Runner(g.run), TierEnv())
 	first := runAttempt(ctx, scrubbed, dir, args)
 	if first.err != nil {
@@ -97,7 +106,7 @@ func (g *Gates) retake(req Request, dir string, pkgs []string, run sysexec.RunFu
 	log := &tierLog{workspace: req.Workspace, args: first.args}
 	g.logAttempt(req, log, 1, " (lane env, contended)", first)
 	release, lockNote := g.acquireLock(gateTier, req)
-	log.args = tierArgs(pkgs)
+	log.args = tierArgs(pkgs, g.timeouts.TierAttempt)
 	retakeCtx, retakeCancel := context.WithTimeout(context.Background(), g.timeouts.TierAttempt)
 	second := runAttempt(retakeCtx, run, dir, log.args)
 	retakeCancel()
