@@ -1,6 +1,6 @@
 # Dispatch process hygiene: tag, reap and gc backstop (2026-10)
 
-> **Status:** lane H2 (`cl-proc-hygiene`), 2026-10-08. The full design for logs and processes is [logging-and-process-hygiene-2026-10.md](logging-and-process-hygiene-2026-10.md). Lane H1 lands that document. This plan covers only the decisions K8, K9, K10 and K11 of that design.
+> **Status:** built, 2026-11-07 (K8 to K11 and D1 to D23 on main; four hardening items remain open). Earlier status: lane H2 (`cl-proc-hygiene`), 2026-10-08. The full design for logs and processes is [logging-and-process-hygiene-2026-10.md](logging-and-process-hygiene-2026-10.md). Lane H1 lands that document. This plan covers only the decisions K8, K9, K10 and K11 of that design.
 
 ## The request
 
@@ -159,3 +159,21 @@ The inbox item `.evolve/inbox/2026-10-08T17-00-00Z-dispatch-hygiene-followups.js
   1. List them: `ps -E -A -o pid=,ppid=,etime=,command= | grep EVOLVE_PROJECT_ROOT= | grep -v EVOLVE_DISPATCH_ID=`.
   2. Keep each row whose parent is alive and is a live loop, a console or an interactive `claude` session.
   3. Find each orphan (ppid 1) that a finished dispatch started, such as an MCP server (`node`, `npx` or `uvx`). Send it `kill -TERM <pid>`. Never stop `tmux`, Chrome, Chromium or a `claude daemon` process by hand from this list.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| K8 and G1: `EVOLVE_DISPATCH_ID` tag (D10) | done | [#817](https://github.com/mickeyyaya/evolve-loop/pull/817), [`1df58d2`](https://github.com/mickeyyaya/evolve-loop/commit/1df58d24d); `go/internal/proctree/dispatchid.go` | none |
+| K9 and G2: reap at dispatch end, recorded tree (D1 to D9, D16, D19) | done | [`1df58d2`](https://github.com/mickeyyaya/evolve-loop/commit/1df58d24d); `go/internal/bridge/dispatch_reap.go:289` | none |
+| K10 and G3: `sysexec.Command` and the guard test (D11, D20) | done | [`1df58d2`](https://github.com/mickeyyaya/evolve-loop/commit/1df58d24d); `go/internal/sysexec/command.go` | none |
+| K11 and G4: gc stale dispatch, orphan tails, test sessions (D12, D13, D17) | done | [`1df58d2`](https://github.com/mickeyyaya/evolve-loop/commit/1df58d24d); `go/internal/gc/dispatch_processes.go` | none |
+| Review rounds 1 to 3: D15, D18, D21, D22, S18 to S25 | done | [`1df58d2`](https://github.com/mickeyyaya/evolve-loop/commit/1df58d24d) | none |
+| D23: the cwd proof fails closed | done | [#1103](https://github.com/mickeyyaya/evolve-loop/pull/1103), [`2e5af99`](https://github.com/mickeyyaya/evolve-loop/commit/2e5af9988), [`ce8f538`](https://github.com/mickeyyaya/evolve-loop/commit/ce8f538a9) | none |
+| Test sessions get a refusing signal sender (S15) | done | [`1cba6ab`](https://github.com/mickeyyaya/evolve-loop/commit/1cba6abc7) | none |
+| Sweep for the other kill paths (`capture_models.go`, `recipe_adapter.go`) | done | cycle 2218, [`08b0d2d`](https://github.com/mickeyyaya/evolve-loop/commit/08b0d2d76) | none |
+| Later: M-c wider shared class, L-a tree file removal, crashed-bridge helper | not started | none | `dispatch-hygiene-followups` |
+| Later: Linux cgroup per dispatch (N1), manual check of legacy MCP processes | not started | none | none (draft `dispatch-hygiene-cgroup-and-legacy`) |
+| Review follow-up `dispatch-hygiene-architecture-followups` | unverified: the item was consumed by the bookkeeping of PR 1605 ([`fd36f33`](https://github.com/mickeyyaya/evolve-loop/commit/fd36f3334)); no code change was traced | none | none |
+
+The core of the plan is on main. A later build, "proctree without ps", is in review. It is not a component of this plan. The cgroup and the legacy sweep have no open item, and a draft exists. The architecture follow-up item was closed by a bookkeeping consume, and its code is unverified.

@@ -1,6 +1,6 @@
 # Plan: a free pool slot takes the work that became ready after the run started
 
-- **Status:** built, 2026-10-19.
+- **Status:** built, 2026-10-19 (3 of 3 components on main). Earlier status: built, 2026-10-19.
 - **Design:** [wave-orchestrator §7](../architecture/wave-orchestrator.md#7-the-rolling-pool) and [§8](../architecture/wave-orchestrator.md#8-the-lane-lease). **Decision:** [ADR-0139](../architecture/adr/0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md) (this plan amends O4 and O5). **Research:** [wave-orchestrator-2026-10](../research/wave-orchestrator-2026-10.md) and §2.2 below.
 - **Package notes:** [internal-fleet.md](../architecture/packages/internal-fleet.md), [internal-orchestrator.md](../architecture/packages/internal-orchestrator.md).
 
@@ -141,3 +141,13 @@ Scores, 1 (bad) to 5 (good):
 
 - Q1. Does the rolling pool of `scheduling: pool` need a launch limit, so it can take a resupply too? Not now: no policy runs it at stage `shadow` (`.evolve/policy.json` sets stage `enforce`).
 - Q2. The plan source reads the triage decision of the last cycle. Mid-run, the last cycle is a lane of the same run. The widen then fills from the inbox (`WidenNarrowDecision`). We accept this, because the same path runs at a boundary.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| R1 `fleet.PoolConfig.Resupply` and the `known` set | done | [#991](https://github.com/mickeyyaya/evolve-loop/pull/991), [`27b4ac5`](https://github.com/mickeyyaya/evolve-loop/commit/27b4ac560); `go/internal/fleet/pool.go:23` | none |
+| R2 `orchestrator.Pool.Resupply`, `CodePoolResupplied`, no re-queue after a deadline stop | done | [#991](https://github.com/mickeyyaya/evolve-loop/pull/991), [`27b4ac5`](https://github.com/mickeyyaya/evolve-loop/commit/27b4ac560); `go/internal/orchestrator/pool.go:58` | none |
+| R3 `poolPlanAt`, `orchestratorResupply` in `cmd/evolve` | done | [#991](https://github.com/mickeyyaya/evolve-loop/pull/991), [`27b4ac5`](https://github.com/mickeyyaya/evolve-loop/commit/27b4ac560) | none |
+
+One change delivered all three components on 2026-10-19. Nothing is left. The live check of G1 (`evolve wave watch` on the first run after the merge) has no recorded result in this review: unverified.

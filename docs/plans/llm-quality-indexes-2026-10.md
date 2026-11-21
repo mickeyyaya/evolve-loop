@@ -1,6 +1,6 @@
 # Plan: turn software-quality concepts into measured indexes that the Signal Center publishes
 
-- **Status:** proposed, 2026-10-21.
+- **Status:** partly built, 2026-11-21 (6 of 11 components on main, 5 not started). Earlier status: proposed, 2026-10-21.
 - **Amended by:** ADR-0158 (Accepted, 2026-10-27): the panel has 22 indexes; PQ5 is the cost for each shipped cycle.
 - **Design:** [llm-quality-indexes](../architecture/llm-quality-indexes.md). **Decision:** [ADR-0153](../architecture/adr/0153-quality-is-a-panel-of-separate-indexes-with-intervals-that-the-signal-center-publishes.md). **Research:** [llm-quality-indexes-2026-10](../research/llm-quality-indexes-2026-10.md).
 
@@ -163,3 +163,22 @@ Each component is one console inbox item with route `console-manual`. Each one s
 - **OQ-1** Does the auditor floor on Claude (`claudeFamilyFloor`) stay? JQ4 measures it but does not change it.
 - **OQ-2** Which items form the PQ2 replay set? Proposal: 10 items from the last 30 days, 5 shipped and 5 failed, frozen at their base commits.
 - **OQ-3** Do the review files move into Git, so that JQ3 has a tracked source?
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| Q1 `quality-index-collector` | done | [`0df174c`](https://github.com/mickeyyaya/evolve-loop/commit/0df174cdc2d3a6084a6a350258b047dde817725d); package `go/internal/qualitypanel` | none |
+| Q2 `pipeline-rates-with-intervals` | done | [`65814f6`](https://github.com/mickeyyaya/evolve-loop/commit/65814f6f26e53c4b409abac8d07b2d2b37167008) | none |
+| Q3 `complexity-ratchet` | done | [`23e03f8`](https://github.com/mickeyyaya/evolve-loop/commit/23e03f8687e1b1d4afcea8d0982a81594234a246) | none |
+| Q4 `outcome-churn-revert-recovery` | done | [`ac0d6d6`](https://github.com/mickeyyaya/evolve-loop/commit/ac0d6d60ed4eb181760c12368be030df65bff13b) (cycle 2569, 2026-11-21) | none |
+| Q5 `mutation-efficacy-on-changed-functions` | done, at `shadow` | [`19ea921`](https://github.com/mickeyyaya/evolve-loop/commit/19ea921e539b25b8d937964730663643e6fb8930) (cycle 2067) | none |
+| Q6 `revert-sensitivity-probe` | done, at `shadow` | [`dedc785`](https://github.com/mickeyyaya/evolve-loop/commit/dedc78592a1b9ccc4c4c65b1636e1f0725cb1abd) (cycle 2074) | none |
+| Q7 `escape-and-false-pass-links` | not started | The item left the inbox in [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443). No `Fixes-Ship` code is on main. | none |
+| Q8 `judge-calibration-seeded-defects` | not started | The item left the inbox in [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443). | none |
+| Q9 `pass-k-replay-harness` | not started | The item left the inbox in [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443). | none |
+| Q10 `held-out-acceptance-share` | not started | No change on main. | `held-out-acceptance-share` |
+| Q11 `quality-health-panel` | not started | No change on main. | `quality-health-panel` |
+
+Q10 and Q11 have open inbox items. Q7, Q8 and Q9 are unfinished and have no open item, because [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443) removed them. Follow-up drafts restore the three items. Q8 and Q9 depend on ADR-0152. The `shadow` to `enforce` flips of Q5 and Q6 are unverified.
+

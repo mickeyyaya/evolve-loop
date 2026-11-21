@@ -1,6 +1,6 @@
 # Plan: the type checker answers `callers`, and `evolve code bench` picks the backend of each query by measure
 
-- **Status:** accepted, 2026-10-17 (the operator approved it). G1 is built (PR 938). G2 is built (cycle 2173). G3 to G5 are open, and each has an inbox item (section 6).
+- **Status:** partly built, 2026-11-21 (4 of 5 components on main; G4 open). Earlier status: accepted, 2026-10-17 (the operator approved it). G1 is built (PR 938). G2 is built (cycle 2173). G3 to G5 are open, and each has an inbox item (section 6).
 - **Research:** [code-index-backends-2026-10](../research/code-index-backends-2026-10.md). **Design:** [code-index-cli](../architecture/code-index-cli.md), section "Backends and the benchmark". **Decision:** [ADR-0140](../architecture/adr/0140-the-type-checker-answers-callers-and-each-query-goes-to-its-best-measured-backend.md).
 - **Extends:** [code-index-cli-2026-10](code-index-cli-2026-10.md) (components K1 to K5). This plan does not change K1 to K5.
 - **Decision numbers:** D1 to D11 of this plan are decisions 1 to 11 of ADR-0140, with the same numbers.
@@ -201,3 +201,15 @@ The target: the exit-1 rate of `callers` falls, and the tokens and the pass rate
 - **Q3:** does the bench also score `map`? There is no type-checked truth for a directory summary. We propose that the bench reports `map` as "not scored".
 - **Q4:** does `gotypes` add a CHA mode for the concrete targets of an interface call (P3.8)? D5 already gives the reverse: the interface calls of a concrete method, with `go/types.Implements` and no new library. A CHA mode comes only if the K3 log shows calls for an interface method followed by a grep for its implementations.
 - **Q5:** what latency can an agent accept for a better answer? No measure gives it yet. For `find`, graphify `query` has a better top-1 than trail-code (25/40 against 19/40), at about 10 times the latency (F2.15). A grep costs about 0.35 s (F2.21). We propose to measure it after PR #931 lands: in the K3 log, compare the follow-up greps and reads after `find` calls of each backend. Until then, the route keeps trail-code for `find`, because the `find` test used exact names, not free words.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| G1 gotypes backend for `callers` and `api` | done | [#938](https://github.com/mickeyyaya/evolve-loop/pull/938), [`8af1f7b`](https://github.com/mickeyyaya/evolve-loop/commit/8af1f7b55); `go/internal/adapters/codeindex/gotypes` | none |
+| G2 boundary step `code-index gotypes` | done | cycle 2173, [`ca70c89`](https://github.com/mickeyyaya/evolve-loop/commit/ca70c89cc) | none |
+| G3 `evolve code bench` | done | cycle 2294, [`5409718`](https://github.com/mickeyyaya/evolve-loop/commit/540971883); `go/cmd/evolve/cmd_code_bench.go` | none |
+| G4 default route `callers` to gotypes | not started: `.evolve/policy.json` has no `code_index.backends` key | none | `code-index-backends-g4-default-route-gotypes` |
+| G5 backend field in the usage record | done | cycle 2297, [`956cb2a`](https://github.com/mickeyyaya/evolve-loop/commit/956cb2a56); `go/internal/codeindex/usagelog/usagelog.go` | none |
+
+G4 is the only open component, and it has an open item. The G3 bench result (gotypes callers at precision 1.00, recall 1.00) is the evidence that G4 needs. Nothing is left without an item.

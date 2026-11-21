@@ -1,6 +1,7 @@
 # Plan: a retry carries the evidence of the dispatch that it replaces (R2, the postmortem of an `attempt`)
 
-- **Status:** wired, 2026-10-10. Follow-ups (Q6, Q7, Q8 and the W1 review items) done on 2026-10-11 in lane `cl-pm-followups` (§6, "Follow-ups"). Components P1 to P5 were built on 2026-10-09 in lane `cl-attempt-postmortem`. The wiring lane W1 (`cl-postmortem-wire`) wired them into the runner. It also added the operator verbs and the policy block, and fixed the R2 review findings.
+- **Status:** partly built, 2026-11-10 (7 of 8 components on main; G1 not built).
+  - Earlier status: wired, 2026-10-10. Follow-ups (Q6, Q7, Q8 and the W1 review items) done on 2026-10-11 in lane `cl-pm-followups` (§6, "Follow-ups"). Components P1 to P5 were built on 2026-10-09 in lane `cl-attempt-postmortem`. The wiring lane W1 (`cl-postmortem-wire`) wired them into the runner. It also added the operator verbs and the policy block, and fixed the R2 review findings.
 - **Decision record:** [ADR-0130](../architecture/adr/0130-a-retry-carries-the-evidence-of-the-attempt-it-replaces.md).
 - **Research:** [attempt-postmortem-2026-10.md](../research/attempt-postmortem-2026-10.md) (findings F1.1 to F3.10, refinements R1 to R9).
 - **Package notes:** [internal-attemptpostmortem.md](../architecture/packages/internal-attemptpostmortem.md).
@@ -241,3 +242,18 @@ A wins. D is defense in depth for Claude, so it stays as R3.
 | W1 | wired: runner, locator, policy block, `evolve postmortem`, R2 hardening | 2026-10-10 |
 | Follow-ups (Q6, Q7, Q8, W1 review items) | done | 2026-10-11 |
 | G1 (R3) | designed | 2026-10-09 |
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| P1 record and store | done | [`220d495`](https://github.com/mickeyyaya/evolve-loop/commit/220d4958b) | none |
+| P2 suspect rule | done | [`220d495`](https://github.com/mickeyyaya/evolve-loop/commit/220d4958b) | none |
+| P3 transcript port | done | [`220d495`](https://github.com/mickeyyaya/evolve-loop/commit/220d4958b) | none |
+| P4 collector | done | [`220d495`](https://github.com/mickeyyaya/evolve-loop/commit/220d4958b) | none |
+| P5 renderer | done | [`220d495`](https://github.com/mickeyyaya/evolve-loop/commit/220d4958b) | none |
+| W1 wiring | done | [`14cc841`](https://github.com/mickeyyaya/evolve-loop/commit/14cc8411f); follow-ups [`736e71e`](https://github.com/mickeyyaya/evolve-loop/commit/736e71ed9), [#847](https://github.com/mickeyyaya/evolve-loop/pull/847) | none |
+| W2 record paths in the dossier | done | cycle 2255, [`4c94d55`](https://github.com/mickeyyaya/evolve-loop/commit/4c94d55f4) (`go/internal/core/failure_dossier.go:96`); item `attempt-postmortem-w2-dossier-paths` | none (item consumed) |
+| G1 repeat guard (R3) | not started; no `guard repeat` verb on main | none | none |
+
+Only G1 is left. It has no open inbox item. A follow-up draft exists: `attempt-postmortem-g1-repeat-guard`. The delta follow-ups also closed in [#1328](https://github.com/mickeyyaya/evolve-loop/pull/1328) (item `attempt-postmortem-delta-followups`).

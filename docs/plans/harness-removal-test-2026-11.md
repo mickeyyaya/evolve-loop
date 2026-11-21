@@ -1,6 +1,6 @@
 # Plan: measure which harness components are load-bearing after the M2 baseline
 
-- **Status:** proposed, 2026-11-20.
+- **Status:** partly built, 2026-11-20 (the test design is built; the removal test has not run, blocked on M2). Earlier status: proposed, 2026-11-20.
 - **Parent plan:** [harness-practices-2026-11](harness-practices-2026-11.md) (D11, D12, R9).
 - **Decision:** [ADR-0159](../architecture/adr/0159-the-loop-keeps-its-integration-train-and-takes-six-practices-from-the-2026-harness-projects.md) and [ADR-0133](../architecture/adr/0133-the-loop-watches-cli-practice-and-trims-its-scaffolding.md).
 - **Research:** [harness-practices-2026-11](../research/harness-practices-2026-11.md) (F10.1, F13.1).
@@ -94,3 +94,14 @@ In a failure case, wave 1 ships 4 of 8 cycles (50%) at $4.90 per shipped cycle. 
 - **What this design does not do:** this design does not change `.evolve/policy.json` or any Go code today.
 - **What a test cannot prove:** a syntax check of this document proves its required sections and STE compliance, not the wave outcome.
 - **Open question:** which optional component follows `plan-review` after M2? The operator picks the next candidate from `workflow.phase_enables` after the first 2-wave result.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| Plan document and design check | done | cycle 2549, [`70e796b`](https://github.com/mickeyyaya/evolve-loop/commit/70e796b37c134e95d565d28b3fb10af276188d11) (item `harness-removal-test`, consumed) | none |
+| Precondition: M2 baseline `evolve prompt stats` | not started | no `prompt stats` verb on main; the item `model-capability-practice-m2-prompt-stats` is neither open nor consumed | none |
+| Removal test: `plan-review` off for 2 waves | not started | none (blocked on M2) | none |
+| Later removal tests of other components | not started | none | none |
+
+Only the design is done. The test needs the M2 baseline, and M2 has no verb on main and no inbox item. The test run has no open inbox item either. A follow-up draft is in `followups/harness-removal-test-run-plan-review.json`. The draft names M2 as its blocker.

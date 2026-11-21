@@ -1,6 +1,6 @@
 # Plan: A read-only debug CLI that gives the console and agents an accurate signal with a next step
 
-- **Status:** proposed, 2026-11-05. The architecture review passed on 2026-11-05 after four rounds (revision 5 of this plan). The build of rows 1 to 5 of section 6 is in progress.
+- **Status:** partly built, 2026-11-05 (4 of 13 components on main). Earlier status: proposed, 2026-11-05. The architecture review passed on 2026-11-05 after four rounds (revision 5 of this plan). The build of rows 1 to 5 of section 6 is in progress.
 - **Design:** [debug-cli](../architecture/debug-cli.md). **Decision:** [ADR-0162](../architecture/adr/0162-the-console-reads-through-a-tested-read-only-debug-family-and-writes-no-scratch-scripts.md). **Research:** [debug-cli-2026-11](../research/debug-cli-2026-11.md).
 - **Related:** [CLI contract](../architecture/cli-contract.md), [gate input inventory](../architecture/gate-input-inventory.md). Its proof rows are in the [pipeline blockers plan](pipeline-blockers-2026-11.md).
 
@@ -213,3 +213,23 @@ Each verb meets the red proof, journey, preservation, wiring, mutation and signa
 None block the build. Revision 1 asked two questions, and the reviews answered them. The workspace digest is not a host fact (F1.3). `debug` stays apart from `evolve status`, which takes no operand.
 
 One point stays open and does not block C1 to C6. It is the default size of the range of `debug cycles` when `--from` and `--to` are absent. No requirement states it (review round 2). The builder of C7 chooses a size and records it in the design.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| C1 Contract harness and silent shims | done | [`33c7d88`](https://github.com/mickeyyaya/evolve-loop/commit/33c7d8848ff4132d0c64dec7815143424b2b192d), PR [#1302](https://github.com/mickeyyaya/evolve-loop/pull/1302) | none |
+| C2 Range read of `wave` | done | [`33c7d88`](https://github.com/mickeyyaya/evolve-loop/commit/33c7d8848ff4132d0c64dec7815143424b2b192d), PR [#1302](https://github.com/mickeyyaya/evolve-loop/pull/1302) | none |
+| C3 `dossier.ReadDirChecked` | done | [`33c7d88`](https://github.com/mickeyyaya/evolve-loop/commit/33c7d8848ff4132d0c64dec7815143424b2b192d), PR [#1302](https://github.com/mickeyyaya/evolve-loop/pull/1302) | none |
+| C4 `cyclefacts` | done | [`33c7d88`](https://github.com/mickeyyaya/evolve-loop/commit/33c7d8848ff4132d0c64dec7815143424b2b192d), PR [#1302](https://github.com/mickeyyaya/evolve-loop/pull/1302) | none |
+| C5 Gate step and end message | not started | The commit of C1 to C4 states that row 5 left for a redesign. `ciwatch` has no end-message field on main. | none |
+| C6 Table of source kinds | not started | `cyclefacts` has the reads only, with no source table. | none |
+| C7 `debugview.Cycles` | not started | No `debugview` package on main. | none |
+| C8 `debugview.Brief` | not started | No `debugview` package on main. | none |
+| C9 State rules | not started | No `debugview` package on main. | none |
+| C10 Check of `next` | not started | No `debugview` package on main. | none |
+| C11 `debug cycles` | not started | No `cmd_debug.go` on main. | none |
+| C12 `debug cycle` | not started | No `cmd_debug.go` on main. | none |
+| C13 Check of every `next` entry | not started | Depends on C11 and C12. | none |
+
+Rows 1 to 4 landed on main with the change of 2026-11-05. The owner reads now report each failure, and no `debug` verb exists yet. Row 5 was sent to a redesign, because parsing the CI log text did not converge. C5 to C13 have no open inbox item and no open PR. Two follow-up drafts cover them: one for C5 and one for C6 to C13.

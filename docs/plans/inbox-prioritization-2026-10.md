@@ -1,6 +1,6 @@
 # Inbox prioritization: one computed rank, re-ranked on every add (2026-10)
 
-> **Status:** approved by the operator on 2026-10-06. The request: "Do we have logic to reprioritize the Todo inbox tasks when adding the new requests? If not, we need to build the logic… with ultrathink".
+> **Status:** partly built, 2026-11-21 (6 of 7 components on main; P5 in review). Earlier status: approved by the operator on 2026-10-06. The request: "Do we have logic to reprioritize the Todo inbox tasks when adding the new requests? If not, we need to build the logic… with ultrathink".
 >
 > **Decision record:** ADR-0121, which lands with P1.
 >
@@ -430,3 +430,17 @@ The three triggers and the boundary backstop are in [inbox-curator.md §The desi
 | P6 | `inbox-prioritization-p6-intake-docs` | lane |
 
 P4, P5 and P6 depend on P3. The item `inbox-curator-event-triggered` starts each review of the inbox from an event. The events are an add, a landing, a change of the policy or of the protected manifest, and the boundary.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| P1 | done | [`e26fecf`](https://github.com/mickeyyaya/evolve-loop/commit/e26fecf5f) (2026-10-06) | none |
+| P2-pre | done | [`d3f2b3f`](https://github.com/mickeyyaya/evolve-loop/commit/d3f2b3f86) (2026-10-07) | none |
+| P2 | done | [`d3f2b3f`](https://github.com/mickeyyaya/evolve-loop/commit/d3f2b3f86) (2026-10-07) | none |
+| P3 (a: intake, b: curator) | done | [`37919da`](https://github.com/mickeyyaya/evolve-loop/commit/37919dabb) (intake); [`9602680`](https://github.com/mickeyyaya/evolve-loop/commit/9602680a7) (curator); [`318e97f`](https://github.com/mickeyyaya/evolve-loop/commit/318e97fcb) ([#1328](https://github.com/mickeyyaya/evolve-loop/pull/1328), cycle 2065) | none |
+| P4 | done | [`28301c1`](https://github.com/mickeyyaya/evolve-loop/commit/28301c1f6) (cycle 2464) | none |
+| P5 | in review | The build is in review. `Reweight` still exists in `go/internal/recurrence/apply.go:30` on main. | `inbox-prioritization-p5-reason-on-priority-change` |
+| P6 | done | [`4ea0406`](https://github.com/mickeyyaya/evolve-loop/commit/4ea0406bf) (cycle 2288) | none |
+
+Only P5 is left, and its build is in review. P5 must also remove the `Reweight` option of `recurrence.ApplyOptions`. No component lacks an open item. ADR-0121 status was not checked.

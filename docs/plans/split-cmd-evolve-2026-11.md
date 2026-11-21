@@ -1,6 +1,6 @@
 # Plan: split cmd/evolve into verb-group packages along change coupling
 
-- **Status:** proposed, 2026-11-17.
+- **Status:** partly built, 2026-11-21 (2 of 6 steps on main). Earlier status: proposed, 2026-11-17.
 - **Parent plan:** `concurrent-edit-layout-2026-11` (PR #1545, commit `0ea7f8c1b`). Its component C6 asks for this design. Its decision D5 sets the rule of the move. Its open question Q2 is answered in section 5.
 - **Related:** component C7 of the parent plan splits the hot package notes along the same groups.
 
@@ -210,3 +210,16 @@ The first item records its own before value, because no source gives it today. A
 - **One big move of every group.** It conflicts with each open lane in the package, and a review cannot hold the whole diff (parent plan D5).
 - **A new `evolve` verb for the census.** The census stays a documented command in section 3 until a second user needs it.
 - **A change of `registry.go`.** Only the target of `Run` moves, so the registry keeps its shape (F5).
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| Step 1 `inboxcmd` | done, 2026-11-18 | cycle 2503 [`5ed6d76`](https://github.com/mickeyyaya/evolve-loop/commit/5ed6d7674) (`go/internal/cli/inboxcmd`, `go/acs/cycle2503/predicates_test.go:73`) | none |
+| Step 2 `landcmd` for pr and ci | done, 2026-11-21 | cycle 2564 [`ca8b6f0`](https://github.com/mickeyyaya/evolve-loop/commit/ca8b6f025) (`go/internal/cli/landcmd`) | none |
+| Step 3 `gccmd` | not started: no `internal/cli/gccmd` package | none | split-cmd-evolve-gccmd |
+| Step 4 `wavecmd` | not started | none | split-cmd-evolve-wavecmd |
+| Step 5 `landcmd` rest | not started | none | split-cmd-evolve-landcmd-rest |
+| Step 6 spine design | not started | none | split-cmd-evolve-spine-design |
+
+Steps 1 and 2 are on main. Steps 3 to 6 each have an open inbox item. Every unfinished step has an item, so no follow-up draft is needed. The plan names `TestLandCmdRun`, but `go/` has no test of that name. The package uses `landcmd_run_test.go`, so the exact name is unverified.

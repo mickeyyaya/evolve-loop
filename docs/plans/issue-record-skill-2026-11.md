@@ -1,6 +1,6 @@
 # Plan: each issue, alert or mistake gets an incident record through one entry skill
 
-- **Status:** proposed, 2026-11-16. Components K1 to K3 are built. Amended 2026-11-18: [the incident knowledge-base plan](incident-knowledge-base-2026-11.md) replaces K4, K5 and K6 with its components I4, I5 and I7. Do not build K4 to K6.
+- **Status:** built, 2026-11-17 (K1 to K3 on main; K4 to K6 superseded by the incident knowledge-base plan). Earlier status: proposed, 2026-11-16. Components K1 to K3 are built. Amended 2026-11-18: [the incident knowledge-base plan](incident-knowledge-base-2026-11.md) replaces K4, K5 and K6 with its components I4, I5 and I7. Do not build K4 to K6.
 - **Design:** the skills [issue-record](../../skills/issue-record/SKILL.md) (the entry point), [issue-analyze](../../skills/issue-analyze/SKILL.md) (the cause) and [docs-write](../../skills/docs-write/SKILL.md) (the text, unchanged). **Decision:** no ADR; the decisions D1 to D8 are in §5. They add skills and one rule, and change no runtime contract. **Research:** [issue-record-skills-2026-11.md](../research/issue-record-skills-2026-11.md).
 - **Rule:** [guidance/rules/issue-gets-a-record.md](../../guidance/rules/issue-gets-a-record.md). **First record:** [2026-11-16-tests-leak-evolve-ledgers-under-go.md](../incidents/2026-11-16-tests-leak-evolve-ledgers-under-go.md).
 
@@ -134,3 +134,16 @@ Checks for this change: `evolve docs ste-lint --strict --changed refs/remotes/or
 - **Q1.** Does the docs-review gate need a light path for a session-log row? Today each `.md` diff needs a docs review.
 - **Q2.** Does the phase `incident-postmortem` load `issue-analyze` as its method? That change touches a phase persona, so it needs its own review.
 - **Q3.** The memory index of the console holds many lessons as feedback files. Does each old lesson get a record? This plan does not move them.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| K1 skills `issue-record` and `issue-analyze` | done, 2026-11-17 | [#1534](https://github.com/mickeyyaya/evolve-loop/pull/1534) [`24c4f40`](https://github.com/mickeyyaya/evolve-loop/commit/24c4f40ab) (`skills/issue-record/SKILL.md`, `skills/issue-analyze/SKILL.md`) | none |
+| K2 rule `issue-gets-a-record` | done, 2026-11-17 | [#1534](https://github.com/mickeyyaya/evolve-loop/pull/1534) [`24c4f40`](https://github.com/mickeyyaya/evolve-loop/commit/24c4f40ab) (`guidance/rules/issue-gets-a-record.md`) | none |
+| K3 first record and index row | done, 2026-11-17 | [#1534](https://github.com/mickeyyaya/evolve-loop/pull/1534) [`24c4f40`](https://github.com/mickeyyaya/evolve-loop/commit/24c4f40ab); index row at `REGRESSION-COVERAGE-INDEX.md:52` | none |
+| K4 `evolve issue stub` | superseded by I4 of the incident knowledge-base plan; no `issue stub` code on main | none | incident-kb-i4-capture-sweep |
+| K5 Signal Center hint | superseded by I5 of the same plan; no hint code on main | none | incident-kb-i5-levels-and-due |
+| K6 `record_doc` field | superseded by I7 of the same plan; built, PR open | [#1624](https://github.com/mickeyyaya/evolve-loop/pull/1624) | incident-kb-i7-record-doc |
+
+K1 to K3 are on main. K4 and K5 move to the incident knowledge-base plan and stay open as inbox items. K6 is built in PR #1624 and not yet merged. The plan has no component that is unfinished and has no open item. The session-log file named in D3 does not exist yet: `docs/incidents/` has no `session-log` file.

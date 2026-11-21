@@ -1,6 +1,6 @@
 # Plan: the pipeline is the only controller, and each LLM agent runs in an isolated cell
 
-- **Status:** proposed, 2026-10-25. The operator approved §1 to §11 on 2026-10-25. The components are built or merged as §6.1 shows.
+- **Status:** partly built, 2026-11-21 (28 of 34 components on main, 1 partial, 1 in review, 4 not started). Earlier status: proposed, 2026-10-25. The operator approved §1 to §11 on 2026-10-25. The components are built or merged as §6.1 shows.
 - **Design:** [llm-isolation](../architecture/llm-isolation.md). **Decisions:** [ADR-0154](../architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md), for §11 [ADR-0155](../architecture/adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md), and for §12 [ADR-0156](../architecture/adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md). **CLI contract:** [cli-contract](../architecture/cli-contract.md). **Research:** [llm-isolation-2026-10](../research/llm-isolation-2026-10.md).
 
 ## Table of contents
@@ -467,3 +467,44 @@ X19 has no scored designs. It is an operator directive of 2026-10-25, and §12.4
 
 1. Q7. Which verbs outside cli-contract.md §5 are core? The proposal is the table of §5. The operator confirms it at X17b.
 2. Q8. Does `loop-stop` stay a verb, or does `wave stop` replace it? The proposal keeps both for one release.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| X1 Substitution harness | done | [#1121](https://github.com/mickeyyaya/evolve-loop/pull/1121), [`1609a21`](https://github.com/mickeyyaya/evolve-loop/commit/1609a21417664682240763b920508645e4c7c73d) | none |
+| X1b Fake tmux for rows M2 to M4 | done | [#1128](https://github.com/mickeyyaya/evolve-loop/pull/1128), [`e9e81ad`](https://github.com/mickeyyaya/evolve-loop/commit/e9e81ad791b9627e049b1f4dee322dc35ef4c265) | none |
+| X2 Hermetic driver environment | done, at `enforce` | [#1122](https://github.com/mickeyyaya/evolve-loop/pull/1122), [#1159](https://github.com/mickeyyaya/evolve-loop/pull/1159), [`e36052a`](https://github.com/mickeyyaya/evolve-loop/commit/e36052a344de1552f3f641edf17d4d63deedffc8) | none |
+| X3 Single launcher | done | [#1127](https://github.com/mickeyyaya/evolve-loop/pull/1127), [`083ab5b`](https://github.com/mickeyyaya/evolve-loop/commit/083ab5b9a68b3be132466d58aad58bdd534f5633) | none |
+| X4 No nested agency (exec deny and dispatch credential) | partial | [#1126](https://github.com/mickeyyaya/evolve-loop/pull/1126), [#1132](https://github.com/mickeyyaya/evolve-loop/pull/1132), [`04b8d7e`](https://github.com/mickeyyaya/evolve-loop/commit/04b8d7e406f80b5490274b00fae18c7d4ac6c06b). The plan says that the shadow report of an exec deny does not emit `ISOLATION_I3_VIOLATION` yet. The state on main is unverified. | none; `isolation-no-nested-agency` left the inbox in [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443) |
+| X4 request channel (`isolation-dispatch-request-channel`) | done, at `shadow` | [#1222](https://github.com/mickeyyaya/evolve-loop/pull/1222), [`8db9ecb`](https://github.com/mickeyyaya/evolve-loop/commit/8db9ecb48fa77d4b462f07b7b551b35e1bdd48f8) | none |
+| X5 Artifact index and read isolation | done, at `shadow` | [#1133](https://github.com/mickeyyaya/evolve-loop/pull/1133), [`853aea4`](https://github.com/mickeyyaya/evolve-loop/commit/853aea49d9d4bd3e19fa8ce5f0ccc2d93c452bfd) | none |
+| X6 Floors and defaults as routing data | done | [#1123](https://github.com/mickeyyaya/evolve-loop/pull/1123), [`9c08de8`](https://github.com/mickeyyaya/evolve-loop/commit/9c08de8c9861f4c644c394fab18238df1422af78) | none |
+| X6b Floor profiles as routing data | in review | A build is in review and has no PR yet. | `isolation-floor-profiles-allowed-clis-as-routing-data` |
+| X7 CLI-neutral guarantees | done, at `shadow` | [#1135](https://github.com/mickeyyaya/evolve-loop/pull/1135), [`c2421f8`](https://github.com/mickeyyaya/evolve-loop/commit/c2421f877bdd60936c86a68f2bfbc472c0a415b6) | none |
+| X8 Typed flow outputs | done | [#1131](https://github.com/mickeyyaya/evolve-loop/pull/1131), [`f990529`](https://github.com/mickeyyaya/evolve-loop/commit/f990529c4e2312704eaa442c19694fd5f324fce9) | none |
+| X9 Manifest parsers and collectors | done | [#1174](https://github.com/mickeyyaya/evolve-loop/pull/1174), [#1328](https://github.com/mickeyyaya/evolve-loop/pull/1328), [`318e97f`](https://github.com/mickeyyaya/evolve-loop/commit/318e97fcb5a8d3b5ef12d933793bd550fcef07f3) | none |
+| X9b `llmroute` and `modelquery` tables from manifests | not started | No change on main. | `isolation-x9b-route-and-model-tables-from-manifests` |
+| X10 Neutral instruction source | done | [#1136](https://github.com/mickeyyaya/evolve-loop/pull/1136), [`d53ed7b`](https://github.com/mickeyyaya/evolve-loop/commit/d53ed7b295372d58f670b5e75bac070bc06bc420) | none |
+| X11 Console through the bridge | done | [#1182](https://github.com/mickeyyaya/evolve-loop/pull/1182), [`f0f1a5a`](https://github.com/mickeyyaya/evolve-loop/commit/f0f1a5aab238212578f1ce76c837b662f9ec1844) | none |
+| X12 Incident detector and records | done, at `shadow` | [#1186](https://github.com/mickeyyaya/evolve-loop/pull/1186), [`51215dd`](https://github.com/mickeyyaya/evolve-loop/commit/51215dd459e06a1d32f395c9849ebaca62760daf) | none |
+| X13 Orchestrator-agent profile and diagnosis schema | done, at `shadow` | [#1194](https://github.com/mickeyyaya/evolve-loop/pull/1194), [`3632134`](https://github.com/mickeyyaya/evolve-loop/commit/363213413feff8f1d1c98425815bf4dcf4c2362d) | none |
+| X14 Action catalog, validator, budgets, breakers | done, at `shadow` | [#1211](https://github.com/mickeyyaya/evolve-loop/pull/1211), [`e054632`](https://github.com/mickeyyaya/evolve-loop/commit/e0546323c5f0d2d6c4ea987e71f7448b3737cd14) | none |
+| X15 Surface tiers and gate classifier | done, classifier at `enforce` | [#1210](https://github.com/mickeyyaya/evolve-loop/pull/1210), [`c7023df`](https://github.com/mickeyyaya/evolve-loop/commit/c7023df8186884d13ff92feb53c451b3d4fba32e) | none |
+| X16 Repair-cycle path | not started | No change on main. | `selfheal-repair-cycle-path` |
+| X17a `loop status <word>` never starts a loop | done | [#1125](https://github.com/mickeyyaya/evolve-loop/pull/1125), [`86933c9`](https://github.com/mickeyyaya/evolve-loop/commit/86933c90c4bd6d02f5692c16a9b1d02ce23c80da) | none |
+| X17b Envelope, exit table, `--json`, `--project-root` | done | [#1178](https://github.com/mickeyyaya/evolve-loop/pull/1178), [`fcdd5a7`](https://github.com/mickeyyaya/evolve-loop/commit/fcdd5a75e45fb511db4abe2dbcc789a80f678fb2) | none |
+| X17c Queue for inbox and routing writers, `gc` lease | done, at `shadow` | [#1180](https://github.com/mickeyyaya/evolve-loop/pull/1180), [`e4d08c0`](https://github.com/mickeyyaya/evolve-loop/commit/e4d08c06026c9c6450b5d06dce8957103350e08b) | none |
+| X17d New verbs `inbox claim`, `dossier show`, `cycle resume`, `wave stop`, `quality show` | done | [#1190](https://github.com/mickeyyaya/evolve-loop/pull/1190), [`9f3f1f6`](https://github.com/mickeyyaya/evolve-loop/commit/9f3f1f650a29c0958d7f2919aa9c5b9df7ead1d2) | none |
+| E9 `events` verbs | done | [#1328](https://github.com/mickeyyaya/evolve-loop/pull/1328), [`318e97f`](https://github.com/mickeyyaya/evolve-loop/commit/318e97fcb5a8d3b5ef12d933793bd550fcef07f3) (item `events-cli-verbs-e9`) | none |
+| X17e Agent class of each verb | done, at `shadow` | [#1130](https://github.com/mickeyyaya/evolve-loop/pull/1130) (docs), [`f7a341c`](https://github.com/mickeyyaya/evolve-loop/commit/f7a341c42ffe2c45125fe759cc474c9962c1079d) (code, `go/internal/agentclass`) | none |
+| X18a Strict `policy.Parse` | done | [#1129](https://github.com/mickeyyaya/evolve-loop/pull/1129), [`1b2df04`](https://github.com/mickeyyaya/evolve-loop/commit/1b2df04e9adb6900d05e9cb6fe8a1d82c52d8e3c) | none |
+| X18b Marker list and AST guard | done | [#1175](https://github.com/mickeyyaya/evolve-loop/pull/1175), [`9825ce5`](https://github.com/mickeyyaya/evolve-loop/commit/9825ce5369ab06edc8b7cc6ba31dd9171154dc6f) | none |
+| X18c Knobs into the policy file | done | [#1187](https://github.com/mickeyyaya/evolve-loop/pull/1187), [`0d3d398`](https://github.com/mickeyyaya/evolve-loop/commit/0d3d398eee46bac2bbb8f598902612e270508037) | none |
+| X18d Bypasses as audited parameters | done | [#1195](https://github.com/mickeyyaya/evolve-loop/pull/1195), [`34dd8d5`](https://github.com/mickeyyaya/evolve-loop/commit/34dd8d5bb199df32186623e841c49c9d1c502a04) | none |
+| X18e Dead names and test seams | done | [#1177](https://github.com/mickeyyaya/evolve-loop/pull/1177), [`c387d48`](https://github.com/mickeyyaya/evolve-loop/commit/c387d482d4e4ef32d1ee791e881cec5f7a6d0d65) | none |
+| X19a Neutral `TaskAssignment` | done | [#1219](https://github.com/mickeyyaya/evolve-loop/pull/1219), [`ff540a9`](https://github.com/mickeyyaya/evolve-loop/commit/ff540a9a6467e7c5ede4577f0f55c2cb35098b74) | none |
+| X19b Neutral sandbox intents and personas | not started | No change on main. | `cli-neutral-profiles-and-personas` |
+| X19c Capability negotiation in the router | not started | No change on main. | `cli-capability-negotiation` |
+
+Of 34 rows, 28 are done, 1 is partial, 1 is in review and 4 are not started. The open items are `isolation-floor-profiles-allowed-clis-as-routing-data` (X6b), `isolation-x9b-route-and-model-tables-from-manifests`, `selfheal-repair-cycle-path` (X16), `cli-neutral-profiles-and-personas` (X19b) and `cli-capability-negotiation` (X19c). The X4 residual (the signal for an exec deny) has no open item, because [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443) removed `isolation-no-nested-agency`. A follow-up draft restores it. The `shadow` to `enforce` flips of X5, X7, X12 to X14, X17c and X17e are unverified. Two ADR status lines look stale: ADR-0155 and ADR-0156 say "Proposed", and most of their components are on main.

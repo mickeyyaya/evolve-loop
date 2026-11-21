@@ -1,5 +1,7 @@
 # Audit evaluation contract: the audit publishes its standard and this cycle's expectations, so build and review aim at the same bar (plan, 2026-10)
 
+> **Status:** partly built, 2026-11-21 (1 of 8 components on main: E0, the docs). Earlier status: proposed, 2026-10-07; nothing built.
+
 > **Purpose.** This is the living plan for the audit evaluation contract.
 > - **What it adds:**
 >   - The audit's full standard (the quality-index dimensions plus gate criteria with stable IDs) is published in one home.
@@ -304,3 +306,18 @@ The 11 findings of the E0 verify follow-ups (cycle 1945), with the line that eac
 | EOQ4 | Does `audit-plan` run at a cheaper tier? | No. It sets the bar the final audit is held to, and a weaker planner gives a weaker contract. Revisit only if the exit test shows cost without benefit. |
 | EOQ5 | The manifesto recommends rotating holdout scenarios between cycles. | It is a future refinement for the probe instances (not the criteria). Consider it after the shadow data shows if builders converge on the probes. |
 | EOQ6 | Do `docsfloor` or `comment_floor` become blocking? | Out of scope (E-D9). Each is its own floor's decision. |
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| E0 | done | [`bc3c476`](https://github.com/mickeyyaya/evolve-loop/commit/bc3c476b8); follow-ups [`9350265`](https://github.com/mickeyyaya/evolve-loop/commit/9350265ed) (cycle 1945) | none |
+| E1 | not started | none on main. `CriterionIDs` does not exist in `go/internal/qualityindex/`. | `audit-evaluation-contract-e1-standard` |
+| E2 | not started | none on main. No `audit-plan` phase exists under `.evolve/phases/`. | `audit-evaluation-contract-e2-audit-plan-phase` |
+| E3 | not started | none on main. No `workflow.audit_contract` key exists in `go/internal/policy/`. | `audit-evaluation-contract-e3-expectations-delivery` |
+| E4 | not started | none on main | merged into `code-review-phase-q5-audit-on-the-index` (PR #1571) |
+| E5 | not started | none on main | merged into `code-review-phase-q4-delta-re-review` (PR #1571) |
+| E6 | not started | none on main. No `AUDIT_CRITERION_RESULT` signal exists. | `audit-evaluation-contract-e6-learning-signals` |
+| E7 | not started | none on main. It waits for the shadow exit test. | none; the flip part rides `code-review-phase-r8b-enforce-flip`. Follow-up draft `audit-evaluation-contract-e7-persona-duty-and-flip` |
+
+Only the docs are on main. E1 to E3 and E6 have open inbox items. E4 and E5 moved into the code-review items Q5 and Q4, which are open. E7 has no open item for its persona changes. A follow-up draft covers them. Landing 2 of the code-review plan carries all of this work, so Q3 to Q6 must land first or together.

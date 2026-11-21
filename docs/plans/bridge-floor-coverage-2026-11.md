@@ -1,6 +1,6 @@
 # Plan: the build floor measures the coverage of a bridge change during a live wave
 
-- **Status:** built, 2026-11-18. Revision 3, after three rounds of architecture review. The HIGH of round 3 is fixed in D3 and D12.
+- **Status:** built, 2026-11-20 (3 of 3 components on main). Earlier status: built, 2026-11-18. Revision 3, after three rounds of architecture review. The HIGH of round 3 is fixed in D3 and D12.
 - **Inbox item:** `bridge-changes-skip-the-coverage-floor-during-a-wave`.
 - **Related:** the floor coverage check is `go/internal/core/cover_changed_floor.go`. The tier table is `go/internal/ciparity/envexclusive.go`. The hermetic test rule is [hermetic-driver-tests.md](../conventions/hermetic-driver-tests.md).
 
@@ -126,3 +126,13 @@ The console builds K1 to K3 as one change, because the protected check routes `g
 ## 10. Open questions
 
 None.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| K1 helper move, `!notmux` constraints, split `TestMain`, guard | done | [#1583](https://github.com/mickeyyaya/evolve-loop/pull/1583), [`296d481`](https://github.com/mickeyyaya/evolve-loop/commit/296d48100); `go/internal/bridge/tmux_own_server_guard_test.go`, `go/Makefile:114` | none (consumed) |
+| K2 floor tag set | done | [#1583](https://github.com/mickeyyaya/evolve-loop/pull/1583), [`296d481`](https://github.com/mickeyyaya/evolve-loop/commit/296d48100); `go/internal/ciparity/envexclusive.go:19`, `go/internal/covchanged/declared.go` | none |
+| K3 floor cover run and split result | done | [#1583](https://github.com/mickeyyaya/evolve-loop/pull/1583), [`296d481`](https://github.com/mickeyyaya/evolve-loop/commit/296d48100); `go/internal/core/cover_changed_floor.go`, `cover_changed_tier.go`, `cover_tier_runs.go` | none |
+
+The plan document came in with [#1555](https://github.com/mickeyyaya/evolve-loop/pull/1555), [`da195e3`](https://github.com/mickeyyaya/evolve-loop/commit/da195e347). The three components landed together in one pull request, as the plan asks. The inbox item `bridge-changes-skip-the-coverage-floor-during-a-wave` was consumed by [#1619](https://github.com/mickeyyaya/evolve-loop/pull/1619), [`98c7baf`](https://github.com/mickeyyaya/evolve-loop/commit/98c7bcafcb011aab561ffa1166b15ac07da58a9c). Nothing is left. The verification rows were not run again for this review, so they are unverified here.

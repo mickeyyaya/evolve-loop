@@ -1,6 +1,6 @@
 # Plan: the console train binds a multi-commit PR to the review record of each commit
 
-- **Status:** proposed, 2026-11-16.
+- **Status:** built, 2026-11-19. Earlier status: proposed, 2026-11-16.
 - **Inbox item:** `train-record-pr-has-no-reachable-attestation`. **Decision:** no ADR, because the guarantee does not change: each landed change has a review record of its own.
 
 ## 1. Request
@@ -93,3 +93,14 @@ Each component keeps 100% coverage of the functions it changes.
 ## 10. Open questions
 
 1. Must the chain also hold the `Closes-Inbox` trailers of each commit? The composer reads them from all commits today (`consolepr.go` `closingIDs`), so no change seems needed.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| C0 `treestate.Between` | done, 2026-11-17 | [#1535](https://github.com/mickeyyaya/evolve-loop/pull/1535) [`138552f`](https://github.com/mickeyyaya/evolve-loop/commit/138552f94) (go/internal/treestate/between_test.go:22) | none |
+| C1 per-commit change in `Evidence` | done, 2026-11-17 | [#1535](https://github.com/mickeyyaya/evolve-loop/pull/1535) [`138552f`](https://github.com/mickeyyaya/evolve-loop/commit/138552f94) (`TestEvidence_CarriesTheChangeOfEachCommit`) | none |
+| C2 `ChainedBinding` and `AuditBinding.Kind` | done, 2026-11-17 | [#1535](https://github.com/mickeyyaya/evolve-loop/pull/1535) [`138552f`](https://github.com/mickeyyaya/evolve-loop/commit/138552f94) (`go/internal/integration/consolepr.go:52`) | none |
+| C3 `reviewedChange` and the chain fallback | done, 2026-11-17 | [#1535](https://github.com/mickeyyaya/evolve-loop/pull/1535) [`138552f`](https://github.com/mickeyyaya/evolve-loop/commit/138552f94) (`go/cmd/evolve/cmd_integration_batch.go:357`) | none |
+
+All four components are on main in PR 1535. The inbox item `train-record-pr-has-no-reachable-attestation` closed through [#1567](https://github.com/mickeyyaya/evolve-loop/pull/1567) [`86e8d77`](https://github.com/mickeyyaya/evolve-loop/commit/86e8d7730) on 2026-11-19. That change adds a journey test through the real gate. Decision D5 defers the unification of the change digest to the open item `change-digest-has-one-pinned-home`. Nothing else is left.

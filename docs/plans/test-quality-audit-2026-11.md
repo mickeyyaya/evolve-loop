@@ -1,6 +1,6 @@
 # Plan: find and remove tests that cannot fail, tests that pin code text, and fakes that differ from the real thing
 
-- **Status:** proposed, 2026-11-18, revised after the design review.
+- **Status:** partly built, 2026-11-21 (7 of 11 components on main, 2 partial, 2 not started). Earlier status: proposed, 2026-11-18, revised after the design review.
 - **Research:** [tests that cannot fail, tests that pin code text, and fakes that differ from the real thing](../research/test-quality-audit-2026-11.md).
 - **Decision:** no new ADR. The rules are data in one package, and section 6 is the spec. T2 changes the hard `apicover` gate of [ADR-0050](../architecture/adr/0050-modularization-and-unified-phase-io.md), so T2 adds an `Amended by` line to that ADR. T5 does the same for the ADR that records the eval gate, if one exists.
 
@@ -221,3 +221,23 @@ The date and the owner of goal 3 follow the count. The console sets the date in 
 | A contract suite skips on a job that has the tool. | `testhost.Tool` fails on a job that declares the tool in `TESTHOST_REQUIRED_TOOLS`. T3 declares `git`. |
 | A fix item records a mutant that nobody re-runs. | T10: the item owes `mutation.json`, and the auditor re-runs each mutant (D9). |
 | The stale rows of a rename block unrelated lanes. | Rows have no line number, and `--rebaseline <package>` re-keys a moved test. It refuses a shard that grows. |
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| T1 analyzer, rules, config, ratchet | done | cycle 2489, [`0f9537a`](https://github.com/mickeyyaya/evolve-loop/commit/0f9537a5612b0c8c13acaede92bbff592b6e2a9d); cycle 2523, [`0718e2d`](https://github.com/mickeyyaya/evolve-loop/commit/0718e2d6d1499d0832641953bb9a15258bbc6c5b); cycle 2518, [`f84667e`](https://github.com/mickeyyaya/evolve-loop/commit/f84667e9234cc40eb8b4431ef8bcd530aa9ea505); `go/internal/testaudit/rules.go` | none |
+| T2 `apicover` counts calls | done | cycle 2500, [`c87e787`](https://github.com/mickeyyaya/evolve-loop/commit/c87e7879638550417df391d4d24afb567aad31a3) | none |
+| T3 skip fixes and `git` in `go.yml` | done | cycle 2539, [`6e12e60`](https://github.com/mickeyyaya/evolve-loop/commit/6e12e6032ae6f889e9a59b279593bd2d7d8478dc); cycle 2541, [`228bf32`](https://github.com/mickeyyaya/evolve-loop/commit/228bf32abef0dd1f36e78bf38c2668b8d31aa430) | none |
+| P1 bridge non-zero exit gives an error | done | cycle 2490, [`d195ed6`](https://github.com/mickeyyaya/evolve-loop/commit/d195ed6e358f5289942ce111e48e8127b927904d); `go/internal/bridge/completion.go:124` | none |
+| T4 fake contract suites (rollback git, bridge git, clock, tmux) | done | cycle 2512, [`650f180`](https://github.com/mickeyyaya/evolve-loop/commit/650f180dce5a7259de054e473f9cf6a876e558b3); cycle 2529, [`33b8548`](https://github.com/mickeyyaya/evolve-loop/commit/33b8548637944c7e385d7fad7f7eda5569812009); cycle 2511, [`45b6487`](https://github.com/mickeyyaya/evolve-loop/commit/45b648774476acb79760c7ce99719462e3f5ca7b); cycle 2509, [`b2486e6`](https://github.com/mickeyyaya/evolve-loop/commit/b2486e62bed06b3b57a1792ad65e0b99566f277a) | none |
+| T5 `evalqualitycheck` refuses source pins | done | cycle 2499, [`b27e13c`](https://github.com/mickeyyaya/evolve-loop/commit/b27e13c68c27e597197d10e5254a751284b51eff) | none |
+| T6 tautology fix batches | partial: core, bridge and rest done; `go/cmd/evolve` open | cycle 2506, [`77b47d7`](https://github.com/mickeyyaya/evolve-loop/commit/77b47d7b30c21d1c86c2f50515327a3fb9c732a3); cycle 2504, [`e876b05`](https://github.com/mickeyyaya/evolve-loop/commit/e876b054b6d7906db65bd7dedbb1706fd5817306); cycle 2501, [`ebf677e`](https://github.com/mickeyyaya/evolve-loop/commit/ebf677e65020027f6ed3b4fab1ecf1a39301a104) | `test-audit-t6c-tautology-cmd`, `test-audit-t6d-tautology-rest-ac-1b-console` |
+| T7 structure-pin fix batches | done | cycle 2552, [`5cd11df`](https://github.com/mickeyyaya/evolve-loop/commit/5cd11df69984e97814e3b75d3cab6e356ae912d7) | none |
+| T8 `acs/` predicate batches | not started | none | `test-audit-t8a-acs-predicates-early`, `test-audit-t8b-acs-predicates-mid`, `test-audit-t8c-acs-predicates-late` |
+| T10 fix-item admission checks | not started | none | `test-audit-t10-fix-item-checks` |
+| T9 `apicover_named_test.go` files | partial: first batches landed; 165 files remain on main | cycle 2514, [`c6c8eae`](https://github.com/mickeyyaya/evolve-loop/commit/c6c8eaedb81f2a83f2219aa1206948e4583c058d); cycle 2564, [`ca8b6f0`](https://github.com/mickeyyaya/evolve-loop/commit/ca8b6f025676462ddc5ff46dccc1007e2cf7caae) | none |
+
+The tooling and the first fix batches are on main. T6 for `go/cmd/evolve`, T8 and T10 have open items. The build floor now runs the test-audit ratchet ([#1597](https://github.com/mickeyyaya/evolve-loop/pull/1597)). The ship backstop does not run it yet, and the item `ship-backstop-runs-the-test-audit-ratchet` tracks that. T9 is in progress, and the count of remaining files is unverified.
+
+T9 has no open inbox item. A follow-up draft is in `followups/test-audit-t9-apicover-named-tests-remaining.json`.
