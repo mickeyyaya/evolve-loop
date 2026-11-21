@@ -114,14 +114,34 @@ func TestLocal(t *testing.T) { _ = filepath.Join("testdata", "x.json") }
 func TestMain(m *testing.M) { _ = moduleRoot }
 
 func Testlowercase(t *testing.T) { _ = moduleRoot }
+
+const literalRoot = "../.."
+
+func TestLiteralRootConstant(t *testing.T) { _ = literalRoot }
+
+const treeRootOneUp = ".."
+
+func TestOneUpConstant(t *testing.T) { _ = treeRootOneUp }
+
+const siblingDir = "../x"
+
+func TestSiblingConstant(t *testing.T) { _ = siblingDir }
+
+const localName = "a/b"
+
+func TestPlainConstant(t *testing.T) { _ = localName }
+
+const fixtureUnderTheRoot = "../../internal/x/testdata"
+
+func TestDataConstant(t *testing.T) { _ = fixtureUnderTheRoot }
 `
 	file, err := parser.ParseFile(token.NewFileSet(), "x_test.go", source, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	tests, reads := readingTestsOf([]*ast.File{file}, "internal/p")
-	if want := []string{"TestDirect", "TestSeam_OneConstructionSite"}; !reads || !slices.Equal(tests, want) {
-		t.Fatalf("readingTestsOf = (%v, %v), want (%v, true): a test reaching a read through helpers and a package-level var is credited, TestMain and a non-test are not", tests, reads, want)
+	if want := []string{"TestDirect", "TestLiteralRootConstant", "TestOneUpConstant", "TestSeam_OneConstructionSite"}; !reads || !slices.Equal(tests, want) {
+		t.Fatalf("readingTestsOf = (%v, %v), want (%v, true): a test reaching a read through helpers and a package-level var is credited, a root-only literal const is a tree read, a sibling, a plain or a data-file const is not, TestMain and a non-test are not", tests, reads, want)
 	}
 	if tests, reads := readingTestsOf([]*ast.File{file}, "."); reads || len(tests) != 0 {
 		t.Fatalf("at the module root nothing climbs out; got (%v, %v)", tests, reads)

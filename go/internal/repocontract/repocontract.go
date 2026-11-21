@@ -169,6 +169,7 @@ var treeReadingSelections = []TestSelection{
 		"TestAgentSubprocessWriters_AllStampRunID",
 		"TestAgentSubprocessWriters_SetIsClosed",
 		"TestCarryoverLifecycle_OneConstructionSite",
+		"TestCoreTests_NeverPinSharedTmpProjectRoot",
 		"TestFailureDiagWriter_OneConstructionSite",
 		"TestFailureLearningEngine_OneConstructionSite",
 		"TestLoadTddKit_TheRealKitNamesExitedPIDForACopyOfItsBody",
@@ -183,6 +184,15 @@ var treeReadingSelections = []TestSelection{
 	{Package: "./internal/gateregistry", Tests: []string{
 		"TestEntries_EachHasItsFieldsAndAKnownPhase",
 		"TestEntries_EachInputIsAnInventoryRowWithTheSameClass",
+		"TestEverySignalCodeHasNonTestEmitter",
+		"TestEveryStageKeyHasRegistryEntry",
+		"TestLiveViolations_NamesAKeyWithNoEntryAndAPlainStringField",
+		"TestNoStringTypedStageField",
+		"TestShadowSignalCarriesWouldFields",
+		"TestSignalViolations_NameEachBrokenShape",
+		"TestStageEntries_AreWellFormed",
+		"TestStageEntryProblems_FlagsEachMalformedShape",
+		"TestViolationBaselineOnlyShrinks",
 	}},
 	{Package: "./internal/inboxbatch", Tests: []string{
 		"TestNoProductionCodeCallsLoadDir",
@@ -225,6 +235,9 @@ var treeReadingSelections = []TestSelection{
 		"TestIsolationMatrix_N2_NoLLMSpawnOutsideTheBridgeLaunchAPI",
 		"TestOnlyTheBridgeStartsAnLLMBinary",
 		"TestPipelineCode_StartsEveryProcessThroughCommand",
+	}},
+	{Package: "./internal/tmuxtest", Tests: []string{
+		"TestEveryTmuxTestPackageUsesTheOrphanGuard",
 	}},
 	{Package: "./test/structure", Tests: []string{
 		"TestEveryGoTestArgvGoesThroughTheLaneBudget",
