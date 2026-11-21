@@ -68,7 +68,7 @@ func TestGoTestGates_ALaneRunsEachGoTestOnTheLaneCPUBudget(t *testing.T) {
 	calls := runEachGoTestGate(t)
 
 	wantArgs := []string{
-		"test -race -count=1 -p 1 -parallel 1 -tags integration ./internal/p/...",
+		"test -race -count=1 -timeout 20m -p 1 -parallel 1 -tags integration ./internal/p/...",
 		"test -p 1 -parallel 1 -count=1 -tags acs ./acs/regression/...",
 		"test -p 1 -parallel 1 -tags integration acs -coverprofile=",
 	}

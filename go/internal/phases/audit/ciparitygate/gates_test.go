@@ -29,7 +29,7 @@ func TestCodes_TenRegisteredUnderModuleAuditWithDocs(t *testing.T) {
 	if conflicts := signalcenter.RegistryConflicts(); len(conflicts) != 0 {
 		t.Errorf("registry conflicts: %+v", conflicts)
 	}
-	want := Timeouts{GoVet: 4 * time.Minute, ACSDurable: 8 * time.Minute, Apicover: 8 * time.Minute, TierAttempt: 15 * time.Minute, TierLockWait: 5 * time.Minute}
+	want := Timeouts{GoVet: 4 * time.Minute, ACSDurable: 8 * time.Minute, Apicover: 8 * time.Minute, TierAttempt: 21 * time.Minute, TierLockWait: 5 * time.Minute}
 	if DefaultTimeouts() != want {
 		t.Errorf("DefaultTimeouts() = %+v, want %+v", DefaultTimeouts(), want)
 	}
