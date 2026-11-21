@@ -34,7 +34,7 @@ func (d *seatStubDriver) Name() string { return "seat-stub" }
 func (d *seatStubDriver) Launch(_ context.Context, cfg *Config, deps Deps) (int, error) {
 	d.launches++
 	d.cfg = *cfg
-	d.env = deps.paneEnv(cfg)
+	d.env = mustPaneEnv(deps, cfg)
 	sandboxPrefixForLaunch(deps, cfg, "")
 	return ExitOK, nil
 }
@@ -360,7 +360,7 @@ func TestLaunch_TheCanaryReachesOnlyTheCellEnvAndNothingTheLaunchWrites(t *testi
 	}
 	seen = append(seen, exportLines(cfg.Realization.Env)...)
 	seen = append(seen, exportLines(deps.cellMarkers(cfg))...)
-	seen = append(seen, probeEnv(deps, "claude")...)
+	seen = append(seen, mustProbeEnv(deps, "claude")...)
 	seen = append(seen, cellEnvHeader(workspace), strings.Join(d.req.WriteSubpaths, " "))
 	for _, s := range seen {
 		if strings.Contains(s, seatCanaryToken) {

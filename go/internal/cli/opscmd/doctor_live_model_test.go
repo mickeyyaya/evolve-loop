@@ -17,7 +17,7 @@ func neverReadyPaneDeps(stderr io.Writer) (*bridge.FakeTmuxController, bridge.De
 		frames[i] = "starting"
 	}
 	pane := &bridge.FakeTmuxController{CaptureFrames: frames}
-	return pane, bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: stderr}
+	return pane, bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: stderr, CellBinRoot: fixedCellBinRoot}
 }
 
 func agyLaunch(sent []string) string {

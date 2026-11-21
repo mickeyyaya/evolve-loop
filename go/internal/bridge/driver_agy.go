@@ -53,9 +53,9 @@ func (agyDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error
 	defer closeFn()
 
 	observeModelDispatch(deps, defaultModelDispatch())
-	rc, err := deps.Runner(ctx, name, cfg.Worktree, args, dispatchEnv(deps, cfg), nil, stdoutF, stderrF)
+	rc, err := deps.runDispatch(ctx, cfg, dispatchRun{name: name, args: args, stdout: stdoutF, stderr: stderrF})
 	if err != nil {
-		return ExitMissingBinary, fmt.Errorf("[agy] %w", err)
+		return rc, fmt.Errorf("[agy] %w", err)
 	}
 	fmt.Fprintf(deps.Stderr, "[agy] agy exited rc=%d\n", rc)
 	return rc, nil
