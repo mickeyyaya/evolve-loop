@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "A width increase over the measured capacity is refused with the measure named, through the real policy entry point.",
+    "A fixture of wave 185 data fails the check at width 8 and a fixture of wave 184 data passes it at width 5.",
+    "The enforce flip of the host window at 12 lanes names the check in its precondition."
+  ],
+  "created_at": "2026-11-21T14:12:29Z",
+  "files": [
+    "go/internal/policy/fleet_orchestrator.go",
+    "go/internal/hostpressure/decide.go",
+    "go/cmd/evolve/cmd_wave_measures.go",
+    "docs/plans/fleet-host-adaptive-window-2026-11.md"
+  ],
+  "fix": "Design review first. Define a capacity record: lock wait for each window, heavy-run time for each cycle and the audit tier timeouts, measured at the current width. A width increase, and the flip of the host window from shadow to enforce at 12, need a record that passes bounds in policy. The check is a verb that refuses with the measure named.",
+  "id": "fleet-width-increase-needs-a-capacity-check",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "The width rose from 4 to 8 on 2026-11-14 with no measure of how many heavy verification runs the host carries. At 8 lanes the lock and the lane budget stacked and wave 185 shipped 0 of 9. The operator wants 12 lanes with a host-adaptive window, shadow first. The window reads CPU, memory and swap, and does not read lock wait.",
+  "title": "A fleet width increase passes a verification capacity check, and fleet-12 enforce needs it",
+  "weight": 0.7
+}

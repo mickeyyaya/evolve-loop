@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "A report with one open HIGH gives open_blocking=1",
+    "At enforce a T0 sandbox diff with only two seats is refused and the refusal names the missing seats",
+    "A lane diff in class C7 triggers architecture-reviewer",
+    "The CI route output equals reviewclass for every tracked path"
+  ],
+  "created_at": "2026-11-21T11:19:18Z",
+  "deps": [
+    "review-routing-s1-reviewclass-registry"
+  ],
+  "files": [
+    "go/internal/commitgate/",
+    "go/internal/policy/strict_keys.go",
+    "go/internal/launchrecord/",
+    "go/internal/phases/ship/",
+    ".github/workflows/required.yml"
+  ],
+  "fix": "Add open_blocking, duration_ms and tokens to launchrecord (S3). Let the commit gate read the reviewclass requirements at shadow and log each missing seat (S4). Let the lane code-review phase read the same requirements (S7). Add a CI job review-class in the required aggregator (S5).",
+  "id": "review-routing-s4-commit-gate-reads-requirements",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Plan review-routing S3, S4, S5 and S7 are not built. Nothing reads the registry. The commit gate cannot tell that a protected diff has too few seats. The launch record has no open_blocking count.",
+  "title": "The commit gate, the CI job and the lane review phase read reviewclass requirements at shadow",
+  "weight": 0.5
+}

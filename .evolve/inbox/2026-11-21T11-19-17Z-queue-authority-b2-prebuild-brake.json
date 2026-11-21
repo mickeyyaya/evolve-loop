@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "3 distinct items with one cause inside 15 cycles park nothing and raise one signal",
+    "The real closeout fires the brake with state.json as finalizeCycle leaves it"
+  ],
+  "created_at": "2026-11-21T11:19:17Z",
+  "deps": [
+    "queue-authority-b1-breaker-charges-prebuild-failures"
+  ],
+  "files": [
+    "go/internal/cycleoutcome/",
+    "go/internal/policy/"
+  ],
+  "fix": "Add a policy key for the brake. When 3 distinct items fail with one cause inside 15 cycles, park none and raise one signal. Tie it to the breaker of the B1 item.",
+  "id": "queue-authority-b2-prebuild-brake",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Plan queue-authority-from-host-facts B2 is not built: no prebuild_brake_items key exists in the Go code. One shared fault, such as a bad host state, fails many items before build. Each item then gets parked for a fault that is not its own.",
+  "title": "The brake for a shared pre-build fault parks no item and raises one signal",
+  "weight": 0.5
+}

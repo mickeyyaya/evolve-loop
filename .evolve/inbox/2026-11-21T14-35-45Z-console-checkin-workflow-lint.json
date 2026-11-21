@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A red-first test: a fixture workflow with a syntax error fails the new floor check through evolve floor run, and a valid one passes.",
+    "CI runs the check on changed workflow and YAML files.",
+    "SOP step B3 names the check, and its GAP B3 yaml note is gone."
+  ],
+  "created_at": "2026-11-21T14:35:45Z",
+  "files": [
+    "go/cmd/evolve/cmd_floor.go",
+    ".github/workflows/required.yml",
+    "docs/operations/console-checkin-sop.md"
+  ],
+  "fix": "Add one lint check for workflow and YAML files to the CI-parity floor (evolve floor run), for example actionlint for .github/workflows/*.yml and a YAML parse for other YAML files, reached through a CLI. Run it in CI on the changed files. Then change step B3 of the SOP from GAP to the new check.",
+  "id": "console-checkin-workflow-lint",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "summary": "The console check-in SOP (docs/operations/console-checkin-sop.md, step B3) gives each change type a fixed check list. The repo has no lint for a change under .github/workflows/ or another YAML file: none in the Makefiles, the workflows or runtime-reference.md (checked 2026-11-21). So B3 marks that row as GAP B3 yaml with the outcome OK, and a broken workflow is found only when CI runs it.",
+  "title": "A workflow or YAML change gets a lint check in the console landing and in CI",
+  "weight": 0.4
+}

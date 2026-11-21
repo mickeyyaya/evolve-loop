@@ -5,7 +5,16 @@
     "TestShip_RefusesLandingWhileOriginMainCIRed",
     "A green main closes the stop and the landings resume"
   ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2587",
+    "branch": "cycle-cd3ae73e-2587",
+    "snapshot_sha": "399d4175dde59cb604c9c551de3f93575f3a5f0c",
+    "base_sha": "23c32f42926c3dcde2c2da08401c897afd66275a",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2587/audit-fail-reason.json",
+    "cycle": 2587
+  },
   "created_at": "2026-11-20T10:06:21Z",
+  "failure_count": 1,
   "files": [
     "go/cmd/evolve/cmd_loop_wavesync.go",
     "go/internal/core/main_red_stop_open.go",
@@ -14,8 +23,15 @@
   "fix": "Poll the required CI of origin/main from the loop tick at a policy interval (reuse mainCIRedForSHA). On red: emit GATE_REPO_MAIN_CI_RED (INCIDENT) with the failed job names, and open the main-red stop without a lane reproduction. On green: close it. A ship precheck refuses a landing while the stop is open, with a typed cause.",
   "id": "main-ci-red-is-polled-while-the-wave-runs",
   "kind": "bug",
+  "last_failure_class": "unknown",
+  "last_failure_cycle": 2587,
+  "last_failure_findings": "the integration tier (`go test -tags integration`) reported 3 offender(s) locally. NOTE — host/CI parity gap: this host HAS tmux and CI runners do not, so every test guarded by requireTmux runs here and SKIPs in CI; those offenders may correspond to no CI failure. An exit=80 (REPL boot timeout) offender is usually host contention — concurrent lanes hold tmux sessions — not a defect. Confirm against a quiet host before treating it as one. Offenders: panic: test timed out after 10m0s; FAIL\tgithub.com/mickeyyaya/evolve-loop/go/cmd/evolve\t600.735s; full output: /Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2587/integration-tier.log\nverdict-conflict: auditor narrative=WARN but 1 deterministic gate(s) forced FAIL [integration-tier gate] — the gate outranks the narrative (ship policy unchanged); both readings are recorded so the disagreement is weighable. Gate detail is in the error diagnostics beside this one.",
+  "last_failure_fingerprint": "text:e0527085247a",
+  "last_failure_reason": "cycle-failure-release",
+  "last_failure_rung": "R3",
   "origin": "console",
   "priority_class": "correctness",
+  "retry_plan": "fresh-deep-plan",
   "summary": "2026-11-20: main required CI went red at 02:11Z after cycle 2554; zero signals until the boundary, and three more landings (2555, 2550, 2549) went onto the red main. GATE_REPO_MAIN_RED_STOP opens only when a lane reproduces a red test itself (go/internal/core/main_red_stop_open.go:90). The only CI poll (go/cmd/evolve/cmd_loop_wavesync.go:33 mainCIRedForSHA) runs at the next wave start.",
   "title": "a red main CI is invisible during a wave, so lanes keep landing on a red main",
   "weight": 0.9

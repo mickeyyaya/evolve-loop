@@ -1,0 +1,33 @@
+{
+  "acceptance": [
+    "A fixture of wave 185 (run_id 20261121T081737Z, shipped_cycles 0, pool_live 8, 9 LOOP_ORCH_LANE_STALLED lines, 75 verify-single-flight-unavailable events in 9 cycles) makes the verb exit 3 and print STALL, SHARED FAULT and the action BRAKE, through the real entry point. The test is red before the verb exists.",
+    "A fixture of wave 184 (5 of 8 shipped, 4 to 5 live lanes) makes the verb exit 0 and print CONTINUE.",
+    "A fixture with a failed required.yml run on main makes the verb exit 4 and name the ci classify command.",
+    "A reading that matches no row exits 3 with the reason unmapped reading.",
+    "Each threshold is read from policy.json with a compiled default, and a test sets each one and sees the outcome change.",
+    "The verb writes no file and calls no mutating verb."
+  ],
+  "created_at": "2026-11-21T14:31:00Z",
+  "files": [
+    "go/cmd/evolve/cmd_wave.go",
+    "go/cmd/evolve/cmd_wave_status.go",
+    "go/cmd/evolve/cmd_wave_latency.go",
+    "go/internal/policy/policy_failure.go",
+    "go/internal/policy/fleet_orchestrator.go",
+    "go/internal/dispatchevents/events.go",
+    "docs/operations/console-checkin-sop.md"
+  ],
+  "fix": "Design review first. Add the verb evolve wave checkin [--json] [--project-root P]. It reads evolve status, evolve wave status, the loop channel signals, df and the load average, and the abnormal-events.jsonl of each cycle of the wave. It evaluates the steps A1 to A10 in order and prints one line per step with its reading, its threshold and its outcome, then one final action: CONTINUE, BRAKE or FIX-LOCAL. Exit 0 is CONTINUE, 3 is BRAKE, 4 is FIX-LOCAL, 2 is a read failure, 10 is usage. It changes nothing. A reading that matches no row is BRAKE with the reason unmapped reading. The GAP steps this item must close: A3 the failure class of each cycle and the fingerprint of each failure across waves (name the source of the fingerprint first, evolve kb graph recurrences needs it); A4 the count of cycles of the wave that hold one abnormal-event event_type; A8 the count of live console seats and full suites (shares the console-full-suite-guard-during-a-wave item); a ship-rate threshold for a wave that ships 1 cycle in 5 hours. Move each threshold to a key under policy.json (wave.checkin.*) with a compiled default, and cite failure_policy.thresholds.repeat_ceiling and fleet.orchestrator.stall_minutes instead of a copy. Update the SOP to name the verb.",
+  "id": "wave-checkin-verb-runs-the-static-sop",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "routed_at": "2026-11-21T19:02:46Z",
+  "routed_by": "operator",
+  "routed_cycle": 2590,
+  "routed_reason": "the console built it (PR #1654); route before a lane claims it",
+  "summary": "Part A of docs/operations/console-checkin-sop.md has ten steps that the console reads by hand. In wave 185 the console read 0 of 8 shipped and took no action for 3.8 hours. Four steps have no verb behind them: the failure class of each cycle (A3), the count of one abnormal-event kind over the cycles of a wave (A4), the count of console suites and seats (A8), and the wave age against the ship count with a rate. The thresholds (2 h, 4 lanes, 3 stall lines, 3 cycles, 10 GiB free, load 50) live in the SOP text, not in policy.json.",
+  "title": "One verb evaluates every step of Part A of the console check-in SOP and prints one action",
+  "weight": 0.7
+}

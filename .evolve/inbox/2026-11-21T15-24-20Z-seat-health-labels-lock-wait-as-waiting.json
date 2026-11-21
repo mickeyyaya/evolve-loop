@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "A red-first test through the real seat health reader: a pane with the wait note gives waiting-on-lock, and a pane with no note and no output gives blocked.",
+    "wave status prints the waiting label for such a seat."
+  ],
+  "created_at": "2026-11-21T15:24:20Z",
+  "files": [
+    "go/internal/bridge/panestream/seathealth.go",
+    "go/internal/verifylock/verifylock.go"
+  ],
+  "fix": "In go/internal/bridge/panestream/seathealth.go, recognize the single-flight wait note in the pane stream and report the seat as waiting on the lock, with the wait time. Keep blocked for a seat with no such note.",
+  "id": "seat-health-labels-lock-wait-as-waiting",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "performance",
+  "summary": "wave status labels an agy seat as blocked while its lane waits at the host verification lock. The label hides the cause. The wait note '[verify] single-flight: waiting ... for the host verification lock' is printed to the pane after 5 s and every 60 s (internal/verifylock/verifylock.go).",
+  "title": "Seat health shows an agy seat that waits on the verification lock as waiting, not blocked",
+  "weight": 0.5
+}

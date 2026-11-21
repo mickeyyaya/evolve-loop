@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A replay of waves 159 to 183 gives one open alert and not 22 items.",
+    "The alert names the cause fields of the breach and the next action.",
+    "A new breach in an open alert does not file an item."
+  ],
+  "created_at": "2026-11-21T14:12:29Z",
+  "files": [
+    "go/cmd/evolve/cmd_wave_latency_check.go",
+    "go/cmd/evolve/cmd_wave_latency.go",
+    "docs/operations/wave-operations.md"
+  ],
+  "fix": "Design review first. Replace the item for each wave with one open alert for the breach, with a count and a trend. The alert names the largest cause from the record (live lane share, host gate share) and the next action. A repeat adds to the open alert and does not file an item. A fix closes it.",
+  "id": "wave-latency-breach-alerts-once-with-an-owner",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "summary": "The loop.warning of 2026-11-21T08:20:16Z says the wave latency budget was exceeded in 22 waves, 159 to 183. Each wave filed a latency-wave-breach inbox item, each was consumed, and the budget stayed exceeded. The alert has no owner action, so it trained the console to ignore the family.",
+  "title": "The wave latency breach raises one alert with an owner and an action, not one item for each wave",
+  "weight": 0.5
+}

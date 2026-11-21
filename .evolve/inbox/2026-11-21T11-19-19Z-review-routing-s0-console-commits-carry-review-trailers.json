@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A manual ship test: the commit message has both trailers, red before the fix",
+    "git log --grep Review-class counts the commits of a wave"
+  ],
+  "created_at": "2026-11-21T11:19:19Z",
+  "deps": [
+    "review-routing-s1-reviewclass-registry"
+  ],
+  "files": [
+    "go/internal/phases/ship/commitgate.go"
+  ],
+  "fix": "Find why console commits carry no review trailer. Make each console commit carry Review-class and the run: ids.",
+  "id": "review-routing-s0-console-commits-carry-review-trailers",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "summary": "Plan review-routing S0 is not built. go/internal/phases/ship/commitgate.go:30 writes Reviewed-by only. No commit names its review class or the review run ids. So no one can count, after the fact, which landed commits had the required seats.",
+  "title": "Console commits carry Review-class and run: trailers",
+  "weight": 0.4
+}

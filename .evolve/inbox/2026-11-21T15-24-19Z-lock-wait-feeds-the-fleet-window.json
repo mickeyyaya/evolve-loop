@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A red-first test through the real window rule: lock wait over the bound gives no widening, and lock wait under the bound gives the old result.",
+    "A shadow record shows the window would not widen while the lock wait of the last window is over its bound.",
+    "wave status shows the total lock wait of the wave."
+  ],
+  "created_at": "2026-11-21T15:24:19Z",
+  "files": [
+    "go/internal/signalcenter/registry.go",
+    "go/internal/verifylock/observer.go",
+    "docs/architecture/packages/internal-verifylock.md"
+  ],
+  "fix": "Sum fields.wait_ms of the HOST_VERIFY_LOCK_WAIT signals of the last window. Add the sum as a pressure input of the window rule, with a bound in policy data. Do not widen the window while the sum is over its bound. Run it in shadow first and record the would-not-widen decisions.",
+  "id": "lock-wait-feeds-the-fleet-window",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "performance",
+  "summary": "The host-adaptive window reads CPU and memory only. In wave 185 the host looked idle while 7 of 8 lanes waited at the host verification lock, so the window would add lanes. Each acquire now emits HOST_VERIFY_LOCK_WAIT with fields.wait_ms, source and outcome (plan docs/plans/verify-lock-holder-budget-2026-11.md), but nothing reads it.",
+  "title": "The host-adaptive fleet window reads the verification lock wait as a pressure input",
+  "weight": 0.7
+}
