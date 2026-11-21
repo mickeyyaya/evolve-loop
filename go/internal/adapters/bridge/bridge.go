@@ -117,6 +117,7 @@ func (a *Adapter) productionEngineDeps(env map[string]string) gobridge.Deps {
 		BootTimeoutS:          a.bridgeConfig.BootTimeoutS,
 		ArtifactTimeoutS:      a.bridgeConfig.ArtifactTimeoutS,
 		ArtifactMaxExtends:    a.bridgeConfig.ArtifactMaxExtends,
+		IdleCheckpointGraceS:  a.bridgeConfig.IdleCheckpointGraceS,
 		PhaseArtifactTimeoutS: a.bridgeConfig.PhaseArtifactTimeouts(),
 		MaxConcurrent:         a.bridgeConfig.MaxConcurrent,
 		Efforts:               a.efforts,
