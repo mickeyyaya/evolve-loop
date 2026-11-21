@@ -78,7 +78,7 @@ This section is the design of plan component G1. The measures are from `c742075a
 | A function on a root | `sizeratchet.Scan`, `rawgitratchet.Scan`, and `testdup.Scan` with a date from its baseline | 3 |
 | A function on a `core.ReviewInput` | the checks of `core.BuildHandoffFloor`, and `tddPredicateFloor` | one for each check |
 | A `go test` pattern of the scanner pack | `repocontract.Packages()` | 15 |
-| A named test that reads the real tree | `repocontract.TreeReadingTests()` | 139 tests in 21 packages |
+| A named test that reads the real tree | `repocontract.TreeReadingTests()` | 159 tests in 23 packages |
 
 Only the first shape fits `GateInput{Root, Base}` now. A floor check needs the cycle number and the workspace, and a pack pattern is a test suite, not a function. So decision 1 of ADR-0165 cannot hold for each gate in one pull request. G1 builds the type and the table, registers the first shape, and records the rest as a debt set that can only get smaller.
 

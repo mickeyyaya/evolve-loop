@@ -84,27 +84,27 @@ func isGoTestArgv(n ast.Node) bool {
 
 func isRouted(ancestors []ast.Node, pkg string) bool {
 	for _, a := range ancestors {
-		if call, ok := a.(*ast.CallExpr); ok && isLaneBudgetCall(call, pkg, "Args") {
+		if call, ok := a.(*ast.CallExpr); ok && isLaneBudgetCall(call, pkg, "Args", "ArgsFor") {
 			return true
 		}
 	}
 	for i := len(ancestors) - 1; i >= 0; i-- {
 		if fn, ok := ancestors[i].(*ast.FuncDecl); ok {
-			return callsLaneBudget(fn, pkg, "Args")
+			return callsLaneBudget(fn, pkg, "Args", "ArgsFor")
 		}
 	}
 	return false
 }
 
-func isLaneBudgetCall(call *ast.CallExpr, pkg, member string) bool {
+func isLaneBudgetCall(call *ast.CallExpr, pkg string, members ...string) bool {
 	sel, ok := call.Fun.(*ast.SelectorExpr)
-	return ok && isMemberOf(sel, pkg, []string{member})
+	return ok && isMemberOf(sel, pkg, members)
 }
 
-func callsLaneBudget(root ast.Node, pkg, member string) bool {
+func callsLaneBudget(root ast.Node, pkg string, members ...string) bool {
 	found := false
 	ast.Inspect(root, func(n ast.Node) bool {
-		if call, ok := n.(*ast.CallExpr); ok && isLaneBudgetCall(call, pkg, member) {
+		if call, ok := n.(*ast.CallExpr); ok && isLaneBudgetCall(call, pkg, members...) {
 			found = true
 		}
 		return !found
@@ -159,6 +159,7 @@ func TestGoTestArgvSites_FindsEachArgvFormAndHonorsTheBudgetAndTheExemption(t *t
 		"internal/h/h.go":      "package h\nimport \"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget\"\nvar Routed = lanebudget.Args([]string{\"test\"})\nvar Unrouted = []string{\"test\", \"./...\"}\n",
 		"internal/i/i.go":      "package i\nimport \"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget\"\nfunc F() { _ = lanebudget.Args(nil); _ = []string{\"test\", \"./...\"} }\n",
 		"internal/k/k.go":      "package k\nimport \"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget\"\nvar R = lanebudget.Runner(nil)\nfunc F() []string { return []string{\"test\", \"./...\"} }\n",
+		"internal/l/l.go":      "package l\nimport \"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget\"\nfunc F(p int) []string { return lanebudget.ArgsFor(p, []string{\"test\"}) }\nfunc G() []string { return []string{\"test\", \"./...\"} }\n",
 		"internal/j/j.go":      "package j\nimport \"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget\"\nfunc F() { _ = lanebudget.Args(nil) }\nfunc G() { _ = []string{\"test\", \"./...\"} }\n",
 	})
 
@@ -170,6 +171,7 @@ func TestGoTestArgvSites_FindsEachArgvFormAndHonorsTheBudgetAndTheExemption(t *t
 		filepath.Join("internal", "c", "c.go") + ":2",
 		filepath.Join("internal", "h", "h.go") + ":4",
 		filepath.Join("internal", "j", "j.go") + ":4",
+		filepath.Join("internal", "l", "l.go") + ":4",
 	}
 	if err != nil || !slices.Equal(sites, want) {
 		t.Errorf("goTestArgvSites = %q, %v, want %q", sites, err, want)

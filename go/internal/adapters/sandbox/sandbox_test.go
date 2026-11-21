@@ -161,9 +161,10 @@ func TestGenerateBwrapArgv_RepoBind(t *testing.T) {
 func TestGenerateBwrapArgv_WritePathsRebound(t *testing.T) {
 	cfg := canonicalConfig()
 	cfg.ReadOnlyRepo = true
-	cfg.WritePaths = []string{"/repo/.evolve/runs"}
+	runs := t.TempDir()
+	cfg.WritePaths = []string{runs}
 	args := GenerateBwrapArgv(cfg, []string{"true"})
-	mustContainArg(t, args, "--bind", "/repo/.evolve/runs", "/repo/.evolve/runs")
+	mustContainArg(t, args, "--bind", runs, runs)
 }
 
 func TestGenerateBwrapArgv_NetworkOff(t *testing.T) {
@@ -279,9 +280,10 @@ func TestGenerateBwrapArgv_EmptyHomeAndRepo(t *testing.T) {
 
 func TestGenerateBwrapArgv_GlobInWritePathWidens(t *testing.T) {
 	cfg := canonicalConfig()
-	cfg.WritePaths = []string{"/repo/.evolve/runs/cycle-*"}
+	runs := t.TempDir()
+	cfg.WritePaths = []string{filepath.Join(runs, "cycle-*")}
 	args := GenerateBwrapArgv(cfg, []string{"true"})
-	mustContainArg(t, args, "--bind", "/repo/.evolve/runs", "/repo/.evolve/runs")
+	mustContainArg(t, args, "--bind", runs, runs)
 }
 
 func TestNewAndExec_Unwrapped(t *testing.T) {
@@ -350,7 +352,8 @@ func TestExec_LinuxBwrap(t *testing.T) {
 	if err := os.MkdirAll(runs, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	s := New(Config{RepoRoot: repo, HomeDir: home, AllowNetwork: true, WritePaths: []string{runs}})
+	missing := filepath.Join(repo, ".evolve", "instincts", "lessons")
+	s := New(Config{RepoRoot: repo, HomeDir: home, AllowNetwork: true, WritePaths: []string{runs, missing}})
 	var stderr strings.Builder
 	err := s.Exec(context.Background(), []string{"/bin/true"}, nil, nil, &stderr)
 	if err != nil {
@@ -372,8 +375,7 @@ func mustContain(t *testing.T, haystack string, needles ...string) {
 	}
 }
 
-func mustContainArg(t *testing.T, args []string, parts ...string) {
-	t.Helper()
+func containsArgSequence(args []string, parts ...string) bool {
 	for i := 0; i+len(parts) <= len(args); i++ {
 		match := true
 		for j := range parts {
@@ -383,10 +385,17 @@ func mustContainArg(t *testing.T, args []string, parts ...string) {
 			}
 		}
 		if match {
-			return
+			return true
 		}
 	}
-	t.Errorf("argv missing sequence %v\n  full: %v", parts, args)
+	return false
+}
+
+func mustContainArg(t *testing.T, args []string, parts ...string) {
+	t.Helper()
+	if !containsArgSequence(args, parts...) {
+		t.Errorf("argv missing sequence %v\n  full: %v", parts, args)
+	}
 }
 
 func endsWithArgv(args, suffix []string) bool {

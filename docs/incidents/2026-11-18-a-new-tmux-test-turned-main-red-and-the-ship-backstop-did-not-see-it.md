@@ -76,7 +76,7 @@ The scan test message, from the audit of 2510 (round 3):
 | Change | Pull request or commit | Regression test |
 |---|---|---|
 | `internal/faketmux` gets a `TestMain` that calls `tmuxtest.Main` | commit `c6c8eaedb` | `TestEveryTmuxTestPackageUsesTheOrphanGuard` (`go/internal/tmuxtest`) |
-| The ship backstop runs the tree-scan guards when a ship adds or changes a `_test.go` file | inbox item `ship-backstop-misses-tree-scan-guards` | open |
+| `TestEveryTmuxTestPackageUsesTheOrphanGuard` becomes a by-name row of `repocontract.TreeReadingTests()`, so every ship runs it. The detector now reads a root-only string constant, which is the shape of the guard's own climb | inbox item `ship-backstop-misses-tree-scan-guards` | `TestRepoContractGate_AnAddedTmuxTestRunsTheOrphanGuardByName`, `TestRepoContractGate_ARedOrphanGuardBlocksShipAndNamesItself` (`go/internal/phases/ship`), `TestReadingTestsOf_CreditsTheTestsThatReachARead` (`go/internal/repocontract`) |
 | The retry rounds stop when a ship red reproduces on main at the same base | inbox item `stop-retry-rounds-when-ship-red-reproduces-on-main` (proposed in the retrospective of 2510) | open |
 
 ## Limits

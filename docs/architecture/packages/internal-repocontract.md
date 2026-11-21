@@ -29,11 +29,26 @@ Cycle 1779 did exactly that (2026-09-30). Its lane ship grew `cmd/evolve.runCycl
   - It lands on a top-level directory with nothing after it, as when `explanationCallSiteFiles("..", vocab)` walks all of `go/internal`.
 
   Inside a `Join`, a leading `Dir(...)` call is taken to be the package's own directory, any other non-literal before the climb is an unknown base (so the call is not a climb from the package), and a non-literal after it counts as a subpath. Any other call ignores its non-literal arguments, as `PartitionGraph(todos, 2, "../..")` and `explanationCallSiteFiles("..", vocab)` show. `strings` and `bytes` calls are string matching, not paths, so they are ignored.
+- **A root-only string constant.** A package-level `const` or `var` that holds one string literal of only `..` steps.
+  - It must land on the module root or on `go/internal`, by the same rule as the climb above, as `const moduleRoot = "../.."` and `const internalTreeRoot = ".."` do.
+  - A literal that names a path after the climb, as `"../../internal/x/testdata"` does, is a data-file read. `DataFileReads` owns it, not this scan.
+  - A literal that lands on a sibling (`"../x"`) or has no climb (`"a/b"`) is not a read.
+  - The rule shares `landsAtTheTree` with the call climb. `TestReadingTestsOf_CreditsTheTestsThatReachARead` pins each case.
 - **A walk up to `go.mod`.** A bare `for { … }` loop that names `"go.mod"`. A `range` or counted loop naming it writes fixtures; it does not climb.
 
-Each package it finds must be in `Packages()`, or every test that reaches its read must be named in `TreeReadingTests()`. The detector works per declaration: a function, a package-level `var`, `const` or type whose body climbs or walks up reads the tree, any declaration that mentions a reading one reads it too (followed to a fixpoint across the package directory's test files), and every `Test…` function that reads is credited by name. So `TestVerdictEngine_OneConstructionSite`, whose climb sits in the helper `nonTestSourcesMentioning`, is found by name. `packProblems` fails on a reading test that is not selected, on a package whose read no test reaches (it must go into `Packages()` whole), and on a selection that is in the pack or no longer reads the tree. Since cycle 1829 the large packages whose seam or single-writer tests read the tree (`cmd/evolve`, `core`, `phases/ship`, `phases/runner` and nine others) run that way: 50 tests by name instead of the whole packages, which were too slow for every ship. No package is recorded outside the pack any more. `TestClimbsOutOfItsPackage`, `TestWalksUpToGoMod`, `TestReadingTestsOf_CreditsTheTestsThatReachARead` and `TestPackProblems` pin each shape, the negative ones included. The test itself is in the pack, so it runs before main does.
+Each package it finds must be in `Packages()`, or every test that reaches its read must be named in `TreeReadingTests()`. The detector works per declaration. A function, a package-level `var`, `const` or type whose body climbs or walks up reads the tree. Any declaration that mentions a reading one reads it too, followed to a fixpoint across the package directory's test files. Every `Test…` function that reads is credited by name. So `TestVerdictEngine_OneConstructionSite`, whose climb sits in the helper `nonTestSourcesMentioning`, is found by name.
 
-The detector knows these shapes and no others. A test that finds the tree another way is not caught until someone adds its shape here.
+`packProblems` fails in three cases:
+
+- A reading test is not selected.
+- A package has a read that no test reaches. It must go into `Packages()` whole.
+- A selection is in the pack, or no longer reads the tree.
+
+Since cycle 1829 the large packages whose seam or single-writer tests read the tree run by name. These are `cmd/evolve`, `core`, `phases/ship`, `phases/runner` and others. Tests chosen by name replace the whole packages, which were too slow for every ship. No package is recorded outside the pack any more. `TestClimbsOutOfItsPackage`, `TestWalksUpToGoMod`, `TestReadingTestsOf_CreditsTheTestsThatReachARead` and `TestPackProblems` pin each shape, the negative ones included. The test itself is in the pack, so it runs before main does.
+
+The package `internal/tmuxtest` is one of the by-name rows. Its `TestEveryTmuxTestPackageUsesTheOrphanGuard` walks the tree by file. It imports none of the packages it reads, so the importer backstop never selects it. The by-name row runs it on every ship.
+
+The detector knows these shapes and no others. A test that finds the tree another way is not caught until someone adds its shape here. It does not see a function-local `root := "../.."`, because the constant rule reads package-level `const` and `var` declarations only.
 
 ## What the detector skips
 
@@ -111,10 +126,11 @@ A test that runs the pack and compares `git status --porcelain --ignored` before
 - **`filepath.WalkDir` and `filepath.Walk` callbacks**: the path the callback receives is not tied to the root being walked.
 - **A root carried in a struct field**, and a root passed through a function in another package.
 - **A relative path**, whether a literal such as `os.WriteFile("out.json", …)` or `filepath.Abs(".")`, which lands in the package directory: the scan treats relative paths as unknown, because a test may have changed its working directory first.
+- **A literal root in the write scan.** The real-tree write detector has no rule for a string constant, so `const root = "../.."` followed by a write under `root` is not seen.
 - **A symlink alias.** A temp directory holding a symlink to the real tree, such as the temp worktree whose `go/` links to the real module in `core`'s regeneration test, is a temp path to the scan; a write through the link lands in the real tree. That test writes only `docs/architecture/control-flags.md` under the temp root, never under the link.
 
 ## Gate contract
 
 - `Packages()` is the union of the pack patterns that a registry entry covers and the debt set `gateregistry.Unregistered()`. See [internal-gateregistry.md](internal-gateregistry.md) and [gate-contract.md](../gate-contract.md) section 6.5.
-- `TreeReadingTests()` names the two `gateregistry` tests that read the real tree. The pack stays at 15 patterns. `ByNameTestsFor(changed)` adds the data rows to the same by-name call.
+- `TreeReadingTests()` names the tests of 23 packages that read the real tree, among them the `gateregistry` tests and `tmuxtest.TestEveryTmuxTestPackageUsesTheOrphanGuard`. The pack stays at 15 patterns. `ByNameTestsFor(changed)` adds the data rows to the same by-name call.
 - `repocontract.go` and `phases/ship/repocontract.go` are on the protected surface. They select the tests that the ship gate runs.

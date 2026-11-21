@@ -129,10 +129,12 @@ func TestBuildFloorResidual_OnlyChangedAreasRunsTheRoundWithTheDocumentPrescript
 
 func TestBuildFloorResidual_AnUnprescribableResidualAbortsAsToday(t *testing.T) {
 	t.Parallel()
+	protectedFailure := protectedSurfaceFailures([]string{"go/internal/guards/role.go"}, func(string) bool { return true }, "HEAD")[0]
 	for name, rr := range map[string]ReviewResult{
-		"a red test beside a coverage residual": floorRejected([]string{coverResidualFailure, testFailure}, coverResidualsFixture()),
-		"a residual of another failure text":    floorRejected([]string{testFailure}, coverResidualsFixture()),
-		"no floor failure":                      {Reason: "contract violation"},
+		"a red test beside a coverage residual":       floorRejected([]string{coverResidualFailure, testFailure}, coverResidualsFixture()),
+		"a protected path beside a coverage residual": floorRejected([]string{coverResidualFailure, protectedFailure}, coverResidualsFixture()),
+		"a residual of another failure text":          floorRejected([]string{testFailure}, coverResidualsFixture()),
+		"no floor failure":                            {Reason: "contract violation"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := floorResidualHarness(t, policy.RetryLadderEnforce, passedFix)

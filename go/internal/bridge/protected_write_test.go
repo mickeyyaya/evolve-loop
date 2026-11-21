@@ -130,3 +130,44 @@ func TestGuaranteeStage_ReadsIsolationI7OfThePolicy(t *testing.T) {
 		t.Fatalf("guaranteeStage = %q, execStage = %q; want enforce from isolation.i7 and shadow for the unset i3", got, exec)
 	}
 }
+
+func TestSandboxWrap_EveryLocalManifestFamilyGetsTheProtectedWriteDenyAtEnforce(t *testing.T) {
+	t.Parallel()
+	names := ManifestNames()
+	local := 0
+	for _, cli := range names {
+		m, err := LoadManifest(cli)
+		if err != nil {
+			t.Fatalf("LoadManifest(%s): %v", cli, err)
+		}
+		if m.Transport == "cloud" {
+			continue
+		}
+		local++
+		t.Run(cli, func(t *testing.T) {
+			t.Parallel()
+			wt := realTempDir(t)
+			prefix, wrap := defaultSandboxWrapWithProbe(Deps{GuaranteeStage: "enforce", ExecStage: "off", SandboxMode: "on"}, fakeProbe("darwin", true))(SandboxWrapRequest{
+				Phase: "build", CLI: cli, Worktree: wt, Workspace: t.TempDir(), RepoRoot: t.TempDir(),
+			})
+			if !wrap.Applied {
+				t.Fatalf("the %s cell was not wrapped: %+v", cli, wrap)
+			}
+			sbpl, err := os.ReadFile(prefix[2])
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, rule := range []string{
+				`(deny file-write* (subpath "` + filepath.Join(wt, "go", "internal", "guards") + `"))`,
+				`(deny file-write* (prefix "` + filepath.Join(wt, ".claude", "settings.json") + `"))`,
+			} {
+				if !strings.Contains(string(sbpl), rule) {
+					t.Errorf("the %s cell must carry %s:\n%s", cli, rule, sbpl)
+				}
+			}
+		})
+	}
+	if local < 8 {
+		t.Fatalf("only %d local families among %v; the corpus of this test shrank", local, names)
+	}
+}

@@ -580,6 +580,8 @@ Each `go test` that a lane runs gets one share of the host CPUs. The share is `p
 
 The formula divides the CPUs among the lanes. The floor of 1 keeps a lane alive on a host with fewer CPUs than lanes. A worked example: 14 CPUs at width 4 gives `procs` 3, so the 4 lanes ask for 12 CPUs.
 
+The ACS suite of a lane runs several scopes at the same time (`internal/acssuite`). It divides the share of the lane among the scopes that run at once. With `slots = min(scopes, share)`, each scope child gets `max(1, share / slots)` for `-p`, `-parallel` and `GOMAXPROCS`. A lane thus never asks for more than one share. A worked example: a share of 3 and 46 scopes give 3 slots of 1 CPU each, which is 3 CPUs for the lane.
+
 `GOMAXPROCS` is necessary because the two flags do not bound the CPU use:
 
 - `-p` bounds the number of packages that build and run at the same time. `-parallel` bounds the number of parallel tests in one test binary. The two multiply: a budget of 3 can still run about 9 test goroutines.

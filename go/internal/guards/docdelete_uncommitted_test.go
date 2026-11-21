@@ -3,12 +3,12 @@ package guards
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 type activeCycle struct {
@@ -24,23 +24,14 @@ const ownDraft = "docs/explain/builds/cycle-2-draft.md"
 
 func gitRepo(t *testing.T, committed map[string]string) string {
 	t.Helper()
-	dir := t.TempDir()
-	run := func(args ...string) {
-		t.Helper()
-		if out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-	}
-	run("init", "-q")
-	run("config", "user.email", "t@example.com")
-	run("config", "user.name", "test")
-	run("config", "commit.gpgsign", "false")
+	r := gittest.Fixture(t)
+	r.Git("config", "commit.gpgsign", "false")
 	for rel, body := range committed {
-		writeFile(t, dir, rel, body)
+		r.Write(rel, body)
 	}
-	run("add", "-A")
-	run("commit", "-q", "-m", "base")
-	return dir
+	r.Git("add", "-A")
+	r.Git("commit", "-q", "-m", "base")
+	return r.Dir
 }
 
 func writeFile(t *testing.T, dir, rel, body string) {

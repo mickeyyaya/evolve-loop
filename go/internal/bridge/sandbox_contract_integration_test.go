@@ -25,6 +25,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/isolation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 type contractVerdict string
@@ -717,15 +718,22 @@ func TestAgentSandboxContract_AnOpenOfAnIndexedPathWritesOneAccessRecord(t *test
 	cfg := &Config{CLI: "claude-tmux", Agent: idx.Phase, Cycle: 7, ProjectRoot: h.root, Worktree: h.worktree, Workspace: h.run,
 		RequireSandbox: true, DispatchID: "sbc-" + strconv.Itoa(os.Getpid())}
 	var stderr strings.Builder
-	deps := Deps{hostOS: "darwin", ReadStage: "enforce", Env: map[string]string{}, Stderr: &stderr, Now: time.Now, Sleep: time.Sleep,
-		SandboxReports: logShowReports(logShowPath), SandboxFence: sandboxFence(sandboxExecPath)}
+	var lastLog []byte
+	reports := logShowReports(logShowPath)
+	deps := Deps{hostOS: "darwin", ReadStage: "enforce", Env: map[string]string{}, Stderr: &stderr, Now: time.Now, Sleep: time.Sleep, Signals: signalcenter.New(),
+		SandboxReports: func(ctx context.Context, tag string, since time.Time) ([]byte, error) {
+			raw, err := reports(ctx, tag, since)
+			lastLog = raw
+			return raw, err
+		}, SandboxFence: sandboxFence(sandboxExecPath)}
 	started := time.Now()
 	deps.reportReadViolations(context.Background(), cfg, since)
 	records, err := inputindex.ReadAccess(h.root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	failure := fmt.Errorf("no access record names the retrospective of cycle 6 after %s of polling for the fence (stderr %q)", time.Since(started).Round(time.Millisecond), stderr.String())
+	read := filepath.Join(filepath.Dir(h.run), "cycle-6", "retrospective-report.md")
+	failure := openRecordFailure(readPoll{log: lastLog, tag: cfg.DispatchID, path: canonicalOrSelf(read), events: deps.Signals.Recent(), elapsed: time.Since(started), stderr: stderr.String()})
 	for _, r := range records {
 		if r.Type == inputindex.AccessOpen && r.Kind == "retrospective" && r.Cycle == 7 && r.Source == inputindex.AccessSourceSandbox {
 			failure = nil

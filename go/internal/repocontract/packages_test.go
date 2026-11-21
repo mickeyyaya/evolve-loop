@@ -102,7 +102,7 @@ func declUnits(files []*ast.File, dir string) []declUnit {
 				units = append(units, declUnit{
 					names: declaredNames(node),
 					test:  isGoTest(node),
-					reads: climbsOutOfItsPackage(node, dir) || walksUpToGoMod(node),
+					reads: climbsOutOfItsPackage(node, dir) || landsOnTheTreeByConstant(node, dir) || walksUpToGoMod(node),
 					refs:  identifiersIn(node),
 				})
 			}
@@ -191,8 +191,28 @@ func climbsOutOfItsPackage(node ast.Node, dir string) bool {
 			return false
 		}
 		steps, rest := climb(call)
-		landing := depth - steps
-		return steps > 0 && (landing == 0 || (landing == 1 && rest == 0))
+		return landsAtTheTree(depth, steps, rest)
+	})
+}
+
+func landsAtTheTree(depth, steps, rest int) bool {
+	landing := depth - steps
+	return steps > 0 && (landing == 0 || (landing == 1 && rest == 0))
+}
+
+func landsOnTheTreeByConstant(node ast.Node, dir string) bool {
+	spec, ok := node.(*ast.ValueSpec)
+	if !ok {
+		return false
+	}
+	depth := depthBelowTheModuleRoot(dir)
+	return slices.ContainsFunc(spec.Values, func(value ast.Expr) bool {
+		text := stringLiteral(value)
+		if text == nil {
+			return false
+		}
+		steps, rest := climbOfPath(*text)
+		return rest == 0 && landsAtTheTree(depth, steps, rest)
 	})
 }
 
@@ -224,7 +244,11 @@ func climb(call *ast.CallExpr) (steps, rest int) {
 			parts = append(parts, "*")
 		}
 	}
-	segments := strings.Split(path.Clean(strings.Join(parts, "/")), "/")
+	return climbOfPath(strings.Join(parts, "/"))
+}
+
+func climbOfPath(text string) (steps, rest int) {
+	segments := strings.Split(path.Clean(text), "/")
 	for steps < len(segments) && segments[steps] == ".." {
 		steps++
 	}

@@ -283,6 +283,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `ISOLATION_I8_VIOLATION` | I-8 typed flow decisions: a flow parser fell back to stdout or prose; fields.cell names the seat (ADR-0154) |
 | `ISOLATION_I9_VIOLATION` | I-9 proven substitution: no run-time emitter; the conformance matrix TestE2ECycleCLIMatrix is its guard (ADR-0154) |
 | `ISOLATION_LANE_PIN_FORGED` | the workspace lane-scope.json lists other items than host record .evolve/lineage/cycle-N.json. The host kept its record and no reader used the file; emitted once per cycle after a cell. fields.record, fields.file, fields.path |
+| `ISOLATION_READ_UNMEASURED` | the cell read report is incomplete, so its reads count as unmeasured and no open rate counts the cell; fields cell, family, stage, cause (fence-deadline, cancelled, fence-write, report-read), elapsed (only for fence-deadline and cancelled). A cancelled launch is INFO because an operator stop caused it; the other causes are WARN (cell-context-index.md §8) |
 | `ISOLATION_REQUEST_FAILED` | the request channel approved a request of a cell, and the dispatch of the agent failed; the same fields as ISOLATION_REQUEST_REFUSED (llm-isolation.md §7.2.1) |
 | `ISOLATION_REQUEST_REFUSED` | the request channel refused a cell request through validator (schema, kind, role, input, cap, or depth) or orchestrator agent. Fields: request, kind, role, decision, precondition, reason, stage (cli-contract.md §4.5, llm-isolation.md §7.2.1) |
 

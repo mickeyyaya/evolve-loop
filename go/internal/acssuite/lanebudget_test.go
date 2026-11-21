@@ -23,7 +23,7 @@ func TestDefaultGoExec_ALaneSuiteRunsOnTheLaneCPUBudget(t *testing.T) {
 	t.Setenv(ipcenv.FleetLiveWidthKey, "")
 	procs := strconv.Itoa(lanebudget.Procs(runtime.NumCPU(), 4))
 
-	out, err := defaultGoExec(context.Background(), t.TempDir(), "./acs/cycle1", []string{"PATH=" + bin})
+	out, err := defaultGoExec(context.Background(), t.TempDir(), "./acs/cycle1", []string{"PATH=" + bin}, lanebudget.Current())
 
 	want := "GOMAXPROCS=" + procs + " test -p " + procs + " -parallel " + procs + " -json -tags acs -count=1 ./acs/cycle1"
 	if err != nil || out != want {
