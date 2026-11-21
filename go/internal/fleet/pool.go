@@ -124,7 +124,7 @@ func (p *pool) resupply() bool {
 	}
 	added := false
 	for _, td := range p.cfg.Resupply(slices.Clone(p.backlog)) {
-		if p.known[td.ID] {
+		if p.known[td.ID] && (!td.Resume || p.live(td.ID)) {
 			continue
 		}
 		p.add(td)
@@ -132,6 +132,20 @@ func (p *pool) resupply() bool {
 		added = true
 	}
 	return added
+}
+
+func (p *pool) live(id string) bool {
+	for idx := range p.running {
+		if p.backlog[idx].ID == id {
+			return true
+		}
+	}
+	for _, idx := range p.pending {
+		if p.backlog[idx].ID == id {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *pool) emit(kind PoolTransitionKind, todo string) {

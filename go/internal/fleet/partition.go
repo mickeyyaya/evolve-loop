@@ -34,6 +34,7 @@ type Todo struct {
 	Optional       bool     `json:"optional,omitempty"`
 	OutputContract string   `json:"output_contract,omitempty"`
 	ToolScope      []string `json:"tool_scope,omitempty"`
+	Resume         bool     `json:"resume,omitempty"`
 }
 
 func Partition(todos []Todo, n int) (buckets [][]Todo, deferred []Todo) {

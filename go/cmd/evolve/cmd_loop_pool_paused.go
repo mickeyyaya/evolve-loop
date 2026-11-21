@@ -82,6 +82,7 @@ func (pp pausedPlan) lead(p core.PausedScope, triage []fleet.Todo) (fleet.Todo, 
 		}
 		lead.Files = files
 	}
+	lead.Resume = mainRedParked(p) && pp.parkedResume
 	slices.Sort(lead.Files)
 	lead.Files = slices.Compact(lead.Files)
 	return lead, rest, true
