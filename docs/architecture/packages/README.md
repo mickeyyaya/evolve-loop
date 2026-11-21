@@ -285,6 +285,8 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/auditcalibration` | a calibration report of auditor narratives against ship-gate outcomes | [internal-auditcalibration.md](internal-auditcalibration.md) |
 | `internal/paralleltest` | the parallel-by-default guard of the package test trees | [internal-paralleltest.md](internal-paralleltest.md) |
 | `test/structure` | source-structure checks shared between package tests | [test-structure.md](test-structure.md) |
+| `test/journeys` | the journey registry file and the guard test that each row names a real, protected test | [test-journeys.md](test-journeys.md) |
+| `internal/journeys` | the journey registry model: rows, test lookup in source, and the `Fix-Journey` trailer of a fix commit | [internal-journeys.md](internal-journeys.md) |
 | `test/e2e` | the end-to-end test tier | [test-e2e.md](test-e2e.md) |
 | `test/component` | the component test tier | [test-component.md](test-component.md) |
 | `test/integration` | the integration test tier | [test-integration.md](test-integration.md) |
