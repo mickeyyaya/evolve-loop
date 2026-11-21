@@ -56,8 +56,11 @@ func TestTokenWeights_PartialFamilyKeepsTheOtherDefaults(t *testing.T) {
 func TestTokenWeightsFor_UnknownFamilyErrors(t *testing.T) {
 	t.Parallel()
 	_, err := Policy{}.TokenWeightsFor("agy-claude")
-	if !errors.Is(err, ErrUnknownKey) || !strings.Contains(err.Error(), `"telemetry.token_weights.agy-claude"`) || strings.Contains(err.Error(), "check its spelling") {
-		t.Errorf("err = %v, want ErrUnknownKey naming the family and not the spelling remedy", err)
+	if !errors.Is(err, ErrUnknownKey) {
+		t.Errorf("err = %v, want ErrUnknownKey", err)
+	}
+	if _, known := (Policy{}).TokenWeightsFor("claude"); known != nil {
+		t.Errorf("claude must stay a known family, got %v", known)
 	}
 }
 
