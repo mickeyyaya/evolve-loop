@@ -63,26 +63,39 @@ func resolvePromptText(cfg *Config, deps Deps) (string, error) {
 		return "", fmt.Errorf("read prompt: %w", err)
 	}
 	content := string(raw)
-	if strings.Contains(content, "$CHALLENGE_TOKEN") {
-		var tok string
-		if existing, err := os.ReadFile(filepath.Join(cfg.Workspace, "challenge-token.txt")); err == nil {
-			if v := strings.TrimSpace(string(existing)); v != "" {
-				tok = v
-			}
-		}
-		if tok == "" {
-			minted, err := deps.NewChallengeToken()
-			if err != nil {
-				return "", fmt.Errorf("mint challenge token: %w", err)
-			}
-			if err := os.WriteFile(filepath.Join(cfg.Workspace, "challenge-token.txt"), []byte(minted+"\n"), 0o644); err != nil {
-				return "", fmt.Errorf("write challenge token: %w", err)
-			}
-			tok = minted
-		}
+	tok, err := promptChallengeToken(cfg, deps, content)
+	if err != nil {
+		return "", err
+	}
+	if tok != "" {
 		content = strings.ReplaceAll(content, "$CHALLENGE_TOKEN", tok)
 	}
 	return strings.ReplaceAll(content, "$ARTIFACT_PATH", cfg.Artifact), nil
+}
+
+func workspaceChallengeToken(cfg *Config) string {
+	existing, err := os.ReadFile(filepath.Join(cfg.Workspace, "challenge-token.txt"))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(existing))
+}
+
+func promptChallengeToken(cfg *Config, deps Deps, content string) (string, error) {
+	if !strings.Contains(content, "$CHALLENGE_TOKEN") {
+		return "", nil
+	}
+	if v := workspaceChallengeToken(cfg); v != "" {
+		return v, nil
+	}
+	minted, err := deps.NewChallengeToken()
+	if err != nil {
+		return "", fmt.Errorf("mint challenge token: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(cfg.Workspace, "challenge-token.txt"), []byte(minted+"\n"), 0o644); err != nil {
+		return "", fmt.Errorf("write challenge token: %w", err)
+	}
+	return minted, nil
 }
 
 func ensureDirs(cfg *Config) error {

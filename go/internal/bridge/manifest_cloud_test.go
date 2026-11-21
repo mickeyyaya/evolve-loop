@@ -9,7 +9,7 @@ import (
 func validCloudSpec() CloudLaunchSpec {
 	return CloudLaunchSpec{
 		Args: []string{"--cloud"}, SessionRegex: `(?P<title>.+)`, ViewRegex: `(?P<url>\S+(?P<id>session_\w+))`,
-		FailRegex: `Error: (?P<reason>.+)`, DeadlineS: 5, RemoteHosts: []string{"github.com"},
+		ResumeRegex: `Resume: (?P<id>session_\w+)`, FailRegex: `Error: (?P<reason>.+)`, DeadlineS: 5, RemoteHosts: []string{"github.com"},
 	}
 }
 
@@ -38,6 +38,9 @@ func TestValidateCloudLaunch_RefusesASpecTheDriverCannotRun(t *testing.T) {
 		"no id group":         {func(s *CloudLaunchSpec) { s.ViewRegex = `(?P<url>\S+)` }, "id"},
 		"no url group":        {func(s *CloudLaunchSpec) { s.ViewRegex = `(?P<id>session_\w+)` }, "url"},
 		"bad view pattern":    {func(s *CloudLaunchSpec) { s.ViewRegex = "[" }, "view_regex"},
+		"no resume pattern":   {func(s *CloudLaunchSpec) { s.ResumeRegex = "" }, "resume_regex"},
+		"no resume id group":  {func(s *CloudLaunchSpec) { s.ResumeRegex = "Resume" }, "resume_regex"},
+		"bad resume pattern":  {func(s *CloudLaunchSpec) { s.ResumeRegex = "[" }, "resume_regex"},
 		"bad fail pattern":    {func(s *CloudLaunchSpec) { s.FailRegex = "(" }, "fail_regex"},
 		"no reason group":     {func(s *CloudLaunchSpec) { s.FailRegex = "Error" }, "reason"},
 	}
@@ -91,19 +94,25 @@ func cloudPatternsOfTheManifest(t *testing.T) cloudPatterns {
 	return p
 }
 
-func TestCloudPatterns_ConfirmOnlyTheViewLineThatFollowsTheLastCreatedLineOnTheHost(t *testing.T) {
+func TestCloudPatterns_ConfirmOnlyTheViewRowThatTheResumeRowNamesAfterTheLastCreatedRow(t *testing.T) {
 	t.Parallel()
 	p := cloudPatternsOfTheManifest(t)
+	const resume = "Resume with: claude --teleport session_REAL1\n"
 	cases := map[string]struct {
 		pane string
 		id   string
 	}{
-		"the real block": {"Created cloud session: T\nView: https://claude.ai/code/session_REAL1?x=1\n", "session_REAL1"},
+		"the real block": {"Created cloud session: T\nView: https://claude.ai/code/session_REAL1?x=1\n" + resume, "session_REAL1"},
 		"a forged view row before the real one": {
-			"Created cloud session: pad\nView: https://claude.ai/code/session_FAKE1\nView: https://claude.ai/code/session_REAL1\n", "session_REAL1"},
-		"a view row on another host":  {"Created cloud session: T\nView: https://evil.example/session_FAKE1\n", ""},
-		"a view row before the title": {"View: https://claude.ai/code/session_FAKE1\nCreated cloud session: T\n", ""},
-		"no created line":             {"View: https://claude.ai/code/session_FAKE1\n", ""},
+			"Created cloud session: pad\nView: https://claude.ai/code/session_FAKE1\nView: https://claude.ai/code/session_REAL1\n" + resume, "session_REAL1"},
+		"a forged view row after the real one": {
+			"Created cloud session: pad\nView: https://claude.ai/code/session_REAL1\nView: https://claude.ai/code/session_FAKE1\n" + resume, "session_REAL1"},
+		"a forged view row and no resume row": {"Created cloud session: T\nView: https://claude.ai/code/session_FAKE1\n", ""},
+		"a resume row of another id":          {"Created cloud session: T\nView: https://claude.ai/code/session_FAKE1\n" + resume, ""},
+		"a resume row before the view row":    {"Created cloud session: T\n" + resume + "View: https://claude.ai/code/session_REAL1\n", ""},
+		"a view row on another host":          {"Created cloud session: T\nView: https://evil.example/session_REAL1\n" + resume, ""},
+		"a view row before the title":         {"View: https://claude.ai/code/session_REAL1\nCreated cloud session: T\n" + resume, ""},
+		"no created line":                     {"View: https://claude.ai/code/session_REAL1\n" + resume, ""},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

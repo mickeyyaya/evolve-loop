@@ -48,7 +48,7 @@ func TestReadRepo_APushedBranchGivesItsRemoteAndNoCommitAhead(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadRepo = %v", err)
 	}
-	want := Repo{Branch: "feature/x", Remote: "origin", URL: "https://github.com/acme/widgets.git", Ahead: 0}
+	want := Repo{Branch: "feature/x", Remote: "origin", URL: "https://github.com/acme/widgets.git", Ahead: 0, Head: r.Git("rev-parse", "HEAD")}
 	if got != want {
 		t.Errorf("ReadRepo = %+v, want %+v", got, want)
 	}
@@ -148,5 +148,61 @@ func TestReadRepo_RefusesAnUnpushedCountThatIsNotANumber(t *testing.T) {
 	_, err := ReadRepo(context.Background(), wrapped, r.Dir)
 	if reason := refusalReason(t, err); !strings.Contains(reason, "is not a number") {
 		t.Errorf("refusal = %q, want the count named as not a number", reason)
+	}
+}
+
+func TestReadRepo_RefusesATreeWhoseHeadItCannotRead(t *testing.T) {
+	r := pushedRepo(t, "https://github.com/acme/widgets.git")
+	wrapped := func(ctx context.Context, name, cwd string, args, env []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
+		if name == "git" && len(args) > 0 && args[0] == "rev-parse" {
+			return 128, nil
+		}
+		return sysexec.DefaultRunner(ctx, name, cwd, args, env, stdin, stdout, stderr)
+	}
+	_, err := ReadRepo(context.Background(), wrapped, r.Dir)
+	if reason := refusalReason(t, err); !strings.Contains(reason, "head of branch feature/x cannot be read") {
+		t.Errorf("refusal = %q, want the unreadable head named", reason)
+	}
+}
+
+func lsRemoteRunner(out string, code int, runErr error, calls *[]string) sysexec.RunFunc {
+	return func(_ context.Context, name, _ string, args, _ []string, _ io.Reader, stdout, _ io.Writer) (int, error) {
+		*calls = append(*calls, name+" "+strings.Join(args, " "))
+		_, _ = io.WriteString(stdout, out)
+		return code, runErr
+	}
+}
+
+func TestVerifyRemoteHead_ComparesTheRemoteBranchHeadWithTheLocalHead(t *testing.T) {
+	repo := Repo{Branch: "feature/x", Remote: "origin", Head: "aaaa"}
+	cases := []struct {
+		name string
+		out  string
+		code int
+		err  error
+		want string
+	}{
+		{"equal head", "bbbb\trefs/heads/other/feature/x\naaaa\trefs/heads/feature/x\n", 0, nil, ""},
+		{"another head", "bbbb\trefs/heads/feature/x\n", 0, nil, "holds bbbb"},
+		{"branch absent", "", 0, nil, "is not on the remote origin"},
+		{"only another ref", "bbbb\trefs/heads/other/feature/x\n", 0, nil, "is not on the remote origin"},
+		{"ls-remote fails", "", 2, nil, "git ls-remote"},
+		{"no git", "", 0, errors.New("no git"), "git ls-remote"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var calls []string
+			err := repo.VerifyRemoteHead(context.Background(), lsRemoteRunner(tc.out, tc.code, tc.err, &calls), t.TempDir())
+			if tc.want == "" {
+				if err != nil {
+					t.Fatalf("VerifyRemoteHead = %v, want nil", err)
+				}
+			} else if reason := refusalReason(t, err); !strings.Contains(reason, tc.want) {
+				t.Errorf("refusal = %q, want it to contain %q", reason, tc.want)
+			}
+			if want := "git ls-remote origin refs/heads/feature/x"; len(calls) != 1 || calls[0] != want {
+				t.Errorf("git calls = %v, want [%q]", calls, want)
+			}
+		})
 	}
 }

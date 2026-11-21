@@ -67,6 +67,7 @@ func newCloudFixture(t *testing.T, repo cloudlaunch.Repo, frames ...string) *clo
 		NewChallengeToken: func() (string, error) { return "tok-42", nil },
 		Sleep:             func(d time.Duration) { f.slept += d },
 		CloudRepo:         func(context.Context, string) (cloudlaunch.Repo, error) { return repo, nil },
+		CloudRemoteHead:   func(context.Context, string, cloudlaunch.Repo) error { return nil },
 	}
 	return f
 }
@@ -184,7 +185,7 @@ func TestClaudeCloudDriver_TypesTheCloudCommandInItsOwnSessionAndEndsOnlyThatSes
 		t.Errorf("the pane did not change to the worktree %s: %q", f.cfg.Worktree, f.tmux.SentKeys)
 	}
 	prompt, _ := os.ReadFile(promptFile)
-	if string(prompt) != "Fix the flaky test. Token tok-42\n" {
+	if string(prompt) != "Fix the flaky test. Token \n" {
 		t.Errorf("cloud prompt = %q, want the resolved prompt", prompt)
 	}
 }
@@ -511,7 +512,8 @@ func TestEngineLaunch_ClaudeCloudDispatchRecordsTheLaunchedRow(t *testing.T) {
 	tmux := &FakeTmuxController{CaptureFrames: []string{cloudCreatedFrame, "$ ", "$ "}}
 	eng := NewEngine(Deps{
 		Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), EnvStage: envStageOff,
-		CloudRepo: func(context.Context, string) (cloudlaunch.Repo, error) { return pushedGitHubRepo, nil },
+		CloudRepo:       func(context.Context, string) (cloudlaunch.Repo, error) { return pushedGitHubRepo, nil },
+		CloudRemoteHead: func(context.Context, string, cloudlaunch.Repo) error { return nil },
 	})
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-cloud", Profile: prof, Model: "sonnet", Prompt: "Fix the flaky test", Workspace: ws,
@@ -711,5 +713,126 @@ func TestClaudeCloudDriver_ADashTaskReachesThePromptFileWithItsPrefix(t *testing
 	}
 	if string(got) != "Task:\n--dangerous do a thing\n" {
 		t.Errorf("cloud-prompt.txt = %q", got)
+	}
+}
+
+func TestLaunchCloud_ARemoteHeadThatDiffersRefusesTheLaunchBeforeAnySession(t *testing.T) {
+	t.Parallel()
+	f := newCloudFixture(t, pushedGitHubRepo, cloudCreatedFrame)
+	f.deps.CloudRemoteHead = func(context.Context, string, cloudlaunch.Repo) error {
+		return &cloudlaunch.Refusal{Reason: "the remote holds another head"}
+	}
+	rc, err := f.launch(t)
+	if rc != ExitSafetyGate || err != nil {
+		t.Fatalf("Launch = %d, %v", rc, err)
+	}
+	if got := f.codes(); !slices.Equal(got, []signalcenter.Code{CodeCloudLaunchRefused}) {
+		t.Errorf("signals = %v, want one refusal", got)
+	}
+	if len(f.tmux.SentKeys) != 0 {
+		t.Errorf("a refused launch typed into a pane: %q", f.tmux.SentKeys)
+	}
+	if _, err := os.Stat(filepath.Join(f.cfg.Workspace, "cloud-prompt.txt")); err == nil {
+		t.Error("a refused launch wrote the cloud prompt")
+	}
+}
+
+func TestLaunchCloud_AHeadThatMovesAfterThePromptIsWrittenRefusesTheLaunch(t *testing.T) {
+	t.Parallel()
+	f := newCloudFixture(t, pushedGitHubRepo, cloudCreatedFrame)
+	var reads int
+	f.deps.CloudRemoteHead = func(context.Context, string, cloudlaunch.Repo) error {
+		reads++
+		if reads == 2 {
+			return &cloudlaunch.Refusal{Reason: "the remote head moved"}
+		}
+		return nil
+	}
+	rc, err := f.launch(t)
+	if rc != ExitSafetyGate || err != nil || reads != 2 {
+		t.Fatalf("Launch = %d, %v after %d head reads; want a refusal at the second", rc, err, reads)
+	}
+	if len(f.tmux.SentKeys) != 0 {
+		t.Errorf("a refused launch typed into a pane: %q", f.tmux.SentKeys)
+	}
+}
+
+func TestClaudeCloudDriver_ReadsTheRemoteHeadWithGitWhenNoReaderIsInjected(t *testing.T) {
+	t.Parallel()
+	f := newCloudFixture(t, pushedGitHubRepo, cloudCreatedFrame)
+	f.deps.CloudRemoteHead = nil
+	rc, err := f.launch(t)
+	if rc != ExitSafetyGate || err != nil || !strings.Contains(f.stderr.String(), "git ls-remote") {
+		t.Errorf("Launch in a tree with no remote = %d, %v; stderr:\n%s", rc, err, f.stderr)
+	}
+}
+
+func TestLaunchCloud_ThePromptHoldsNoChallengeTokenAndNoAbsolutePath(t *testing.T) {
+	t.Parallel()
+	f := newCloudFixture(t, pushedGitHubRepo, cloudCreatedFrame)
+	f.cfg.ProjectRoot = t.TempDir()
+	if err := os.WriteFile(filepath.Join(f.cfg.Workspace, "challenge-token.txt"), []byte("tok-existing\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	text := "Fix it.\n<!-- challenge-token: tok-existing -->\nToken $CHALLENGE_TOKEN\nWrite $ARTIFACT_PATH or " + f.cfg.Artifact +
+		"\nIn " + f.cfg.Worktree + ", " + f.cfg.Workspace + ", " + f.cfg.ProjectRoot + "/x\n"
+	if err := os.WriteFile(f.cfg.PromptFile, []byte(text), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if rc, err := f.launch(t); rc != ExitOK || err != nil {
+		t.Fatalf("Launch = %d, %v", rc, err)
+	}
+	got, _ := os.ReadFile(filepath.Join(f.cfg.Workspace, "cloud-prompt.txt"))
+	want := "Fix it.\nToken \nWrite builder-report.md or builder-report.md\nIn ., ., ./x\n"
+	if string(got) != want {
+		t.Errorf("cloud prompt = %q, want %q", got, want)
+	}
+	report, _ := os.ReadFile(f.cfg.Artifact)
+	if !strings.HasPrefix(string(report), "<!-- challenge-token: tok-existing -->\n") {
+		t.Errorf("the launch report lost the challenge token: %q", report)
+	}
+}
+
+func TestLaunchCloud_ThePromptTextFailsOnAnUnreadablePromptOrATokenItCannotMint(t *testing.T) {
+	t.Parallel()
+	f := newCloudFixture(t, pushedGitHubRepo, cloudCreatedFrame)
+	errNoEntropy := errors.New("no entropy")
+	f.deps.NewChallengeToken = func() (string, error) { return "", errNoEntropy }
+	if rc, err := f.launch(t); rc != ExitBadFlags || !errors.Is(err, errNoEntropy) {
+		t.Errorf("Launch with no token = %d, %v", rc, err)
+	}
+	f.cfg.PromptFile = filepath.Join(f.cfg.Workspace, "missing.txt")
+	if rc, err := f.launch(t); rc != ExitBadFlags || !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("Launch with no prompt = %d, %v", rc, err)
+	}
+}
+
+func TestBaseOfAbsolutePathKeepsTheBoundaryAndDropsTheDirectory(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		" /Users/dev/notes.md": " notes.md",
+		"\"/home/ci/out.log":   "\"out.log",
+		"/a/b":                 "b",
+	}
+	for in, want := range cases {
+		if got := baseOfAbsolutePath(in); got != want {
+			t.Errorf("baseOfAbsolutePath(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestCloudPromptTextScrubsAbsolutePathsAndInlineTokens(t *testing.T) {
+	t.Parallel()
+	ws := t.TempDir()
+	pf := filepath.Join(ws, "p.txt")
+	if err := os.WriteFile(pf, []byte("see /opt/x/y.md and a/b, token <!-- challenge-token: abc --> end\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := cloudPromptText(&Config{PromptFile: pf, Workspace: ws}, Deps{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "see y.md and a/b, token  end\n"; got != want {
+		t.Errorf("cloudPromptText = %q, want %q", got, want)
 	}
 }

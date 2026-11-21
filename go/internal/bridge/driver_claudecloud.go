@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -33,7 +34,7 @@ const (
 
 func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeCloudLaunched, "a cloud seat started a cloud session. The CLI printed the session line and view line within its manifest deadline. Outcome is launched, and the deliverable is a later pull request. Fields: cli, session_id, url, title, repo, branch, profile")
-	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeCloudLaunchRefused, "a cloud seat refused a launch before starting a session. Causes: detached HEAD, no upstream, unpushed commits, or a remote outside the manifest host list. The reason names the cause. Fields: cli, profile, dir")
+	signalcenter.RegisterCode(signalcenter.ModuleBridge, CodeCloudLaunchRefused, "a cloud seat refused a launch before starting a session. Causes: detached HEAD, no upstream, unpushed commits, a remote outside the manifest host list, or a remote branch head that differs from the local head or is absent. The reason names the cause. Fields: cli, profile, dir")
 }
 
 type claudeCloudDriver struct{}
@@ -79,16 +80,18 @@ func launchCloud(ctx context.Context, cfg *Config, deps Deps, m Manifest) (int, 
 	if err == nil {
 		err = repo.Check(m.CloudLaunch.RemoteHosts)
 	}
-	var refusal *cloudlaunch.Refusal
-	if errors.As(err, &refusal) {
-		return l.refuse(refusal), nil
+	if err == nil {
+		err = deps.cloudRemoteHead(ctx, l.dir, repo)
 	}
-	if err != nil {
-		return ExitBadFlags, fmt.Errorf("%s read the repository of %s: %w", l.prefix, l.dir, err)
+	if rc, err := l.verdict(err); rc != ExitOK {
+		return rc, err
 	}
 	promptFile, err := l.writePrompt()
 	if err != nil {
 		return ExitBadFlags, err
+	}
+	if rc, err := l.verdict(deps.cloudRemoteHead(ctx, l.dir, repo)); rc != ExitOK {
+		return rc, err
 	}
 	confirmed, rc, err := l.start(ctx, promptFile)
 	if rc != ExitOK {
@@ -115,6 +118,24 @@ func (deps Deps) cloudRepo(ctx context.Context, dir string) (cloudlaunch.Repo, e
 	return cloudlaunch.ReadRepo(ctx, sysexec.DefaultRunner, dir)
 }
 
+func (deps Deps) cloudRemoteHead(ctx context.Context, dir string, repo cloudlaunch.Repo) error {
+	if deps.CloudRemoteHead != nil {
+		return deps.CloudRemoteHead(ctx, dir, repo)
+	}
+	return repo.VerifyRemoteHead(ctx, sysexec.DefaultRunner, dir)
+}
+
+func (l cloudLaunch) verdict(err error) (int, error) {
+	var refusal *cloudlaunch.Refusal
+	switch {
+	case err == nil:
+		return ExitOK, nil
+	case errors.As(err, &refusal):
+		return l.refuse(refusal), nil
+	}
+	return ExitBadFlags, fmt.Errorf("%s read the repository of %s: %w", l.prefix, l.dir, err)
+}
+
 func (l cloudLaunch) refuse(err *cloudlaunch.Refusal) int {
 	fmt.Fprintf(l.deps.Stderr, "%s safety gate: launch refused: %v\n", l.prefix, err)
 	l.emit(signalcenter.Event{
@@ -125,7 +146,7 @@ func (l cloudLaunch) refuse(err *cloudlaunch.Refusal) int {
 }
 
 func (l cloudLaunch) writePrompt() (string, error) {
-	prompt, err := resolvePromptText(l.cfg, l.deps)
+	prompt, err := cloudPromptText(l.cfg, l.deps)
 	if err != nil {
 		return "", fmt.Errorf("%s %w", l.prefix, err)
 	}
@@ -137,6 +158,48 @@ func (l cloudLaunch) writePrompt() (string, error) {
 		return "", fmt.Errorf("%s write the cloud prompt: %w", l.prefix, err)
 	}
 	return path, nil
+}
+
+var (
+	challengeCommentLine = regexp.MustCompile(`(?m)^[ \t]*<!--\s*challenge-token:[^\n]*?-->[ \t]*\n?|<!--\s*challenge-token:[^\n]*?-->`)
+	absolutePathToken    = regexp.MustCompile(`(^|[\s"'(\[<=` + "`" + `])(/[A-Za-z0-9._@+-]+(?:/[A-Za-z0-9._@+-]+)+)`)
+)
+
+func cloudPromptText(cfg *Config, deps Deps) (string, error) {
+	raw, err := os.ReadFile(cfg.PromptFile)
+	if err != nil {
+		return "", fmt.Errorf("read prompt: %w", err)
+	}
+	content := string(raw)
+	tok, err := promptChallengeToken(cfg, deps, content)
+	if err != nil {
+		return "", err
+	}
+	if tok == "" {
+		tok = workspaceChallengeToken(cfg)
+	}
+	scrubbed := cloudPromptReplacer(cfg, tok).Replace(challengeCommentLine.ReplaceAllString(content, ""))
+	return absolutePathToken.ReplaceAllStringFunc(scrubbed, baseOfAbsolutePath), nil
+}
+
+func baseOfAbsolutePath(match string) string {
+	i := strings.Index(match, "/")
+	return match[:i] + filepath.Base(match[i:])
+}
+
+func cloudPromptReplacer(cfg *Config, tok string) *strings.Replacer {
+	name := filepath.Base(cfg.Artifact)
+	pairs := [][2]string{
+		{"$CHALLENGE_TOKEN", ""}, {"$ARTIFACT_PATH", name}, {cfg.Artifact, name}, {tok, ""},
+		{cfg.Workspace, "."}, {cfg.Worktree, "."}, {cfg.ProjectRoot, "."},
+	}
+	pairs = slices.DeleteFunc(pairs, func(p [2]string) bool { return p[0] == "" || p[0] == "/" })
+	slices.SortStableFunc(pairs, func(a, b [2]string) int { return len(b[0]) - len(a[0]) })
+	args := make([]string, 0, 2*len(pairs))
+	for _, p := range pairs {
+		args = append(args, p[0], p[1])
+	}
+	return strings.NewReplacer(args...)
 }
 
 func cloudTaskArgument(prompt string) string {

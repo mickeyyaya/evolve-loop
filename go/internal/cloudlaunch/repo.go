@@ -16,6 +16,7 @@ type Repo struct {
 	Remote string
 	URL    string
 	Ahead  int
+	Head   string
 }
 
 type Refusal struct{ Reason string }
@@ -45,7 +46,35 @@ func ReadRepo(ctx context.Context, run sysexec.RunFunc, dir string) (Repo, error
 	if r.Ahead, err = strconv.Atoi(ahead); err != nil {
 		return r, refuse("branch %s: the count of unpushed commits %q is not a number: %v", r.Branch, ahead, err)
 	}
+	if r.Head, err = sysexec.Output(ctx, run, dir, "git", "rev-parse", "HEAD"); err != nil {
+		return r, refuse("the head of branch %s cannot be read: %v", r.Branch, err)
+	}
 	return r, nil
+}
+
+func (r Repo) VerifyRemoteHead(ctx context.Context, run sysexec.RunFunc, dir string) error {
+	ref := "refs/heads/" + r.Branch
+	out, err := sysexec.Output(ctx, run, dir, "git", "ls-remote", r.Remote, ref)
+	if err != nil {
+		return refuse("the head of branch %s cannot be read from the remote %s with git ls-remote: %v", r.Branch, r.Remote, err)
+	}
+	remote := remoteHead(out, ref)
+	switch {
+	case remote == "":
+		return refuse("branch %s is not on the remote %s: push it first, because the cloud session clones the remote branch", r.Branch, r.Remote)
+	case remote != r.Head:
+		return refuse("the remote %s holds %s for branch %s and the local head is %s: the cloud session would clone another commit, so push or pull first", r.Remote, remote, r.Branch, r.Head)
+	}
+	return nil
+}
+
+func remoteHead(lsRemote, ref string) string {
+	for _, line := range strings.Split(lsRemote, "\n") {
+		if fields := strings.Fields(line); len(fields) == 2 && fields[1] == ref {
+			return fields[0]
+		}
+	}
+	return ""
 }
 
 func (r Repo) Check(hosts []string) error {

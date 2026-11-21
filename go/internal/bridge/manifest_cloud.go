@@ -11,13 +11,14 @@ type CloudLaunchSpec struct {
 	Args         []string `json:"args"`
 	SessionRegex string   `json:"session_regex"`
 	ViewRegex    string   `json:"view_regex"`
+	ResumeRegex  string   `json:"resume_regex"`
 	FailRegex    string   `json:"fail_regex"`
 	DeadlineS    int      `json:"deadline_s"`
 	RemoteHosts  []string `json:"remote_hosts"`
 }
 
 type cloudPatterns struct {
-	session, view, fail *regexp.Regexp
+	session, view, resume, fail *regexp.Regexp
 }
 
 type cloudConfirmation struct {
@@ -47,6 +48,9 @@ func (s *CloudLaunchSpec) patterns(cli string) (cloudPatterns, error) {
 		return cloudPatterns{}, err
 	}
 	if p.view, err = groupedPattern(cli, "view_regex", s.ViewRegex, "url", "id"); err != nil {
+		return cloudPatterns{}, err
+	}
+	if p.resume, err = groupedPattern(cli, "resume_regex", s.ResumeRegex, "id"); err != nil {
 		return cloudPatterns{}, err
 	}
 	if p.fail, err = groupedPattern(cli, "fail_regex", s.FailRegex, "reason"); err != nil {
@@ -86,19 +90,28 @@ func group(re *regexp.Regexp, pane string, m []int, name string) string {
 }
 
 func (p cloudPatterns) confirmation(pane string) (cloudConfirmation, bool) {
-	session := lastMatch(p.session, pane)
-	if session == nil {
+	resume := lastMatch(p.resume, pane)
+	if resume == nil {
 		return cloudConfirmation{}, false
 	}
-	view := lastMatch(p.view, pane)
-	if view == nil || view[0] < session[1] {
-		return cloudConfirmation{}, false
+	id := group(p.resume, pane, resume, "id")
+	views := p.view.FindAllStringSubmatchIndex(pane[:resume[0]], -1)
+	for i := len(views) - 1; i >= 0; i-- {
+		view := views[i]
+		if group(p.view, pane, view, "id") != id {
+			continue
+		}
+		session := lastMatch(p.session, pane[:view[0]])
+		if session == nil {
+			return cloudConfirmation{}, false
+		}
+		return cloudConfirmation{
+			title: group(p.session, pane, session, "title"),
+			url:   group(p.view, pane, view, "url"),
+			id:    id,
+		}, true
 	}
-	return cloudConfirmation{
-		title: group(p.session, pane, session, "title"),
-		url:   group(p.view, pane, view, "url"),
-		id:    group(p.view, pane, view, "id"),
-	}, true
+	return cloudConfirmation{}, false
 }
 
 func (p cloudPatterns) failure(pane string) (string, bool) {
