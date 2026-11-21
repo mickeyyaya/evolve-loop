@@ -67,6 +67,14 @@ type PrefixRule struct {
 
 var prefixRE = regexp.MustCompile(`^([a-z][a-z-]*(\([a-z0-9-]+\))?)!?:`)
 
+func Type(subject string) string {
+	m := prefixRE.FindStringSubmatch(strings.TrimLeft(subject, " \t"))
+	if m == nil {
+		return ""
+	}
+	return strings.TrimSuffix(m[1], m[2])
+}
+
 func Run(opts Options) (Result, error) {
 	res := Result{}
 

@@ -1,6 +1,6 @@
 # Regression proof and supervision: a fix proves itself, and a stuck agent says why
 
-**Status:** proposed, 2026-11-04. Each new name in this file is a proposal until its component lands: `GUARD_DENIED`, `guard_refused`, `FIX_PROOF_*`, `FLOOR_RETAKE_*`, `regression_proof.stage`, `Fix-Journey` and `go/test/journeys`.
+**Status:** proposed, 2026-11-04. Component R5 landed: `go/test/journeys`, the `Fix-Journey` trailer and `FIX_PROOF_MISSING`. Each other new name in this file is a proposal until its component lands: `GUARD_DENIED`, `guard_refused`, the other `FIX_PROOF_*` codes, `FLOOR_RETAKE_*` and `regression_proof.stage`.
 
 > [ADR-0159](adr/0159-the-loop-keeps-its-integration-train-and-takes-six-practices-from-the-2026-harness-projects.md) · plan: [harness-practices-2026-11](../plans/harness-practices-2026-11.md) and [§10 of the integration plan](../plans/wave-integration-2026-10.md#10-amendment-of-2026-11-04-console-prs-enter-the-train) · research: [harness-practices-2026-11](../research/harness-practices-2026-11.md).
 > This file is the spec of record for the regression proof gate, the journey registry, derived cycle liveness, the terminal refusal and the floor retake. [wave-orchestrator](wave-orchestrator.md) holds the integration train.
@@ -74,7 +74,13 @@ The registry is one JSON file at `go/test/journeys/journeys.json`. Each row has 
 | `test` | The package and the test name | `internal/bridge.TestClaudeCloud_...` |
 | `issue` | The inbox id or the PR | `#1286` |
 
-A guard test in `go/test/journeys` fails when a row names a test that does not exist. The file and each test that it names are on the protected surface, so a cycle cannot remove or weaken them (research F8.3). A row never goes away by edit. A retired journey keeps its row with the field `retired` and a reason.
+A guard test in `go/test/journeys` fails when a row names a test that does not exist. It also fails when the test sits in a file that the default build skips. The model of the registry is `go/internal/journeys` ([package note](packages/internal-journeys.md)). The data and the guard test are in `go/test/journeys` ([package note](packages/test-journeys.md)).
+
+The file, the guard, the model and the file of each named test are on the protected surface. So a cycle cannot remove or weaken them (research F8.3). The guard fails when the file of an active row is not protected. So a new row needs its test file in the manifest of `go/internal/guards/integrity_surface.go`.
+
+A row never goes away by edit. A retired journey keeps its row with the field `retired` and a reason. The commit gate enforces this rule. `refuseRemovedJourneyRows` reads the registry at `HEAD` and on disk. It refuses a change that removes a row or empties a `retired` reason.
+
+The seed rows are the five journeys of the plan whose tests exist today. The journey of F3.6 has no test yet, so it has no row. The cloud launch test is `internal/bridge.TestClaudeCloudCommand_PassesNoSeparatorBecauseTheRealCLIRefusesIt`.
 
 **Who adds a row.** A lane cannot change a protected path, so a lane adds no row. A lane fix names its test: `Fix-Journey: test:<package>.<Test>`, and the gate runs it. The lane writes the row as a held proposal ([ADR-0157](adr/0157-the-loop-works-its-own-code-a-narrow-fence-and-held-proposals.md)), and the console adds it at the boundary. Until then the gate reports `FIX_PROOF_PROVEN` with `row=pending`.
 
@@ -104,7 +110,11 @@ flowchart TD
   G -- fails --> X
 ```
 
-The gate runs in `evolve commit-gate` and in the ship gate. The red run uses a temporary worktree. Test files come from the commit, and each other file comes from the parent. This keeps the copy of the test that the author wrote and removes the fix.
+The check runs at ship. Ship holds the message that becomes the commit, and it runs once for each commit. `evolve ship --class manual` reads the message of the author before it appends the diff footer and the `Reviewed-by` lines. `Fix-Journey` is a line of the closing trailer block of that text. The landed commit has the footer after it. So a later reader must read the text of the author, not the last paragraph of the landed commit.
+
+At R5, ship emits `FIX_PROOF_MISSING` as a WARN when a `fix:` commit (also `fix!:` and `fix(scope):`) has no usable trailer. The field `problem` is `missing`, `malformed`, `unknown_journey`, `missing_test` or `registry_unreadable`. A signal is for shadow only and blocks nothing. R6 adds `regression_proof.stage`, and the always-emit behavior of R5 becomes its `shadow` value, so no second stage constant exists. R6 also adds the other codes. The `none <reason>` form emits nothing at R5, and R6 owns `FIX_PROOF_WAIVED`.
+
+The module of the code is `fix.proof`, and its prefix is `FIX_PROOF_`. So the five names of this section keep one prefix. The red run uses a temporary worktree. Test files come from the commit, and each other file comes from the parent. This keeps the copy of the test that the author wrote and removes the fix.
 
 The red run must fail twice, and each failure must name the journey test, so a one-off or an unrelated failure is not proof. A failure that names no such test is `INCONCLUSIVE`. A compile failure is `INCONCLUSIVE` too, because a test can need an API that the fix adds. Neither blocks. A high share of this result means that the design must change (ADR-0159).
 
@@ -220,7 +230,9 @@ This is a read-only view. It starts no server, seat or agent, and it sends no ke
 
 | Rule | Guard | State |
 |---|---|---|
-| A registry row names a real test | Test in `go/test/journeys` | Planned (R5) |
+| A registry row names a real test | Test in `go/test/journeys` | Landed (R5) |
+| A registry row goes away only with a reason | `refuseRemovedJourneyRows` in the commit gate | Landed (R5) |
+| A `fix:` commit names a journey | `FIX_PROOF_MISSING` from `evolve ship --class manual` | Landed (R5), shadow |
 | A `fix:` commit has a proof | `regression_proof.stage` | Planned (R6), shadow first |
 | A terminal phase with a dead owner is not active | Role guard test | Planned (R1) |
 | A guard denial ends the chain | Bridge test | Planned (R2) |
@@ -229,6 +241,8 @@ This is a read-only view. It starts no server, seat or agent, and it sends no ke
 
 ## Limits
 
+- The R5 check covers console `fix:` commits only. A lane commit is titled `evolve-cycle N: ...` and has no `fix:` prefix. R6 covers lanes.
+- The registry guard proves that a named test exists and that its file is protected. It does not prove that the test drives the journey.
 - The gate proves that a test depends on the fix. It does not prove that the test covers the whole journey.
 - A test that fails twice by chance on the old tree and passes on the new tree still reads as proof.
 - A fix that adds an API gets `INCONCLUSIVE`, so the gate proves less for that fix.

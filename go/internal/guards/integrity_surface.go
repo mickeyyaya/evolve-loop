@@ -268,6 +268,14 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/gateclass/", Class: GateGuarantee, Rationale: "the gate classifier and the surface tiers of I-10: an agent that could edit them could weaken a gate and pass its own check (ADR-0155, llm-isolation.md §20)", Constitution: true},
 	{Fragment: "/go/internal/phases/ship/gate_classifier_gate.go", Class: GateGuarantee, Rationale: "the ship check that refuses a cycle diff the gate classifier flags (ADR-0155, llm-isolation.md §20.3)"},
 	{Fragment: "/go/internal/core/gate_classifier_floor.go", Class: GateGuarantee, Rationale: "the build floor check that fails a build the gate classifier flags (ADR-0155, llm-isolation.md §20.3)"},
+	{Fragment: "/go/internal/journeys/", Class: GateGuarantee, Rationale: "the journey registry model: it loads the rows, resolves each named test and reads the Fix-Journey trailer, so a cycle that weakened it could pass a fix with no proof (regression-proof-and-supervision.md section 3)"},
+	{Fragment: "/go/test/journeys/", Class: GateGuarantee, Rationale: "the journey registry, journeys.json, and its guard test: a row goes away only with a retired reason, and each unretired row names a real test on the protected surface (regression-proof-and-supervision.md section 3)"},
+	{Fragment: "/go/internal/phases/ship/fixjourney.go", Class: GateGuarantee, Rationale: "the ship check that reads the Fix-Journey trailer of a manual fix commit and emits FIX_PROOF_MISSING; a cycle that weakened it could hide a fix with no proof"},
+	{Fragment: "/go/internal/phases/ship/fixjourney_test.go", Class: GateGuarantee, Rationale: "the fix proof signal's own regression pins through the real manual ship"},
+	{Fragment: "/go/internal/bridge/driver_claudecloud_test.go", Class: GuardGuarantee, Rationale: "the test of journey cloud-launch-reaches-the-cli: it checks the launch line against the real CLI refusal of a separator (#1286)"},
+	{Fragment: "/go/cmd/evolve/cmd_cycle_resume_concurrent_test.go", Class: GuardGuarantee, Rationale: "the test of journey paused-cycles-resume-through-lanes: each paused cycle resumes concurrently after one grant (#1280)"},
+	{Fragment: "/go/internal/orchestrator/family_holds_test.go", Class: GuardGuarantee, Rationale: "the test of journey one-family-runs-one-lane: two todos of one family run one after the other (F3.8)"},
+	{Fragment: "/go/internal/cli/agentcmd/agent_verdict_fence_test.go", Class: GuardGuarantee, Rationale: "the test of journey fenced-verdict-reads-as-its-verdict: a verdict line in a code fence reads as the verdict it states (#1250)"},
 }
 
 func IsProtectedSurface(path string) bool {

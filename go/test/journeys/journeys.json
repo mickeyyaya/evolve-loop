@@ -1,0 +1,32 @@
+[
+  {
+    "id": "cloud-launch-reaches-the-cli",
+    "journey": "A cloud launch line reaches the real CLI without a separator that the CLI refuses",
+    "test": "internal/bridge.TestClaudeCloudCommand_PassesNoSeparatorBecauseTheRealCLIRefusesIt",
+    "issue": "#1286"
+  },
+  {
+    "id": "paused-cycles-resume-through-lanes",
+    "journey": "Each paused cycle resumes at once through its own lane after one grant",
+    "test": "cmd/evolve.TestResumeAll_EveryPausedCycleResumesConcurrentlyAtItsOwnPhaseAfterOneGrant",
+    "issue": "#1280"
+  },
+  {
+    "id": "aborted-cycle-lets-the-boundary-heal",
+    "journey": "A sealed cycle with no live owner lets the boundary self-heal agent write its own output",
+    "test": "internal/cli/guardcmd.TestRunGuard_Role_AbortedCycleWithNoLeaseLetsTheBoundarySelfHealWrite",
+    "issue": "F3.4"
+  },
+  {
+    "id": "one-family-runs-one-lane",
+    "journey": "Two todos of one family run one after the other in any launch order",
+    "test": "internal/orchestrator.TestPool_TwoTodosOfOneFamilyRunOneAfterTheOther",
+    "issue": "F3.8"
+  },
+  {
+    "id": "fenced-verdict-reads-as-its-verdict",
+    "journey": "A verdict line inside a code fence reads as the verdict that it states",
+    "test": "internal/cli/agentcmd.TestAgentRun_AVerdictLineInACodeFenceReadsAsTheVerdictThatItStates",
+    "issue": "#1250"
+  }
+]
