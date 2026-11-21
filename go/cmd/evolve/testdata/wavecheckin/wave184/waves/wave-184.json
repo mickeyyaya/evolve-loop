@@ -1,0 +1,14 @@
+{
+  "number": 184,
+  "run_id": "20261120T204107Z",
+  "goal_hash": "b6eb4bab334df11d2c4facaef9c701b554a85f247b7db4faccb057c6bf9e054f",
+  "goal_path": "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/waves/wave-184-goal.md",
+  "goal_bytes": 4160,
+  "main_sha": "63f36a9357898ca756cd09e7f945ceb628905b29",
+  "cycle_floor": 2572,
+  "pid": 26667,
+  "log_path": "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/logs/20261120T204107Z/loop.log",
+  "started_at": "2026-11-21T04:47:02.027267+08:00",
+  "ended_at": "2026-11-21T05:30:36.755283024Z",
+  "outcome": "5 of 8 cycles shipped"
+}

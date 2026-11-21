@@ -1,0 +1,20 @@
+{
+  "cycle": 2574,
+  "run_id": "01M7XBCV8SVQYYN648X1G3B0Q7",
+  "audit_artifact_sha256": "460b139fecee7e01aa1a9333d84fd74373f1c00838660bb2702ff67fb5b82fab",
+  "audited_tree": "dbc84dfdb0d96a4c699c6143d0c80051a5f55ec1",
+  "lane_tree": "dbc84dfdb0d96a4c699c6143d0c80051a5f55ec1",
+  "worktree_base_sha": "63f36a9357898ca756cd09e7f945ceb628905b29",
+  "commit_sha": "5c1fa15eaf473884974de1b9e9aab88838b6c7d6",
+  "commit_tree": "23addf34e05f047e14e6f0fc1327597e2c4cfe4a",
+  "consumed_paths": [
+    ".evolve/inbox/2026-11-20T19-09-42Z-hostsampler-stop-test-stops-after-a-counted-read.json",
+    ".evolve/inbox/consumed/2026-11-20T19-09-42Z-hostsampler-stop-test-stops-after-a-counted-read.json"
+  ],
+  "explanation_view_sha256": "ea3f30802d1faa6186ab18451933789a121f6c732ff3763c9da0f1e082cfcf99",
+  "pre_main": "63f36a9357898ca756cd09e7f945ceb628905b29",
+  "branch": "main",
+  "lane_branch": "cycle-cd3ae73e-2574",
+  "status": "complete",
+  "completed_at": "2026-11-20T21:33:15Z"
+}

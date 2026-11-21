@@ -895,3 +895,4 @@
 ./internal/cli/landcmd
 ./internal/hostpressure
 ./internal/logread
+./internal/wavehealth

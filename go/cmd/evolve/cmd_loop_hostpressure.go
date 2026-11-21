@@ -102,9 +102,13 @@ func hostConfig(a policy.AdaptiveConfig, floor, ceiling int) hostpressure.Config
 }
 
 func hostSamplesPath(cfg loopConfig) string {
-	dir := filepath.Join(cfg.EvolveDir, "logs")
-	if cfg.LogPath != "" {
-		dir = filepath.Dir(cfg.LogPath)
+	return hostSamplesFilePath(cfg.EvolveDir, cfg.LogPath)
+}
+
+func hostSamplesFilePath(evolveDir, logPath string) string {
+	dir := filepath.Join(evolveDir, "logs")
+	if logPath != "" {
+		dir = filepath.Dir(logPath)
 	}
 	return filepath.Join(dir, "host-pressure.ndjson")
 }

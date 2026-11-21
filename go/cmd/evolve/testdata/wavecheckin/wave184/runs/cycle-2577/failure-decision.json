@@ -1,0 +1,9 @@
+{
+  "category": "non-progress",
+  "level": "system",
+  "evidence": "cycle 2560 and cycle 2577 both failed the build floor on the same macOS sys/user ratio predicate (TestC2560_006, TestC2577_003) of item core-tests-cut-git-starts; the 2560 carryover to drop the ratio never reached the item, and the 2577 eval still lists the criterion",
+  "justification": "the lane cannot change its own acceptance contract, so a retry repeats the failure; the pipeline did not deliver the prior remedy to the item",
+  "action": "halt-and-diagnose",
+  "fix_type": "reintent",
+  "schema_version": 1
+}

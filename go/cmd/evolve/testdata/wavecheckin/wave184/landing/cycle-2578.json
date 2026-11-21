@@ -1,0 +1,20 @@
+{
+  "cycle": 2578,
+  "run_id": "01M7XBCVAGQNYMZMN07KGF3ZP6",
+  "audit_artifact_sha256": "2c2beb05deb908dbc144c9cf745e4e350d14e40f800877ec9499105ad7e9217c",
+  "audited_tree": "234b6d8f3f550be26448c0cae5bf8ebbde257b87",
+  "lane_tree": "6bd297a50798e6a55a9b7c37712915a65743f985",
+  "worktree_base_sha": "5badf79df3dcdab8b63e85ad8bd64dbdf64221d6",
+  "commit_sha": "bca87621231f3a25e5a70b90bf5644ae7dd944a3",
+  "commit_tree": "89e6bcb72b9b22c6f4526ef04f4d8c2d5303299e",
+  "consumed_paths": [
+    ".evolve/inbox/2026-11-20T10-06-19Z-integration-batch-ejects-a-pr-whose-head-ci-is-red.json",
+    ".evolve/inbox/consumed/2026-11-20T10-06-19Z-integration-batch-ejects-a-pr-whose-head-ci-is-red.json"
+  ],
+  "explanation_view_sha256": "3b96bb946869f23de998a60ba8eb556611678e6bf36f7803cc680b6c4226b63c",
+  "pre_main": "5badf79df3dcdab8b63e85ad8bd64dbdf64221d6",
+  "branch": "main",
+  "lane_branch": "cycle-cd3ae73e-2578",
+  "status": "complete",
+  "completed_at": "2026-11-20T23:58:10Z"
+}
