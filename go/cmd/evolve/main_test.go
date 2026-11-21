@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/internal/derived"
 	"io"
 	"os"
 	"path/filepath"
@@ -33,6 +34,7 @@ func TestMain(m *testing.M) {
 			os.Exit(1)
 		}
 	}
+	derivedRunner = func(string) derived.Generator { return func(context.Context, ...string) error { return nil } }
 	disableWorkspaceGuardForTest = true
 	cycleStartDiskUsageFn = func(string) (looppreflight.DiskUsage, error) {
 		return looppreflight.DiskUsage{FreeBytes: 90 << 30, TotalBytes: 100 << 30}, nil

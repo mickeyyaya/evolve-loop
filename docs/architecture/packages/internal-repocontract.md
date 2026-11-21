@@ -61,6 +61,7 @@ The pack takes the changed paths (D23). The floor judge passes `floorPaths`. If 
 No check proves that each reader has a row (D19). A static read detector is open by construction, and three review rounds found new shapes that escaped it. The registry has these checks instead:
 
 - `TestDataFileReads_EveryNamedTestExists` fails when a row names a test function that its package does not declare. `go test -run` of an absent name passes with nothing run.
+- The row for `go/` and `TestDarwinSetFile_MatchesTheSetDerivedFromTheTree` is CI parity for `go/.darwin-set`. The derived catalog is the one home of the freshness rule ([internal-derived.md](internal-derived.md)). The build floor runs the catalog check first. The pack still refuses the same fact at the floor and at ship, with the `make -C go darwin-set` text of the test.
 - `TestDataFileReads_EveryPathExists` fails when a row `Path` is absent from the tree. `WholeRepository` is exempt.
 - `TestDataFileReads_EveryRowPathMatchesItsKind` fails on a directory `Path` with no `/`, and on a file `Path` that ends in `/`.
 - `TestByNameTests_StaysUnderTheCap` fails when `ByNameTests()` names more than `byNameTestCap` (775) tests. The floor judge fails open on a timeout, so the cap stops silent growth.
