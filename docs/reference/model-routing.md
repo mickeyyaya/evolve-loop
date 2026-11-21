@@ -12,8 +12,8 @@ Each profile in `.evolve/profiles/` names a default tier and an envelope (`model
 |---|---|---|---|---|
 | `fast` | haiku | Gemini 4 Hydrogen (Medium) | Claude Sonnet 5.5 (Low) | gpt-5.6-luna |
 | `balanced` | sonnet | Gemini 4 Hydrogen (High) | Claude Sonnet 5.5 (Medium) | gpt-5.6-terra |
-| `deep` | opus | Gemini 4 Argon (Medium) | Claude Opus 5.5 (Medium) | gpt-5.6-sol |
-| `top` | opus | Gemini 4 Argon (Medium) | Claude Opus 5.5 (Medium) | gpt-5.6-sol |
+| `deep` | opus | Gemini 4 Neon (High) | Claude Opus 5.5 (Medium) | gpt-5.6-sol |
+| `top` | opus | Gemini 4 Neon (XHigh) | Claude Opus 5.5 (Medium) | gpt-5.6-sol |
 
 In Claude Code 2.1.293, the `haiku` alias of the `fast` tier resolves to Haiku 5.5 (checked on 2026-10-08). agy has no Haiku model, so the `fast` tier of `agy-claude-tmux` is Claude Sonnet 5.5 (Low).
 
@@ -61,15 +61,19 @@ This section is the spec of record for what each tier is for and in which order 
 |---|---|---|---|
 | `fast` | does a mechanical transform that a later step checks. No profile uses it today. | `claude` → `agy` → `agy-claude` | haiku; Gemini 4 Hydrogen (Medium); Sonnet 5.5 (Low) |
 | `balanced` | reads and writes code or reports that a reviewer checks. | `claude` → `agy` → `agy-claude` (`builder`: `agy` → `agy-claude` → `claude`) | sonnet; Gemini 4 Hydrogen (High); Sonnet 5.5 (Medium) |
-| `deep` | reasons about correctness, failure or design, without a floor seat at the same depth. | `claude` → `agy` → `agy-claude` | opus; Gemini 4 Argon (Medium); Opus 5.5 (Medium) |
+| `deep` | reasons about correctness, failure or design, without a floor seat at the same depth. | `claude` → `agy` → `agy-claude` | opus; Gemini 4 Neon (High); Opus 5.5 (Medium) |
 | `top` | decides a dispute, or a decision that is expensive to undo. No profile uses it today. | `agy-claude` → `claude` | Opus 5.5 (Medium); opus |
 | floor seats | review the work of another phase. | `claude` only | opus or sonnet, per profile |
 
-**How agy pins stay in place.** agy has no effort flag; the effort is part of the model name. The live catalog picks a model for each tier and overrides the manifest. A catalog tier pin in `.evolve/policy.json` holds `Gemini 4 Hydrogen (Medium)` for `fast`, `Gemini 4 Hydrogen (High)` for `balanced` and `Gemini 4 Neon (XHigh)` for `top` (operator, 2026-11-21). The `top` pin applies only when a `top` seat walks to `agy`; the `top` chain has no `agy` today. Without a pin, the `agy-tmux` manifest sets `Gemini 4 Argon (Medium)` for `deep` and `top`:
+**How agy pins stay in place.** agy has no effort flag; the effort is part of the model name. The live catalog picks a model for each tier and overrides the manifest. A catalog tier pin in `.evolve/policy.json` holds `Gemini 4 Hydrogen (Medium)` for `fast`, `Gemini 4 Hydrogen (High)` for `balanced` and `Gemini 4 Neon (XHigh)` for `top` (operator, 2026-11-21). The `top` pin applies only when a `top` seat walks to `agy`; the `top` chain has no `agy` today.
+
+Without a pin, the `agy-tmux` manifest sets `Gemini 4 Neon (High)` for `deep` and `Gemini 4 Neon (XHigh)` for `top` (operator, 2026-11-21). The picker of agy lists both names. A live launch of them is pending item `agy-neon-names-launch-proof`:
 
 ```json
 "catalog": { "tier_pins": { "agy": { "fast": "Gemini 4 Hydrogen (Medium)", "balanced": "Gemini 4 Hydrogen (High)", "top": "Gemini 4 Neon (XHigh)" } } }
 ```
+
+The deep-tier share ([ADR-0150](../architecture/adr/0150-the-deep-tier-gives-its-first-family-a-fixed-share-of-the-seats-and-paces-it-by-its-week-window.md)) paces agy deep seats by the week window of the deep model, which is now the Gemini models window.
 
 The pin wins over the classifier, also for a cached catalog. A pin to a model that agy does not offer makes `evolve models refresh` fail; it does not fall back. Check the result with `evolve models list`.
 

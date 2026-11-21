@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-var agyModelName = regexp.MustCompile(`^[A-Za-z0-9.\- ]+ \((Low|Medium|High|Thinking)\)$`)
+var agyModelName = regexp.MustCompile(`^[A-Za-z0-9.\- ]+ \((Low|Medium|High|XHigh|Thinking)\)$`)
 
 func TestAgyManifestTierModelsAreNamesAgyAccepts(t *testing.T) {
 	t.Parallel()
@@ -19,7 +19,7 @@ func TestAgyManifestTierModelsAreNamesAgyAccepts(t *testing.T) {
 	}
 	for tier, model := range m.ModelTierMap {
 		if !agyModelName.MatchString(model) {
-			t.Errorf("agy tier %q model %q is not a name agy accepts — it needs the capability/effort parenthetical, e.g. %q. agy does NOT error on a bad name; it silently serves Gemini 3.5 Flash (Medium) for the whole session.",
+			t.Errorf("agy tier %q model %q is not a name agy accepts — it needs the capability/effort parenthetical (Low, Medium, High, XHigh or Thinking; the live agy picker lists Gemini 4 Neon and Hydrogen with XHigh, 2026-11-21), e.g. %q. agy does NOT error on a bad name; it silently serves Gemini 3.5 Flash (Medium) for the whole session.",
 				tier, model, "Gemini 3.8 Flash (Low)")
 		}
 		if strings.Contains(model, "Flash") && !strings.Contains(model, "Flash (") {
@@ -40,11 +40,11 @@ func TestAgyTierModelsPinnedToVerifiedNames(t *testing.T) {
 	for tier, want := range map[string]string{
 		"fast":     "Gemini 4 Hydrogen (Medium)",
 		"balanced": "Gemini 4 Hydrogen (High)",
-		"deep":     "Gemini 4 Argon (Medium)",
-		"top":      "Gemini 4 Argon (Medium)",
+		"deep":     "Gemini 4 Neon (High)",
+		"top":      "Gemini 4 Neon (XHigh)",
 	} {
 		if got := m.ModelTierMap[tier]; got != want {
-			t.Errorf("agy tier %q = %q, want %q (each name launched live and shown verbatim in agy's footer: 4 Hydrogen Medium and High on agy 1.5.9, 2026-11-15, evolve doctor live agy-tmux; 4 Argon Medium for deep and top on agy 1.4.0, 2026-10-16)", tier, got, want)
+			t.Errorf("agy tier %q = %q, want %q (4 Hydrogen Medium and High were launched live on agy 1.5.9, 2026-11-15, evolve doctor live agy-tmux, and shown verbatim in agy's footer; 4 Neon High and XHigh are listed by the live agy picker, 2026-11-21, with the launch proof pending item agy-neon-names-launch-proof)", tier, got, want)
 		}
 	}
 }
