@@ -171,8 +171,8 @@ func TestRunCycleFromPhase_AMovedHeadOverAChangedLaneStillGetsAnAuditRound(t *te
 		t.Fatalf("the spend reader counts %d audit round(s), want 2: a changed lane pays its audit round", got)
 	}
 	paths := recoveryPaths(*out.signals)
-	if len(paths) != 1 || paths[0]["path"] != recoveryPathReaudit || paths[0]["code"] != string(CodeAuditBindingHeadMoved) || paths[0]["reason"] == "" {
-		t.Fatalf("recovery path signals = %v, want one %s path that names why", paths, recoveryPathReaudit)
+	if len(paths) != 1 || paths[0]["path"] != RecoveryPathReaudit || paths[0]["code"] != string(CodeAuditBindingHeadMoved) || paths[0]["reason"] == "" {
+		t.Fatalf("recovery path signals = %v, want one %s path that names why", paths, RecoveryPathReaudit)
 	}
 }
 
@@ -333,7 +333,7 @@ func TestRecoveryPathOf_NamesEachRoute(t *testing.T) {
 	for next, want := range map[Phase]string{
 		"":            recoveryPathEnd,
 		PhaseShip:     recoveryPathRebind,
-		PhaseAudit:    recoveryPathReaudit,
+		PhaseAudit:    RecoveryPathReaudit,
 		PhaseBuild:    recoveryPathRebuild,
 		PhaseDebugger: recoveryPathDebugger,
 		PhaseScout:    string(PhaseScout),
@@ -575,8 +575,8 @@ func TestRunCycleFromPhase_ADeclinedCarryOnAPendingFleetRebaseGoesToReaudit(t *t
 	}
 	requireOrder(t, out.order, "ship", "audit", "ship")
 	paths := recoveryPaths(*out.signals)
-	if len(paths) != 1 || paths[0]["path"] != recoveryPathReaudit || paths[0]["code"] != string(CodeAuditBindingHeadMoved) || paths[0]["original_code"] != string(CodeGitFleetRebaseNeeded) || paths[0]["reason"] == "" {
-		t.Fatalf("recovery path signals = %v, want one %s path for %s that names the fleet-rebase origin and why", paths, recoveryPathReaudit, CodeAuditBindingHeadMoved)
+	if len(paths) != 1 || paths[0]["path"] != RecoveryPathReaudit || paths[0]["code"] != string(CodeAuditBindingHeadMoved) || paths[0]["original_code"] != string(CodeGitFleetRebaseNeeded) || paths[0]["reason"] == "" {
+		t.Fatalf("recovery path signals = %v, want one %s path for %s that names the fleet-rebase origin and why", paths, RecoveryPathReaudit, CodeAuditBindingHeadMoved)
 	}
 }
 

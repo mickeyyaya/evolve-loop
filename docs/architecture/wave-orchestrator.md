@@ -508,6 +508,7 @@ The window never stops a lane in flight. A smaller window only delays the next a
 
 The facts:
 
+- **Re-audits that a moved main caused (since 2026-11-21).** Each cycle in `wave status` carries `moved_main_reaudits`. It counts the `ORCHESTRATOR_SHIP_RECOVERY_PATH` events of the cycle with `fields.path` equal to `reaudit`. A recovery that took `rebind` is not counted. `TestReadCycles_ACycleCountsTheReauditsThatAMovedMainCaused` pins it ([internal-shipwindow](packages/internal-shipwindow.md), wave 184).
 - **The run window.** It starts at the `started_at` of the wave record. It ends at `ended_at`, else at the next record's `started_at`. A current run whose loop is not live ends at the mtime of its loop log. `wave next` uses the same rule to close a wave.
 - **The one exception to "reads state and signals".** `wave status` reads the mtime of the loop log for the run end. It reads the metadata only, never the text. A live run ends at the clock.
 - **A lane interval.** When the run has pool signals, the pool gives each interval. A `LOOP_ORCH_LANE_LAUNCHED` or `LOOP_ORCH_LANE_BACKFILLED` opens a lane, and the next `LOOP_ORCH_LANE_EXITED` of the same `fields.todo` closes it (`wave.MeasureFacts`). The cycles then give only `landed` and the conflicts.

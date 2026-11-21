@@ -409,7 +409,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `ORCHESTRATOR_RESUME_CARRIER_PENDED` | a resume found this cycle's Evolve-Carrier commit at HEAD (crash between rebase and pend) and pended it on its fork point. The resumed cycle sees the pending change instead of an empty diff |
 | `ORCHESTRATOR_SCOPE_DELTA` | the build handoff floor found changed paths outside declared scope (ADR-0087). fields.total, fields.disposition_keep, fields.disposition_carve, and fields.disposition_refuse hold the counts; scope-delta.json lists the paths. WARN for carve or refuse, INFO when all are keep; reports only (shadow) |
 | `ORCHESTRATOR_SHIP_RECOVERY_PATH` | a ship error naming a moved main (AUDIT_BINDING_HEAD_MOVED or GIT_FLEET_REBASE_NEEDED) took a recovery path. fields.path is rebind (identity carry re-bound audit), reaudit, rebuild, debugger, end, or next phase. Fields: fields.code (routed), fields.original_code (raised), fields.reason (why moved HEAD re-audited) |
-| `ORCHESTRATOR_SHIP_WINDOW_LEASE_BROKEN` | a ship recovery broke the ship-window lease of a live holder whose heartbeat passed the TTL. Two lanes can overlap in the window. fields.owner_pid and fields.heartbeat_at name the broken holder |
+| `ORCHESTRATOR_SHIP_WINDOW_LEASE_BROKEN` | the ship-window lease was broken. A ship recovery broke the lease of a live holder whose heartbeat passed the TTL (fields.owner_pid and fields.heartbeat_at name the broken holder). Or the holder of a recovery lost its own lease at a beat (fields.role is holder, and fields.reason names the cause). Two lanes can overlap in the window |
 | `ORCHESTRATOR_SYSTEM_FAILURE` | an ADR-0072 system-level failure was attached to the cycle (INCIDENT when it halts the loop, WARN otherwise); fields.category names the floor |
 
 ### outcome
@@ -558,7 +558,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_TRIVIAL_CRITICAL_PATHS` | verify-class: a trivial-class ship touches critical paths |
 | `SHIP_TRIVIAL_NOT_TRIVIAL` | verify-class: a trivial-class ship exceeds the trivial diff bound |
 | `SHIP_UNKNOWN` | an unclassified ship failure |
-| `SHIP_WINDOW_LEASE_BROKEN` | a ship broke the ship-window lease of a live holder whose heartbeat passed the TTL. Two lanes can overlap in the window. fields.owner_pid and fields.heartbeat_at name the holder |
+| `SHIP_WINDOW_LEASE_BROKEN` | the ship-window lease was broken. A ship broke the lease of a live holder whose heartbeat passed the TTL (fields.owner_pid and fields.heartbeat_at name the holder). Or the holder lost its own lease at a beat (fields.role is holder, and fields.reason names the cause). Two lanes can overlap in the window |
 | `SHIP_WORKTREE_RESOLVE` | atomic-ship: the cycle worktree failed to resolve |
 
 ### signal
