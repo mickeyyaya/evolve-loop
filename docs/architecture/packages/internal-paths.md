@@ -20,6 +20,7 @@
   - `AdaptersDir` and `CapabilityDir` are `<PluginRoot>/adapters`.
   - No environment variable overrides a directory (X18e, I-16). A test sets the roots `EVOLVE_PROJECT_ROOT` and `EVOLVE_PLUGIN_ROOT` instead.
 - **`Resolve` takes the env lookup and the cwd as parameters.** Production passes `os.Getenv`, or calls `ResolveFromEnv`. `ResolveFromEnv` resolves a failing `os.Getwd` to `""` to keep the signature pure. A caller that must surface a cwd failure calls `Resolve` with an explicit cwd.
+- **`BlockerRecordPath` sits beside `FailureDigestRecordPath`.** It gives `.evolve/failure-digests/cycle-<N>.blocker.json`, the record of [internal-cycleblocker](internal-cycleblocker.md). Pinned by `TestBlockerRecordPath_SitsBesideTheDigest`.
 - **Single homes.** `EvolveDirOf` is the intended home of the `<root>/.evolve` join. Other call sites in `cmd/` and `internal/` still spell the join inline. They migrate here when they are touched.
 - **`PolicyPath` and `LoopStopPath`.** `PolicyPath` is the home of the policy file, which the loop wave and chain engines read. `LoopStopPath` is the home of the brake marker that `evolve loop-stop` writes.
 - **`RunWorkspace` is the one home of `<root>/.evolve/runs/cycle-<N>`** ([ADR-0103](../adr/0103-component-breakdown-program.md) unit 09). `core.RunWorkspacePath` projects it for the orchestrator. The defect ledger sits below `core` and reads it directly.

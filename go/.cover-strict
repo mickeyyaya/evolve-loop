@@ -110,6 +110,7 @@
 ./internal/launchrecord 100
 ./internal/integration 100
 ./internal/cyclespend 100
+./internal/cycleblocker 100
 ./internal/selfheal 100
 ./internal/citelemetry 100
 ./internal/coversplit 100

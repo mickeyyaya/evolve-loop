@@ -110,6 +110,10 @@ func FailureDigestRecordPath(evolveDir string, cycle int) string {
 	return filepath.Join(evolveDir, FailureDigestsDir, "cycle-"+strconv.Itoa(cycle)+".json")
 }
 
+func BlockerRecordPath(evolveDir string, cycle int) string {
+	return filepath.Join(evolveDir, FailureDigestsDir, "cycle-"+strconv.Itoa(cycle)+".blocker.json")
+}
+
 func EvolveDirOf(projectRoot string) string { return filepath.Join(projectRoot, ".evolve") }
 
 func EventChannelsRoot(evolveDir string) string { return filepath.Join(evolveDir, "events", "ch") }

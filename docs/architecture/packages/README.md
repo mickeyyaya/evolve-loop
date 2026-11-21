@@ -78,6 +78,7 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/attemptpostmortem` | records how a phase dispatch ended: the cause, the last commands, the suspect command and the pane tail. It renders the record into the next prompt (ADR-0130, R2) | [internal-attemptpostmortem.md](internal-attemptpostmortem.md) |
 | `internal/atomicwrite` | the one crash-safe write-then-rename implementation: plain `Bytes`/`JSON` and the fsyncing `Durable` | [internal-atomicwrite.md](internal-atomicwrite.md) |
 | `internal/changedpkgs` | maps a change to its packages, covering tests and importers | [internal-changedpkgs.md](internal-changedpkgs.md) |
+| `internal/cycleblocker` | names the one blocker of a sealed cycle: a failed check, a failure class or waiting | [internal-cycleblocker.md](internal-cycleblocker.md) |
 | `internal/cyclestate` | the per-cycle state, verdicts and outcome record every phase shares | [internal-cyclestate.md](internal-cyclestate.md) |
 | `internal/cycleclassify` | classifies how a cycle ended: quota pause, hang, refusal or failure | [internal-cycleclassify.md](internal-cycleclassify.md) |
 | `internal/evalqualitycheck` | grades eval commands for vacuity, diversity and flaky shapes before they run | [internal-evalqualitycheck.md](internal-evalqualitycheck.md) |

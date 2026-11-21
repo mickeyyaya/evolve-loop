@@ -53,7 +53,7 @@ func Parse(raw []byte) (Policy, error) {
 }
 
 func (w *WorkflowPolicy) validate() error {
-	for _, check := range []func() error{w.validateRetryLadder, w.validateRepair, w.validateCycleSpend, w.validateBuilderSelfCheck, w.validateSupersede} {
+	for _, check := range []func() error{w.validateRetryLadder, w.validateRepair, w.validateCycleSpend, w.validateBlockerAttribution, w.validateBuilderSelfCheck, w.validateSupersede} {
 		if err := check(); err != nil {
 			return err
 		}
