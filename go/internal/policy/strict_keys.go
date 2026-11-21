@@ -63,13 +63,17 @@ func unknownObjectKey(obj map[string]any, t reflect.Type, path string) error {
 		child := strings.TrimPrefix(path+"."+key, ".")
 		fieldType, ok := keyType(t, key)
 		if !ok {
-			return fmt.Errorf("%w %q: remove it or check its spelling; docs/architecture/policy-config.md lists the keys", ErrUnknownKey, child)
+			return unknownKeyError(child)
 		}
 		if err := unknownKey(obj[key], fieldType, child); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func unknownKeyError(key string) error {
+	return fmt.Errorf("%w %q: remove it or check its spelling; docs/architecture/policy-config.md lists the keys", ErrUnknownKey, key)
 }
 
 func keyType(t reflect.Type, key string) (reflect.Type, bool) {
