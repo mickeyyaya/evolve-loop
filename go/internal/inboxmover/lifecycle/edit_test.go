@@ -328,3 +328,23 @@ func TestMover_Edit_NeverOpensAConsoleOwnedItemToLanes(t *testing.T) {
 		})
 	}
 }
+
+func TestMover_Edit_ARequestThatNamesAPathNoInboxItemOwnsIsNotFound(t *testing.T) {
+	inbox, _ := curationInbox(t)
+	outside := filepath.Join(t.TempDir(), "elsewhere.json")
+	writeItem(t, outside, curatedItem)
+	m := New(inbox, &recordingAppender{})
+	title := []FieldEdit{{Op: EditSet, Field: "title", Value: "renamed"}}
+
+	for name, target := range map[string]string{
+		"a path to no file":        filepath.Join(inbox, "absent.json"),
+		"a file outside the inbox": outside,
+	} {
+		if _, err := m.Edit(target, title); !errors.Is(err, ErrNotFound) {
+			t.Errorf("%s: err = %v, want ErrNotFound", name, err)
+		}
+	}
+	if item := readItem(t, outside); item["title"] != "a curated item" {
+		t.Errorf("outside file = %v, want it untouched", item)
+	}
+}
