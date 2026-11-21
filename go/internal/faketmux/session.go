@@ -23,14 +23,12 @@ const (
 )
 
 var (
-	openFile    = os.OpenFile
-	signalGroup = func(pid int) error { return syscall.Kill(-pid, syscall.SIGKILL) }
-	paneShell   = "/bin/sh"
-	groupOf     = syscall.Getpgid
-	ownGroup    = syscall.Getpgrp
-	commandOf   = func(pid int) (string, error) {
-		return sysexec.Output(context.Background(), sysexec.DefaultRunner, "", "ps", "-o", "comm=", "-p", strconv.Itoa(pid))
-	}
+	openFile     = os.OpenFile
+	signalGroup  = func(pid int) error { return syscall.Kill(-pid, syscall.SIGKILL) }
+	paneShell    = "/bin/sh"
+	groupOf      = syscall.Getpgid
+	ownGroup     = syscall.Getpgrp
+	commandOf    = proctree.CommOf
 	setBlocking  = func(f *os.File) error { return syscall.SetNonblock(int(f.Fd()), false) }
 	processStart = proctree.StartOf
 )

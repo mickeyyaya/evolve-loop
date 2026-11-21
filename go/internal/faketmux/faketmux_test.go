@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
 )
 
 type fakeTmux struct {
@@ -326,7 +328,7 @@ func TestPaneEnv_DropsTheTerminalAndTheOuterTmuxIdentity(t *testing.T) {
 
 func TestForeground_FollowsTheNewestChildToTheDeepestProcess(t *testing.T) {
 	t.Parallel()
-	table := []process{{pid: 10, ppid: 1, comm: "/bin/sh"}, {pid: 11, ppid: 10, comm: "old"}, {pid: 12, ppid: 10, comm: "/usr/bin/agy"}, {pid: 13, ppid: 12, comm: "evolve-fake-cli"}, {pid: 5, ppid: 5, comm: "kernel"}}
+	table := []proctree.Process{{Pid: 10, Ppid: 1, Comm: "/bin/sh"}, {Pid: 11, Ppid: 10, Comm: "old"}, {Pid: 12, Ppid: 10, Comm: "/usr/bin/agy"}, {Pid: 13, Ppid: 12, Comm: "evolve-fake-cli"}, {Pid: 5, Ppid: 5, Comm: "kernel"}}
 	if got := foreground(table, 10); got != "evolve-fake-cli" {
 		t.Errorf("foreground = %q, want the deepest newest descendant", got)
 	}
@@ -335,19 +337,6 @@ func TestForeground_FollowsTheNewestChildToTheDeepestProcess(t *testing.T) {
 	}
 	if got := foreground(table, 99); got != "" {
 		t.Errorf("an unknown pane process = %q, want nothing", got)
-	}
-}
-
-func TestParseProcesses_ReadsPsAndRefusesAMalformedLine(t *testing.T) {
-	t.Parallel()
-	table, err := parseProcesses("  1   0 /sbin/launchd\n 20  1 /Applications/A B.app/a\n")
-	if err != nil || len(table) != 2 || table[1].comm != "/Applications/A B.app/a" || table[1].ppid != 1 {
-		t.Fatalf("parseProcesses = %+v, %v", table, err)
-	}
-	for _, bad := range []string{"1 0", "x 0 sh", "1 y sh"} {
-		if _, err := parseProcesses(bad); err == nil {
-			t.Errorf("parseProcesses(%q) must refuse the line", bad)
-		}
 	}
 }
 

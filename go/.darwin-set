@@ -15,6 +15,7 @@
 ./internal/cycleclassify
 ./internal/events/reader
 ./internal/events/wake
+./internal/faketmux
 ./internal/looppreflight
 ./internal/phases/ship
 ./internal/phasestream
