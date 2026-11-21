@@ -13,15 +13,15 @@
 | ❌ none | No regression test pins this mode. |
 | ⛔ untestable | Depends on external infra/CLI behavior (vendor rate limit, interactive modal) a unit test cannot reproduce; mitigate by design + docs, not a unit test. |
 
-## Summary (counts moved 2026-11-21 for the records of wave 183)
+## Summary (counts moved 2026-11-21 for the records of waves 183 and 185)
 
 | | Count |
 |---|---|
-| Incidents mapped | 80 |
-| Distinct failure modes (coverage-map rows) | 128 |
+| Incidents mapped | 81 |
+| Distinct failure modes (coverage-map rows) | 133 |
 | ✅ covered (a test fails if the bug comes back) | 89 |
 | 🟡 partial (related test, doesn't pin the exact mode) | 11 |
-| ❌ none (no regression test) | 28 |
+| ❌ none (no regression test) | 33 |
 | ⛔ untestable (external infra / live CLI) | 0 |
 
 These counts are tallies of the coverage map's rows, so they move with it: a new
@@ -38,6 +38,8 @@ Recounted on 2026-11-16: the record of the test leak under `go/` adds two rows. 
 Recounted on 2026-11-21: the 11 records of wave 183 add 11 incidents and 13 rows. Three rows are covered and 10 rows have no test yet. The covered rows are the cycle-2558 ratchet row, the cycle-2558 build-floor row and the TDD-floor row. PR #1597 and PR #1601 landed through batch PR #1604.
 
 The map now holds 80 incidents and 128 rows. Of these, 89 are covered, 11 are partial and 28 have no test. Before these rows, main held 69 incidents and 115 rows. Of these, 86 were covered, 11 partial and 18 with no test. PR #1597 had flipped two of them to covered.
+
+Recounted on 2026-11-21: the record of the wave 185 stall adds 1 incident and 5 rows. All five rows have no test yet, and each names the item that tracks it. The map now holds 81 incidents and 133 rows. Of these, 89 are covered, 11 are partial and 33 have no test.
 
 **Historical baseline.** The 2026-05-29 13-agent parallel sweep counted 14
 incidents and 73 distinct failure modes: 40 covered, 20 partial, 10 with no
@@ -179,6 +181,11 @@ not the coverage map, which is the hand-maintained per-incident record.
 | 2026-11-20 — tests and predicates that wait on host time failed on a loaded host | `TestRun_StopSignalEndsRunAndClosesFile` sends the stop after a sleep of 80 ms and expects a sample, so it fails on a loaded runner | `cmd/hostsampler/main_test.go` | ❌ | proposal: inbox item `hostsampler-stop-test-stops-after-a-counted-read` |
 | [2026-11-20 — inbox withdraw refused items that carry lifecycle stamps](2026-11-20-inbox-withdraw-refused-items-that-carry-lifecycle-stamps.md) | the boundary runbook chose `withdraw` for items that carry lifecycle stamps, and the verb refused 5 of them | console runbook, `inboxmover/lifecycle/withdraw.go` (`refuseLifecycleStamps`) | ❌ | none: the refusal is by design; the runbook check is the control |
 | [2026-11-20 — a parked lane never resumed after the main-red stop released](2026-11-20-a-parked-lane-never-resumed-after-the-main-red-stop-released.md) | `pool.resupply` skips an id that is in `known`, and `pool.settle` never clears it, so the lead todo of a paused scope is dropped | `fleet/pool.go` (`add`, `resupply`, `settle`) | ❌ | proposal: inbox item `pool-relaunches-a-parked-lane-after-the-main-red-stop-releases` (`TestPoolResupply_RelaunchesAParkedLeadAfterItsLaneExited`) |
+| [2026-11-21 — wave 185 stalled on the host verification lock](2026-11-21-wave-185-verification-lock-stall.md) | the lock holder gets `max(1, hostCPUs/width)` processors, so 1 at width 8. Other lanes wait 15 minutes each (75 timeouts) | `lanebudget/lanebudget.go`, `verifylock/verifylock.go` | ❌ | proposal: item `verify-lock-holder-gets-the-host-budget` |
+| [2026-11-21 — wave 185 stalled on the host verification lock](2026-11-21-wave-185-verification-lock-stall.md) | no breaker reads a stall: zero ships with live lanes, lane stall signals and a repeated abnormal event did not engage the brake | `cmd/evolve/cmd_loop_window.go`, `cmd_loop_orchestrator.go` | ❌ | proposal: item `in-wave-brake-trips-on-a-shared-fault` |
+| [2026-11-21 — wave 185 stalled on the host verification lock](2026-11-21-wave-185-verification-lock-stall.md) | the audit integration tier ran `-p 1 -parallel 1` behind its own lock and timed out at 10 minutes in four cycles | `phases/audit/ciparitygate/tier.go`, `ciparity/tierscope.go` | ❌ | proposal: part of item `verify-lock-holder-gets-the-host-budget` (plan component C1) |
+| [2026-11-21 — wave 185 stalled on the host verification lock](2026-11-21-wave-185-verification-lock-stall.md) | the console watches wake on failure codes and not on a stall | console watch, `cmd/evolve/cmd_wave_watch_events.go` | ❌ | proposal: draft item `wave-watch-wakes-on-a-stall` (not filed yet) |
+| [2026-11-21 — wave 185 stalled on the host verification lock](2026-11-21-wave-185-verification-lock-stall.md) | a fleet width increase has no verification capacity check | `policy/fleet_orchestrator.go`, `hostpressure/decide.go` | ❌ | proposal: draft item `fleet-width-increase-needs-a-capacity-check` (not filed yet) |
 
 ## Prioritized gap backlog (13-agent sweep; agent confidence in parens)
 
