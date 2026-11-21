@@ -3,12 +3,16 @@
 package ship
 
 import (
+	"context"
 	"encoding/json"
+	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/shiptest"
 )
 
 func TestRun_AForgedIntentNeverShipsAnAuditFAIL(t *testing.T) {
@@ -89,5 +93,42 @@ func TestRun_APolicyRefusalOfACarriedLaneUnwindsItToItsCarriedTree(t *testing.T)
 	}
 	if status := l.Intent(t)["status"]; status != "unwound" {
 		t.Errorf("intent status %v, want unwound", status)
+	}
+}
+
+func TestRun_AnIntentThatCannotBeMarkedUnwoundIsReportedBesideThePushRefusal(t *testing.T) {
+	t.Parallel()
+	shiptest.SkipWhenRoot(t)
+	l := laneReadyToLand(t)
+	outage := &pushOutage{Failures: 1 << 20, Stderr: githubPolicyError}
+	intentDir := filepath.Dir(intentPath(&Options{ProjectRoot: l.Repo}, landingCycle))
+	push := outage.Runner()
+	runner := func(ctx context.Context, name, cwd string, args, env []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
+		if name == "git" && len(args) > 0 && args[0] == "push" {
+			if err := os.Chmod(intentDir, 0o500); err != nil {
+				t.Error(err)
+			}
+		}
+		return push(ctx, name, cwd, args, env, stdin, stdout, stderr)
+	}
+	t.Cleanup(func() { _ = os.Chmod(intentDir, 0o755) })
+
+	_, err := runShip(t, l.Repo, l.options(runner, &sleepLog{}))
+
+	joined, ok := err.(interface{ Unwrap() []error })
+	if !ok {
+		t.Fatalf("err = %v, want the push refusal joined with the failed unwound mark", err)
+	}
+	var codes []core.ShipErrorCode
+	for _, part := range joined.Unwrap() {
+		if se, isShip := core.AsShipError(part); isShip {
+			codes = append(codes, se.Code)
+		}
+	}
+	if len(codes) != 2 || codes[0] != core.CodeGitPushPolicyRefused || codes[1] != core.CodeStateIO {
+		t.Fatalf("ship error codes %v, want the policy refusal then the state write failure", codes)
+	}
+	if status := l.Intent(t)["status"]; status != "prepared" {
+		t.Errorf("intent status %v, want prepared: the mark did not land", status)
 	}
 }

@@ -16,17 +16,22 @@ func init() {
 }
 
 func enterShipWindow(ctx context.Context, opts *Options, res *RunResult) func() {
+	_, release := acquireShipWindow(ctx, opts, res)
+	return release
+}
+
+func acquireShipWindow(ctx context.Context, opts *Options, res *RunResult) (context.Context, func()) {
 	if opts.Class != ClassCycle || opts.DryRun || shipwindow.Held(ctx) {
-		return func() {}
+		return ctx, func() {}
 	}
 	lease, err := shipwindow.Acquire(ctx, filepath.Join(opts.ProjectRoot, ".evolve"), shipwindow.Options{
 		OnStaleBreak: func(h shipwindow.StaleHolder) { reportShipWindowBreak(opts, res, h) },
 	})
 	if err != nil {
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: ship-window lease not acquired (%v); proceeding unleased", err))
-		return func() {}
+		return ctx, func() {}
 	}
-	return func() {
+	return shipwindow.WithHeld(ctx, lease), func() {
 		if err := lease.Release(); err != nil {
 			res.Logs = append(res.Logs, "[ship] WARN: ship-window lease release: "+err.Error())
 		}
@@ -37,7 +42,7 @@ func reportShipWindowBreak(opts *Options, res *RunResult, h shipwindow.StaleHold
 	reason := h.Reason()
 	res.Logs = append(res.Logs, "[ship] WARN: "+reason)
 	opts.Signals.Emit(signalcenter.Event{
-		Cycle: opts.CycleID, RunID: opts.RunID, Phase: "ship", Module: signalcenter.ModuleShip, Origin: "enterShipWindow",
+		Cycle: opts.CycleID, RunID: opts.RunID, Phase: "ship", Module: signalcenter.ModuleShip, Origin: "acquireShipWindow",
 		Kind: signalcenter.KindShipWarning, Severity: signalcenter.SeverityWarn, Code: codeShipWindowLeaseBroken,
 		Reason: reason, Fields: h.Fields(),
 	})

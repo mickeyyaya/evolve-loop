@@ -80,7 +80,7 @@ func TestInboxCenterlessRootsArePinned(t *testing.T) {
 		"internal/cli/inboxcmd/cmd_inbox_claims.go":        "operator commands `evolve inbox claims` and `release` (cycle 1838) — a console verb prints its own lines",
 		"internal/cli/inboxcmd/cmd_inbox_claim.go":         "operator command `evolve inbox claim` (X17d) — a console verb prints its own lines, as `release` does",
 		"cmd/evolve/cmd_syncmain.go":                       "operator command `evolve sync-main`, the claim absorb after the merge (cycle 1838) — it prints its own lines",
-		"cmd/evolve/cmd_loop_wavesync.go":                  "the loop's wave-boundary sync, the claim absorb after the fast-forward (cycle 1838) — it prints its own [loop] lines",
+		"internal/mainsync/mainsync.go":                    "the claim absorb after the fast-forward (cycle 1838), shared by the wave-boundary sync and the ship-window sync — it returns the absorbed claims and each caller prints its own lines",
 		"cmd/evolve/cmd_gc_claims.go":                      "operator command `evolve gc`, the empty claim dir sweep (cycle 1838) — read-only survey, no mover warning",
 		"cmd/evolve/cmd_gc_continuations.go":               "operator command `evolve gc`, the release of old continuation bindings — a console verb prints its own lines",
 		"internal/cli/inboxcmd/cmd_inbox_route_lane.go":    "operator command `evolve inbox route-lane` — 06-F1",

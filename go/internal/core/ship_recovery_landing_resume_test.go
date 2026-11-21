@@ -11,6 +11,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -33,8 +36,8 @@ const (
 )
 
 type outageLane struct {
-	root, wt, ws, base string
-	view               *phaseio.ExplanationView
+	root, wt, ws, base, remote string
+	view                       *phaseio.ExplanationView
 }
 
 func writeResumeFile(t *testing.T, path, body string) {
@@ -50,7 +53,7 @@ func writeResumeFile(t *testing.T, path, body string) {
 func newOutageLane(t *testing.T) outageLane {
 	t.Helper()
 	repo, remote := gittest.Fixture(t), gittest.Bare(t)
-	l := outageLane{root: repo.Dir}
+	l := outageLane{root: repo.Dir, remote: remote.Dir}
 	writeResumeFile(t, filepath.Join(l.root, ".gitignore"), ".evolve/\n!.evolve/\n.evolve/*\n!.evolve/inbox/\n")
 	writeResumeFile(t, filepath.Join(l.root, "fixture.txt"), "fixture line 1\n")
 	writeResumeFile(t, filepath.Join(l.root, filepath.FromSlash(resumeItem)), `{"id":"`+resumeItemID+`"}`+"\n")
@@ -200,3 +203,161 @@ func TestRecoverFromShipError_ATransientPushFailureResumesTheShipWithoutAReaudit
 		t.Errorf("the ship landed at recovery depth %d, want 1: one transient failure, one resumed ship", depth)
 	}
 }
+
+type racingOrigin struct {
+	peer       *gittest.Repo
+	pushes     int
+	racesOnNth int
+}
+
+func (r *racingOrigin) runner() sysexec.RunFunc {
+	return func(ctx context.Context, name, cwd string, args, env []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
+		if name == "git" && len(args) > 0 && args[0] == "push" {
+			r.pushes++
+			if r.pushes == r.racesOnNth {
+				originCommit(r.peer, "raced.txt")
+			}
+		}
+		return sysexec.DefaultRunner(ctx, name, cwd, args, env, stdin, stdout, stderr)
+	}
+}
+
+func originCommit(peer *gittest.Repo, file string) string {
+	peer.Write(file, "origin moved after the audit\n")
+	peer.Git("add", "-A")
+	peer.Git("-c", "commit.gpgsign=false", "commit", "-q", "-m", "origin moves "+file)
+	peer.Git("push", "-q", "origin", "main")
+	return peer.Git("rev-parse", "HEAD")
+}
+
+func auditedRow(t *testing.T, l outageLane) core.LedgerEntry {
+	t.Helper()
+	return core.LedgerEntry{Cycle: resumeCycle, RunID: resumeRunID, Role: "auditor", Kind: "agent_subprocess", ArtifactSHA256: "audit-ref",
+		GitHEAD: l.base, WorktreeBaseSHA: l.base, WorktreeTreeSHA: strings.TrimSpace(runGitT(t, l.wt, "write-tree"))}
+}
+
+func reauditRebasedLane(t *testing.T, l outageLane, cs *core.CycleState, ledger *auditRowLedger) outageLane {
+	t.Helper()
+	l.base = strings.TrimSpace(runGitT(t, l.wt, "rev-parse", "HEAD"))
+	writeResumeFile(t, filepath.Join(l.root, ".evolve", "cycle-state.json"), fmt.Sprintf(
+		`{"cycle_id":%d,"run_id":%q,"active_worktree":%q,"workspace_path":%q,"worktree_base_sha":%q}`, resumeCycle, resumeRunID, l.wt, l.ws, l.base))
+	cs.WorktreeBaseSHA = l.base
+	sealOutageAudit(t, l, strings.TrimSpace(runGitT(t, l.root, "rev-parse", "HEAD")))
+	view, err := explanationdocs.Load(l.ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	l.view = view
+	_ = ledger.Append(context.Background(), auditedRow(t, l))
+	return l
+}
+
+func shipUntilLanded(t *testing.T, l outageLane, phase *ship.Phase, o *core.Orchestrator, ledger *auditRowLedger, cs *core.CycleState) int {
+	t.Helper()
+	for depth := 0; depth < 4; depth++ {
+		resp, err := phase.Run(context.Background(), l.shipRequest())
+		if err == nil && resp.Verdict == core.VerdictPASS {
+			return depth
+		}
+		se, ok := core.AsShipError(err)
+		if !ok {
+			t.Fatalf("ship %d failed without a ShipError: %v", depth+1, err)
+		}
+		next, recovered := o.RecoverWithCarryForTest(context.Background(), l.root, resumeCycle, cs, se, depth, 1)
+		if !recovered || (next != core.PhaseShip && next != core.PhaseAudit) {
+			t.Fatalf("ship %d failed with %s/%s (%s) and recovery routed to %q (recovered=%v): a lane behind an origin that moved must sync and rebind onto it", depth+1, se.Code, se.Class, se.Message, next, recovered)
+		}
+		if next == core.PhaseAudit {
+			l = reauditRebasedLane(t, l, cs, ledger)
+		}
+	}
+	t.Fatal("the lane did not land within the recovery budget")
+	return -1
+}
+
+func landedOnOrigin(t *testing.T, l outageLane, tip string) {
+	t.Helper()
+	remoteMain := strings.Fields(runGitT(t, l.root, "ls-remote", "origin", "refs/heads/main"))[0]
+	if main := strings.TrimSpace(runGitT(t, l.root, "rev-parse", "main")); remoteMain != main {
+		t.Errorf("origin main %s and the plane main %s must both hold the landed lane commit", remoteMain, main)
+	}
+	runGitT(t, l.root, "fetch", "-q", "origin", "main")
+	runGitT(t, l.root, "merge-base", "--is-ancestor", tip, "origin/main")
+	if got := strings.TrimSpace(runGitT(t, l.root, "show", "origin/main:fixture.txt")); got != "fixture line 1\nthe audited cycle work" {
+		t.Errorf("origin fixture.txt = %q, want the audited cycle work", got)
+	}
+}
+
+func TestRecoverFromShipError_AnOriginCommitAfterTheAuditSyncsTheMainThenRebindsAndLands(t *testing.T) {
+	t.Parallel()
+
+	l := newOutageLane(t)
+	tip := originCommit(gittest.Clone(t, l.remote), "peer.txt")
+	phase := ship.New(ship.Config{Runner: sysexec.DefaultRunner, Sleep: func(time.Duration) {}})
+	ledger := &auditRowLedger{entries: []core.LedgerEntry{auditedRow(t, l)}}
+	o := core.NewOrchestrator(&recStorage{}, ledger, newRunners(nil))
+	cs := core.CycleState{CycleID: resumeCycle, RunID: resumeRunID, ActiveWorktree: l.wt, WorkspacePath: l.ws,
+		WorktreeBaseSHA: l.base, ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion}
+
+	depth := shipUntilLanded(t, l, phase, o, ledger, &cs)
+
+	if depth != 1 {
+		t.Errorf("the ship landed at recovery depth %d, want 1: one rebind after the sync", depth)
+	}
+	landedOnOrigin(t, l, tip)
+}
+
+func TestRecoverFromShipError_AnOriginThatMovesAgainAfterTheSyncLandsAfterOneMoreRecovery(t *testing.T) {
+	t.Parallel()
+
+	l := newOutageLane(t)
+	race := &racingOrigin{peer: gittest.Clone(t, l.remote), racesOnNth: 2}
+	originCommit(race.peer, "peer.txt")
+	phase := ship.New(ship.Config{Runner: race.runner(), Sleep: func(time.Duration) {}})
+	ledger := &auditRowLedger{entries: []core.LedgerEntry{auditedRow(t, l)}}
+	o := core.NewOrchestrator(&recStorage{}, ledger, newRunners(nil))
+	cs := core.CycleState{CycleID: resumeCycle, RunID: resumeRunID, ActiveWorktree: l.wt, WorkspacePath: l.ws,
+		WorktreeBaseSHA: l.base, ExplanationDocumentationVersion: explanationdocs.CurrentContractVersion}
+
+	depth := shipUntilLanded(t, l, phase, o, ledger, &cs)
+
+	if depth != 2 {
+		t.Errorf("the ship landed at recovery depth %d, want 2: the race costs exactly one more sync and rebind", depth)
+	}
+	landedOnOrigin(t, l, race.peer.Git("rev-parse", "HEAD"))
+}
+
+type auditRowLedger struct {
+	mu      sync.Mutex
+	entries []core.LedgerEntry
+}
+
+func (l *auditRowLedger) Append(_ context.Context, e core.LedgerEntry) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.entries = append(l.entries, e)
+	return nil
+}
+
+func (l *auditRowLedger) Verify(context.Context) error { return nil }
+
+func (l *auditRowLedger) Iter(context.Context) (core.LedgerIterator, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return &rowIterator{rows: slices.Clone(l.entries)}, nil
+}
+
+type rowIterator struct {
+	rows []core.LedgerEntry
+	next int
+}
+
+func (i *rowIterator) Next() (core.LedgerEntry, bool, error) {
+	if i.next >= len(i.rows) {
+		return core.LedgerEntry{}, false, nil
+	}
+	i.next++
+	return i.rows[i.next-1], true, nil
+}
+
+func (i *rowIterator) Close() error { return nil }
