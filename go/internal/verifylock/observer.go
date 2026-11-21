@@ -9,6 +9,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
+var now = time.Now
+
 type Observer struct {
 	Signals *signalcenter.Center
 	Cycle   int
@@ -17,9 +19,9 @@ type Observer struct {
 }
 
 func (o Observer) AcquireWithin(ctx context.Context, projectRoot string, wait time.Duration, warn io.Writer) (func(), error) {
-	start := time.Now()
+	start := now()
 	release, err := acquireWithin(ctx, projectRoot, wait, warn)
-	o.Signals.Emit(o.waitEvent(time.Since(start), err))
+	o.Signals.Emit(o.waitEvent(now().Sub(start), err))
 	return release, err
 }
 

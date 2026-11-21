@@ -22,7 +22,7 @@ One `flock`, resident in the hub, is shared by every lane of a repository. LLM p
   - The lock never depends on the signal.
   - The floor uses `ReviewInput.Signals`.
   - The ACS suite takes `Options.Signals`. The audit phase passes its own center. A manual `evolve acs` run passes none and emits nothing.
-  - Pinned by `TestObserverAcquireWithin_AWaitBehindAHeldLockIsMeasuredInOneSignal`, `TestObserverAcquireWithin_AWaitThatEndsAtTheBoundIsAWarnOfOutcomeUnserialized`, `TestObserverAcquireWithin_ANilCenterStillTakesTheLock`, `TestBuildFloorCover_EachLockAcquireEmitsOneWaitSignal` and `TestRun_EachSuiteAcquireEmitsOneWaitSignalOnTheGivenCenter` and `TestGenerateACSVerdictWith_TheSuiteLockWaitReachesTheAuditCenter`.
+  - Pinned by `TestObserverAcquireWithin_TheMeasuredWaitIsTheTimeBetweenAskAndAnswerInOneSignal`, `TestObserverAcquireWithin_AWaitThatEndsAtTheBoundIsAWarnOfOutcomeUnserialized`, `TestObserverAcquireWithin_ANilCenterStillTakesTheLock`, `TestBuildFloorCover_EachLockAcquireEmitsOneWaitSignal` and `TestRun_EachSuiteAcquireEmitsOneWaitSignalOnTheGivenCenter` and `TestGenerateACSVerdictWith_TheSuiteLockWaitReachesTheAuditCenter`.
 - **The holder gets the host budget** (since 2026-11-21). The one run that holds the lock asks `lanebudget.ShareFor(true)` for its share. The rule is in [internal-lanebudget](internal-lanebudget.md), and `verifylock` has no CPU math. A run that lost the lock keeps the lane share. The plan: [verify-lock-holder-budget-2026-11](../../plans/verify-lock-holder-budget-2026-11.md). Evidence: wave 185 ran the one holder at `-p 1` on 14 CPUs and had 73 `verify-single-flight-unavailable` events in 9 cycles.
 - **The release function is idempotent** (`sync.Once`).
 

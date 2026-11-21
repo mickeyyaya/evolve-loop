@@ -2,7 +2,6 @@ package verifylock
 
 import (
 	"context"
-	"strconv"
 	"testing"
 	"time"
 
@@ -19,19 +18,22 @@ func lockWaitEvents(c *signalcenter.Center) []signalcenter.Event {
 	return out
 }
 
-func TestObserverAcquireWithin_AWaitBehindAHeldLockIsMeasuredInOneSignal(t *testing.T) {
-	root := t.TempDir()
-	hold, err := Acquire(context.Background(), root, nil)
-	if err != nil {
-		t.Fatal(err)
+func steppingClock(t *testing.T, step time.Duration) {
+	t.Helper()
+	prev := now
+	at := time.Unix(0, 0)
+	now = func() time.Time {
+		at = at.Add(step)
+		return at
 	}
-	go func() {
-		time.Sleep(300 * time.Millisecond)
-		hold()
-	}()
+	t.Cleanup(func() { now = prev })
+}
+
+func TestObserverAcquireWithin_TheMeasuredWaitIsTheTimeBetweenAskAndAnswerInOneSignal(t *testing.T) {
+	steppingClock(t, 400*time.Millisecond)
 	center := signalcenter.New()
 
-	release, err := Observer{Signals: center, Cycle: 7, RunID: "r7", Source: "build-floor"}.AcquireWithin(context.Background(), root, MaxWait, nil)
+	release, err := Observer{Signals: center, Cycle: 7, RunID: "r7", Source: "build-floor"}.AcquireWithin(context.Background(), t.TempDir(), MaxWait, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,9 +44,8 @@ func TestObserverAcquireWithin_AWaitBehindAHeldLockIsMeasuredInOneSignal(t *test
 		t.Fatalf("got %d lock wait signals, want exactly 1", len(events))
 	}
 	e := events[0]
-	waitMS, perr := strconv.Atoi(e.Fields["wait_ms"])
-	if perr != nil || waitMS < 250 || e.Fields["outcome"] != "acquired" || e.Fields["source"] != "build-floor" || e.Cycle != 7 || e.Module != signalcenter.ModuleHost || e.Severity != signalcenter.SeverityInfo {
-		t.Errorf("event = %+v, want an INFO host signal of source build-floor, outcome acquired and wait_ms of at least 250", e)
+	if e.Fields["wait_ms"] != "400" || e.Fields["outcome"] != "acquired" || e.Fields["source"] != "build-floor" || e.Cycle != 7 || e.Module != signalcenter.ModuleHost || e.Severity != signalcenter.SeverityInfo {
+		t.Errorf("event = %+v, want an INFO host signal of source build-floor, outcome acquired and wait_ms 400", e)
 	}
 }
 
