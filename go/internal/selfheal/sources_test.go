@@ -221,3 +221,26 @@ func TestLoadCycles_ANegativeLimitReadsNoCycle(t *testing.T) {
 		t.Fatalf("%+v %v", got, err)
 	}
 }
+
+func TestTreeVerifier_RecordDocExistsOnlyForALocalRegularFileUnderTheRoot(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "docs/incidents/2026-11-20-x.md"), "# x\n")
+	outside := filepath.Join(filepath.Dir(root), "outside.md")
+	writeFile(t, outside, "# outside\n")
+	v := TreeVerifier{Root: root}
+	cases := map[string]bool{
+		"docs/incidents/2026-11-20-x.md": true,
+		"":                               false,
+		"docs/incidents/absent.md":       false,
+		"docs/incidents":                 false,
+		"../outside.md":                  false,
+		"docs/../../outside.md":          false,
+		filepath.ToSlash(outside):        false,
+	}
+	for doc, want := range cases {
+		if got := v.RecordDocExists(Incident{RecordDoc: doc}); got != want {
+			t.Errorf("record_doc %q: exists %v, want %v", doc, got, want)
+		}
+	}
+}

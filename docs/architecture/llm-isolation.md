@@ -1474,6 +1474,7 @@ The pipeline writes `.evolve/incidents/<id>.json`. The path is a protected surfa
 | `state` | `diagnosing` | `open`, `diagnosing`, `repairing`, `verifying`, `closed`, `escalated` |
 | `attempts` | 1 | the repair cycles so far |
 | `repro_test` | `go/internal/bridge/..._test.go:TestX` | the red test of the repair, after TDD |
+| `record_doc` | `docs/incidents/2026-11-20-x.md` | the path of the incident record, set by `evolve selfheal record-doc`; it is empty until then, and a reopened incident keeps it |
 | `opened_at`, `closed_at` | RFC 3339 times | for OQ4 time to green |
 
 ### 18.3 The evidence index (built by X13, §18.6)
@@ -1516,7 +1517,7 @@ X12 builds step 1 (detect) and step 5 (verify) in `go/internal/selfheal` ([packa
 | Severity | the highest severity of the evidence; INCIDENT at 3 occurrences or on a protected surface |
 | Tier | T0 when the evidence names a protected surface, else T1 or T2 by class (§20.1) |
 | Pass | level-triggered: it reads the whole window each time. A closed record whose fingerprint is in the window again reopens, and an observed fingerprint cannot close. |
-| Close | `Incident.Close` with the four conditions of §22. A record with no `repro_test` stays open until X16. |
+| Close | `Incident.Close` with the five conditions of §22. A record with no `repro_test` stays open until X16. |
 | Stage | the policy key `healing.detector.stage`: `shadow` (default) or `off`. `enforce` is refused until X16 (item `selfheal-repair-cycle-path`). |
 
 The record has the fields of §18.2 and some more fields ([internal-selfheal.md](packages/internal-selfheal.md)). `.evolve/incidents/`, `go/internal/selfheal/`, `go/cmd/evolve/cmd_selfheal.go` and `go/internal/policy/healing.go` are in `guards.ProtectedSurfaceManifest`. The states are `open` and `closed`. X16 adds the other states of §18.2 with a new major schema version, because X16 runs the repairs that move a record through them.
@@ -1738,12 +1739,13 @@ A T0 flag in a loop cycle refuses the ship with `HEALING_I10_VIOLATION`. The rep
 
 ## 22. Close an incident with evidence (I-14)
 
-An incident moves to `closed` only when all four hold:
+An incident moves to `closed` only when all five hold:
 
 1. The red reproduction test of the repair is green on `main`.
 2. The signal that opened the incident does not fire again for one wave.
 3. No quality index regresses outside its interval (ADR-0153 §4).
 4. The recovery retrospective exists (ADR-0151).
+5. The file at `record_doc` exists in the tree. It is the incident record of the knowledge base ([plan](../plans/incident-knowledge-base-2026-11.md) D12).
 
 If a condition fails, the incident goes back to `diagnosing` with `attempts + 1`, and the breaker counts the failure.
 
@@ -1771,7 +1773,7 @@ The module is `healing` (built by X12, code prefix `HEALING_`), in the same shap
 | `incident.opened` | WARN | `HEALING_INCIDENT_OPENED` | the detector opens an incident |
 | `incident.proposal` | INFO | none | the validator accepts a proposal |
 | `incident.refused` | WARN | `HEALING_PROPOSAL_REFUSED` | a proposal fails a precondition, a tier limit or a budget |
-| `incident.closed` | INFO | none | the four close conditions hold |
+| `incident.closed` | INFO | none | the five close conditions hold |
 | `incident.escalated` | INCIDENT | `HEALING_ESCALATED` | two failed repairs, two refused proposals, an open breaker or a `low` diagnosis |
 | `healing.violation` | WARN | `HEALING_I10_VIOLATION` to `HEALING_I14_VIOLATION` | an invariant of Part II breaks |
 
@@ -2065,7 +2067,7 @@ X19 lands in three items:
 | I-11 No agent writes its own oracle | the TDD digest check (item `tdd-predicates-frozen-at-handoff`); `TestT1AuditSeatIsAnotherFamily` | X15, X16 | `enforce` | `HEALING_I11_VIOLATION` |
 | I-12 Orchestrator proposes, pipeline disposes | `TestValidator_RefusesAnActionOutsideTheCatalog` (built); `TestRepairDispatch_NeedsAnAcceptedProposal` (built); the orchestrator profile has no dispatch tool | X13, X14 | `shadow`, then `enforce` for each tier | `HEALING_I12_VIOLATION` |
 | I-13 Bounded autonomy | `TestBudget_RefusesTheFourthT1RepairInAWindow` (built); `TestBreaker_OpensAfterTwoFailedRepairs` (built) | X14 | `shadow` (built), then `enforce` with X16 | `HEALING_I13_VIOLATION` |
-| I-14 Evidence closes an incident | `TestIncident_ClosesOnlyWithTheFourConditions` | X12, X16 | `enforce` | `HEALING_I14_VIOLATION` |
+| I-14 Evidence closes an incident | `TestIncident_ClosesOnlyWhenEachConditionHolds` and `TestIncidentClose_RefusesWithoutARecordDoc` | X12, X16 | `enforce` | `HEALING_I14_VIOLATION` |
 | I-15 The CLI is the service contract | `TestLoopStatus_AnExtraWordNeverStartsALoop`; `TestCLIContract_DocMatchesTheRegistry`; `TestCLIContract_EachCoreVerbPrintsOneEnvelope`; `TestAgentClasses_MatchTheContract` (X17e) | X17 | `enforce` | none (a test guard); X17e: `ISOLATION_I3_VIOLATION` with `rule=verb.class.r` or `verb.class.d` |
 | I-16 No ambient control | `TestNoControlFlagReadOutsideTheMarkerList` (AST); `TestPolicyParse_RefusesAnUnknownKey`; matrix row N1 extended with `EVOLVE_SANDBOX` and `EVOLVE_BYPASS_SHIP_GATE` | X18 | `enforce` | `CONTROL_BYPASS_USED` (INFO, for each audited bypass) |
 | I-17 The assignment is CLI-neutral | `TestNoCLISpecificsAboveTheDriver` (a shrinking allowlist); a routing test that refuses a seat with no capable driver | X19a to X19c | `enforce` | none (a test guard); a routing refusal is a normal routing error |
