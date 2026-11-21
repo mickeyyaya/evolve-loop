@@ -22,7 +22,7 @@ func captureGoTestArgs(t *testing.T, target string, vars ...string) string {
 	t.Helper()
 	root := probeFixture(t, false)
 	writeMakeFixture(t, root, DarwinSetFile, "./internal/probe\n")
-	argLog := filepath.Join(root, "go-test-args.txt")
+	argLog := filepath.Join(t.TempDir(), "go-test-args.txt")
 	wrapper := "#!/bin/sh\nif [ \"$1\" = test ]; then echo \"$*\" > '" + argLog + "'; fi\n" + makeGoBuildRedirect(t) + makeGoRunRedirect(t) + "exec go \"$@\"\n"
 	fakeclitest.Install(t, filepath.Join(root, "probe-go"), wrapper)
 	if out, err := runMakeFixture(t, root, target, vars...); err != nil {
@@ -48,7 +48,7 @@ func TestMakeIntegrationDarwin_GivesTheSlowerHostItsOwnTimeout(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			root := probeFixture(t, false)
 			writeMakeFixture(t, root, DarwinSetFile, "./internal/probe\n")
-			argLog := filepath.Join(root, "go-test-args.txt")
+			argLog := filepath.Join(t.TempDir(), "go-test-args.txt")
 			wrapper := "#!/bin/sh\nif [ \"$1\" = test ]; then echo \"$*\" > '" + argLog + "'; fi\n" + makeGoBuildRedirect(t) + makeGoRunRedirect(t) + "exec go \"$@\"\n"
 			fakeclitest.Install(t, filepath.Join(root, "probe-go"), wrapper)
 			if out, err := runMakeFixture(t, root, tc.target, tc.vars...); err != nil {

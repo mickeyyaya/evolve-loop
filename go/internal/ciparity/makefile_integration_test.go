@@ -466,7 +466,7 @@ func TestMakeIntegration_PassesTheTestTimeout(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := probeFixture(t, false)
-			argLog := filepath.Join(root, "go-test-args.txt")
+			argLog := filepath.Join(t.TempDir(), "go-test-args.txt")
 			wrapper := "#!/bin/sh\nif [ \"$1\" = test ]; then echo \"$*\" > '" + argLog + "'; fi\n" + makeGoBuildRedirect(t) + makeGoRunRedirect(t) + "exec go \"$@\"\n"
 			fakeclitest.Install(t, filepath.Join(root, "probe-go"), wrapper)
 			out, err := runMakeFixture(t, root, "test-integration", tc.vars...)
@@ -600,7 +600,7 @@ func TestMakeIntegration_RoutesTestBinariesThroughTheRusageWrapperOnlyWhenAsked(
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := probeFixture(t, false)
-			argLog := filepath.Join(root, "go-test-args.txt")
+			argLog := filepath.Join(t.TempDir(), "go-test-args.txt")
 			wrapper := "#!/bin/sh\nif [ \"$1\" = test ]; then echo \"$*\" > '" + argLog + "'; fi\n" + makeGoBuildRedirect(t) + makeGoRunRedirect(t) + "exec go \"$@\"\n"
 			fakeclitest.Install(t, filepath.Join(root, "probe-go"), wrapper)
 			out, err := runMakeFixture(t, root, "test-integration", append([]string{"TESTRUSAGE_OUT=" + filepath.Join(root, "rusage.ndjson")}, tc.vars...)...)

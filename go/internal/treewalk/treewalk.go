@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 type Snapshot struct {
@@ -56,6 +57,30 @@ func Diff(before, after Snapshot) []string {
 		}
 	}
 	return added
+}
+
+func Filter(paths, allow []string) []string {
+	prefixes := make([]string, len(allow))
+	for i, a := range allow {
+		prefixes[i] = filepath.Clean(a)
+	}
+	var kept []string
+	for _, p := range paths {
+		if isAllowed(p, prefixes) {
+			continue
+		}
+		kept = append(kept, p)
+	}
+	return kept
+}
+
+func isAllowed(path string, prefixes []string) bool {
+	for _, prefix := range prefixes {
+		if path == prefix || strings.HasPrefix(path, prefix+string(filepath.Separator)) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s Snapshot) Write(path string) error {

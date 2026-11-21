@@ -1,16 +1,32 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/treewalk"
 )
 
 const treewalkUsage = `Usage:
   evolve treewalk snapshot --root DIR --out FILE
-  evolve treewalk check --root DIR --baseline FILE`
+  evolve treewalk check --root DIR --baseline FILE [--allow PREFIX]...`
+
+type allowList []string
+
+func (a *allowList) String() string {
+	return strings.Join(*a, ",")
+}
+
+func (a *allowList) Set(value string) error {
+	if value == "" {
+		return errors.New("allow prefix must not be empty")
+	}
+	*a = append(*a, value)
+	return nil
+}
 
 func runTreewalk(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
@@ -56,6 +72,8 @@ func runTreewalkCheck(args []string, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	root := fs.String("root", ".", "directory tree to walk")
 	baseline := fs.String("baseline", "", "snapshot taken before the tests ran")
+	var allow allowList
+	fs.Var(&allow, "allow", "path or directory prefix allowed to appear under root (repeatable)")
 	if fs.Parse(args) != nil || fs.NArg() != 0 || *baseline == "" {
 		fmt.Fprintln(stderr, treewalkUsage)
 		return 10
@@ -70,7 +88,7 @@ func runTreewalkCheck(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve treewalk check: %v\n", err)
 		return 1
 	}
-	leaked := treewalk.Diff(before, after)
+	leaked := treewalk.Filter(treewalk.Diff(before, after), allow)
 	for _, p := range leaked {
 		fmt.Fprintf(stdout, "LEAK %s\n", p)
 	}

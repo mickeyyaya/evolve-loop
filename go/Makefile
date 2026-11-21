@@ -104,11 +104,15 @@ $(DIST_CHECKSUMS): $(DIST_TARGETS) $(DIST_UNIVERSAL)
 dist-clean: ## Remove cross-compiled artifacts
 	rm -rf $(DIST_DIR)
 
+TREEWALK_SNAPSHOT = $(GO) run ./cmd/evolve treewalk snapshot --root . --out
+TREEWALK_CHECK    = $(GO) run ./cmd/evolve treewalk check --root . --baseline
+TREEWALK_ALLOW    = coverage.txt coverage.partial.txt runner-samples.ndjson $(BIN_DIR) $(TEST_JSON) $(TESTRUSAGE_OUT)
+
 test: ## FAST layer: co-located unit/functional/component tests, race on (excludes acs/, integration, e2e); a treewalk guard fails the run on any file or empty directory the tests leave in go/
 	@base=$$(mktemp) || exit 1; \
-	$(GO) run ./cmd/evolve treewalk snapshot --root . --out "$$base" || exit 1; \
+	$(TREEWALK_SNAPSHOT) "$$base" || { rm -f "$$base"; exit 1; }; \
 	$(GO) test -race -count=1 -cover -timeout $(TEST_TIMEOUT) $(FAST_PKGS); status=$$?; \
-	$(GO) run ./cmd/evolve treewalk check --root . --baseline "$$base" || status=1; \
+	$(TREEWALK_CHECK) "$$base" || status=1; \
 	rm -f "$$base"; exit $$status
 
 test-notmux: ## The notmux build of internal/tmuxtest and internal/bridge under -tags integration,notmux: the floor build, which needs no tmux
@@ -131,7 +135,10 @@ BUILD_RUSAGE = if [ -n "$(TEST_RUSAGE)" ]; then $(GO) build -o $(BIN_DIR)/testru
 INTEGRATION_TEST = $(GO) test $(RUSAGE_EXEC) $(PARALLEL_FLAG) -race -count=1 -timeout $(TEST_TIMEOUT) -tags integration
 
 test-integration: ## Full non-ACS runtime suite with integration, race, and coverage (shared by CI and release); coverage.txt exists only after a green run; TEST_TIMEOUT=20m bounds each package; TEST_JSON=<file> also writes the go test -json stream while the console keeps the plain text; TEST_RUSAGE=1 runs every test binary through bin/testrusage (appends to TESTRUSAGE_OUT); a test package split from the package it tests (go/.cover-split) runs beside the main run with -coverpkg, and its profile and -json stream join the main ones
-	@rm -f coverage.txt coverage.partial.txt coverage.run.*; \
+	@base=$$(mktemp) || exit 1; \
+	trap 'rm -f "'"$$base"'"' EXIT; \
+	rm -f coverage.txt coverage.partial.txt coverage.run.*; \
+	$(TREEWALK_SNAPSHOT) "$$base" || exit 1; \
 	$(BUILD_RUSAGE); \
 	roots=./...; \
 	if [ -n "$(INTEGRATION_SET)" ]; then \
@@ -171,11 +178,32 @@ test-integration: ## Full non-ACS runtime suite with integration, race, and cove
 		[ "$$runstatus" = 0 ] || status=$${runstatus:-1}; \
 		i=$$((i+1)); \
 	done; \
-	if [ "$$status" -ne 0 ]; then rm -f coverage.run.*; exit "$$status"; fi; \
-	profiles=; i=1; while [ "$$i" -le "$$n" ]; do profiles="$$profiles coverage.run.$$i.txt"; i=$$((i+1)); done; \
-	$(BIN_DIR)/coversplit -merge coverage.partial.txt $$profiles || { rm -f coverage.run.* coverage.partial.txt; exit 1; }; \
+	if [ "$$status" -eq 0 ]; then \
+		profiles=; i=1; while [ "$$i" -le "$$n" ]; do profiles="$$profiles coverage.run.$$i.txt"; i=$$((i+1)); done; \
+		$(BIN_DIR)/coversplit -merge coverage.partial.txt $$profiles || status=1; \
+	fi; \
 	rm -f coverage.run.*; \
-	mv coverage.partial.txt coverage.txt
+	if [ "$$status" -eq 0 ]; then \
+		mv coverage.partial.txt coverage.txt || status=1; \
+	else \
+		rm -f coverage.partial.txt; \
+	fi; \
+	set --; \
+	root_abs=$$(pwd -P); \
+	for p in $(foreach a,$(TREEWALK_ALLOW),'$(a)'); do \
+		case "$$p" in \
+			"") continue ;; \
+			/*) if [ -d "$$p" ]; then p=$$(cd "$$p" 2>/dev/null && pwd -P); elif [ -e "$$p" ]; then d=$$(cd "$$(dirname "$$p")" 2>/dev/null && pwd -P) && p="$$d/$$(basename "$$p")"; fi ;; \
+		esac; \
+		case "$$p" in \
+			"$$PWD"/*) p=$${p#"$$PWD"/} ;; \
+			"$$root_abs"/*) p=$${p#"$$root_abs"/} ;; \
+		esac; \
+		[ -n "$$p" ] && set -- "$$@" --allow "$$p"; \
+	done; \
+	$(TREEWALK_CHECK) "$$base" "$$@" || status=1; \
+	if [ "$$status" -ne 0 ]; then rm -f coverage.txt; fi; \
+	exit "$$status"
 
 test-integration-darwin: ## test-integration over the packages of go/.darwin-set only (the macOS CI job); fails when the set file is missing or names no package
 test-integration-darwin: INTEGRATION_SET = $(DARWIN_SET)

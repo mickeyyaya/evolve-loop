@@ -20,7 +20,7 @@ func TestNamedExports(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := Diff(snap, loaded); len(got) != 0 {
-		t.Errorf("Diff = %v, want none", got)
+	if got := Filter(Diff(snap, loaded), []string{"ignored"}); len(got) != 0 {
+		t.Errorf("Filter(Diff) = %v, want none", got)
 	}
 }
