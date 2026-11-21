@@ -62,6 +62,22 @@ func (o *Orchestrator) recordPhaseOutcome(result *CycleResult, timings *[]phaseT
 	}
 }
 
+func (fl failureLearningRequest) failing(phase Phase, err error, attempt int) failureLearningRequest {
+	fl.Failed, fl.Err, fl.Attempt = phase, err, max(attempt, 1)
+	return fl
+}
+
+func (o *Orchestrator) failPhase(ctx context.Context, fl failureLearningRequest, out recovery.PhaseOutcome) {
+	o.recordPhaseOutcome(fl.Result, fl.Timings, fl.CycleState.WorkspacePath, out)
+	o.recordFailureLearning(ctx, fl)
+}
+
+func (o *Orchestrator) diagnoseDispatchFailure(ctx context.Context, fl failureLearningRequest) {
+	workspace := fl.CycleState.WorkspacePath
+	o.writePhaseFailureDiag(workspace, string(fl.Failed), fl.Cycle, fl.Err, fl.Attempt)
+	o.adviseOnUnclassifiedFailure(ctx, fl.Cycle, workspace, fl.CycleRequest.ProjectRoot, fl.Failed, fl.Err, fl.Env)
+}
+
 func (o *Orchestrator) recordHostEnding(timings *[]phaseTimingEntry, out recovery.PhaseOutcome) {
 	o.recorder().RecordEnding(timings, out)
 }

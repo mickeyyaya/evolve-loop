@@ -19,6 +19,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
+	"github.com/mickeyyaya/evolve-loop/go/internal/recovery"
 	"github.com/mickeyyaya/evolve-loop/go/internal/router"
 )
 
@@ -106,20 +107,27 @@ type dispatchResult struct {
 	remediation   bool
 }
 
-func (cr *cycleRun) recordFailureLearning(failed Phase, failErr error, attempt int) {
-	cr.o.recordFailureLearning(cr.ctx, failureLearningRequest{
+func (cr *cycleRun) learning() failureLearningRequest {
+	return failureLearningRequest{
 		CycleRequest: cr.req,
 		Cycle:        cr.cycle,
-		Failed:       failed,
-		Err:          failErr,
-		Attempt:      attempt,
 		State:        &cr.state,
 		CycleState:   &cr.cs,
 		Context:      cr.ctxSnap,
 		Env:          cr.envSnap,
 		Result:       &cr.result,
 		Timings:      &cr.phaseTimings,
-	})
+	}
+}
+
+func (cr *cycleRun) recordFailureLearning(failed Phase, failErr error, attempt int) {
+	fl := cr.learning()
+	fl.Failed, fl.Err, fl.Attempt = failed, failErr, attempt
+	cr.o.recordFailureLearning(cr.ctx, fl)
+}
+
+func (cr *cycleRun) failPhase(out recovery.PhaseOutcome, err error, attempt int) {
+	cr.o.failPhase(cr.ctx, cr.learning().failing(Phase(out.Phase), err, attempt), out)
 }
 
 func (o *Orchestrator) recordFloorVerdictFailure(ctx context.Context, req CycleRequest, cycle int, failed Phase, state *State, cs *CycleState, diags []Diagnostic) {
