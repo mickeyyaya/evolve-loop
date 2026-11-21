@@ -25,8 +25,9 @@ const (
 )
 
 type FieldRole struct {
-	Owner FieldOwner
-	Shape ValueShape
+	Owner       FieldOwner
+	Shape       ValueShape
+	NeedsReason bool
 }
 
 func (r FieldRole) IsCounter() bool {
@@ -80,6 +81,9 @@ const (
 
 var (
 	curated       = func(shape ValueShape) FieldRole { return FieldRole{Owner: CuratorOwned, Shape: shape} }
+	priorityField = func(shape ValueShape) FieldRole {
+		return FieldRole{Owner: CuratorOwned, Shape: shape, NeedsReason: true}
+	}
 	loopStamp     = FieldRole{Owner: LoopStampOwned}
 	loopCounter   = FieldRole{Owner: LoopStampOwned, Shape: CounterValue}
 	loopGrowOnly  = FieldRole{Owner: LoopStampOwned, Shape: GrowOnlyList}
@@ -91,8 +95,8 @@ var fieldRoles = map[string]FieldRole{
 	"title":          curated(TextValue),
 	"summary":        curated(TextValue),
 	"fix":            curated(TextValue),
-	"priority_class": curated(TextValue),
-	"weight":         curated(NumberValue),
+	"priority_class": priorityField(TextValue),
+	"weight":         priorityField(NumberValue),
 	"acceptance":     curated(ListValue),
 	"files":          curated(ListValue),
 	"deps":           curated(ListValue),
@@ -134,6 +138,16 @@ func RoleOf(key string) FieldRole {
 		return role
 	}
 	return FieldRole{Owner: AuthorOwned}
+}
+
+func FieldsNeedingReason() []string {
+	var keys []string
+	for _, key := range slices.Sorted(maps.Keys(fieldRoles)) {
+		if fieldRoles[key].NeedsReason {
+			keys = append(keys, key)
+		}
+	}
+	return keys
 }
 
 func FieldsOwnedBy(owner FieldOwner) []string {

@@ -104,7 +104,7 @@ func TestEmitLoopEscalation_IsAWarnNamingTheStage(t *testing.T) {
 	t.Parallel()
 	c, got, _ := recordingLoopSignals()
 	emitLoopEscalation(c, 1641, "applyEscalationBoundary", "escalation boundary staged 3 items",
-		map[string]string{"stage": "enforce", "bumped": "1", "filed": "2", "skipped": "0", "planned": "0"})
+		map[string]string{"stage": "enforce", "escalated": "1", "filed": "2", "skipped": "0", "planned": "0"})
 	if len(*got) != 1 {
 		t.Fatalf("one loop.escalation, got %d", len(*got))
 	}

@@ -29,7 +29,7 @@ func readItemFields(t *testing.T, path string) map[string]any {
 func TestEdit_RewritesACurationFieldThroughTheLeaf(t *testing.T) {
 	root, inboxDir := seedInbox(t, "task-a")
 
-	path, err := Edit(Options{ProjectRoot: root}, "task-a", []FieldEdit{{Op: EditSet, Field: "weight", Value: "0.4"}, {Op: EditAdd, Field: "files", Value: "go/a.go"}})
+	path, err := EditBecause(Options{ProjectRoot: root}, "task-a", "operator review", []FieldEdit{{Op: EditSet, Field: "weight", Value: "0.4"}, {Op: EditAdd, Field: "files", Value: "go/a.go"}})
 
 	if err != nil || path != filepath.Join(inboxDir, "task-a.json") {
 		t.Fatalf("Edit = (%q, %v)", path, err)
@@ -183,5 +183,20 @@ func TestVerifyPremise_EvidenceNamingAProtectedFileNeverRoutesTheItem(t *testing
 	}
 	if routed, why := inboxbatch.ConsoleRouted(item, isProtected); routed {
 		t.Errorf("ConsoleRouted = (true, %q): a premise stamp must not route the item", why)
+	}
+}
+
+func TestEdit_RefusesAWeightWithoutAReasonAndCheckEditNamesTheSameRule(t *testing.T) {
+	root, inboxDir := seedInbox(t, "task-a")
+	weight := []FieldEdit{{Op: EditSet, Field: "weight", Value: "0.4"}}
+	before := readItemFields(t, filepath.Join(inboxDir, "task-a.json"))
+
+	_, err := Edit(Options{ProjectRoot: root}, "task-a", weight)
+
+	if !errors.Is(err, ErrBadArgs) || !errors.Is(CheckEdit(weight, ""), ErrBadArgs) || CheckEdit(weight, "why") != nil {
+		t.Errorf("Edit err = %v, CheckEdit(no reason) = %v, CheckEdit(reason) = %v", err, CheckEdit(weight, ""), CheckEdit(weight, "why"))
+	}
+	if after := readItemFields(t, filepath.Join(inboxDir, "task-a.json")); after["weight"] != before["weight"] {
+		t.Errorf("a refused edit changed the weight: %v -> %v", before["weight"], after["weight"])
 	}
 }
