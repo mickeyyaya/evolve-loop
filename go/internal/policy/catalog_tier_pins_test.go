@@ -42,13 +42,13 @@ func TestCatalogConfig_TierPinsAbsentIsNil(t *testing.T) {
 	}
 }
 
-func TestTheCheckedInPolicyPinsTheAgyFastAndBalancedTiers(t *testing.T) {
+func TestTheCheckedInPolicyPinsTheAgyFastBalancedAndTopTiers(t *testing.T) {
 	_, thisFile, _, _ := runtime.Caller(0)
 	p, err := Load(filepath.Join(filepath.Dir(thisFile), "..", "..", "..", ".evolve", "policy.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]string{"fast": "Gemini 4 Hydrogen (Medium)", "balanced": "Gemini 4 Hydrogen (High)"}
+	want := map[string]string{"fast": "Gemini 4 Hydrogen (Medium)", "balanced": "Gemini 4 Hydrogen (High)", "top": "Gemini 4 Neon (XHigh)"}
 	if got := p.CatalogConfig().TierPins["agy"]; !reflect.DeepEqual(got, want) {
 		t.Errorf("agy tier_pins = %v, want %v", got, want)
 	}

@@ -74,7 +74,7 @@ A fixed share still lets Argon spend its week in the first days when the share i
 
 ### Solution
 
-The host reader `TierWeek` (`projectTierWeek` in `go/cmd/evolve/cli_routing_lanes.go`) finds the tier model of the family in its manifest. For agy at deep this is Gemini 4 Argon (Medium). It then calls `usageprobe.TierWeek`. That function returns the live week window whose model is a prefix of the tier model, or else the week window of the family.
+The host reader `TierWeek` (`projectTierWeek` in `go/cmd/evolve/cli_routing_lanes.go`) finds the tier model of the family in its manifest. For agy at deep this is Gemini 4 Neon (High), so the window is the Gemini models window. It then calls `usageprobe.TierWeek`. That function returns the live week window whose model is a prefix of the tier model, or else the week window of the family.
 
 The share stage compares the used percent with the percent of the week that is gone: `100 × (1 − time to the reset ÷ 7 days)`. When the used percent is higher, the family is paced and gives the seat away. With 60% used and 6 days to the reset, 14% of the week is gone, so Argon is paced.
 
@@ -100,7 +100,7 @@ When the reader is absent, fails, finds no window, or finds no reset time, the p
 | Other tiers and other chains are untouched | `TestShare_AnotherTierIsUntouched`, `TestShare_AChainThatDoesNotLeadWithTheSharedFamilyIsUntouched` | built |
 | The compile check of `share_pct` | `TestCompile_AShareNeedsATierChainAndAPercentInRange` | built |
 | The cycle reaches the router | `TestRouteRequest_CarriesTheCycleToTheRouter`, `TestDefaultPlanResolver_TheCycleReachesTheDeepTierShare` | built |
-| The Argon window is read for the deep tier | `TestTierWeek_TheModelWindowOfTheTierModelWinsOverTheFamilyWindow`, `TestResolveModelTier_TheAgyDeepSeatIsArgon` | built |
+| The week window of the deep model is read for the deep tier | `TestTierWeek_TheModelWindowOfTheTierModelWinsOverTheFamilyWindow`, `TestResolveModelTier_TheAgyDeepSeatIsNeon` | built |
 | An env pin or a caller CLI pin wins over the share | `TestShare_AnOperatorEnvPinKeepsTheSharedFamilyOnTheSeat`, `TestShare_ACallerOrAdvisorCLIPinKeepsTheSharedFamilyOnTheSeat` | built |
 | The escalation route carries the cycle | `TestRoutingDecision_TheEscalationRouteCarriesTheCycleToTheDeepShare` | built |
 | A given seat keeps `agy-claude` as its own family | `TestShare_AGivenSeatKeepsAgyClaudeAsItsOwnFamilyBeforeClaude` | built |

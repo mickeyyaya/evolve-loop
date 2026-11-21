@@ -57,11 +57,11 @@ func TestProjectTierWeek_ReadsTheWindowOfTheTierModelOfTheFamily(t *testing.T) {
 	}
 }
 
-func TestResolveModelTier_TheAgyDeepSeatIsArgon(t *testing.T) {
+func TestResolveModelTier_TheAgyDeepSeatIsNeon(t *testing.T) {
 	t.Parallel()
 	model, ok := resolveModelTier("agy", "deep")
-	if !ok || !strings.HasPrefix(model, "Gemini 4 Argon") {
-		t.Fatalf("resolveModelTier(agy, deep) = %q, %v; the share pace reads the Argon window through this model", model, ok)
+	if !ok || !strings.HasPrefix(model, "Gemini 4 Neon") {
+		t.Fatalf("resolveModelTier(agy, deep) = %q, %v; the deep-tier share pace reads the week window of the deep model, which is now the Gemini models window", model, ok)
 	}
 }
 
