@@ -763,6 +763,17 @@ var dataFileReads = []DataFileRead{
 		"TestMaterialize_TheCodeReviewSimplifyOverlayIsItsCompactProjection",
 		"TestMaterialize_TheDocsWriteOverlayIsItsCompactProjectionWithoutFrontmatter",
 	}}},
+	{Path: "skills/docs-write/references/templates.md", TestSelection: TestSelection{Package: "./internal/incidentkb", Tests: []string{
+		"TestIncidentTemplate_AFilledTemplateRendersToARecordTheCheckerAccepts",
+		"TestIncidentTemplate_AnUnrenderedTemplateFailsOnlyOnItsGeneratedParts",
+		"TestIncidentTemplate_HeadingsEqualRequiredSections",
+	}}},
+	{Path: "skills/docs-write/references/templates.md", TestSelection: TestSelection{Package: "./cmd/evolve", Tests: []string{
+		"TestRunIssue_RenderTurnsATemplateRecordFromFailingCheckToPassing",
+	}}},
+	{Path: "skills/issue-record/SKILL.md", TestSelection: TestSelection{Package: "./internal/incidentkb", Tests: []string{
+		"TestIssueRecordSkill_ProcedureRunsTheRenderAndCheckVerbs",
+	}}},
 	{Path: "skills/docs-write/SKILL.md", TestSelection: TestSelection{Package: "./internal/skilloverlay", Tests: []string{
 		"TestMaterialize_TheDocsWriteOverlayIsItsCompactProjectionWithoutFrontmatter",
 	}}},

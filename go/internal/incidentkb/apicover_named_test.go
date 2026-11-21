@@ -73,6 +73,9 @@ func TestAPICover_NamesEveryExportedSymbol(t *testing.T) {
 	if err != nil || len(report.Records) != 1 || len(report.Legacy) != 1 {
 		t.Errorf("CheckAll = %+v, %v", report, err)
 	}
+	if err := incidentkb.RenderRecord(root, rec.ID); err != nil {
+		t.Errorf("RenderRecord = %v", err)
+	}
 	rows, err := incidentkb.List(root, "fixed", "SHIP_INTEGRATION_EJECTED")
 	if err != nil || len(rows) != 1 || !strings.Contains(rows[0].ID, rec.ID) {
 		t.Errorf("List = %+v, %v", rows, err)

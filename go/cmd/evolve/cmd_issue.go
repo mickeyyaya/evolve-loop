@@ -19,6 +19,7 @@ import (
 const issueUsage = `Usage:
   evolve issue evidence add [--project-root P] <incident-id> <source-file>
   evolve issue check [--project-root P] [<incident-id>]
+  evolve issue render [--project-root P] <incident-id>
   evolve issue list [--project-root P] [--status S] [--code C] [--json]`
 
 func runIssue(args []string, _ io.Reader, stdout, stderr io.Writer) int {
@@ -27,10 +28,12 @@ func runIssue(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runIssueEvidenceAdd(args[2:], stdout, stderr)
 	case len(args) >= 1 && args[0] == "check":
 		return runIssueCheck(args[1:], stdout, stderr)
+	case len(args) >= 1 && args[0] == "render":
+		return runIssueRender(args[1:], stdout, stderr)
 	case len(args) >= 1 && args[0] == "list":
 		return runIssueList(args[1:], stdout, stderr)
 	}
-	fmt.Fprintln(stderr, "evolve issue: expected `evidence add`, `check`, or `list`\n"+issueUsage)
+	fmt.Fprintln(stderr, "evolve issue: expected `evidence add`, `check`, `render`, or `list`\n"+issueUsage)
 	return 10
 }
 
@@ -72,6 +75,20 @@ func runIssueCheck(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	return printIssueCheck(results, legacy, stdout, stderr)
+}
+
+func runIssueRender(args []string, stdout, stderr io.Writer) int {
+	root, rest, ok := issueFlags("evolve issue render", args, stderr)
+	if !ok || len(rest) != 1 {
+		fmt.Fprintln(stderr, issueUsage)
+		return 10
+	}
+	if err := incidentkb.RenderRecord(root, rest[0]); err != nil {
+		fmt.Fprintf(stderr, "evolve issue render: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "rendered %s\n", rest[0])
+	return 0
 }
 
 func issueCheckResults(root string, ids []string) (map[string][]string, []string, error) {

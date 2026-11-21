@@ -126,12 +126,77 @@ A concept primer serves a new reader. It builds the mental model before any rule
 
 ## Incident
 
-```markdown
-# <date>: <what broke, as a sentence>
+An incident record has YAML frontmatter and the sections below. The tool `evolve issue check` checks the frontmatter, the headings in order, and three generated regions. The headings of this template are checked by the tool, so they carry no hint. Each hint is on the line under its heading.
 
-## Summary            (impact, duration, root cause, fix, in five lines)
-## Timeline           (a table: time | event | evidence)
-## Root cause         (the chain from the first cause to the symptom)
-## What changed       (each fix with its pull request and its regression test)
-## What we learned    (each lesson with the rule or the guard it became)
-```
+Fill the placeholders in angle brackets. Then write the prose and run `evolve issue render <id>`. The command fills the three regions between the `GENERATED` markers from the frontmatter. Do not type text between the markers.
+
+The frontmatter can also hold these fields:
+
+- `selfheal`: the incident id.
+- `fingerprint`: the fingerprint of the cause.
+- `prs`: a list of numbers.
+- `items`: a list of inbox item ids.
+- `actions`: each with `id`, `type`, `owner`, `item`, `pr`, `done` and `state`.
+- `effectiveness`: a `metric`, a `baseline`, a `target` and a `checks` count.
+- `verified_at`: the time of the last check.
+
+Quote each value that contains a colon.
+
+````markdown
+---
+schema: incident-record/1
+id: <yyyy-mm-dd-slug>
+title: "<what broke, as a sentence>"
+level: record
+status: open
+selfheal: ""
+fingerprint: ""
+signals: ["<cycle:N:S>"]
+prs: []
+items: []
+actions: []
+effectiveness: {}
+verified_at: ""
+---
+
+# <what broke, as a sentence>
+
+## Summary
+(the status line is generated; add the impact, the duration, the root cause and the fix in five lines)
+
+<!-- GENERATED:status BEGIN -->
+<!-- GENERATED:status END -->
+
+## Trigger and level
+(the signal or the event that started the record, and why it has this level)
+
+## Timeline
+(a table: time in UTC | event | evidence)
+
+## Key logs
+(each log trimmed to 20 lines or fewer, in a fenced block, with its bundle file)
+
+## Root cause and contributing factors
+(the chain from the first cause to the symptom, and the factors apart from the cause)
+
+## Analysis
+(how the situation looked at each step, and which gate did not catch it)
+
+## Approaches taken
+(each approach, its result, and why it was kept or dropped)
+
+## Actions
+(the table is generated from the actions in the frontmatter)
+
+<!-- GENERATED:actions BEGIN -->
+<!-- GENERATED:actions END -->
+
+## Effectiveness
+(the metric, the baseline and each check are generated from the frontmatter)
+
+<!-- GENERATED:effectiveness BEGIN -->
+<!-- GENERATED:effectiveness END -->
+
+## Lessons
+(each lesson with the rule or the guard it became)
+````
