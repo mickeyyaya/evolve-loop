@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — the segment manifest of the ledger seal (ledger restructure C11, 2026-11-21)
+
+- **The seal line.** Each `segment_seal` line now carries `summary` (seq and time range, cycles, kind counts, raw and gz sha, line count, last line sha) and `manifest_sha256`. Old readers ignore the two new keys.
+- **The manifest.** `Seal` writes `ledger-segments/manifest.jsonl`, one line for each segment, before it appends the anchor. A missing or changed manifest is built again from the segments, and the result must match the previous seal. A mismatch stops the seal before it writes anything.
+- Plan: [ledger-restructure-2026-10.md](docs/plans/ledger-restructure-2026-10.md) (C11). Docs: [internal-adapters-ledger](docs/architecture/packages/internal-adapters-ledger.md).
+
 ## Added — the wave latency check (latency gates T6, 2026-11-14)
 
 - **The check.** `evolve wave latency --check` judges each recorded wave. A wave breaches on one of two rules. The first: the average live lanes is below `wave_latency.min_live_share` (default 0.8) while the ready supply is not short. The second: the host gate share is above `wave_latency.max_gate_share` (default 0.25). A wave with a quota pause, a loop `stop_reason` or an operator brake is left out.
