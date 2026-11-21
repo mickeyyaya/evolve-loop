@@ -36,7 +36,15 @@ Cycle 1779 did exactly that (2026-09-30). Its lane ship grew `cmd/evolve.runCycl
   - The rule shares `landsAtTheTree` with the call climb. `TestReadingTestsOf_CreditsTheTestsThatReachARead` pins each case.
 - **A walk up to `go.mod`.** A bare `for { … }` loop that names `"go.mod"`. A `range` or counted loop naming it writes fixtures; it does not climb.
 
-Each package it finds must be in `Packages()`, or every test that reaches its read must be named in `TreeReadingTests()`. The detector works per declaration: a function, a package-level `var`, `const` or type whose body climbs or walks up reads the tree, any declaration that mentions a reading one reads it too (followed to a fixpoint across the package directory's test files), and every `Test…` function that reads is credited by name. So `TestVerdictEngine_OneConstructionSite`, whose climb sits in the helper `nonTestSourcesMentioning`, is found by name. `packProblems` fails on a reading test that is not selected, on a package whose read no test reaches (it must go into `Packages()` whole), and on a selection that is in the pack or no longer reads the tree. Since cycle 1829 the large packages whose seam or single-writer tests read the tree (`cmd/evolve`, `core`, `phases/ship`, `phases/runner` and others) run that way: tests chosen by name instead of the whole packages, which were too slow for every ship. No package is recorded outside the pack any more. `TestClimbsOutOfItsPackage`, `TestWalksUpToGoMod`, `TestReadingTestsOf_CreditsTheTestsThatReachARead` and `TestPackProblems` pin each shape, the negative ones included. The test itself is in the pack, so it runs before main does.
+Each package it finds must be in `Packages()`, or every test that reaches its read must be named in `TreeReadingTests()`. The detector works per declaration. A function, a package-level `var`, `const` or type whose body climbs or walks up reads the tree. Any declaration that mentions a reading one reads it too, followed to a fixpoint across the package directory's test files. Every `Test…` function that reads is credited by name. So `TestVerdictEngine_OneConstructionSite`, whose climb sits in the helper `nonTestSourcesMentioning`, is found by name.
+
+`packProblems` fails in three cases:
+
+- A reading test is not selected.
+- A package has a read that no test reaches. It must go into `Packages()` whole.
+- A selection is in the pack, or no longer reads the tree.
+
+Since cycle 1829 the large packages whose seam or single-writer tests read the tree run by name. These are `cmd/evolve`, `core`, `phases/ship`, `phases/runner` and others. Tests chosen by name replace the whole packages, which were too slow for every ship. No package is recorded outside the pack any more. `TestClimbsOutOfItsPackage`, `TestWalksUpToGoMod`, `TestReadingTestsOf_CreditsTheTestsThatReachARead` and `TestPackProblems` pin each shape, the negative ones included. The test itself is in the pack, so it runs before main does.
 
 The package `internal/tmuxtest` is one of the by-name rows. Its `TestEveryTmuxTestPackageUsesTheOrphanGuard` walks the tree by file. It imports none of the packages it reads, so the importer backstop never selects it. The by-name row runs it on every ship.
 
