@@ -11,6 +11,7 @@ func TestShadowCodes_AreRegisteredUnderTheModuleThatEmitsThem(t *testing.T) {
 	}{
 		{CodeAuditCascadeShadow, "AUDIT_CASCADE_SHADOW", ModuleAudit},
 		{CodeParallelEvaluateShadow, "PARALLEL_EVALUATE_SHADOW", ModuleParallelEval},
+		{CodeLogAccessShadow, "LOG_ACCESS_SHADOW", ModuleLog},
 	} {
 		if string(tc.code) != tc.spelling {
 			t.Errorf("code %q drifted from its spelling %q", tc.code, tc.spelling)

@@ -318,6 +318,12 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `LIVENESS_PANE_STAGNANT` | a tmux pane is busy but its output stopped changing (LivenessCenter edge: busy-stagnant) |
 | `LIVENESS_PHASE_STALLED` | the per-phase observer saw no progress for the stall threshold between review checkpoints. Tmux checks pane-watch hash (kind pane.liveness); headless checks stdout and workspace growth (kind observer.warning). Log and signal only; nothing is killed. Fields: source (pane | stdout), session, busy, stall_s |
 
+### log
+
+| Code | Meaning |
+|---|---|
+| `LOG_ACCESS_SHADOW` | at log_access shadow, a phase read a log layer that its phase.json log_access does not declare, and the read went on. fields.layer (D0 to D3), declared (the layers of log_access) and verb (the evolve logs verb) give the read |
+
 ### loop
 
 | Code | Meaning |

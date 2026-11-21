@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — the log reader and `log_access` in shadow mode (logging plan H4, 2026-11-21)
+
+- **The reader.** `evolve logs digest|events|failures|index|show --cycle N` reads the log layers D0 to D3. Each verb stops at its line budget (D0 40, D1 and D2 200, D3 150). It ends with a truncation line that names a narrower query. No verb returns a whole file.
+- **`log_access`.** `phase.json` accepts `log_access` (layers, categories, scope, line budget). With `--as PHASE`, a read outside the declared layers records `LOG_ACCESS_SHADOW` (WARN, module `log`) and goes on. The prompt of a phase that declares `log_access` gets the D0 digest and one instruction to use `evolve logs`.
+- Plan: [logging-and-process-hygiene-2026-10.md](docs/plans/logging-and-process-hygiene-2026-10.md) (§6.2 to §6.4). Docs: [internal-logread](docs/architecture/packages/internal-logread.md).
+
 ## Added — the wave latency check (latency gates T6, 2026-11-14)
 
 - **The check.** `evolve wave latency --check` judges each recorded wave. A wave breaches on one of two rules. The first: the average live lanes is below `wave_latency.min_live_share` (default 0.8) while the ready supply is not short. The second: the host gate share is above `wave_latency.max_gate_share` (default 0.25). A wave with a quota pause, a loop `stop_reason` or an operator brake is left out.

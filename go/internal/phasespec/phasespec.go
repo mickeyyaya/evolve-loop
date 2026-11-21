@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 
@@ -68,6 +69,18 @@ type PhaseSpec struct {
 	Gate              *ArtifactGate               `json:"gate,omitempty"`
 	Recovery          *RecoveryMap                `json:"recovery,omitempty"`
 	EarlyExit         *bool                       `json:"early_exit,omitempty"`
+	LogAccess         *LogAccess                  `json:"log_access,omitempty"`
+}
+
+type LogAccess struct {
+	Layers     []string `json:"layers,omitempty"`
+	Categories []string `json:"categories,omitempty"`
+	Scope      string   `json:"scope,omitempty"`
+	LineBudget int      `json:"line_budget,omitempty"`
+}
+
+func (a *LogAccess) Allows(layer string) bool {
+	return a == nil || slices.Contains(a.Layers, layer)
 }
 
 type RecoveryMap struct {

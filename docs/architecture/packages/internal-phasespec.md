@@ -70,3 +70,4 @@
   - `TestSourceWriterProfiles_DeclareOnlyTheLaneWorktreeAndRunDir` pins the declared write scope of the two profiles.
   - The trust decision is a hand-authored profile that passes `SandboxedProfilePredicate`, not a registrar mint. The predicate checks the sandbox fields only, so the two paths give the same eligibility.
   - The role guard and ship staging read `phasecontract.SourceWriterPhases`, so a reproduction test can be written on each CLI and ships through its own report.
+- **`log_access`** (2026-11-21, logging plan H4): `PhaseSpec.LogAccess` declares the log layers (D0 to D3), the categories, the scope and the line budget of a phase. `ValidateLogAccess` rejects a layer outside D0 to D3, an empty category, a scope outside cycle, run and project, and a negative budget. `LogAccess.Allows` is true for a nil access. `internal/logread` reads it in shadow mode, and the runner adds the D0 digest to the prompt of a phase that declares it.

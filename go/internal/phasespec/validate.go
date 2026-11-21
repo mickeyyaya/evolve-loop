@@ -82,7 +82,36 @@ func validateUserSpec(s PhaseSpec, exemptSingleWordFloor bool) []string {
 		v = append(v, fmt.Sprintf("classify.verdict_on_pass %q must be one of PASS/FAIL/WARN/SKIPPED", s.Classify.VerdictOnPass))
 	}
 
+	v = append(v, ValidateLogAccess(s.LogAccess)...)
 	return append(v, unregisteredGrammars(s)...)
+}
+
+var logLayers = []string{"D0", "D1", "D2", "D3"}
+
+var logScopes = []string{"", "cycle", "run", "project"}
+
+func ValidateLogAccess(a *LogAccess) []string {
+	if a == nil {
+		return nil
+	}
+	var v []string
+	for _, l := range a.Layers {
+		if !slices.Contains(logLayers, l) {
+			v = append(v, fmt.Sprintf("log_access.layers %q must be one of %s", l, strings.Join(logLayers, ", ")))
+		}
+	}
+	for _, c := range a.Categories {
+		if c == "" {
+			v = append(v, "log_access.categories must not hold an empty name")
+		}
+	}
+	if !slices.Contains(logScopes, a.Scope) {
+		v = append(v, fmt.Sprintf("log_access.scope %q must be one of cycle, run, project (or empty)", a.Scope))
+	}
+	if a.LineBudget < 0 {
+		v = append(v, fmt.Sprintf("log_access.line_budget %d must not be negative", a.LineBudget))
+	}
+	return v
 }
 
 func unregisteredGrammars(s PhaseSpec) []string {
