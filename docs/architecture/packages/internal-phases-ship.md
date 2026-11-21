@@ -292,6 +292,26 @@ These rules held in comments before the comment-zero change. Tests pin the ones 
 - `SHIP_BASE_RED_REBASE` and `SHIP_BASE_RED_MAIN_RED` register under the ship module. Each has the fields `keys`, `base`, `main` and `took`.
 - The attributor runs git from the project root, so each base checkout is under the project scratch path. A malformed policy file gets a line in the pack log. `Options.baseRun` replaces the `go test` runner in tests.
 
+### CI source of the main-red stop
+
+The file is `main_red_ci.go`. The plan is [main-red-stop-provable-means-a-lane-can-prove-it-2026-11.md](../../plans/main-red-stop-provable-means-a-lane-can-prove-it-2026-11.md).
+
+- `Config.MainCI` is a `ciwatch.Fetcher`. The production root sets it through `landcmd.MainCIFetcher`. With no `MainCI`, the source is off.
+- `checkMainRedStop` calls `mainCI.sync` before it reads the stop result. The call resolves the `main` ref, and a ref that does not resolve gets a WARN line and no CI read.
+- A stop that holds is not judged again. When its `MainSHA` is the `main` tip, `sync` records that commit as judged, so a release does not reopen the stop on the same commit.
+- `sync` reads the judged record before it asks for the CI run. A judged commit costs no download of job logs.
+- A run that is not completed or not red judges nothing, and it records nothing. A failed read emits `SHIP_MAIN_RED_CI_UNREAD` and the next ship retries.
+- For a red run, `sync` first claims the commit through `mainstop.ClaimJudged`. One lane wins the claim. The other lanes go on with no stop.
+- `provable` is the one rule of the key. A row is provable when it has a `Package` and a `Test`. A gate row has neither, because `gateRow` in `ciwatch` writes only `Step` and `Detail`.
+- The claimant runs the provable keys at the `main` commit through `Attributor.RunAt` with `mainstop.ProofReds`. This is the call that the train uses. Only a key that is red there enters the stop.
+- A key that is green there does not enter the stop. A red that shows only under `-race` or a flaky red is such a key.
+- A failed `RunAt` fails closed. Each provable row goes to the signal with the error in `fields.error`, and no stop opens. The commit stays judged, so N lanes do not each wait for the run.
+- Every other row goes to `SHIP_MAIN_RED_CI_UNPROVABLE`, once for each commit. The name of a row is `package.Test`, or the first of `Step`, `Test`, `Package` and the job names. The `detail` field holds the hint of the row.
+- A red run with no named row emits the signal with the key `(none parsed)`.
+- A stop that opens holds only the reproduced test keys, so a stop never holds a key that a prover cannot run. The train and the ship lane both run `go test` for each key.
+- `SHIP_MAIN_RED_CI_OPENED` reports the opened stop. The test seam is `Options.baseRun` with a real temporary repository, because `RunAt` checks out the commit.
+- A coverage or lint red on `main` opens no stop and parks no lane. The train refuses a red `main`. Lint proof is a separate item, because it needs one design for both provers.
+
 ### Main-red stop check and release
 
 The file is `main_red_stop.go`. The design is in [gate-contract-g4-base-red-attribution.md](../gate-contract-g4-base-red-attribution.md), sections 7.5 and 7.6.

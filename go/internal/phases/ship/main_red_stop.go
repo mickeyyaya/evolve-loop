@@ -25,6 +25,13 @@ type stopCheck struct {
 
 func checkMainRedStop(ctx context.Context, opts *Options, warn io.Writer) ([]baseattr.Key, error) {
 	stop, holds := selfheal.ReadStop(opts.evolveDir(), warn)
+	if !holds && opts.mainCI == nil {
+		return nil, nil
+	}
+	gates := shipGates(opts, warn)
+	if opts.mainCI != nil {
+		stop, holds = mainCI{opts: opts, warn: warn, attr: attributorOf(opts, gates)}.sync(ctx, stop, holds)
+	}
 	if !holds {
 		return nil, nil
 	}
@@ -32,7 +39,6 @@ func checkMainRedStop(ctx context.Context, opts *Options, warn io.Writer) ([]bas
 	if err != nil {
 		return nil, err
 	}
-	gates := shipGates(opts, warn)
 	bound := selfheal.StopBound{EvolveDir: opts.evolveDir(), Bound: gates.MainRedStopBound, Now: opts.clock(), Emit: opts.Signals.Emit}
 	if err := bound.Check(); err != nil {
 		fmt.Fprintf(warn, "[ship] WARN main-red stop: %v\n", err)
