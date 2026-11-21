@@ -78,6 +78,7 @@
 ./internal/sessionrecord
 ./internal/setup
 ./internal/shipwindow
+./internal/shipwindowtest
 ./internal/sysexec
 ./internal/systemprompt
 ./internal/textutil

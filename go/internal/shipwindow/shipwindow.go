@@ -41,6 +41,9 @@ type Options struct {
 	Poll         time.Duration
 	OwnerPID     int
 	OnStaleBreak func(StaleHolder)
+	MaxHold      time.Duration
+	Ticker       Ticker
+	OnLost       func(*LostError)
 }
 
 type StaleHolder struct {
@@ -77,6 +80,12 @@ func (o Options) normalized() Options {
 	if o.Alive == nil {
 		o.Alive = pidAlive
 	}
+	if o.MaxHold <= 0 {
+		o.MaxHold = DefaultMaxHold
+	}
+	if o.Ticker == nil {
+		o.Ticker = realTicker
+	}
 	if o.Poll <= 0 {
 		o.Poll = defaultPoll
 	}
@@ -95,6 +104,7 @@ type record struct {
 type Lease struct {
 	path  string
 	token string
+	beat  *beat
 }
 
 func PathIn(evolveDir string) string {
@@ -116,6 +126,9 @@ func Acquire(ctx context.Context, evolveDir string, opts Options) (*Lease, error
 		l, err := tryAcquire(evolveDir, queueDir, ticket, o)
 		if err != nil || l != nil {
 			_ = os.Remove(ticketPath)
+			if l != nil {
+				l.startBeat(ctx, o)
+			}
 			return l, err
 		}
 		select {
@@ -231,17 +244,10 @@ func readRecord(path string) (record, bool, error) {
 }
 
 func (l *Lease) Release() error {
-	rec, ok, err := readRecord(l.path)
-	if err != nil && !ok {
-		return fmt.Errorf("shipwindow: release read: %w", err)
+	if l.beat != nil {
+		l.stopBeat()
 	}
-	if err != nil || !ok || rec.Token != l.token {
-		return nil
-	}
-	if rerr := os.Remove(l.path); rerr != nil && !errors.Is(rerr, os.ErrNotExist) {
-		return fmt.Errorf("shipwindow: release: %w", rerr)
-	}
-	return nil
+	return l.removeIfOwned()
 }
 
 func pidAlive(pid int) bool {

@@ -16,8 +16,12 @@ func init() {
 }
 
 const (
+	FieldRecoveryPath   = "path"
+	RecoveryPathReaudit = "reaudit"
+)
+
+const (
 	recoveryPathRebind   = "rebind"
-	recoveryPathReaudit  = "reaudit"
 	recoveryPathRebuild  = "rebuild"
 	recoveryPathDebugger = "debugger"
 	recoveryPathEnd      = "end"
@@ -120,7 +124,7 @@ func (cr *cycleRun) reportRecoveryPath(r shipRecovery) {
 		return
 	}
 	path := recoveryPathOf(r.next)
-	fields := map[string]string{"path": path, "code": string(r.routed.Code), "original_code": string(r.raised.Code)}
+	fields := map[string]string{FieldRecoveryPath: path, "code": string(r.routed.Code), "original_code": string(r.raised.Code)}
 	if r.declined != "" {
 		fields["reason"] = r.declined
 	}
@@ -138,7 +142,7 @@ func recoveryPathOf(next Phase) string {
 	case PhaseShip:
 		return recoveryPathRebind
 	case PhaseAudit:
-		return recoveryPathReaudit
+		return RecoveryPathReaudit
 	case PhaseBuild:
 		return recoveryPathRebuild
 	case PhaseDebugger:
