@@ -290,10 +290,10 @@ const (
 
 var coverLockWait = verifylock.MaxWait
 
-func coverTestArgs(profile string, pkgs, tags []string) []string {
+func coverTestArgs(share int, profile string, pkgs, tags []string) []string {
 	args := []string{"test", "-count=1", "-timeout", addedtests.PackageTimeout}
 	args = append(args, covchanged.TagFlags(tags)...)
-	return lanebudget.Args(append(append(args, "-coverprofile", profile), pkgs...))
+	return lanebudget.ArgsFor(share, append(append(args, "-coverprofile", profile), pkgs...))
 }
 
 func scopedCoverFunc(ctx context.Context, in ReviewInput, moduleDir string, pkgs []string) (path, output string, status int) {
@@ -317,7 +317,7 @@ func scopedCoverFunc(ctx context.Context, in ReviewInput, moduleDir string, pkgs
 }
 
 func scopedCoverProfile(ctx context.Context, in ReviewInput, moduleDir string, pkgs, tags []string) (profile, output string, status int, failedTags []string) {
-	plan, red, status := firstCoverPass(ctx, in, coverPlan{moduleDir: moduleDir, label: strings.Join(pkgs, ","), pkgs: pkgs, tags: tags})
+	plan, red, status := firstCoverPass(ctx, in, coverPlan{moduleDir: moduleDir, label: strings.Join(pkgs, ","), pkgs: pkgs, tags: tags, share: lanebudget.Current()})
 	if status == coverStatusTestsFailed {
 		red, status = plan.retake(ctx, in, red)
 	}
@@ -326,8 +326,11 @@ func scopedCoverProfile(ctx context.Context, in ReviewInput, moduleDir string, p
 
 func firstCoverPass(ctx context.Context, in ReviewInput, plan coverPlan) (coverPlan, coverRed, int) {
 	root := filepath.Dir(plan.moduleDir)
-	if release, lerr := verifylock.AcquireWithin(ctx, root, coverLockWait, in.errOut()); lerr == nil {
+	share := plan.share
+	observer := verifylock.Observer{Signals: in.Signals, Cycle: in.Cycle, RunID: in.RunID, Source: "build-floor"}
+	if release, lerr := observer.AcquireWithin(ctx, root, coverLockWait, in.errOut()); lerr == nil {
 		defer release()
+		share = lanebudget.ShareFor(true)
 	} else {
 		in.recordUnserializedFloor(root, lerr)
 	}
@@ -340,7 +343,7 @@ func firstCoverPass(ctx context.Context, in ReviewInput, plan coverPlan) (coverP
 		return plan, coverRed{out: err.Error()}, coverStatusPlumbingError
 	}
 	plan.profile, plan.runs = filepath.Join(tmpDir, "cover.out"), tierRuns(coversplit.Plan(plan.pkgs, splits))
-	red, status := plan.run(ctx)
+	red, status := plan.withShare(share).run(ctx)
 	return plan, red, status
 }
 
@@ -348,18 +351,24 @@ type coverPlan struct {
 	moduleDir, profile, label string
 	runs                      []coversplit.Run
 	pkgs, tags                []string
+	share                     int
+}
+
+func (p coverPlan) withShare(share int) coverPlan {
+	p.share = share
+	return p
 }
 
 func (p coverPlan) run(ctx context.Context) (coverRed, int) {
 	if len(p.runs) == 1 {
 		tags := p.runs[0].TagsOr(p.tags)
-		out, status := coverPass(ctx, p.moduleDir, p.profile, p.runs[0].Args(), tags)
+		out, status := coverPass(ctx, p.share, p.moduleDir, p.profile, p.runs[0].Args(), tags)
 		if status != coverStatusTestsFailed {
 			tags = nil
 		}
 		return coverRed{out: out, tags: tags}, status
 	}
-	return runSplitCoverPasses(ctx, p.moduleDir, p.profile, p.runs, p.tags)
+	return runSplitCoverPasses(ctx, p.share, p.moduleDir, p.profile, p.runs, p.tags)
 }
 
 func (p coverPlan) retake(ctx context.Context, in ReviewInput, first coverRed) (coverRed, int) {
@@ -387,22 +396,22 @@ func coverRetakeOutcome(status int) floorRetakeOutcome {
 
 var coverPass = runCoverPass
 
-func runCoverPass(ctx context.Context, moduleDir, profile string, args, tags []string) (string, int) {
-	cmd := sysexec.Command(ctx, "go", coverTestArgs(profile, args, tags)...)
+func runCoverPass(ctx context.Context, share int, moduleDir, profile string, args, tags []string) (string, int) {
+	cmd := sysexec.Command(ctx, "go", coverTestArgs(share, profile, args, tags)...)
 	cmd.Dir = moduleDir
-	cmd.Env = lanebudget.Env(ipcenv.Scrub(os.Environ()))
+	cmd.Env = lanebudget.EnvFor(share, ipcenv.Scrub(os.Environ()))
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return string(out), coverStatusTestsFailed
 	}
 	return "", coverStatusOK
 }
 
-func runSplitCoverPasses(ctx context.Context, moduleDir, profile string, runs []coversplit.Run, tags []string) (coverRed, int) {
+func runSplitCoverPasses(ctx context.Context, share int, moduleDir, profile string, runs []coversplit.Run, tags []string) (coverRed, int) {
 	var parts [][]byte
 	for i, run := range runs {
 		part := fmt.Sprintf("%s.%d", profile, i)
 		runTags := run.TagsOr(tags)
-		if out, status := coverPass(ctx, moduleDir, part, run.Args(), runTags); status != coverStatusOK {
+		if out, status := coverPass(ctx, share, moduleDir, part, run.Args(), runTags); status != coverStatusOK {
 			return coverRed{out: out, tags: runTags}, status
 		}
 		data, err := os.ReadFile(part)

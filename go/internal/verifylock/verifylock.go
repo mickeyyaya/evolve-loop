@@ -33,7 +33,7 @@ func Acquire(ctx context.Context, projectRoot string, warn io.Writer) (func(), e
 	return AcquireAt(ctx, path, warn)
 }
 
-func AcquireWithin(ctx context.Context, projectRoot string, wait time.Duration, warn io.Writer) (func(), error) {
+func acquireWithin(ctx context.Context, projectRoot string, wait time.Duration, warn io.Writer) (func(), error) {
 	waitCtx, cancel := context.WithTimeout(ctx, wait)
 	defer cancel()
 	release, err := Acquire(waitCtx, projectRoot, warn)

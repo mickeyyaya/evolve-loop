@@ -19,6 +19,13 @@
 - **`Args(args)`** adds `-p N` and `-parallel N` after the `test` word of a `go test` argv. It keeps a `-p` or `-parallel` that the caller already set. It does not change an argv that does not start with `test`, and it does not write into the array of the caller.
 - **`ArgsFor(procs, args)`** is `Args` with the share given by the caller. `Args(args)` is `ArgsFor(Current(), args)`. A share of 0 changes nothing.
   - A caller can run several `go test` children at the same time. It gives each child its part of `Current()`. Then the children together ask for no more than one share. Pinned by `TestArgsFor_AGoTestGetsTheGivenShareNotTheLaneShare`, `TestArgsFor_AZeroShareLeavesTheArgvAlone` and `TestArgsFor_OnlyAGoTestArgvChanges`.
+- **The holder share.** The run that holds the host verification lock ([internal-verifylock](internal-verifylock.md)) is the only locked run of the host. The other lanes run their unlocked package runs at the lane share. So the holder can use the rest of the host. `HolderProcs(hostCPUs, width)` gives `max(lane share, hostCPUs - (width - 1) * lane share)`. A width below 1 gives 0.
+  - Example: 14 CPUs and width 8 give 7. Width 4 gives 5. Width 1 gives 14.
+  - The plan: [verify-lock-holder-budget-2026-11](../../plans/verify-lock-holder-budget-2026-11.md). The retakes under `integration-tier.lock` keep the lane share (decision D8).
+  - `Holder()` reads the width like `Current()` does, through one shared `laneWidth()`.
+  - `ShareFor(held)` is the one entry for a caller. `ShareFor(true)` gives `Holder()` and `ShareFor(false)` gives `Current()`. A caller asks only after it knows if it holds the lock, and passes the value to `ArgsFor`, `EnvFor` or `scopeShare`. A run without the lock never gets the holder share.
+  - The share sets `-p`, `-parallel` and `GOMAXPROCS` to the same number. So it caps each flag. It is not a count of busy CPUs.
+  - Pinned by `TestHolderProcs_TheHolderGetsTheHostLessTheShareOfTheOtherLanes`, `TestHolderProcs_NeverFallsBelowTheLaneShare`, `TestShareFor_AHolderGetsTheHolderShareAndAnyOtherRunTheLaneShare`, `TestShareFor_AHolderOnTheConsoleStaysUnbudgeted` and `TestHolder_ReadsTheLiveWidthLikeCurrent`.
 - **`Env(env)`** adds `GOMAXPROCS=N` at the end of the child environment, so it wins over an inherited value. A nil `env` means "inherit", as in `exec.Cmd`, so `Env(nil)` starts from `os.Environ()`. Give it the environment after `ipcenv.Scrub`: the scrub removes the `EVOLVE_` keys but keeps `GOMAXPROCS`.
 - **`EnvFor(procs, env)`** is `Env` with the share given by the caller. `Env(env)` is `EnvFor(Current(), env)` (pinned by `TestEnvFor_AChildGetsGOMAXPROCSOfTheGivenShare`, `TestEnvFor_AZeroShareLeavesTheEnvAlone` and `TestEnvFor_ANilEnvInheritsTheProcessEnvironment`).
 - **`Runner(run)`** wraps a `sysexec.RunFunc`. It applies `Args` and `Env` to each `go test` call and passes every other call through. Put it inside a wrapper that replaces the environment (`sysexec.WithEnv` with `ciparitygate.TierEnv()`), so that the replaced environment still gets `GOMAXPROCS`.
@@ -29,10 +36,10 @@
 | Site | How it goes through the budget |
 |---|---|
 | `phases/ship/repocontract.go` (`repoContractTestArgs`, `runGoTestJSON`) | `Args` and `Env`. The importer backstop of `repocontract_importers.go` runs through the same two functions. |
-| `acssuite/acssuite.go` (`defaultGoExec`), `acssuite/golane.go` (`runScopes`) | `ArgsFor` and `EnvFor` with the share split among the scopes that run at once (`scopeShare`). `golane.go` also reads `Current()` to size the slots. |
+| `acssuite/acssuite.go` (`defaultGoExec`, `acquireSuiteLock`), `acssuite/golane.go` (`runScopes`) | `ArgsFor` and `EnvFor` with the share split among the scopes that run at once (`scopeShare`). The share comes from `ShareFor` after the lock acquire, and it also sizes the slots. |
 | `acsrunner/runner.go` (`Run`, `execCommand`) | `Args` and `Env` |
 | `core/task_contract.go` (`go test -list`) | `Args` and `Env`: the list run still compiles the package |
-| `core/build_floor_reviewer.go` (`coverTestArgs`, `scopedCoverProfile`) | `Args` and `Env` |
+| `core/build_floor_reviewer.go` (`coverTestArgs`, `runCoverPass`) | `ArgsFor` and `EnvFor` with the `share` of the cover plan. The first pass holds the lock and takes `ShareFor(true)`. A run without the lock, and the retake after the lock is released, keep `Current()`. |
 | `core/phase_bindings_selfcheck.go` (`unitTestArgs`, `taggedTestArgs` and their runners) | `Args` and `Env` |
 | `phases/audit/ciparitygate/tier.go` | `Current` replaces the fixed 4 in a lane, and `Runner` adds `GOMAXPROCS` |
 | `phases/audit/ciparitygate/command.go` (acs-durable) and `apicover.go` | `Runner` |
@@ -51,5 +58,6 @@ The console measured the cost on 2026-11-14, on a host with 14 CPUs and a live w
 - The formula and the two "no lane" answers: `TestProcs_DividesTheHostAmongTheLanes`, `TestCurrent_ReadsTheFleetWidthOfThisProcess`.
 - A console run gets no flag and no `GOMAXPROCS`: `TestArgs_AConsoleRunIsUnchanged`, `TestEnv_AConsoleRunIsUnchanged`.
 - A composed gate gets `GOMAXPROCS` in a lane and no limit on the console: `TestRunComposedGates_ALaneGateGetsItsCPUShare`, `TestRunComposedGates_AConsoleGateGetsNoCPULimit`.
+- The coverage pass and the ACS suite use the holder share only with the lock: `TestBuildFloorCover_TheRunThatHoldsTheHostLockGetsTheHolderBudget`, `TestBuildFloorCover_ARunThatLostTheHostLockKeepsTheLaneBudget`, `TestBuildFloorCover_TheRetakeOutsideTheLockKeepsTheLaneBudget`, `TestRun_TheSuiteThatHoldsTheHostLockSplitsTheHolderShare` and `TestRun_ASuiteThatLostTheHostLockKeepsTheLaneShare`.
 - Each function under `go/internal` or `go/cmd` that runs `make` calls `lanebudget.Env`, or its file is in `laneBudgetMakeExempt` with a reason: `TestEveryMakeRunGoesThroughTheLaneBudget`. The guard finds any call that has the literal `"make"` as its first or second argument.
 - Each non-test file under `go/internal` or `go/cmd` that builds a `go test` argv imports this package: `TestEveryGoTestArgvGoesThroughTheLaneBudget` in `go/test/structure`. The test finds a `[]string{"test", …}` literal and a call with the arguments `"go", "test"`. It does not prove that each argv in the file goes through the budget, only that the file uses it. Each site has its own test that runs it in a lane.

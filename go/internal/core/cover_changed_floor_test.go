@@ -69,7 +69,7 @@ func TestCoverTestArgs_AddTheTagsOfTheCoverageRunOnlyWhenGiven(t *testing.T) {
 	t.Setenv(ipcenv.FleetWidthKey, "")
 	t.Setenv(ipcenv.FleetLiveWidthKey, "")
 
-	got := coverTestArgs("/tmp/cover.out", []string{"./p"}, []string{"integration", "acs"})
+	got := coverTestArgs(0, "/tmp/cover.out", []string{"./p"}, []string{"integration", "acs"})
 
 	want := []string{"test", "-count=1", "-timeout", addedtests.PackageTimeout, "-tags", "integration,acs", "-coverprofile", "/tmp/cover.out", "./p"}
 	if !slices.Equal(got, want) {
