@@ -24,6 +24,10 @@ func IsSkipped(filename string) bool {
 	return base == "REGRESSION-COVERAGE-INDEX.md" || sessionLogRE.MatchString(base)
 }
 
+func IsRecordFile(filename string) bool {
+	return strings.HasSuffix(filename, ".md") && !IsSkipped(filename)
+}
+
 func IsLegacy(filename string, raw []byte) bool {
 	if IsSkipped(filename) {
 		return false
@@ -82,7 +86,7 @@ func walkIncidentFiles(root string, fn func(name, id string, raw []byte, legacy 
 		return err
 	}
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") || IsSkipped(e.Name()) {
+		if e.IsDir() || !IsRecordFile(e.Name()) {
 			continue
 		}
 		raw, err := os.ReadFile(filepath.Join(dir, e.Name()))

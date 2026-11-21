@@ -11,13 +11,14 @@ import (
 var t0 = time.Date(2026, 10, 27, 1, 0, 0, 0, time.UTC)
 
 type fakeVerifier struct {
-	repro, waveEnded, retro bool
+	repro, waveEnded, retro, recordDoc bool
 }
 
 func (f fakeVerifier) ReproGreen(Incident) bool                 { return f.repro }
 func (f fakeVerifier) WaveEndedAfter(time.Time) bool            { return f.waveEnded }
 func (f fakeVerifier) RetrospectiveExists(string) bool          { return f.retro }
-func allClear() fakeVerifier                                    { return fakeVerifier{true, true, true} }
+func (f fakeVerifier) RecordDocExists(Incident) bool            { return f.recordDoc }
+func allClear() fakeVerifier                                    { return fakeVerifier{true, true, true, true} }
 func breach(seq uint64, at time.Time) signalcenter.Event        { return pq1Breach(seq, at) }
 func observationsOf(events ...signalcenter.Event) []Observation { return FromSignals(events) }
 
@@ -225,5 +226,21 @@ func TestDetect_AnotherClassFiringDoesNotHoldAQualityIncidentOpen(t *testing.T) 
 		if inc.Class == ClassQuality && inc.State != StateClosed {
 			t.Fatalf("a red main is not a quality regression: %+v", inc)
 		}
+	}
+}
+
+func TestDetect_KeepsAnIncidentOpenWithoutARecordDoc(t *testing.T) {
+	t.Parallel()
+	opened, _ := Detect(nil, observationsOf(breach(1, t0)), fakeVerifier{}, t0)
+	noDoc := fakeVerifier{repro: true, waveEnded: true, retro: true}
+	got, transitions := Detect(opened, nil, noDoc, t0.Add(time.Hour))
+	if got[0].State != StateOpen || len(transitions) != 0 {
+		t.Fatalf("three of the five conditions held and the record doc missing: the incident stays open, got %+v %+v", got[0], transitions)
+	}
+	closed, _ := Detect(opened, nil, allClear(), t0.Add(time.Hour))
+	closed[0].RecordDoc = "docs/incidents/2026-10-27-x.md"
+	reopened, _ := Detect(closed, observationsOf(breach(2, t0.Add(2*time.Hour))), fakeVerifier{}, t0.Add(3*time.Hour))
+	if reopened[0].State != StateOpen || reopened[0].RecordDoc != "docs/incidents/2026-10-27-x.md" {
+		t.Fatalf("a reopened incident keeps its record doc: %+v", reopened[0])
 	}
 }

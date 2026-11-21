@@ -49,3 +49,11 @@ func (v TreeVerifier) RetrospectiveExists(id string) bool {
 	})
 	return found
 }
+
+func (v TreeVerifier) RecordDocExists(inc Incident) bool {
+	if inc.RecordDoc == "" || !filepath.IsLocal(inc.RecordDoc) {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(v.Root, filepath.FromSlash(inc.RecordDoc)))
+	return err == nil && info.Mode().IsRegular()
+}
