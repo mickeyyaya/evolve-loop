@@ -73,6 +73,12 @@
         ],
         "model": "balanced"
       },
+      "handoff-judge": {
+        "cli": [
+          "agy",
+          "claude"
+        ]
+      },
       "reflector": {
         "effort": "low"
       },

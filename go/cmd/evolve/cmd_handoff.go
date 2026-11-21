@@ -63,8 +63,15 @@ type handoffSite struct {
 }
 
 type handoffPairOutcome struct {
-	Pair    string `json:"pair"`
-	Outcome string `json:"outcome"`
+	Pair    string            `json:"pair"`
+	Outcome string            `json:"outcome"`
+	Judge   *handoffJudgeLine `json:"judge,omitempty"`
+}
+
+type handoffJudgeLine struct {
+	Seat    handoff.Seat  `json:"seat"`
+	Outcome string        `json:"outcome"`
+	Basis   handoff.Basis `json:"basis"`
 }
 
 type handoffShowResult struct {
@@ -180,7 +187,7 @@ func runHandoffShow(args []string, asJSON bool, stdout, stderr io.Writer) int {
 		if res.Exit != handoffExitPass {
 			break
 		}
-		res.Pairs = append(res.Pairs, handoffPairOutcome{Pair: pair, Outcome: handoffShowOutcome(root, a.cycle, pair)})
+		res.Pairs = append(res.Pairs, handoffPairOutcome{Pair: pair, Outcome: handoffShowOutcome(root, a.cycle, pair), Judge: handoffShowJudge(root, a.cycle, pair)})
 	}
 	if a.asJSON {
 		writeHandoffJSON(stdout, stderr, res)
@@ -192,8 +199,31 @@ func runHandoffShow(args []string, asJSON bool, stdout, stderr io.Writer) int {
 	}
 	for _, p := range res.Pairs {
 		fmt.Fprintf(stdout, "%s: %s\n", p.Pair, p.Outcome)
+		printHandoffJudge(stdout, p.Judge)
 	}
 	return res.Exit
+}
+
+func printHandoffJudge(stdout io.Writer, judge *handoffJudgeLine) {
+	if judge == nil {
+		return
+	}
+	b := judge.Basis
+	fmt.Fprintf(stdout, "  judge: %s@%s outcome=%s\n", judge.Seat.CLI, judge.Seat.Tier, judge.Outcome)
+	fmt.Fprintf(stdout, "    basis: author_model=%s seat_model=%s author_vendors=%s seat_vendors=%s tier_ceiling=%s\n",
+		b.AuthorModel, b.SeatModel, strings.Join(b.AuthorVendors, ","), strings.Join(b.SeatVendors, ","), b.TierCeiling)
+}
+
+func handoffShowJudge(root string, cycle int, pair string) *handoffJudgeLine {
+	raw, err := core.ReadHandoffLedger(handoffLedgerPath(root, cycle, pair))
+	if err != nil {
+		return nil
+	}
+	ledger, err := handoff.Parse(raw)
+	if err != nil || ledger.Judge == nil {
+		return nil
+	}
+	return &handoffJudgeLine{Seat: ledger.Judge.Seat, Outcome: ledger.Judge.Outcome(ledger.MetAsks()), Basis: ledger.Judge.Basis}
 }
 
 func handoffShowOutcome(root string, cycle int, pair string) string {
