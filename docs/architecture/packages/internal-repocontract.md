@@ -118,3 +118,13 @@ A test that runs the pack and compares `git status --porcelain --ignored` before
 - `Packages()` is the union of the pack patterns that a registry entry covers and the debt set `gateregistry.Unregistered()`. See [internal-gateregistry.md](internal-gateregistry.md) and [gate-contract.md](../gate-contract.md) section 6.5.
 - `TreeReadingTests()` names the two `gateregistry` tests that read the real tree. The pack stays at 15 patterns. `ByNameTestsFor(changed)` adds the data rows to the same by-name call.
 - `repocontract.go` and `phases/ship/repocontract.go` are on the protected surface. They select the tests that the ship gate runs.
+
+## Change digest home rule
+
+- `changedigest_home_test.go` fails on a second home of the change digest. The test walks the production `.go` files under `go/` and parses each one.
+- **Rule 1.** A call or a literal list that holds `"diff"` and no output-shape flag is a site. The set `outputShapeFlags` in `changedigest_home_test.go` is the one list of those flags. The rule ignores how the output is hashed, so a hash in another function does not hide a site.
+- **Rule 2.** A call of `treestate.DiffArgs` outside `internal/treestate` fails. Such a caller skips the hunk-header strip and the env scrub, and so it gets another digest.
+- `internal/treestate` and every `_test.go` file are exempt. A test that needs the argv builds it through `treestate.DiffArgs`.
+- The allowlist `diffHomeAllowlist` names each other site and its reason. A site that moves to `treestate` leaves the list in the same PR, and a stale entry fails the test.
+- Planted trees in a temp directory prove the scan. They hold a second home, a hash through a helper, a `DiffArgs` caller, an output-shape call and a stale entry.
+- The plan is [change-digest-has-one-pinned-home-2026-11.md](../../plans/change-digest-has-one-pinned-home-2026-11.md). The test file is on the protected surface.
