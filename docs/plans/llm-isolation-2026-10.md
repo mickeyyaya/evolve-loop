@@ -166,7 +166,7 @@ The state on 2026-10-27. Each component re-reads this table before it starts.
 | X2 | merged, stage `enforce` | #1122, #1159 | The stage key is `isolation.i2.stage`. PR #1159 set it to `enforce` on 2026-10-26. X2 closed review finding H2 in the bridge with the explicit list `pipelineEnvMarkers`. X18b moved that list into `ipcenv`. |
 | X1b | merged | #1128 | Follow-up of X1: a fake `tmux` (`go/internal/faketmux`), so the rows M2 to M4 run a full cycle and are green. |
 | X6 | merged | #1123 | `cli_routing.floors` holds the Claude floor, and its compiled default is `go/internal/policy/routing_defaults.json`. The flow seat defaults are routing data. |
-| X6b | not started | none | Follow-up of X6, item `isolation-floor-profiles-allowed-clis-as-routing-data`. 7 profiles still set `allowed_clis` to Claude families, so an agy-only table cannot compile yet (§6.2). |
+| X6b | built | none | Item `isolation-floor-profiles-allowed-clis-as-routing-data`. The six floor profiles hold no `allowed_clis`. An agy-only table refuses only the router (§6.2). |
 | X3 | merged | #1127 | One launch API (`bridge.LaunchLLM`, `launchPane`, `newRecipeDriver`) starts each LLM binary. The guard `TestOnlyTheBridgeStartsAnLLMBinary` found 9 spawns on 7 paths before the change and 0 after it. Row N2 is green. The probe purpose keeps its bypass grant until item `isolation-probe-bypass-plan-mode-proof` proves a plan-mode control capture. |
 | X18a | merged | #1129 | `policy.Parse` refuses an unknown key at any level and names its path. The spec §27 has the design and the rollout step. |
 | X7 | merged, stage `shadow` | #1135 | The sandbox denies each write of a protected path of `guards.ProtectedSurfaceManifest` for each family (policy `isolation.i7.stage`). `guard phase` allows an in-cell `Agent` or `Task` and denies an out-of-cell phase persona. Rows N10 and N11 are green. The spec §9.1 has the map of each hook to its CLI-neutral layer. |
@@ -203,7 +203,7 @@ X6 moves the Claude floor into routing data, but 7 tracked profiles keep their o
 | `auditor`, `adversarial-review`, `tdd-engineer`, `spec-verifier`, `spec-verify`, `code-reviewer` | `["claude"]` |
 | `router` | `["agy-claude", "claude"]` |
 
-A policy that routes every seat to `agy` and sets `floors` to `{}` still cannot compile, because these profiles refuse the family. So the matrix rows M2 to M5 stay red after X6. X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`, filed by #1123) moves each pin into the `floors` data or the `agents` chain of `cli_routing`, with the same values. Its red test is the matrix row M2 with `floors: {}`. It depends on X6.
+A policy that routes every seat to `agy` and sets `floors` to `{}` still cannot compile, because these profiles refuse the family. So the matrix rows M2 to M5 stay red after X6. X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`, filed by #1123) drops the six floor ceilings and clamps each floor agent to the floor family at read time ([design](../architecture/llm-isolation-x6b-floor-profiles-2026-11.md)). The `router` ceiling stays until the operator answers Q1 of that design. It depends on X6.
 
 The operator refinement of 2026-10-25 (the lineage index) is in D6 and D6b, in the spec §8 and in ADR-0154 rules 10 to 15. No change is needed for it.
 

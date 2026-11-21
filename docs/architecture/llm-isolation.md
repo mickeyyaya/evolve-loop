@@ -14,7 +14,7 @@
 > - X3: merged in #1127. The single launch API of §5.1 and its AST guard `TestOnlyTheBridgeStartsAnLLMBinary` are on `main`, and matrix row N2 is green.
 > - X4: merged in #1126, and the dispatch credential of I-3 merged in #1132. The request channel of §7.2.1 (item `isolation-dispatch-request-channel`) is built at stage `shadow`.
 > - X5: merged in #1133 at stage `shadow` (the policy key `isolation.i5.stage`).
-> - X6: merged in #1123. The routing data of §10 is on `main`: `cli_routing.floors`, with the compiled default in `go/internal/policy/routing_defaults.json`. The follow-up X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`) moves the `allowed_clis` pins of 7 profiles.
+> - X6: merged in #1123. The routing data of §10 is on `main`: `cli_routing.floors`, with the compiled default in `go/internal/policy/routing_defaults.json`. The follow-up X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`) dropped the `allowed_clis` of the six floor profiles. The `router` ceiling stays.
 > - X7: merged in #1135 at stage `shadow` (the policy key `isolation.i7.stage`). The sandbox holds the protected write rule for each family, `guard phase` follows §7.2 for `Agent` and `Task`, and rows N10 and N11 are green (§9.1).
 > - X8: merged in #1131.
 > - X10: built in this change. `AGENTS.md` is the one source. `evolve skills generate` renders its digest into `CLAUDE.md` and `GEMINI.md`, and the four `.claude/agents` reviewers from their neutral personas (§13).
@@ -1006,7 +1006,7 @@ The floor becomes the `floors` key of `cli_routing` (built in X6, #1123). Its va
 - The bare name `gemini` becomes an error that names the `agy` drivers.
 - A grep guard (proposed `TestFlowCodeNamesNoFamily`) checks each non-test Go file. It fails when flow code names a family as a string. The manifests, the bridge drivers and the routing data are exempt.
 - `evolve cli-routing explain <agent>` prints the same chain for each agent before and after X6. X6 records both outputs in its PR.
-- X6 alone does not make an agy-only table compile. 7 tracked profiles still set `allowed_clis` to Claude families: `auditor`, `adversarial-review`, `tdd-engineer`, `spec-verifier`, `spec-verify` and `code-reviewer` set `["claude"]`, and `router` sets `["agy-claude", "claude"]` (`.evolve/profiles/*.json`). The follow-up X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`) moves these pins into the `floors` data, so that the matrix rows M2 and M3 can pass.
+- X6 alone did not make an agy-only table compile, because 7 tracked profiles set `allowed_clis`. Six floor profiles set `["claude"]`. `router` sets `["agy-claude", "claude"]`. X6b dropped the six floor ceilings. The `router` ceiling stays.
 
 ### Status of X6
 
@@ -1025,7 +1025,7 @@ These parts stay open:
 
 - The seat defaults are compiled data, not policy keys. A policy cannot move the advisor seat yet. The router and the failure advisor already resolve through `cliroute` with their profiles; the seat default applies only when that route fails.
 - Row N13 is green. Rows M2 to M4 stayed open on the next gap, the tmux REPL fake of the harness. X1b (inbox item `isolation-matrix-tmux-repl-fake`) closes that gap, and the rows are green. Row M5 stays open on its tool capability (X19c, §11.1).
-- The tracked profiles of the floor agents and the router set `allowed_clis` to Claude families. Thus an agy-only table over the tracked profiles still refuses seven agents, even with `floors: {}`. The matrix uses its own profiles, so this limit does not show there. Inbox item `isolation-floor-profiles-allowed-clis-as-routing-data` owns it.
+- X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`) is built. The six floor profiles hold no `allowed_clis`. An agy-only table with `floors: {}` thus refuses only the router. Its ceiling is an open operator question ([design](llm-isolation-x6b-floor-profiles-2026-11.md), Q1).
 - A `--bypass-policy` run ignores the declared table, `floors` included, so it keeps the compiled Claude floor. This is fail-closed (`TestBuild_ABypassRunKeepsTheCompiledFloorEvenWhenThePolicyDeclaresNone`).
 - `TestFlowCodeNamesNoFamily` matches exact string literals only. A built string (`"claude-" + x`), a prefix test, a name outside its list and a file in an exempt home pass it. Non-Go data is not scanned.
 

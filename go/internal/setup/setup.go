@@ -179,6 +179,7 @@ func detectPhases(o DetectOptions, env func(string) string, pol policy.Policy, p
 	profLoader := profiles.NewFromDir(profilesDir)
 	var phases []PhaseStatus
 	router, routeErr := detectRouter(o.Router, pol)
+	floors := pol.Floors()
 	for _, role := range Roles {
 		ps := PhaseStatus{Role: role, Source: "unresolved"}
 		if res, ok := resolvedRole(router, routeErr, role, resolvellm.Options{
@@ -187,11 +188,12 @@ func detectPhases(o DetectOptions, env func(string) string, pol policy.Policy, p
 			ps.CurrentCLI, ps.CurrentTier, ps.Source = res.CLI, res.ModelTier, res.Source
 		}
 		if pc, ok := readProfileConstraints(profilesDir, role); ok {
-			ps.Envelope, ps.CrossFamilyWith, ps.AllowedCLIs = pc.Envelope, pc.CrossFamilyWith, pc.AllowedCLIs
+			ps.Envelope, ps.CrossFamilyWith = pc.Envelope, pc.CrossFamilyWith
+			ps.AllowedCLIs = floors.Clamp(role, profiles.Profile{AllowedCLIs: pc.AllowedCLIs}).AllowedCLIs
 			ps.DefaultCLI, ps.DefaultTier = pc.DefaultCLI, pc.DefaultTier
 		}
 		if pin, ok := pol.PinFor(role); polErr == nil && ok {
-			ps = withPolicyPin(ps, pin, profLoader)
+			ps = withPolicyPin(ps, pin, profLoader, floors)
 		}
 		phases = append(phases, ps)
 	}
@@ -213,7 +215,7 @@ func resolvedRole(router *cliroute.Router, routeErr error, role string, opts res
 	return res, err == nil
 }
 
-func withPolicyPin(ps PhaseStatus, pin policy.Pin, profLoader *profiles.Loader) PhaseStatus {
+func withPolicyPin(ps PhaseStatus, pin policy.Pin, profLoader *profiles.Loader, floors policy.Floors) PhaseStatus {
 	role := ps.Role
 	if pin.CLI != "" {
 		ps.CurrentCLI = pin.CLI
@@ -223,6 +225,7 @@ func withPolicyPin(ps PhaseStatus, pin policy.Pin, profLoader *profiles.Loader) 
 	}
 	ps.Source = "policy-pin"
 	if prof, err := profLoader.Get(role); err == nil {
+		prof = floors.Clamp(role, prof)
 		if verr := policy.ValidatePin(role, pin, &prof); verr != nil {
 			ps.PinViolation = verr.Error()
 		}
