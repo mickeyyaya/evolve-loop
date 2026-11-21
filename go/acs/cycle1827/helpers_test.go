@@ -338,25 +338,3 @@ func exprText(sel *ast.SelectorExpr) string {
 	}
 	return "." + sel.Sel.Name
 }
-
-func entryNames(t *testing.T, dir string) []string {
-	t.Helper()
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatalf("listing %s: %v", dir, err)
-	}
-	names := make([]string, 0, len(entries))
-	for _, e := range entries {
-		names = append(names, e.Name())
-	}
-	return names
-}
-
-func permOf(t *testing.T, path string) fs.FileMode {
-	t.Helper()
-	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return info.Mode().Perm()
-}
