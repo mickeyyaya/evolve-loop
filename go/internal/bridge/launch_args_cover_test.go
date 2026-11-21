@@ -32,7 +32,7 @@ func TestLaunchArgs_AFailedPreflightIsLoggedAndTheArtifactBudgetReachesTheDriver
 	Register(d)
 	defer func() { ResetDriversForTesting(); registerBuiltins() }()
 	fx := newFixture(t, "cover-probe", "")
-	eng := NewEngine(Deps{Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil)})
 	var stdout, stderr bytes.Buffer
 
 	code := eng.LaunchArgs(context.Background(), fx.args("cover-probe", "--artifact-timeout-s=45"), nil, &stdout, &stderr)
@@ -53,7 +53,7 @@ func TestLaunchArgs_ABadArtifactBudgetFallsBackToTheBuiltinDeadline(t *testing.T
 	Register(d)
 	defer func() { ResetDriversForTesting(); registerBuiltins() }()
 	fx := newFixture(t, "cover-probe", "")
-	eng := NewEngine(Deps{Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil)})
 	for _, v := range []string{"abc", "-5"} {
 		var stdout, stderr bytes.Buffer
 		code := eng.LaunchArgs(context.Background(), fx.args("cover-probe", "--artifact-timeout-s="+v), nil, &stdout, &stderr)
@@ -73,7 +73,7 @@ func TestLaunchArgs_AGlobInASandboxDenialIsABadFlag(t *testing.T) {
 	if err := os.WriteFile(profile, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	eng := NewEngine(Deps{Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil)})
 	var stdout, stderr bytes.Buffer
 
 	code := eng.LaunchArgs(context.Background(), fx.args("cover-probe", "--profile="+profile, "--worktree="+t.TempDir()), nil, &stdout, &stderr)

@@ -171,7 +171,7 @@ func TestEngineLaunch_ArtifactTimeout_SummaryBeatsEarlierBridgeChatter(t *testin
 	t.Cleanup(func() { ResetDriversForTesting(); registerBuiltins() })
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "chatty", "")
-	eng := NewEngine(Deps{LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{LookupEnv: mapLookup(nil)})
 	_, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "acs-chatty-timeout", Profile: prof, Model: "auto", Prompt: "x",
 		Workspace: ws, ArtifactPath: filepath.Join(ws, "a.md"), Agent: "audit",
@@ -196,7 +196,7 @@ func TestEngineLaunch_NonTimeoutExit_CauseUnchanged(t *testing.T) {
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-test", "")
 	fr := &fakeRunner{exit: ExitSafetyGate}
-	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
 	_, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-p", Profile: prof, Model: "auto", Prompt: "x",
 		Workspace: ws, ArtifactPath: filepath.Join(ws, "a.md"), Agent: "build-planner",

@@ -76,7 +76,7 @@ func launchThroughFixture(t *testing.T, ctx context.Context, deps Deps, script [
 	if req.Agent == "" {
 		req.Agent = "build"
 	}
-	resp, err := NewEngine(deps).Launch(ctx, req)
+	resp, err := newTestEngine(deps).Launch(ctx, req)
 	return resp, ws, err
 }
 

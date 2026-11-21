@@ -32,7 +32,7 @@ func TestLadderEffort_AClaudeLaunchAtBalancedSendsTheLadderEffort(t *testing.T) 
 	}
 	artifact := filepath.Join(ws, "artifact.md")
 	fake := &FakeTmuxController{CaptureFrames: slices.Repeat([]string{"working ❯"}, 20)}
-	eng := NewEngine(Deps{Tmux: &artifactOnPasteTmux{FakeTmuxController: fake, artifact: artifact}, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Tmux: &artifactOnPasteTmux{FakeTmuxController: fake, artifact: artifact}, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil)})
 
 	if _, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-tmux", Profile: prof, Model: "balanced", Effort: "high", Prompt: "work",
@@ -67,7 +67,7 @@ func TestLadderEffort_AnUnknownLadderEffortIsABadFlag(t *testing.T) {
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "ladder-effort-bad", "")
 	var stderr bytes.Buffer
-	eng := NewEngine(Deps{LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{LookupEnv: mapLookup(nil)})
 	args := launchArgs(core.BridgeRequest{CLI: "claude-tmux", Profile: prof, Model: "balanced", Effort: "turbo", Workspace: ws, ArtifactPath: filepath.Join(ws, "a.md")},
 		writePromptFile(t, ws), filepath.Join(ws, "o.log"), filepath.Join(ws, "e.log"), Deps{})
 

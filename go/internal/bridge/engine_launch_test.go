@@ -16,7 +16,7 @@ func TestEngineLaunch_ClaudeP_MapsToPipeline(t *testing.T) {
 	prof := writeProfile(t, ws, "eng-test", "")
 	artifact := filepath.Join(ws, "artifact.md")
 	fr := &fakeRunner{writeArtifactPath: artifact, writeArtifactBody: "ARTIFACT-OK\n"}
-	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
 
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-p", Profile: prof, Model: "auto",
@@ -46,7 +46,7 @@ func TestEngineLaunch_ClaudeP_MapsToPipeline(t *testing.T) {
 
 func TestEngineLaunch_MissingCLI_Errors(t *testing.T) {
 	t.Parallel()
-	_, err := NewEngine(Deps{}).Launch(context.Background(), core.BridgeRequest{
+	_, err := newTestEngine(Deps{}).Launch(context.Background(), core.BridgeRequest{
 		Profile: "p", Workspace: "w", ArtifactPath: "a",
 	})
 	if err == nil {
@@ -58,7 +58,7 @@ func TestEngineLaunch_NonZeroExit_Errors(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-test", "")
-	resp, err := NewEngine(Deps{LookupEnv: mapLookup(nil)}).Launch(context.Background(), core.BridgeRequest{
+	resp, err := newTestEngine(Deps{LookupEnv: mapLookup(nil)}).Launch(context.Background(), core.BridgeRequest{
 		CLI: "nope", Profile: prof, Model: "auto", Prompt: "x",
 		Workspace: ws, ArtifactPath: filepath.Join(ws, "a.md"),
 	})

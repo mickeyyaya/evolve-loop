@@ -266,7 +266,7 @@ func TestTmuxREPL_PromptDelivery_SettlesBeforeBaselineCapture(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	rec := &timelineRecorder{}
 	tm := &timelineTmux{fakeTmux: &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}, rec: rec}
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux:      tm,
 		Sleep:     func(d time.Duration) { rec.add("sleep:" + d.String()) },
 		LookupEnv: mapLookup(nil),

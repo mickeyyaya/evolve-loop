@@ -32,7 +32,7 @@ func TestTmuxREPL_ExhaustionWall_FastFailNotAtCheckpoint(t *testing.T) {
 	walled := "❯\nYou've reached your Fable 5 limit. Run /usage-credits to continue or switch models with /model.\n❯"
 	tmux := &nudgeRecordingTmux{fakeTmux: &fakeTmux{paneSeq: []string{walled}}}
 	polls := 0
-	eng := NewEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) { polls++ }, LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) { polls++ }, LookupEnv: mapLookup(nil)})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	var stdout, stderr bytes.Buffer
@@ -61,7 +61,7 @@ func TestTmuxREPL_ContentWall_SuppressedByCorroborator(t *testing.T) {
 	walled := "❯\nYou've reached your Fable 5 limit. Run /usage-credits to continue or switch models with /model.\n❯"
 	tmux := &nudgeRecordingTmux{fakeTmux: &fakeTmux{paneSeq: []string{walled}}}
 	healthy := func(context.Context, string) bool { return false }
-	eng := NewEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), CorroborateWall: healthy})
+	eng := newTestEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), CorroborateWall: healthy})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	var stdout, stderr bytes.Buffer

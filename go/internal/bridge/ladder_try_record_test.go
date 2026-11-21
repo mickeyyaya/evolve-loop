@@ -18,7 +18,7 @@ func TestTryRecord_AnR1TryStartsANewSessionAndRecordsTheDecision(t *testing.T) {
 	prof := writeProfile(t, ws, "try-record", "")
 	artifact := filepath.Join(ws, "artifact.md")
 	tmux := &artifactOnPasteTmux{FakeTmuxController: &FakeTmuxController{CaptureFrames: slices.Repeat([]string{"working ❯"}, 40)}, artifact: artifact}
-	eng := NewEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil)})
 	base := core.BridgeRequest{
 		CLI: "claude-tmux", Profile: prof, Model: "balanced", Prompt: "work",
 		Workspace: ws, Worktree: ws, ProjectRoot: ws, ArtifactPath: artifact, Agent: "builder", Attempt: 1,

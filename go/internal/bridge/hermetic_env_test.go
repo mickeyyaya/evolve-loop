@@ -363,10 +363,10 @@ func TestDoctorProbe_RunsWithTheFamilyCellEnv(t *testing.T) {
 func TestNewEngine_GivesEachEngineADropLog(t *testing.T) {
 	t.Parallel()
 	shared := &EnvDropLog{}
-	if NewEngine(Deps{}).deps.EnvDrops == nil {
+	if newTestEngine(Deps{}).deps.EnvDrops == nil {
 		t.Fatal("an engine with no drop log must get its own, so one dispatch reports each name once")
 	}
-	if NewEngine(Deps{EnvDrops: shared}).deps.EnvDrops != shared {
+	if newTestEngine(Deps{EnvDrops: shared}).deps.EnvDrops != shared {
 		t.Fatal("a caller's drop log must be kept")
 	}
 }
