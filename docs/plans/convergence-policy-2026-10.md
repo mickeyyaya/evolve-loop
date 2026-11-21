@@ -1,5 +1,7 @@
 # Convergence policy: every iterative loop converges or escalates (plan, 2026-10)
 
+> **Status:** partly built, 2026-11-21 (8 of 15 components on main). Earlier status: proposed, 2026-10-07; V0 landed in commit c45224854.
+
 > **Purpose.** This is the living plan for ADR-0126.
 > - **What it adds:** one convergence policy for every repeat-until-accepted loop, in the pipeline and in the console.
 >   - Loops land in at most three fix rounds.
@@ -182,3 +184,25 @@ The decisions of the V1–V3 fix round 1:
 | CQ2 | Are 3 rounds, a 0.6 concentration threshold and a minimum of 5 findings right? | Start there. Read rounds-to-land, the deferred-then-closed share and the falsification drop rate in shadow, then tune through config. |
 | CQ3 | Is the console bound by `stage`? | No. The console follows the decision from the start (V-D8). |
 | CQ4 | Do the judge trust weights come from the falsification drop rate (a noisy judge's findings weigh less)? | Phase B, after the data. |
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| V0 | done | [`c452248`](https://github.com/mickeyyaya/evolve-loop/commit/c45224854), [`d901d71`](https://github.com/mickeyyaya/evolve-loop/commit/d901d71f4) | none |
+| V1 | done | [`b9165d2`](https://github.com/mickeyyaya/evolve-loop/commit/b9165d2e3) (merge [`8f5bf05`](https://github.com/mickeyyaya/evolve-loop/commit/8f5bf0510)); later changes [`2f1d2eb`](https://github.com/mickeyyaya/evolve-loop/commit/2f1d2eb50), [`0718e2d`](https://github.com/mickeyyaya/evolve-loop/commit/0718e2d6d) (cycle 2536) | none |
+| V2 | done | [`b9165d2`](https://github.com/mickeyyaya/evolve-loop/commit/b9165d2e3); `go/cmd/evolve/cmd_convergence.go` | none |
+| V3 | done | [`b9165d2`](https://github.com/mickeyyaya/evolve-loop/commit/b9165d2e3); `go/internal/policy/convergence.go` | none |
+| V3b | done | [`f7d6844`](https://github.com/mickeyyaya/evolve-loop/commit/f7d6844f5) | none |
+| V4 | done | [`4fc4588`](https://github.com/mickeyyaya/evolve-loop/commit/4fc458846) (cycle 2038) | none |
+| V5 | done (shadow) | [`23d09f7`](https://github.com/mickeyyaya/evolve-loop/commit/23d09f7c6) (cycle 2142); `go/internal/core/audit_repair_convergence.go` | none |
+| V6 | not started | none on main. Nothing in `go/internal/codereview/` calls the `convergence` package. | none (withdrawn 2026-11-13); follow-up draft `convergence-policy-v6-code-review-loop-decide` |
+| V7 | not started | none on main. A search of `go/internal/codereview/` and `go/internal/qualityindex/` finds no falsification field. | none (withdrawn 2026-11-13); follow-up draft `convergence-policy-v7-finding-grammar-fields` |
+| V8 | partly built | metrics verb: [`ae7704f`](https://github.com/mickeyyaya/evolve-loop/commit/ae7704f57) (cycle 2328). Signal codes: unverified, because no cycle commit names them. | none |
+| V9 | not started | none | `convergence-policy-v9-stage-enforce-flip` |
+| V10 | partly built | The `max_backward_edges` key exists in `go/internal/policy/convergence.go`. No cycle code reads it; only `go/internal/convergence/rules.go:45` does. | none (withdrawn 2026-11-13); follow-up draft `convergence-policy-v10-cycle-backward-edges` |
+| V11 | done | [`eaea4ed`](https://github.com/mickeyyaya/evolve-loop/commit/eaea4edd8) (cycle 2254); [`4debd5d`](https://github.com/mickeyyaya/evolve-loop/commit/4debd5d13) (cycle 2265); `go/internal/core/retry_ladder.go` | none |
+| V12 | not started | none on main | none (withdrawn 2026-11-13); follow-up draft `convergence-policy-v12-ship-recovery-signals` |
+| VB | dropped | Retired on 2026-11-20 (boundary 183): the work needs V9 shadow data first. File it again then. | none (consumed as retired) |
+
+The policy runs in shadow for the console, audit repair and the inbox-item ladder. The code-review loop (V6), the finding fields (V7) and the cycle-wide edge budget (V10) are not built. Ship recovery (V12) is not built. Each of V6, V7, V10 and V12 has no open inbox item, because the operator withdrew them in the 2026-11-13 cleanup. Follow-up drafts exist for them. V9 waits for two shadow waves.

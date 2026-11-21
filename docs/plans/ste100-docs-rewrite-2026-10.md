@@ -1,6 +1,6 @@
 # Plan: rewrite all documentation in Simplified Technical English (ASD-STE100)
 
-- **Status:** in progress, opened 2026-10-07.
+- **Status:** partly built, 2026-11-21 (4 of 13 batches done: S0, S1, S11, S12; S9 dropped; S2 to S7 and S10 partial; S8 not started). Earlier status: in progress, opened 2026-10-07.
 - **Standard:** [ste100-writing.md](../conventions/ste100-writing.md).
 - **Operator request (2026-10-07):** "improve the readability by strictly follow ASD-STE100 policy and rewrite all docs wording by strictly follow ASD-STE100 format".
 - **Operator decisions (2026-10-07):**
@@ -133,3 +133,28 @@ The design must choose one home for "a documentation rewrite runs on agy". The c
 | C | A `cli_routing` rule for the work role of a documentation rewrite |
 
 Until the design lands, the batches wait. The S1 pilot used Claude lanes.
+
+## Delivery status (2026-11-21)
+
+The lint counts below come from `evolve docs ste-lint` on main at `98c7bcafc` on 2026-11-21.
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| S0: standard, plan, `ste-lint`, build-floor WARN | done | [`45b18a8`](https://github.com/mickeyyaya/evolve-loop/commit/45b18a8b2) | none |
+| S1: pilot, 21 files | done | [`70cb0c3`](https://github.com/mickeyyaya/evolve-loop/commit/70cb0c3d6) | none |
+| S2: `runtime-reference.md`, `docs/plans` | partial: `runtime-reference.md` has 568 findings; `docs/plans` has 236 findings in 10 of 83 files | none traced | none (draft `ste-rewrite-campaign-remaining`) |
+| S3: `docs/architecture/*.md` | partial: `docs/architecture` has 220 of 680 files with findings | [#1142](https://github.com/mickeyyaya/evolve-loop/pull/1142), [#1143](https://github.com/mickeyyaya/evolve-loop/pull/1143), [#1144](https://github.com/mickeyyaya/evolve-loop/pull/1144), [#1145](https://github.com/mickeyyaya/evolve-loop/pull/1145) | none (draft `ste-rewrite-campaign-remaining`) |
+| S4: `docs/architecture/adr` | partial: 121 of 165 files have findings | none traced | none (draft `ste-rewrite-campaign-remaining`) |
+| S5: packages and decomposition | partial: `packages` has 83 of 363 files with findings | none traced | none (draft `ste-rewrite-campaign-remaining`) |
+| S6: research | partial: 108 of 200 files have findings | none traced | none (draft `ste-rewrite-campaign-remaining`) |
+| S7: incidents, reports, chronicle, superpowers, adr | partial: `incidents` 77 of 127, `reports` 35 of 35, the other three 35 of 37 | none traced | none (draft `ste-rewrite-campaign-remaining`) |
+| S8: `CHANGELOG.md` | not started: 1545 findings | none | none (draft `ste-rewrite-campaign-remaining`) |
+| S9: phase-output overlay | dropped: retired, not built, by the inbox review of 2026-11-20 (the overlay adds prompt tokens and changes no verdict) | [`fd36f33`](https://github.com/mickeyyaya/evolve-loop/commit/fd36f3334) (PR 1605, bookkeeping) | none |
+| S10: Go log and error text | partial: one batch, 12 files; `ste-lint --go` still reports 242 findings in 140 files | cycle 2507, [`1e2e9d6`](https://github.com/mickeyyaya/evolve-loop/commit/1e2e9d642) | none (draft `ste100-docs-rewrite-s10-go-log-text-remaining`) |
+| S11: generator templates | done: `README.md` and `docs/architecture/signal-codes.md` have 0 findings; other generated documents are unverified | cycle 2536, [`f31324c`](https://github.com/mickeyyaya/evolve-loop/commit/f31324cca) | none |
+| S12: console and lane text | done (in effect from 2026-10-07; no code) | none | none |
+| Section 9: where agy runs the bulk batches (T-D4) | not started: no design chosen among options A, B and C | none | none |
+
+The campaign is far from finished. The plan names the item `ste-rewrite-campaign-remaining` for S2 to S8. That item is in neither the inbox nor `consumed/`. So no open item tracks these batches. A draft is ready.
+
+The rest of S10 and the agy dispatch design of section 9 also have no open item. A draft exists for S10. The design question of section 9 needs an operator decision first.

@@ -1,6 +1,6 @@
 # Plan: a wave orchestrator keeps at least four lanes busy, keeps their conflicts low, and scales to a large fleet
 
-- **Status:** proposed, 2026-10-17. Built at stage `enforce` (`fleet.orchestrator.stage`), with `fleet.count` 4. The state on 2026-10-27:
+- **Status:** partly built, 2026-11-21 (11 of 12 components on main; O2a partial; G1 and G3 not measured). Earlier status: proposed, 2026-10-17. Built at stage `enforce` (`fleet.orchestrator.stage`), with `fleet.count` 4. The state on 2026-10-27:
   - Merged: O1 (#922), O2b (#923), O2c (#959) and O3 (#925, #1007).
   - Merged: O4 and O5 (#941, #991), the O6 library and the census R1 (#963, #966), O7 (#929), O8 (#964) and O9 (#942).
   - Open: O6 R2, the loop wiring of `orchestrator.Oversight`. No production code constructs it. Item: `wave-orchestrator-o6-wire-oversight-into-the-loop`.
@@ -253,3 +253,22 @@ The inbox holds one item for each group of components, in the campaign `wave-orc
   - Rejected (a): direct imports only, which shrinks the reach of non-leaf packages and misses transitive importers.
   - Rejected (c): reach by exported API, which needs a type diff before the build exists.
 - **Q3:** does a goal-split planner phase (design D) become a second supply source? We propose not until O2 is live and measured.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| O0 design set and inbox items | done | [`ff505a7`](https://github.com/mickeyyaya/evolve-loop/commit/ff505a707) | none |
+| O1 fallback-aware shrink, `fleet.count` 4 | done | [#922](https://github.com/mickeyyaya/evolve-loop/pull/922), [`196c653`](https://github.com/mickeyyaya/evolve-loop/commit/196c653d4) | none |
+| O2a re-route and sweep of lane items | partial: `evolve wave supply` admitted 1 item on 2026-10-27, against 20 in the acceptance; no later measure | data work, no code change | none (draft `wave-orchestrator-o2a-restore-lane-routable-supply`) |
+| O2b `IsProtectedScope` directory rule | done | [#923](https://github.com/mickeyyaya/evolve-loop/pull/923), [`4486089`](https://github.com/mickeyyaya/evolve-loop/commit/448608933) | none |
+| O2c `evolve inbox split` | done | [#959](https://github.com/mickeyyaya/evolve-loop/pull/959), [`7c9f42d`](https://github.com/mickeyyaya/evolve-loop/commit/7c9f42dd5) | none |
+| O3 admission by cell | done | [#925](https://github.com/mickeyyaya/evolve-loop/pull/925), [`522221b`](https://github.com/mickeyyaya/evolve-loop/commit/522221b69); [#1007](https://github.com/mickeyyaya/evolve-loop/pull/1007), [`5dd8cfb`](https://github.com/mickeyyaya/evolve-loop/commit/5dd8cfb90); `go/internal/admission` | none |
+| O4 rolling pool under the orchestrator | done | [#941](https://github.com/mickeyyaya/evolve-loop/pull/941), [`afe232f`](https://github.com/mickeyyaya/evolve-loop/commit/afe232f03); resupply: [#991](https://github.com/mickeyyaya/evolve-loop/pull/991), [`27b4ac5`](https://github.com/mickeyyaya/evolve-loop/commit/27b4ac560) | none |
+| O5 lane lease, heartbeat, deadline | done | [#941](https://github.com/mickeyyaya/evolve-loop/pull/941), [`afe232f`](https://github.com/mickeyyaya/evolve-loop/commit/afe232f03) | none |
+| O6 oversight loop, intake, census | done | [#963](https://github.com/mickeyyaya/evolve-loop/pull/963), [`191aa0b`](https://github.com/mickeyyaya/evolve-loop/commit/191aa0b4f); R1 [#966](https://github.com/mickeyyaya/evolve-loop/pull/966), [`6ed9f7c`](https://github.com/mickeyyaya/evolve-loop/commit/6ed9f7c00); R2 cycle 2427, [`fd03a5b`](https://github.com/mickeyyaya/evolve-loop/commit/fd03a5b3d), item consumed in [#1605](https://github.com/mickeyyaya/evolve-loop/pull/1605); `go/cmd/evolve/cmd_loop_orchestrator.go:135` | none |
+| O7 width, utilization, conflict rate | done | [#929](https://github.com/mickeyyaya/evolve-loop/pull/929), [`6168772`](https://github.com/mickeyyaya/evolve-loop/commit/616877236); `go/internal/wavemeasure` | none |
+| O8 adaptive window | done | [#964](https://github.com/mickeyyaya/evolve-loop/pull/964), [`c9a0f06`](https://github.com/mickeyyaya/evolve-loop/commit/c9a0f067b); the oversight loop feeds it at `go/cmd/evolve/cmd_loop_orchestrator.go:146` | none |
+| O9 lane CPU budget | done | [#942](https://github.com/mickeyyaya/evolve-loop/pull/942), [`b7c4c3d`](https://github.com/mickeyyaya/evolve-loop/commit/b7c4c3d76); `go/internal/lanebudget` | none |
+
+The status block at the top of this plan, dated 2026-10-27, is stale in one point: O6 R2 (the oversight wiring) landed in cycle 2427. O2a is partial and has no open item. The measure of G1 and G3 has no open item either: the items `restore-lane-routable-supply` and `wave-orchestrator-measure-goals-g1-g3` left the inbox in [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443) without a result. A draft exists for each.

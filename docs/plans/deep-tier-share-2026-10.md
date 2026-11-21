@@ -1,6 +1,6 @@
 # Plan: the deep tier shares its seats between Argon and Claude by budget
 
-- **Status:** built, 2026-10-21.
+- **Status:** built, 2026-10-21. Earlier status: built, 2026-10-21.
 - **Design:** [deep-tier-share](../architecture/deep-tier-share.md). **Decision:** [ADR-0150](../architecture/adr/0150-the-deep-tier-gives-its-first-family-a-fixed-share-of-the-seats-and-paces-it-by-its-week-window.md). **Research:** [deep-tier-share-2026-10](../research/deep-tier-share-2026-10.md).
 
 ## 1. Request
@@ -96,3 +96,16 @@ A alone keeps the share when Argon runs ahead of its week. B alone sends every s
 ## 10. Open questions
 
 - The share value 50 is a first value. After one week, compare the Argon and Claude weeks and set a new value with `evolve cli-routing set tiers.deep --share-pct N`.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| S1 `SharePct` field | done | [`6af3ead`](https://github.com/mickeyyaya/evolve-loop/commit/6af3eadb14024541a5d144ffde61fb4745dfba70); `go/internal/policy/cli_routing.go` | none |
+| S2 `shareTier` stage | done | [`6af3ead`](https://github.com/mickeyyaya/evolve-loop/commit/6af3eadb14024541a5d144ffde61fb4745dfba70), [`c0f4431`](https://github.com/mickeyyaya/evolve-loop/commit/c0f443181) (an explicit pin wins); `go/internal/cliroute/share.go:45` | none |
+| S3 `TierWeek` and `projectTierWeek` | done | [`6af3ead`](https://github.com/mickeyyaya/evolve-loop/commit/6af3eadb14024541a5d144ffde61fb4745dfba70); `go/internal/usageprobe/week_used.go:44`, `go/cmd/evolve/cli_routing_lanes.go:55` | none |
+| S4 cycle in the route request | done | [`c0f4431`](https://github.com/mickeyyaya/evolve-loop/commit/c0f443181) (the escalation route carries the cycle) | none |
+| S5 explain note and `--share-pct` | done | [`6af3ead`](https://github.com/mickeyyaya/evolve-loop/commit/6af3eadb14024541a5d144ffde61fb4745dfba70); `go/cmd/evolve/cli_routing_edit.go` | none |
+| S6 `tiers.deep.share_pct: 50` | done | [`6af3ead`](https://github.com/mickeyyaya/evolve-loop/commit/6af3eadb14024541a5d144ffde61fb4745dfba70); `.evolve/policy.json:100` | none |
+
+The inbox item `deep-tier-shares-argon-by-budget` is consumed in the same commit. Nothing is left in the code. The live measure in section 8 (the Argon week below 100% after one reset) is unverified, because no reading is in the repository.

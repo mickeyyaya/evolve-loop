@@ -1,6 +1,6 @@
 # Plan: a capability failure climbs one bounded retry ladder
 
-- **Status:** accepted, 2026-10-19. The operator decided Q1 to Q3 of §6 on 2026-10-19. L5 and L6 are built at stage `shadow` (2026-10-27, [§5](#5-components-and-order)).
+- **Status:** partly built, 2026-11-18 (8 of 9 components done; L8, the move to `enforce`, is open). Earlier status: accepted, 2026-10-19. The operator decided Q1 to Q3 of §6 on 2026-10-19. L5 and L6 are built at stage `shadow` (2026-10-27, [§5](#5-components-and-order)).
 - **Amended by:** [ADR-0146](../architecture/adr/0146-a-defect-that-survives-two-builder-rounds-is-fixed-from-the-finders-spec-and-verified-by-another.md) and [finder-fix-ownership-2026-10](finder-fix-ownership-2026-10.md): the ladder gains R3, a fix from the finder's spec, and stops after R3. D3 and D5 below describe the ladder before this change.
 - **Research:** [retry-ladder-2026-10](../research/retry-ladder-2026-10.md). **Decision:** [ADR-0142](../architecture/adr/0142-a-capability-failure-climbs-one-bounded-retry-ladder.md). **Design:** [retry-ladder](../architecture/retry-ladder.md).
 - **Related:** [ADR-0146](../architecture/adr/0146-a-defect-that-survives-two-builder-rounds-is-fixed-from-the-finders-spec-and-verified-by-another.md), [ADR-0158](../architecture/adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md), [ADR-0096](../architecture/adr/0096-repair-rounds-escalate-and-carry-findings.md) (repair rounds raise the tier). [ADR-0126](../architecture/adr/0126-every-iterative-loop-converges-or-escalates.md) (converge or escalate), [ADR-0130](../architecture/adr/0130-a-retry-carries-the-evidence-of-the-attempt-it-replaces.md) (a retry carries the evidence), [ADR-0141](../architecture/adr/0141-every-phase-handoff-is-a-request-build-check-loop-with-three-exits.md) (the three exits of a handoff).
@@ -168,3 +168,22 @@ Two gaps stay open:
 - The ladder cannot fix a request that is wrong. It can only stop sooner and say so.
 - Shadow records the choice of the ladder, not its effect. The help shows only at `enforce`, in the report of D13.
 - The fingerprint uses the violation codes of the contract escalation. Two different defects with the same code look the same.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| L0 try record | done | [`b8dec1c`](https://github.com/mickeyyaya/evolve-loop/commit/b8dec1ceeb3431b702a36f740d9312bb72448cdb) | none (consumed) |
+| L1 classifier | done | cycle commit [`5ecd06e`](https://github.com/mickeyyaya/evolve-loop/commit/5ecd06e50a8c64575b3a27d7874ddaf4d0fb630b) | none (consumed) |
+| L2 decider | done | cycle commit [`4f58477`](https://github.com/mickeyyaya/evolve-loop/commit/4f5847785eba1674a2792b344866d01a86ad3041) | none (consumed) |
+| L3 effort overlay | done | [`16b852f`](https://github.com/mickeyyaya/evolve-loop/commit/16b852fa8bbaca621bc06f24270d682f39a907bc) | none (consumed) |
+| L4 pin as base | done | [`076a2ec`](https://github.com/mickeyyaya/evolve-loop/commit/076a2eca5a42876ae32d39250763806862a8c527) | none (consumed) |
+| L5 wiring at shadow | done (stage `shadow`) | [`f654a9e`](https://github.com/mickeyyaya/evolve-loop/commit/f654a9e6e807f0edf9791ca5857169a6d1e5ed80); `go/internal/core/retry_ladder.go` | none (consumed) |
+| L6 fresh session and digest | done | [`f654a9e`](https://github.com/mickeyyaya/evolve-loop/commit/f654a9e6e807f0edf9791ca5857169a6d1e5ed80); `go/internal/retryladder/digest.go` | none (consumed) |
+| L7 `evolve ladder report` | done | cycle commit [`7aa5456`](https://github.com/mickeyyaya/evolve-loop/commit/7aa5456e2e2f2bfe6f9903ba3e730ee489661b3d) | none (consumed) |
+| L8 move to `enforce` | not started | `.evolve/policy.json:217` is `shadow` | none: draft `retry-ladder-l8-enforce` |
+| `audit_fix` rung (D16) | done (stage `enforce`) | [#1236](https://github.com/mickeyyaya/evolve-loop/pull/1236); `.evolve/policy.json:219` | none |
+| Gap 1: failure record carries the rung | done | cycle commit [`1128e9d`](https://github.com/mickeyyaya/evolve-loop/commit/1128e9d82c2a92d9c81ab18461be35fe2298ce42) | none (consumed) |
+| Gap 2: resume keeps the ladder state | done | cycle commit [`df3393b`](https://github.com/mickeyyaya/evolve-loop/commit/df3393b5798d1a552609d76192b8a55e90235eeb) | none (consumed) |
+
+The two gaps at the end of section 5 are closed. Only L8 is left: the ladder still runs at `shadow`. The L8 inbox item is in neither the inbox nor the consumed folder, so a draft is written. Plan [finder-fix-ownership](finder-fix-ownership-2026-10.md) adds rung R3, which is partly built.

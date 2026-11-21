@@ -1,6 +1,6 @@
 # `evolve wave`: a public CLI to run and watch waves (2026-10)
 
-> **Status:** lane `cl-wave-cli`, stacked on PR #816 (`fix/loop-log-retention`). Written in ASD-STE100.
+> **Status:** built, 2026-10-21 ([#818](https://github.com/mickeyyaya/evolve-loop/pull/818) and later fixes). Earlier status: lane `cl-wave-cli`, stacked on PR #816 (`fix/loop-log-retention`). Written in ASD-STE100.
 >
 > **Owner of this document:** lane `cl-wave-cli`.
 
@@ -186,3 +186,18 @@ All generated text is in STE. A typical goal is about 3 KB, against 36 KB for th
 - `watch` sees a phase only when it polls. A phase shorter than the poll interval does not show.
 - `wave-build` rebuilds `go/bin/evolve` in the plane. When the console runs a different binary, `loop --detach` starts that binary, as `boundary run` does today. D17 gives a warning for this case.
 - Two ad-hoc decoders (`internal/redteamcheck`, `internal/wave`) read `state.json:lastCycleNumber` beside the typed `cyclestate.State`. Merged PRs come only from merge-commit subjects, so a squash merge is missed. The inbox item `wave-shared-state-reader-and-squash-prs` holds both.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| `go/internal/wave` package and the verbs `next`, `status`, `watch`, `note` (D1 to D19) | done | [#818](https://github.com/mickeyyaya/evolve-loop/pull/818), [`d186d25`](https://github.com/mickeyyaya/evolve-loop/commit/d186d2588); `go/cmd/evolve/cmd_wave.go:86` | none |
+| Boundary split into halt and launch halves (D2) | done | [#818](https://github.com/mickeyyaya/evolve-loop/pull/818); `go/cmd/evolve/cmd_boundary.go:224` | none |
+| D20: the cycle floor reads the cycle lease (`HighestCycleNumber`) | done | [#820](https://github.com/mickeyyaya/evolve-loop/pull/820), [`53631d5`](https://github.com/mickeyyaya/evolve-loop/commit/53631d597) | none |
+| D21: boot refresh before the policy parse | done | [#1107](https://github.com/mickeyyaya/evolve-loop/pull/1107), [`04ffa80`](https://github.com/mickeyyaya/evolve-loop/commit/04ffa80c0), [`61ec905`](https://github.com/mickeyyaya/evolve-loop/commit/61ec905e5) | none |
+| Shared state reader and squash-merge PRs (section 11) | done | cycle 1870, [`be9bfd8`](https://github.com/mickeyyaya/evolve-loop/commit/be9bfd824); squash rule at `go/cmd/evolve/cmd_wave.go:43` | none |
+| Review follow-ups (`wave-cli-review-followups`) | done | cycle 1949, [`2939684`](https://github.com/mickeyyaya/evolve-loop/commit/2939684c2) | none |
+| Section 10 seam: stale-claim release in `boundaryHaltSteps` | superseded by the planner release (D6 of [inbox-stale-claims-2026-10.md](inbox-stale-claims-2026-10.md)) | [#819](https://github.com/mickeyyaya/evolve-loop/pull/819) | none |
+| Section 11 limits: poll gaps, gc before dossier | accepted limits, no work planned | none | none |
+
+All components are on main. The verb has grown since the plan: it now has `supply`, `latency` and `stop` sub-verbs, and a free-space refusal ([`4b52782`](https://github.com/mickeyyaya/evolve-loop/commit/4b5278252)). Those belong to other plans. No unfinished component of this plan lacks an inbox item.

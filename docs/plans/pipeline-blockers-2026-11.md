@@ -1,6 +1,6 @@
 # Plan: Each pipeline blocker gets a design check, six test rows and a signal that states its cause
 
-- **Status:** proposed, 2026-11-05. The operator asked for a complete test plan on 2026-11-04. The console chose the six rows. This plan waits for the operator.
+- **Status:** partly built, 2026-11-21 (7 of 19 components done, 1 in review, 4 partial, 7 not started). Earlier status: proposed, 2026-11-05. The operator asked for a complete test plan on 2026-11-04. The console chose the six rows. This plan waits for the operator.
 - **Design:** [signal-accuracy](../architecture/signal-accuracy.md). **Decision:** [ADR-0161](../architecture/adr/0161-a-pipeline-blocker-fix-meets-six-test-rows-and-a-signal-states-its-cause-and-next-step.md). **Research:** [pipeline-blockers-2026-11](../research/pipeline-blockers-2026-11.md). **Incident:** [2026-11-05 wave 155](../incidents/2026-11-05-wave-155-false-signals-and-the-logout.md).
 - **Related:** [wave operations](../operations/wave-operations.md), [operating policy](../operations/operating-policy.md), [convergence policy](../architecture/convergence-policy.md).
 
@@ -227,3 +227,29 @@ Each component has 100% coverage on each changed function, a red-first test and 
 | Q4 | Which code wrote `quota-pause` for the logout (F1.12)? | Trace it in the design check of B10. |
 | Q5 | What proves that a PR was reviewed (B11)? | A record per commit that the gate wrote, joined over the commits of the PR. This is the proposal of the inbox item, and the design check decides. |
 | Q6 | Which ADR number? | The console chose 0161, because the trust root set takes 0160. |
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| B1 paused scope of a console-routed item | done | [`bb69b60`](https://github.com/mickeyyaya/evolve-loop/commit/bb69b6092) (2026-11-04); merged in [#1300](https://github.com/mickeyyaya/evolve-loop/pull/1300), [`5df3fdf`](https://github.com/mickeyyaya/evolve-loop/commit/5df3fdf77) | none |
+| B2 triage gate accepts the prescribed answer | done | [`0cbfd3f`](https://github.com/mickeyyaya/evolve-loop/commit/0cbfd3f5f) (2026-11-06) | none |
+| B3 resume path proves a blocker | done | [`b75347e`](https://github.com/mickeyyaya/evolve-loop/commit/b75347edb) (2026-11-05); follow-up [#1570](https://github.com/mickeyyaya/evolve-loop/pull/1570), [`4391efa`](https://github.com/mickeyyaya/evolve-loop/commit/4391efa00) | none |
+| B4 ship check reads the lane tree against the audited base | partial: related ship-backstop fixes landed ([#1611](https://github.com/mickeyyaya/evolve-loop/pull/1611), [#1615](https://github.com/mickeyyaya/evolve-loop/pull/1615)); the plan's own three-form test is unverified | [#1611](https://github.com/mickeyyaya/evolve-loop/pull/1611), [#1615](https://github.com/mickeyyaya/evolve-loop/pull/1615) | none |
+| B5 one count of ships | done | [`7b6a283`](https://github.com/mickeyyaya/evolve-loop/commit/7b6a28302) (2026-11-05) | none |
+| B6 phase cell runs the host `evolve` | in review (the build is not yet a PR) | none | none |
+| B7 `sync-main` accepts a quarantine move | done | cycle 2449, [`8fd4bfb`](https://github.com/mickeyyaya/evolve-loop/commit/8fd4bfba2); also [#1593](https://github.com/mickeyyaya/evolve-loop/pull/1593) ([`ab7c945`](https://github.com/mickeyyaya/evolve-loop/commit/ab7c9450e)) | none |
+| B8 class from the writer, one `go test -json` parser | partial: unverified. A `gate-block` class exists in loop tests, and no single parser was confirmed | none found | none (draft `pipeline-blockers-b8-class-from-the-writer-check`) |
+| B9 one INFO signal for each launch | partial: the item `isolation-i2-refusal-is-not-a-violation` was consumed in [#1605](https://github.com/mickeyyaya/evolve-loop/pull/1605); the code and the WARN rules are unverified | [#1605](https://github.com/mickeyyaya/evolve-loop/pull/1605) | 2026-11-20T10-06-23Z-signal-severity-and-noise-cleanup |
+| B10 a logout reads as a logout | done | [#1317](https://github.com/mickeyyaya/evolve-loop/pull/1317), [`234b34e`](https://github.com/mickeyyaya/evolve-loop/commit/234b34ec2); `go/cmd/evolve/cmd_cycle_login_journey_test.go` | none |
+| B11 the train accepts a reviewed PR | done | [`2607b6e`](https://github.com/mickeyyaya/evolve-loop/commit/2607b6e9d) (2026-11-05); follow-up [#1567](https://github.com/mickeyyaya/evolve-loop/pull/1567), [`86e8d77`](https://github.com/mickeyyaya/evolve-loop/commit/86e8d7730) | none |
+| R1 one block count per subject | not started: no such count found | none | none (draft `pipeline-blockers-r1-one-block-count`) |
+| R2 `convergence.Decide` returns `ActionRedesign` | not started: `Decision.Redesign` is a list of text lines (`go/internal/convergence/convergence.go:137`); no action constant | none | none (draft `pipeline-blockers-r2-decide-returns-redesign`) |
+| R3 audit repair, code review and `convergence decide` act on `redesign` | not started | none | none (draft `pipeline-blockers-r3-entries-act-on-redesign`) |
+| R4 failure events feed the count; an item at the ceiling routes to the console | not started | none | none (draft `pipeline-blockers-r4-failure-events-feed-the-count`) |
+| R5 a redesign subject leaves the lane queue | not started | none | none (draft `pipeline-blockers-r5-redesign-subject-leaves-the-lane-queue`) |
+| R6 six-part text of the convergence signals | not started: no `CONVERGENCE_REDESIGN` code in the Go code | none | none (draft `pipeline-blockers-r6-convergence-signal-text`) |
+| P2 equality helper for signal text | not started: no helper found | none | none (draft `pipeline-blockers-p2-signal-text-equality-helper`) |
+| P3 debug verbs | partial: tracked by [debug-cli-2026-11.md](debug-cli-2026-11.md) (ADR-0162); the verbs `signals count` and `agent show` are not on main | see that plan | see that plan |
+
+The B fixes are mostly built. The R group (the redesign rung of the convergence ladder) and P2 are not built, and none has an open inbox item. Eight drafts are ready: R1 to R6, P2 and a B8 check. ADR-0161 reads Proposed, so its status line looks stale. This review did not change it. The operator ruling of 2026-11-06 (Q1) is on record, but the code does not show it yet.

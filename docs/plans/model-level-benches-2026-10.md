@@ -1,6 +1,6 @@
 # Model-level benches: bench (family, model), not only the family (design note, 2026-10-06)
 
-> Status: **steps 1 and 2 landed in commits 83e7ca5aa and c63b9bd24; steps 3 to 5 pending.** Filed as a follow-up of the usage-window reader ([internal-usageprobe](../architecture/packages/internal-usageprobe.md)). Inbox item: `model-level-benches-from-per-model-usage-windows`.
+> Status: **partly built, 2026-11-09 (steps 1 to 4 on main; step 5 unverified).** Earlier status: **steps 1 and 2 landed in commits 83e7ca5aa and c63b9bd24; steps 3 to 5 pending.** Filed as a follow-up of the usage-window reader ([internal-usageprobe](../architecture/packages/internal-usageprobe.md)). Inbox item: `model-level-benches-from-per-model-usage-windows`.
 
 ## The gap
 
@@ -41,3 +41,16 @@ Bench at **(family, model)** granularity and demote only the tiers that resolve 
 - **Opus on the screen.** claude's per-model rows are named by the screen (`Fable` today). Which models get their own row varies with the plan. The map must stay data, never a Go list.
 - **Which pool is binding.** agy's Claude group is one pool for Opus, Sonnet and GPT-OSS, so its scope is a family, not a model. Only a screen that meters one model on its own produces a model bench.
 - **Reset trust.** A model bench should keep the 24 h cap the family bench has (`clihealth` `resetHintCap`).
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| Step 1: model-scoped entry in the bench store | done | cycle 1981, [`83e7ca5`](https://github.com/mickeyyaya/evolve-loop/commit/83e7ca5aa); `go/internal/clihealth/clihealth.go:221`, `:322` | none |
+| Step 2: the usage probe writes model benches | done | cycle 2225, [`c63b9bd`](https://github.com/mickeyyaya/evolve-loop/commit/c63b9bd24); `go/internal/usageprobe/windows.go:141` | none |
+| Step 3: the router demotes tiers (`model_match`, `applyModelBench`) | done | cycle 2225, [`c63b9bd`](https://github.com/mickeyyaya/evolve-loop/commit/c63b9bd24); `go/internal/bridgechain/bridgechain.go:212`, `go/internal/bridge/manifests/claude-tmux.json:155` | none |
+| Step 4: the canary clears a model bench with a model probe | done | cycle 2225, [`c63b9bd`](https://github.com/mickeyyaya/evolve-loop/commit/c63b9bd24); `go/cmd/evolve/cli_health_model_canary.go:45` | none |
+| Step 5: `clihealth list` and preflight show model benches | unverified: no caller of `ActiveModels` was found in the list command or in preflight | none | none (draft `model-level-benches-step5-operator-surfaces`) |
+| Item `model-level-benches-from-per-model-usage-windows` and its lane and console parts | done (all in `consumed/`) | [`b73b90c`](https://github.com/mickeyyaya/evolve-loop/commit/b73b90c54) (split), [`83e7ca5`](https://github.com/mickeyyaya/evolve-loop/commit/83e7ca5aa), [`c63b9bd`](https://github.com/mickeyyaya/evolve-loop/commit/c63b9bd24) | none |
+
+Steps 1 to 4 are on main with their named tests. Step 5 is not shown on main, and no open inbox item covers it. A draft is ready. The note says "steps 1 and 2 landed" in the earlier status, which is now stale.

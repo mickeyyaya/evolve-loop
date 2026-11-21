@@ -1,6 +1,6 @@
 # Plan: each rule has one home and loads in the case where it applies
 
-- **Status:** proposed, 2026-10-20. The operator decided the eight conflicts of §6 on 2026-10-20. §9 adds the runtime index on 2026-10-26. On 2026-10-27, G0, G1 and G2 are merged in PR #1138, with the 20 rules of the first L0 batch (§9.5) in `guidance/rules/`.
+- **Status:** partly built, 2026-11-02 (4 of 13 components done; G5 is partial). Earlier status: proposed, 2026-10-20. The operator decided the eight conflicts of §6 on 2026-10-20. §9 adds the runtime index on 2026-10-26. On 2026-10-27, G0, G1 and G2 are merged in PR #1138, with the 20 rules of the first L0 batch (§9.5) in `guidance/rules/`.
 - **Inbox items of the open components (2026-10-27):**
   - G1b: `guidance-build-l2-outputs`.
   - G3a: `guidance-phase-marker`.
@@ -277,3 +277,25 @@ These 20 rules apply to every agent of every family. They are ordered by the cos
 | `one-home-no-duplicates` | memory `never_duplicate_centralize_via_design_patterns` | — |
 
 The commit rules (`commit-gate-unpiped` and the staging rules) are L2 of `commit-ship` (design §6), so they wait for batch 2.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| G0 registry and reader | done | [#1138](https://github.com/mickeyyaya/evolve-loop/pull/1138) ([`78fcb1f`](https://github.com/mickeyyaya/evolve-loop/commit/78fcb1f3d19778e16187e6c05cd2bf8cb9a2aee2)); `go/internal/guidance/registry.go` | none (consumed) |
+| G1 `evolve guidance build` | done | [#1138](https://github.com/mickeyyaya/evolve-loop/pull/1138) ([`78fcb1f`](https://github.com/mickeyyaya/evolve-loop/commit/78fcb1f3d19778e16187e6c05cd2bf8cb9a2aee2)) | none (consumed) |
+| G1b path rules, action files, skill blocks | not started | `go/internal/guidance` has no L2 render | none: draft `guidance-build-l2-outputs` |
+| G2 `check` and `index` | done | [#1138](https://github.com/mickeyyaya/evolve-loop/pull/1138) ([`78fcb1f`](https://github.com/mickeyyaya/evolve-loop/commit/78fcb1f3d19778e16187e6c05cd2bf8cb9a2aee2)) | none (consumed) |
+| G3a phase marker | not started | No `EVOLVE_PHASE_AGENT` in `go/` | none: draft `guidance-phase-marker` |
+| G3 action and SessionStart hooks | not started | `.claude/settings.json` has no such hook | none: draft `guidance-action-and-session-hooks` |
+| G4 `Paths` selector | done | cycle commit [`09ecdad`](https://github.com/mickeyyaya/evolve-loop/commit/09ecdad80fa018342d02b57fa8693879e9d4ca59); `go/internal/policy/overlays.go:38` | none (consumed) |
+| G5 migration, batch 1 | done | [#1138](https://github.com/mickeyyaya/evolve-loop/pull/1138) ([`78fcb1f`](https://github.com/mickeyyaya/evolve-loop/commit/78fcb1f3d19778e16187e6c05cd2bf8cb9a2aee2)); 23 files in `guidance/rules/` | none |
+| G5 migration, batch 2 | not started | No batch 2 PR found | `guidance-migrate-batch-2-commit-boundary` |
+| G5 migration, batch 3 | not started | No change list found | none: draft `guidance-migrate-batch-3-rest` |
+| G6 trigger evals | not started | No `skills/*/evals` folder found | none: draft `guidance-skill-trigger-evals` |
+| G7 with-and-without eval of L0 | not started | No change list found | none: draft `guidance-l0-with-without-eval` |
+| G8 cell index reads the guidance index | not started | Depends on the context-index builder | none: draft `guidance-cell-index-input` |
+| G9 driver instruction loader | not started | No manifest field found | `guidance-driver-instruction-loader` |
+| G10 `AGENTS.md` byte budget | not started | `AGENTS.md` is 55196 bytes, above 32768 | none: draft `guidance-agents-md-byte-budget` |
+
+The registry, the generator, the check, the index verb and the overlay selector are on main. The forced loaders (G3a, G3), the migration after batch 1, the evals and the byte budget are not built. Eight of these have no open inbox item: the items of 2026-10-27 are in neither the inbox nor the consumed folder, so drafts are written. It is unverified if those items merged into others. The inbox item ids listed at the top of this plan for G3a, G3, G6, G7, G8 and G10 are stale.

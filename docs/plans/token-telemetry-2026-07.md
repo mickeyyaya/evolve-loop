@@ -1,5 +1,7 @@
 # Plan: Token-Usage Telemetry (per-phase + advisor + subagent) → Concurrency Token-Optimization Campaign
 
+> **Status:** built, 2026-11-09 (8 of 8 slices on main; the advisor part of S5 is unverified). Superseded in part by [token-telemetry-2026-10](token-telemetry-2026-10.md), which adds phase, seat, round purpose and step. Earlier status: proposed, 2026-07-07.
+
 > Supersedes the completed workspace-hygiene plan (preserved at docs/plans/workspace-hygiene-2026-07.md).
 
 ## Context
@@ -58,3 +60,20 @@ Reconcile diverged local main (quiet tree: clear stray `.tmp.37299` from index �
 ## First measurement outcome (2026-07-08)
 
 Batch bkm5wr3ey (cycles 612-619, first full S1-S7 binary): report structure correct, **all token counts zero** — root cause: `Deps.TokenResolver` was wired at no composition root (`withDefaults` leaves nil = silently disabled; fail-open masked it). Full post-mortem + diagnostic recipe: [docs/research/code-audit-2026-07/token-telemetry-zero-postmortem.md](../research/code-audit-2026-07/token-telemetry-zero-postmortem.md). Fix queued as inbox item `token-resolver-production-wiring` (0.96). Acceptance for the NEXT boundary: non-zero `source=transcript` tokens per phase.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| S1 transcript scanner | done | `go/internal/tokenusage/scanner.go`; tests `TestTranscriptScan_*` in `scanner_test.go`. First landing: [`84bdb5e`](https://github.com/mickeyyaya/evolve-loop/commit/84bdb5e47), [`dca6398`](https://github.com/mickeyyaya/evolve-loop/commit/dca6398cb) (2026-07-07) | none |
+| S2 collector chain | done | `go/internal/tokenusage/chain.go`; [`98691af`](https://github.com/mickeyyaya/evolve-loop/commit/98691afad) (cycle 596) | none |
+| S3 `Engine.Launch` records and `llm-calls.ndjson` | done | `go/internal/bridge/engine_launch_tokens_test.go`; `go/internal/llmcalls/record.go` ([`705559a`](https://github.com/mickeyyaya/evolve-loop/commit/705559a09)) | none |
+| S4 terminal projection and sidecar | done | `go/internal/core/orchestrator_tokens_projection_test.go` | none |
+| S5 advisor, swarm and subagent tokens | partial | Swarm: `swarm_tokens_test.go`. Subagent: `subagent_tokens_test.go`. The advisor span test `TestAdvisorSpan_CarriesTokenUsage` does not exist. Unverified for the advisor. | none; covered by the 2026-10 plan, superseded in part by [token-telemetry-2026-10](token-telemetry-2026-10.md) (phase, seat, round purpose and step; T1 to T9) |
+| S6 phase rollups and dossier tokens | done | `go/internal/phasetiming/tokens_rollup_test.go` | none |
+| S7 `evolve tokens report` | done | `go/cmd/evolve/cmd_tokens.go`; test `TestTokensReport_RanksPhasesByInputTokens`; [`8ff4a85`](https://github.com/mickeyyaya/evolve-loop/commit/8ff4a85fb) (cycle 593) | none; the follow-up `tokens-report-from-llm-calls` is open |
+| S8 fleet join (shadow) | done | `MedianTokensPerCycle` in `go/internal/budgethistory/budgethistory.go:24` | none |
+| Post-mortem fix: wire the token resolver | done | [`7e6bfa8`](https://github.com/mickeyyaya/evolve-loop/commit/7e6bfa8f8) (2026-11-09); `tokenusage.HostResolver` at the composition roots | none |
+| Phase-2 optimization items (cache audit, session resume, handoff digests) | partial | Handoff digests: [`849a9c3`](https://github.com/mickeyyaya/evolve-loop/commit/849a9c3dd) (cycle 1942). Cache audit and session resume items are open. | `tokenopt-cache-discipline-audit`, `tokenopt-session-resume-on-retry` |
+
+The measurement slices S1 to S8 are on main, and the token resolver is wired. The 2026-10 plan carries the work that remains: seat, round purpose and step. The advisor token part of S5 has no test of the named kind. No follow-up draft exists, because the 2026-10 plan covers it. ADR-0071 status was not checked.

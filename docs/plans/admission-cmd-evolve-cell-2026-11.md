@@ -1,6 +1,6 @@
 # Plan: admission splits the coarse `cmd/evolve` cell
 
-- **Status:** proposed, 2026-11-17.
+- **Status:** partly built, 2026-11-21 (K1 and K3 on main, and the operator step done; K2 not started). Earlier status: proposed, 2026-11-17.
 - **Research:** [Console work: when the console builds an item and when it routes the item to a lane](../research/console-build-or-route-2026-11.md), finding F1.8.
 - **Related:** [console-build-or-route-2026-11](console-build-or-route-2026-11.md), component K5. The package page: [internal-admission](../architecture/packages/internal-admission.md).
 
@@ -170,3 +170,14 @@ The item files for K1 and K2 are in the inbox with this plan.
 
 1. How many of the 19 to 22 items name a file other than `registry.go` and `parallel_serial_tests_test.go`? Section 8 gives the first count. The answer decides how soon K2 must land.
 2. Must `parallel_serial_tests_test.go` split by area? It takes 91 edits in 30 days. A test file adds no reach, but two edits of it still conflict under D3.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| K1 file sets for leaf packages | done, 2026-11-18 | cycle 2471 [`295d242`](https://github.com/mickeyyaya/evolve-loop/commit/295d24204) (`go/internal/admission/admission.go`, `go/acs/cycle2471/predicates_test.go`) | none |
+| K1 operator step: `fleet.orchestrator.file_cells = ["cmd/evolve"]` | done, 2026-11-21. The operator approved it on 2026-11-21. | [#1606](https://github.com/mickeyyaya/evolve-loop/pull/1606) [`3e6ee1b`](https://github.com/mickeyyaya/evolve-loop/commit/3e6ee1b87) in batch PR [#1618](https://github.com/mickeyyaya/evolve-loop/pull/1618) (`.evolve/policy.json:134`) | none |
+| K2 self-registering verbs | not started: no `TestHelpOutputIsUnchangedWhenVerbsRegisterThemselves` in `go/` | none | cmd-evolve-self-registering-verbs |
+| K3 `internal-admission.md` update | done, 2026-11-18 | cycle 2471 [`295d242`](https://github.com/mickeyyaya/evolve-loop/commit/295d24204) (`docs/architecture/packages/internal-admission.md:107`) | none |
+
+K1 and K3 are on main and the list is set. The first wave with the list set has not run in the record that I read, so the Verification numbers are not yet measured. K2 waits for those numbers and has an open item. The item `admission-file-cells-for-leaf-packages` is consumed. The older item `cmd-evolve-cell-is-too-coarse-for-8-lanes` stays open, and the numbers decide if it closes.

@@ -1,6 +1,6 @@
 # Plan: the skills-drift gate always grades with the worktree's own generator
 
-- **Status:** implemented in the console lane `cl-skills-drift-peer` (branch `fix/skills-drift-host-stamp`, base `9b47ca6ae`), opened 2026-10-09. Fix round 1 replaced the first design (option B, below) with option A after an architecture review.
+- **Status:** built, 2026-10-09 ([#822](https://github.com/mickeyyaya/evolve-loop/pull/822)). Earlier status: implemented in the console lane `cl-skills-drift-peer` (branch `fix/skills-drift-host-stamp`, base `9b47ca6ae`), opened 2026-10-09. Fix round 1 replaced the first design (option B, below) with option A after an architecture review.
 - **Incident:** cycle 1841, wave 83. The third skills-drift false red, after cycles 1828 and 1840.
 - **Lessons:** `inst-L1841a`. Its consumption record: `.evolve/inbox/consumed/lesson-inst-L1841a-skills-drift-host-stamp.json`.
 - **Prior plan:** [skills-drift-worktree-generator-2026-10.md](skills-drift-worktree-generator-2026-10.md) (#821). This plan replaces its trigger (D1, D2, D3) and closes its first two limits.
@@ -81,3 +81,19 @@ Unit tests (no tag) pin `carriesSkillsGenerator` (the package directory, a sibli
   - The CI-parity gates (go vet, acs-durable, integration tier, apicover) and the composed-tree gates run the worktree's own toolchain.
 - The composed-tree gate decline at 23:27:24 (`ORCHESTRATOR_COMPOSED_GATE_DECLINED`, apicover) was real, not host skew. The gate runs `make -C go apicover-enforce` in the worktree. A replay over the composed tree (`925c58d12`) fails one test, `TestSkillsDriftGate_Cycle1840ReplayPasses`, because of the stale anchor above. The required CI of main is red at `9b47ca6ae` for the same reason. This lane fixes the test.
 - The ADR-0072 classifier did not file a `pipeline-defect-*` item for cycle 1841. `buildFailureDossier` (`go/internal/core/failure_dossier.go:74`) reads only the audit's failure block. The auditor wrote PASS each round, so there is no block. The builder's `infrastructure-systemic` WARN block is not an input. The follow-up `failure-dossier-reads-no-builder-declared-system-class` records this. It is a different seam.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| A1: the gate always runs the worktree generator when the tree carries its source (`carriesSkillsGenerator`) | done | [#822](https://github.com/mickeyyaya/evolve-loop/pull/822), [`10d0c1d`](https://github.com/mickeyyaya/evolve-loop/commit/10d0c1d39); `go/internal/phases/audit/skillsdrift.go:47` | none |
+| A2: a tree without the generator keeps the in-process grade | done | [#822](https://github.com/mickeyyaya/evolve-loop/pull/822) | none |
+| A3: delete the #821 trigger `changesSkillsGenerator` | done | [#822](https://github.com/mickeyyaya/evolve-loop/pull/822) | none |
+| A4: host WARN after a clean worktree check | done | [#822](https://github.com/mickeyyaya/evolve-loop/pull/822) | none |
+| A5: reworded texts | done | [#822](https://github.com/mickeyyaya/evolve-loop/pull/822) | none |
+| Red-first tests (section 4), including the cycle 1841 replay | done | [#822](https://github.com/mickeyyaya/evolve-loop/pull/822) | none |
+| Fix of the stale anchor in `TestSkillsDriftGate_Cycle1840ReplayPasses` | done | [#822](https://github.com/mickeyyaya/evolve-loop/pull/822) | none |
+| Limit: the lane binary owns the comparator (render verb) | not started | none | none (draft `skills-drift-gate-render-verb`) |
+| Follow-up `failure-dossier-reads-no-builder-declared-system-class` | done as an item (in `consumed/`); the code change is unverified | none | none |
+
+All decisions A1 to A5 are on main. What is left is the render verb of residual (a), the same gap as in [skills-drift-worktree-generator-2026-10.md](skills-drift-worktree-generator-2026-10.md). It has no open inbox item, and the draft `skills-drift-gate-render-verb` covers it.

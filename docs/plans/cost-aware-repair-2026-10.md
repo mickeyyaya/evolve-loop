@@ -1,6 +1,6 @@
 # Plan: a cycle stops on a blocker that the lane cannot fix, and a small prescribed fix costs one patch, not one build
 
-- **Status:** accepted 2026-10-27 (operator, "build now"). Item 1 (`cost-per-shipped-cycle-measure`) is built: `evolve wave status` prints the cost, and `evolve quality report --scope wave` publishes PQ5. Items 2 and 3 have two builds. §11 compares them and gives the parts that move onto the build on `main`. Item 4 is built at `shadow` with its part of item 11: the spend check at each phase boundary. At `enforce`, the stop of ADR-0158 decision 16 (plan D8) acts only at a failed audit, and a passing audit still ships.
+- **Status:** partly built, 2026-11-19 (8 of 11 items on main, 1 partial, 2 not started). Earlier status: accepted 2026-10-27 (operator, "build now"). Item 1 (`cost-per-shipped-cycle-measure`) is built: `evolve wave status` prints the cost, and `evolve quality report --scope wave` publishes PQ5; items 2 and 3 have two builds. §11 compares them and gives the parts that move onto the build on `main`. Item 4 is built at `shadow` with its part of item 11: the spend check at each phase boundary. At `enforce`, the stop of ADR-0158 decision 16 (plan D8) acts only at a failed audit, and a passing audit still ships.
 - **Decision:** [ADR-0158](../architecture/adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md). **Research:** [cost-aware-repair-2026-10](../research/cost-aware-repair-2026-10.md). **Case:** [cycle 2035](../incidents/2026-10-27-cycle-2035-repair-loop.md). **Design of record for the rungs:** [retry-ladder.md](../architecture/retry-ladder.md).
 
 ## Table of contents
@@ -222,3 +222,22 @@ Item 8 (`builder-selfcheck-before-close`) landed. `.evolve/policy.json` sets `wo
 - At `shadow`, the wait runs no floor. The orchestrator records the findings of the review gate as `would_return_in_session` when the build has no GREEN receipt for its tree ([internal-core](../architecture/packages/internal-core.md)).
 - At `enforce`, a build dispatch carries a check before the close. The bridge runs it inside the deadline of the wait and pastes the findings into the live session one time ([internal-bridge](../architecture/packages/internal-bridge.md)). The record says `delivered` or `delivery_failed`. The review gate runs the floor again after the close.
 - The key is `workflow.builder_selfcheck.stage` ([policy-config](../architecture/policy-config.md)).
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| 1 `cost-per-shipped-cycle-measure` | done | [`d229dc2`](https://github.com/mickeyyaya/evolve-loop/commit/d229dc2291dacc93d13f6e5a37f0002f2ff8b874), [#1184](https://github.com/mickeyyaya/evolve-loop/pull/1184) | none |
+| 2 `repair-fixability-handoff` | done | [`13ec27e`](https://github.com/mickeyyaya/evolve-loop/commit/13ec27e4cfe9937f7a7c23537679e8a2d62be306) (cycle 2039), [`0509161`](https://github.com/mickeyyaya/evolve-loop/commit/0509161c19ebe24a5b7a0eb362a5a05b2f4feae6) ([#1188](https://github.com/mickeyyaya/evolve-loop/pull/1188) gaps, in [#1198](https://github.com/mickeyyaya/evolve-loop/pull/1198)) | none |
+| 3 `triage-defers-item-with-pending-console-companion` | done | [`0509161`](https://github.com/mickeyyaya/evolve-loop/commit/0509161c19ebe24a5b7a0eb362a5a05b2f4feae6), [#1198](https://github.com/mickeyyaya/evolve-loop/pull/1198) | none |
+| 4 `cycle-spend-limit-stop-and-handoff` | done, at `shadow` as §11 says | [`1dab573`](https://github.com/mickeyyaya/evolve-loop/commit/1dab5730260eb219ea7090728f6c2ec5480d1f96), [#1205](https://github.com/mickeyyaya/evolve-loop/pull/1205), [#1206](https://github.com/mickeyyaya/evolve-loop/pull/1206) | none |
+| 5 `vacuous-test-guard` | not started | No `emptytests` package on main. | `empty-test-body-guard-in-the-build-floor` |
+| 6 `audit-fix-rung-handler` | done | [`9c735c7`](https://github.com/mickeyyaya/evolve-loop/commit/9c735c7d2), [`9b5df33`](https://github.com/mickeyyaya/evolve-loop/commit/9b5df33a6), [`fee4d9c`](https://github.com/mickeyyaya/evolve-loop/commit/fee4d9c4c), [#1236](https://github.com/mickeyyaya/evolve-loop/pull/1236) | none |
+| 7 `audit-reviews-the-final-diff` | not started | No change on main. | `audit-reviews-the-final-diff` |
+| 8 `builder-selfcheck-before-close` | done | [`75e9d98`](https://github.com/mickeyyaya/evolve-loop/commit/75e9d984d), [`fa70b7d`](https://github.com/mickeyyaya/evolve-loop/commit/fa70b7dde), [#1236](https://github.com/mickeyyaya/evolve-loop/pull/1236) | none |
+| 9 `cycle-stops-when-console-takes-its-item` | done | [`d81eb95`](https://github.com/mickeyyaya/evolve-loop/commit/d81eb9540fbe0ddef32072bcf1f896be3e49409e) (cycle 2105) | none |
+| 10 `lane-deadline-from-shipped-lanes` | done | [`e919bfd`](https://github.com/mickeyyaya/evolve-loop/commit/e919bfd1d1cbc78282f3f109704b5094cd7b5951) (cycle 2540) | none |
+| 11 `wire-cost-aware-repair-call-sites` | partial | The wiring of fixability, spend, handoff and `audit_fix` landed with items 2, 4, 6 and 9 (commits above). The item stays open for the rest. | `wire-cost-aware-repair-call-sites` |
+
+Items 5, 7 and the rest of item 11 are left. Each has an open inbox item, routed `console-manual`. The item for row 5 is named `empty-test-body-guard-in-the-build-floor`, and its name differs from the plan id. Item 11 is partial because its test, "cycle 2035 stops after audit round 1 as `handed-off`", was not checked here: unverified.
+

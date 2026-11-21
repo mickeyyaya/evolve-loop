@@ -1,6 +1,7 @@
 # Plan: event channels, a push-only publish/subscribe protocol for `evolve events`
 
-- **Status:** in build. E0 to E6 and E10 merged; E7 and E11 are in part (section 16). The design opened on 2026-10-09 in the docs lane `cl-events` (branch `docs/events-subscriptions`, base `9b47ca6ae`). The operator approved the console plan on 2026-10-09. This file is its mirror in `docs/`, with its research amendments, the operator decisions of fix round 1 and the review fixes.
+- **Status:** partly built, 2026-11-12 (9 of 15 components on main or part-built; E8, E13 and E14 not started).
+  - Earlier status: in build. E0 to E6 and E10 merged; E7 and E11 are in part (section 16). The design opened on 2026-10-09 in the docs lane `cl-events` (branch `docs/events-subscriptions`, base `9b47ca6ae`). The operator approved the console plan on 2026-10-09. This file is its mirror in `docs/`, with its research amendments, the operator decisions of fix round 1 and the review fixes.
 - **Spec of record:** [event-channels.md](../architecture/event-channels.md). It holds the protocol, the command surface, the exit codes and the limits. This plan holds the decisions, the components and the tests.
 - **Decision record:** [ADR-0127](../architecture/adr/0127-push-only-event-channels.md).
 - **Research:** [event-notification-protocol-2026-10.md](../research/event-notification-protocol-2026-10.md) (findings F1.1 to F7.3, refinements R1 to R24).
@@ -410,3 +411,27 @@ The lane `cl-events-e10` made these choices for E10 and for the part of E11:
 - **`ship.landed` is at most once.** The code emits it after the `complete` intent is on disk. A stop between the write and the emit loses the event, and no retry repeats it.
 - **An evolve directory that is not absolute.** `rootwire.Attach` refuses it, writes one WARN and publishes nothing, so a channel log never goes under the working directory. The channel root comes from `paths.EventChannelsRoot`.
 - **No retention yet.** The channel segments have no gc category until E7, so no segment is deleted. A measured cycle publishes about 138 events of about 386 bytes each, and 83 percent of them are `ledger.appended`. At 8 lanes, the logs grow by 8 to 10 MB each day. No cap holds this growth until E7 lands, and E7 must land within the first month of use.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| E0 documents | done | [#823](https://github.com/mickeyyaya/evolve-loop/pull/823) | none |
+| E1 `ReadLines` | done | [#825](https://github.com/mickeyyaya/evolve-loop/pull/825) | none |
+| E2 channel log, `LockWithin` | done, unwired | [#825](https://github.com/mickeyyaya/evolve-loop/pull/825) | none |
+| E3 `wake` | done, unwired | [#826](https://github.com/mickeyyaya/evolve-loop/pull/826), [`9a9fa16`](https://github.com/mickeyyaya/evolve-loop/commit/9a9fa1617) | none |
+| E4 `filter` | done, unwired | [#824](https://github.com/mickeyyaya/evolve-loop/pull/824) | none |
+| E5 `reader`, `proctree.StartOf` | done, unwired | [#834](https://github.com/mickeyyaya/evolve-loop/pull/834), [`238ca62`](https://github.com/mickeyyaya/evolve-loop/commit/238ca629c) | none |
+| E6 `publisher` | done, unwired | [#828](https://github.com/mickeyyaya/evolve-loop/pull/828), [`dc8b4fe`](https://github.com/mickeyyaya/evolve-loop/commit/dc8b4fe6f) | none |
+| E7 events config, gc categories | partial: compiled defaults only; no `EventsConfig()` on main | [#967](https://github.com/mickeyyaya/evolve-loop/pull/967) | `event-notification-protocol-e7-events-config-load` |
+| E8 subscriptions runner | not started (no `internal/events/subs`) | none | `event-notification-protocol-e8-subscriptions-runner` |
+| E9 CLI verbs | partial: `channels`, `kinds`, `watch --channel` built; `subscribe` and `watch --sub` not | [`1baf7aa`](https://github.com/mickeyyaya/evolve-loop/commit/1baf7aadc) | none (item consumed without a build) |
+| E10 wiring | done | [#967](https://github.com/mickeyyaya/evolve-loop/pull/967), [`34164e7`](https://github.com/mickeyyaya/evolve-loop/commit/34164e7d5) | none |
+| E11 producers | done | cycle 2321, [`6e35fc4`](https://github.com/mickeyyaya/evolve-loop/commit/6e35fc4f7); first part [#967](https://github.com/mickeyyaya/evolve-loop/pull/967) | none (item consumed) |
+| E12 poller migrations | partial: `wave watch` wakes on channels; 5 s fallback stays | part of [`1baf7aa`](https://github.com/mickeyyaya/evolve-loop/commit/1baf7aadc) | `event-notification-protocol-e12-poller-migrations` |
+| E13 consumer groups | not started (no `max_deliver` on main) | none | none (item consumed by bookkeeping, [#1605](https://github.com/mickeyyaya/evolve-loop/pull/1605)) |
+| E14 push for other pollers | not started | none | none |
+
+Built on main: E0 to E6, E10 and E11. E7, E9 and E12 are partial. E8, E13 and E14 are not started. E7, E8 and E12 have open inbox items. The item of E13 was consumed by a curator sweep and the item of E9 by PR 1328, with no build for either. E14 has no inbox item.
+
+A follow-up draft exists: `event-protocol-e9-e13-e14-refile`. Retention has no gc category until E7 lands, and the plan asked for E7 within the first month of use.

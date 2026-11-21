@@ -1,5 +1,7 @@
 # Comment reduction workstream (2026-09)
 
+> **Status:** partly built, 2026-11-21 (786 comment lines and 28 narrative lines remain in `go/`; the target is zero). Earlier status: in progress since 2026-09, with batches 1-85 landed.
+
 **Goal:** every Go file meets [the code-comment convention](../conventions/code-comments.md). Knowledge the comments carry moves to `docs/` first. No behavior changes along the way.
 
 **Target (the operator's rule, 2026-09-30): zero comments**, except the comments that something reads. These are toolchain directives, generated-file headers, `Deprecated:` and `Output:` lines, machine-read markers, and the package doc that `docgo` enforces. The docs of exported identifiers are no longer kept, and `commentaudit verify` accepts their deletion.
@@ -233,3 +235,20 @@ Code problems the editors found are reported, not changed, and filed as inbox it
 - `guards-path-traversal-and-ship-bypass` (P1)
 - `lane-lint-debt-class`: the lint debt that held batch 11.
 - `codex-pretrust-presence-and-escaping` (P2), from batch 43.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| Phase 1 batches 0-84 (reduce comments by package) | done | [#638](https://github.com/mickeyyaya/evolve-loop/pull/638), [#640](https://github.com/mickeyyaya/evolve-loop/pull/640); later trains [#902](https://github.com/mickeyyaya/evolve-loop/pull/902), [#906](https://github.com/mickeyyaya/evolve-loop/pull/906), [#907](https://github.com/mickeyyaya/evolve-loop/pull/907), [#908](https://github.com/mickeyyaya/evolve-loop/pull/908) | none |
+| 3a: `commentaudit strip` tool | done | `go/internal/commentaudit/` on main; fixes [#984](https://github.com/mickeyyaya/evolve-loop/pull/984), [#1012](https://github.com/mickeyyaya/evolve-loop/pull/1012) | none |
+| 3b: review against Clean Code | done | The report is linked in the plan (phase 3 table). No code change. | none |
+| 3c: tests and predicate packages stripped in bulk | done | Batch 85 (`go/acs`); comment-zero lanes [#985](https://github.com/mickeyyaya/evolve-loop/pull/985), [#989](https://github.com/mickeyyaya/evolve-loop/pull/989) | none |
+| 3d: production code package by package with refactors | partly built | Trains [#902](https://github.com/mickeyyaya/evolve-loop/pull/902) (core and cmd/evolve finished), [#906](https://github.com/mickeyyaya/evolve-loop/pull/906), [#907](https://github.com/mickeyyaya/evolve-loop/pull/907), [#908](https://github.com/mickeyyaya/evolve-loop/pull/908). `evolve comments rank` on main 98c7bcafc counts 786 comment lines and 28 narrative lines, mostly in `test/fixtures` and `internal/core`. The target is zero. | none |
+| 3e/2e: regrowth guard | done | [`9b1a989`](https://github.com/mickeyyaya/evolve-loop/commit/9b1a989ca) (comment floor at enforce, 2026-10-27); [`4a1d025`](https://github.com/mickeyyaya/evolve-loop/commit/4a1d025f5) (rule is mandatory) | none |
+| 2c: turn kept whys into pinned invariants | not started | Unverified: no commit names this step. | none; follow-up draft `comment-reduction-2c-pin-kept-whys` |
+| Loop history archive entry for comment removal | partly built | The lane item was filed 2026-10-18. A related item landed: [#1605](https://github.com/mickeyyaya/evolve-loop/pull/1605) | `loop-history-comment-removal-needs-an-archive-entry-lane` |
+
+The workstream is near its target, but not at zero. The comment floor stops regrowth. Step 2c has no commit and no open item. A follow-up draft covers it. The remaining lines sit mostly in `test/fixtures` (202 lines) and `internal/core` (79 lines).
+
+No open item tracks them. Follow-up draft `comment-reduction-remaining-lines` covers them.

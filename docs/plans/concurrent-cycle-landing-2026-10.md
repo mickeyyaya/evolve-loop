@@ -1,6 +1,7 @@
 # Plan: concurrent cycle landing, a landing queue with tiered re-verification
 
-- **Status:** design, opened 2026-10-09 in the docs lane `cl-landing-queue` (branch `docs/landing-queue-tiered-reverify`, base `4f934cf90`). The operator chose the approach on 2026-10-09. This file holds the decisions, the components, the migration and the rollout. [ADR-0147](../architecture/adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md) (proposed) amends this design on 2026-10-20. §16 marks the rows that it supersedes, and the item `landing-plans-reconcile-with-adr-0147` decides the rest.
+- **Status:** partly built, 2026-11-21 (Q0, Q1, Q3 and Q12 on main). The integration train absorbed Q4, Q7, Q8 and Q11. The rest is not started or superseded.
+  - Earlier status: design, opened 2026-10-09 in the docs lane `cl-landing-queue` (branch `docs/landing-queue-tiered-reverify`, base `4f934cf90`). The operator chose the approach on 2026-10-09. This file holds the decisions, the components, the migration and the rollout. [ADR-0147](../architecture/adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md) (proposed) amends this design on 2026-10-20. §16 marks the rows that it supersedes, and the item `landing-plans-reconcile-with-adr-0147` decides the rest.
 - **Spec of record:** [fleet-landing-queue.md](../architecture/fleet-landing-queue.md). It holds every rule. This plan links it and does not restate it.
 - **Decision record:** [ADR-0128](../architecture/adr/0128-landing-queue-tiered-reverification.md).
 - **Research:** [concurrent-cycle-landing-2026-10.md](../research/concurrent-cycle-landing-2026-10.md) (findings F2.1 to F9.3, refinements R1 to R33).
@@ -414,3 +415,32 @@ The operator ruled on 2026-11-06: the train of ADR-0147 is the target. So the ro
 | Q17 | ☐ not started. Superseded by ADR-0147 (proposed), operator ruling of 2026-11-06: `evolve wave integration status` (item `wave-integration-i8-status-verb`) replaces the queue verbs. |
 | Q18 | ☐ not started. The reconcile item `landing-plans-reconcile-with-adr-0147` decides the final status. |
 | Q19 | ☐ not started. Superseded by ADR-0147 (proposed), operator ruling of 2026-11-06: the flip of `fleet.integration.stage` (item `wave-integration-i9-enforce-flip`) retires the per-lane landing. |
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| Q0 documents | done | [`8a6e3bd`](https://github.com/mickeyyaya/evolve-loop/commit/8a6e3bd24) | none |
+| Q1 `internal/derived` | done | [#837](https://github.com/mickeyyaya/evolve-loop/pull/837), [`dfcc9a1`](https://github.com/mickeyyaya/evolve-loop/commit/dfcc9a18b) | none |
+| Q2 dispatch partition | partial: replaced by admission by cell (ADR-0139 O3), shadow | [#925](https://github.com/mickeyyaya/evolve-loop/pull/925), [`522221b`](https://github.com/mickeyyaya/evolve-loop/commit/522221b69) | none |
+| Q3 `internal/overlap` | done, unwired | [#829](https://github.com/mickeyyaya/evolve-loop/pull/829), [`14363d9`](https://github.com/mickeyyaya/evolve-loop/commit/14363d98b) | none |
+| Q4 `landing.Compose` | superseded by the compose engine I2 of ADR-0147, built | `wave-integration-i2-compose-engine`: [`93f95a5`](https://github.com/mickeyyaya/evolve-loop/commit/93f95a50f) | none (item consumed) |
+| Q5 `internal/testimpact` | not started (no package on main) | none | none |
+| Q6 `landingqueue` | superseded by ADR-0147 (no queue package on main) | none | none |
+| Q7 composed gates | superseded by the batch test I3b of ADR-0147, built | [#1580](https://github.com/mickeyyaya/evolve-loop/pull/1580) | none (item consumed) |
+| Q8 records and ship acceptance | superseded by the deliverable record I0 of ADR-0147, built | [#1580](https://github.com/mickeyyaya/evolve-loop/pull/1580); item `wave-integration-i0-deliverable-record` | `wave-integration-i0-hardening-before-enforce` (follow-up) |
+| Q9 explanation rebind for T2 | not started | none | none |
+| Q10 `landing-review` phase | not started | none | none |
+| Q11 signals and router rules | superseded: ADR-0147 uses `SHIP_INTEGRATION_*` codes; built with I0 | [#1580](https://github.com/mickeyyaya/evolve-loop/pull/1580) | none |
+| Q12 continuation identity proof | done | [#832](https://github.com/mickeyyaya/evolve-loop/pull/832), [`706961f`](https://github.com/mickeyyaya/evolve-loop/commit/706961f3a) | none |
+| Q13 shadow wiring | superseded by the shadow stage of the integration engine | none | none |
+| Q14 enforce wiring | superseded by ADR-0147 | none | none |
+| Q15 waits | superseded by ADR-0147 | none | none |
+| Q16 orchestrator edges | superseded by ADR-0147 | none | none |
+| Q17 queue verbs | superseded by `evolve wave integration status`; not built | none | `wave-integration-i8-status-verb` |
+| Q18 `landing census` | not started | none | none |
+| Q19 retirement at the default flip | superseded by the flip of `fleet.integration.stage`; not built | none | none |
+
+Four components are built on main: Q0, Q1, Q3 and Q12. The integration train of ADR-0147 took over Q4, Q6 to Q8 and Q11 to Q16. Q5, Q9, Q10 and Q18 are unfinished and have no open item. The reconcile item sits in quarantine. 
+
+Q19 needs the item `wave-integration-i9-enforce-flip`, which has no inbox file. A follow-up draft exists: `landing-queue-q-rows-after-adr-0147`. ADR-0128 and ADR-0134 still read as proposed or accepted: check their status lines against ADR-0147.

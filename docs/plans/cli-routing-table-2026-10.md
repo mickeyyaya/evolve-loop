@@ -1,6 +1,6 @@
 # CLI routing table — design and landing plan (2026-10-05)
 
-> Status: approved by the operator 2026-10-05. L1 landed 2026-10-06; L2 built 2026-10-07 (see "L2 landing notes"); L3 open. Implementation tracked by ADR-0119. This file is the design record; the ADR states the decision.
+> **Status:** partly built, 2026-11-21 (L1 and L2 on main; L1c and L3 partial). Earlier status: approved by the operator 2026-10-05. L1 landed 2026-10-06; L2 built 2026-10-07 (see "L2 landing notes"); L3 open. Implementation tracked by ADR-0119. This file is the design record; the ADR states the decision.
 >
 > **Note (2026-11-20):** Current `.evolve/policy.json` sets `default` to `claude, agy, agy-claude`, `agents.builder` to `agy, agy-claude, claude` (`Gemini 4 Hydrogen (High)`), `tiers.deep` to `claude, agy, agy-claude` (`share_pct` 50), and `tiers.top` to `agy-claude, claude`.
 
@@ -676,3 +676,17 @@ The CLI routing table needs a name for "Claude through agy" before it can route 
 | 8 | `update_argv: null` looked dead | kept; the note now says the target opts out of the agy binary's updater, which only agy-tmux owns; see the landing note above | — |
 | 9 | LOW: `TestFamilyMapsDriverToBinary` tested the routing family | renamed `TestFamilyMapsDriverToRoutingFamily` | — |
 | 10 | LOW: `manifest_base.go` discards one `json.Unmarshal` error | kept on purpose: `parseManifest` reports the malformed target | `TestManifestBase_AMalformedTargetIsStillReportedAsInvalidJSON` |
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| L1a: `cliroute` package, unwired (steps 1-3) | done | [`c8c3e53`](https://github.com/mickeyyaya/evolve-loop/commit/c8c3e5379) (2026-10-05) | none |
+| L1b: wire every launch path, read-only verbs (steps 4-5) | done | [`66057c0`](https://github.com/mickeyyaya/evolve-loop/commit/66057c0fd) (2026-10-06) | none |
+| L1c: route by model family | partial | Provider target landed in [`e3874ec`](https://github.com/mickeyyaya/evolve-loop/commit/e3874ecd3). `go/internal/cliroute/` has no model-family check on main. Unverified: the family floor may live in another package. | none; follow-up draft `cli-routing-l1c-model-family-floor` |
+| L2: write verbs, profile fixes, Gemini 3.8, operator table (steps 6-9) | done | [`af63f5e`](https://github.com/mickeyyaya/evolve-loop/commit/af63f5e71) ([#797](https://github.com/mickeyyaya/evolve-loop/pull/797), merge [`e215e84`](https://github.com/mickeyyaya/evolve-loop/commit/e215e84fe)) | none |
+| L2 follow-up: agy boot model check reads a structured source | partial | Served model is now recorded: [`b8dec1c`](https://github.com/mickeyyaya/evolve-loop/commit/b8dec1cee). The footer check stays in `go/internal/bridge/launch_model_verification.go`. | none (withdrawn 2026-11-13); follow-up draft `agy-boot-model-check-reads-a-structured-source` |
+| L3: delete the legacy keys, alias `resolve-llm`, docs (steps 10-12) | partial | The keys `pins` and `workflow.universal_fallback*` are load errors beside a declared table (`go/internal/cliroute/findings.go:30`). They are not deleted. `resolve-llm` is still its own verb (`go/cmd/evolve/registry.go:97`). | none; follow-up draft `cli-routing-l3-retire-legacy-keys` |
+| Adjunct: `evolve routing plan` | done | [`5f6fb08`](https://github.com/mickeyyaya/evolve-loop/commit/5f6fb0813) (cycle 1999, lane); [`d2b2549`](https://github.com/mickeyyaya/evolve-loop/commit/d2b25492e) (cycle 2140, console) | none |
+
+L1 and L2 are on main, and the operator's table is live. L3 (retire the legacy keys) and L1c (model-family floor) are partial. Neither has an open inbox item. The agy boot-check follow-up was withdrawn on 2026-11-13. Follow-up drafts exist for all three.
