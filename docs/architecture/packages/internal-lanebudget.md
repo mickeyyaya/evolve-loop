@@ -17,7 +17,10 @@
   - Each test that sets `FleetWidthKey` also clears `FleetLiveWidthKey`. So a test run inside a live lane does not take the share of the pool (`core`, `acssuite`, `acsrunner`, `commitgate`, `ciparitygate`, `ship`, `ciparity`, `cmd/evolve`).
   - Pinned by `TestCurrent_ALoneLaneGetsTheHostCPUs`, `TestCurrent_ReadsTheLiveWidthNotThePoolLimit`, `TestCurrent_ADeadPoolFileFallsBackToTheSpawnWidth`, `TestCurrent_AnUnusableLiveFileFallsBackToTheSpawnWidth`, `TestCurrent_ALiveFileWithNoSpawnWidthStaysAConsoleRun` and `TestProcessAlive_IsTheRunLeaseCheck`.
 - **`Args(args)`** adds `-p N` and `-parallel N` after the `test` word of a `go test` argv. It keeps a `-p` or `-parallel` that the caller already set. It does not change an argv that does not start with `test`, and it does not write into the array of the caller.
+- **`ArgsFor(procs, args)`** is `Args` with the share given by the caller. `Args(args)` is `ArgsFor(Current(), args)`. A share of 0 changes nothing.
+  - A caller can run several `go test` children at the same time. It gives each child its part of `Current()`. Then the children together ask for no more than one share. Pinned by `TestArgsFor_AGoTestGetsTheGivenShareNotTheLaneShare`, `TestArgsFor_AZeroShareLeavesTheArgvAlone` and `TestArgsFor_OnlyAGoTestArgvChanges`.
 - **`Env(env)`** adds `GOMAXPROCS=N` at the end of the child environment, so it wins over an inherited value. A nil `env` means "inherit", as in `exec.Cmd`, so `Env(nil)` starts from `os.Environ()`. Give it the environment after `ipcenv.Scrub`: the scrub removes the `EVOLVE_` keys but keeps `GOMAXPROCS`.
+- **`EnvFor(procs, env)`** is `Env` with the share given by the caller. `Env(env)` is `EnvFor(Current(), env)` (pinned by `TestEnvFor_AChildGetsGOMAXPROCSOfTheGivenShare`, `TestEnvFor_AZeroShareLeavesTheEnvAlone` and `TestEnvFor_ANilEnvInheritsTheProcessEnvironment`).
 - **`Runner(run)`** wraps a `sysexec.RunFunc`. It applies `Args` and `Env` to each `go test` call and passes every other call through. Put it inside a wrapper that replaces the environment (`sysexec.WithEnv` with `ciparitygate.TierEnv()`), so that the replaced environment still gets `GOMAXPROCS`.
 - **Why all three values.** `-p` bounds the packages that run at the same time, and `-parallel` bounds the parallel tests in one binary. They multiply. Only `GOMAXPROCS` bounds the compiler, the linker and the CPU use inside each test binary.
 
@@ -26,7 +29,7 @@
 | Site | How it goes through the budget |
 |---|---|
 | `phases/ship/repocontract.go` (`repoContractTestArgs`, `runGoTestJSON`) | `Args` and `Env`. The importer backstop of `repocontract_importers.go` runs through the same two functions. |
-| `acssuite/acssuite.go` (`defaultGoExec`) | `Args` and `Env` |
+| `acssuite/acssuite.go` (`defaultGoExec`), `acssuite/golane.go` (`runScopes`) | `ArgsFor` and `EnvFor` with the share split among the scopes that run at once (`scopeShare`). `golane.go` also reads `Current()` to size the slots. |
 | `acsrunner/runner.go` (`Run`, `execCommand`) | `Args` and `Env` |
 | `core/task_contract.go` (`go test -list`) | `Args` and `Env`: the list run still compiles the package |
 | `core/build_floor_reviewer.go` (`coverTestArgs`, `scopedCoverProfile`) | `Args` and `Env` |

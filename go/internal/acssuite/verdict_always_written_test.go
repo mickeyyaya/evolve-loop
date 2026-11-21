@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -130,9 +131,13 @@ func (e *inventoryGap) Error() string {
 func (e *inventoryGap) Unwrap() error { return errIncompleteInventory }
 
 func TestRun_AScopeLeftWithoutBudgetReportsTheSpentDeadline(t *testing.T) {
+	setLaneShare(t, "1000000")
 	started := map[string]int{}
+	var mu sync.Mutex
 	exec := func(ctx context.Context, _, pattern string, _ []string) (string, error) {
+		mu.Lock()
 		started[pattern]++
+		mu.Unlock()
 		if strings.HasPrefix(pattern, "./acs/cycle") {
 			<-ctx.Done()
 			return "", ctx.Err()
@@ -180,12 +185,16 @@ func TestRun_AnExpiredLaneBudgetIsReportedAsTheDeadlineNotAsAnEmptyScope(t *test
 }
 
 func TestRun_TheGoLaneBudgetIsOneDeadlineSharedByEveryScope(t *testing.T) {
+	setLaneShare(t, "1000000")
+	var mu sync.Mutex
 	var deadlines []time.Time
 	exec := func(ctx context.Context, _, _ string, _ []string) (string, error) {
 		d, ok := ctx.Deadline()
 		if !ok {
 			t.Error("every scope must run under the lane deadline")
 		}
+		mu.Lock()
+		defer mu.Unlock()
 		deadlines = append(deadlines, d)
 		return "", nil
 	}
@@ -209,8 +218,11 @@ func TestRun_TheGoLaneBudgetIsOneDeadlineSharedByEveryScope(t *testing.T) {
 func TestRun_ReadsTheLaneBudgetFromThePolicyUnderTheStateRoot(t *testing.T) {
 	root := t.TempDir()
 	writeFixtureModule(t, root, map[string]string{".evolve/policy.json": `{"acs":{"go_timeout_s":7}}`})
+	var mu sync.Mutex
 	var deadline time.Time
 	exec := func(ctx context.Context, _, _ string, _ []string) (string, error) {
+		mu.Lock()
+		defer mu.Unlock()
 		deadline, _ = ctx.Deadline()
 		return "", nil
 	}
@@ -238,9 +250,12 @@ func TestRun_StampsAbsoluteRootsForRelativeInputs(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw := goStream(goLine(acsPkgBase+"cycle9", "TestC9_001_Ok", "pass"))
+	var mu sync.Mutex
 	var seenEnv []string
 	exec := func(_ context.Context, _, pattern string, env []string) (string, error) {
+		mu.Lock()
 		seenEnv = env
+		mu.Unlock()
 		return seamGo(raw, nil)(context.Background(), "", pattern, env)
 	}
 	v, err := Run(Options{Root: relRoot, ProjectRoot: relPlane, Cycle: 9, GoExec: exec})

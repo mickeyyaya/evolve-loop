@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
@@ -42,7 +43,10 @@ func setLaneIPCEnv(t *testing.T) {
 }
 
 func captureScopeEnvs(envs *[][]string) func(context.Context, string, string, []string) (string, error) {
+	var mu sync.Mutex
 	return func(_ context.Context, _, _ string, env []string) (string, error) {
+		mu.Lock()
+		defer mu.Unlock()
 		*envs = append(*envs, env)
 		return "", nil
 	}

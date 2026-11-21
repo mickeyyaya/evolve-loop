@@ -19,12 +19,12 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-func executeCompleteGoScope(ctx context.Context, moduleDir, pattern string, env []string) (string, error) {
+func executeCompleteGoScope(ctx context.Context, moduleDir, pattern string, env []string, procs int) (string, error) {
 	expected, err := declaredPredicateTests(ctx, moduleDir, pattern, env)
 	if err != nil {
 		return "", err
 	}
-	raw, execErr := defaultGoExec(ctx, moduleDir, pattern, env)
+	raw, execErr := defaultGoExec(ctx, moduleDir, pattern, env, procs)
 	for _, line := range strings.Split(raw, "\n") {
 		var ev goEvent
 		if json.Unmarshal([]byte(line), &ev) == nil && (ev.Action == "pass" || ev.Action == "fail" || ev.Action == "skip") {
