@@ -7,10 +7,13 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
+	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -20,6 +23,7 @@ type goLane struct {
 	exec      goExecFunc
 	moduleDir string
 	patterns  []string
+	slots     int
 	env       []string
 	cycle     int
 	budget    laneBudget
@@ -39,10 +43,7 @@ func runGoTest(opts Options, cfg policy.ACSConfig) []Result {
 	lane.budget = newLaneBudget(goLaneTimeout(opts.GoTimeout, cfg))
 	defer lane.budget.cancel()
 
-	var all []Result
-	for _, pattern := range lane.patterns {
-		all = append(all, lane.runScope(pattern)...)
-	}
+	all := lane.runScopes()
 	if len(all) == 0 {
 		return []Result{noPredicatesRed(fmt.Sprintf("no predicate in scopes %v produced a result for cycle %d", lane.patterns, opts.Cycle))}
 	}
@@ -67,17 +68,53 @@ func discoverGoLane(opts Options) (goLane, string) {
 	lane := goLane{exec: opts.GoExec, moduleDir: moduleRoot(opts), cycle: opts.Cycle}
 	if lane.exec != nil {
 		lane.patterns = []string{CyclePackage(opts.Cycle), "./acs/regression/...", "./acs/redteam"}
+		lane.slots, _ = scopeShare(len(lane.patterns), lanebudget.Current())
 		return lane, ""
 	}
 	if !hasGoACSTree(lane.moduleDir) {
 		return lane, fmt.Sprintf("no Go predicate tree: %s needs a go.mod and an acs/ directory", lane.moduleDir)
 	}
-	lane.exec = executeCompleteGoScope
 	lane.patterns = goLanePatterns(lane.moduleDir, opts.Cycle)
 	if len(lane.patterns) == 0 {
 		return lane, fmt.Sprintf("no active predicate scope under %s for cycle %d", filepath.Join(lane.moduleDir, "acs"), opts.Cycle)
 	}
+	var procs int
+	lane.slots, procs = scopeShare(len(lane.patterns), lanebudget.Current())
+	lane.exec = completeScopeExec(procs)
 	return lane, ""
+}
+
+func scopeShare(scopes, share int) (slots, procs int) {
+	if share < 1 {
+		return 1, 0
+	}
+	slots = max(1, min(scopes, share))
+	return slots, max(1, share/slots)
+}
+
+func completeScopeExec(procs int) goExecFunc {
+	return func(ctx context.Context, moduleDir, pattern string, env []string) (string, error) {
+		return executeCompleteGoScope(ctx, moduleDir, pattern, env, procs)
+	}
+}
+
+func (l goLane) runScopes() []Result {
+	perScope := make([][]Result, len(l.patterns))
+	slots := make(chan struct{}, max(1, l.slots))
+	var wg sync.WaitGroup
+	for i := range l.patterns {
+		slots <- struct{}{}
+		wg.Add(1)
+		go l.runScopeInto(&wg, slots, perScope, i)
+	}
+	wg.Wait()
+	return slices.Concat(perScope...)
+}
+
+func (l goLane) runScopeInto(wg *sync.WaitGroup, slots <-chan struct{}, perScope [][]Result, i int) {
+	defer wg.Done()
+	defer func() { <-slots }()
+	perScope[i] = l.runScope(l.patterns[i])
 }
 
 func (l goLane) runScope(pattern string) []Result {

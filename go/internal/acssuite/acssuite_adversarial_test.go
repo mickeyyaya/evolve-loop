@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -159,7 +160,7 @@ func TestPredicate(t *testing.T) {}
 	if err := os.WriteFile(filepath.Join(pkgDir, "predicate_test.go"), []byte(testFile), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	out, err := defaultGoExec(context.Background(), dir, "./acs/cycle1", os.Environ())
+	out, err := defaultGoExec(context.Background(), dir, "./acs/cycle1", os.Environ(), lanebudget.Current())
 	if err != nil {
 		t.Fatalf("defaultGoExec: %v\n%s", err, out)
 	}

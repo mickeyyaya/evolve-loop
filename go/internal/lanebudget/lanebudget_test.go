@@ -282,3 +282,66 @@ func TestProcessAlive_IsTheRunLeaseCheck(t *testing.T) {
 		t.Error("the default liveness check must see this process and reject pid 0")
 	}
 }
+
+func TestArgsFor_AGoTestGetsTheGivenShareNotTheLaneShare(t *testing.T) {
+	inLane(t, 14, "1")
+	got := ArgsFor(2, []string{"test", "./x"})
+	if !slices.Equal(got, []string{"test", "-p", "2", "-parallel", "2", "./x"}) {
+		t.Errorf("ArgsFor(2) = %q, want -p 2 -parallel 2 and not the lane share of 14", got)
+	}
+}
+
+func TestArgsFor_AZeroShareLeavesTheArgvAlone(t *testing.T) {
+	inLane(t, 14, "1")
+	in := []string{"test", "./x"}
+	if got := ArgsFor(0, in); !slices.Equal(got, in) {
+		t.Errorf("ArgsFor(0) = %q, want %q unchanged", got, in)
+	}
+}
+
+func TestArgsFor_OnlyAGoTestArgvChanges(t *testing.T) {
+	if got := ArgsFor(3, []string{"list", "./x"}); !slices.Equal(got, []string{"list", "./x"}) {
+		t.Errorf("ArgsFor on go list = %q, want it unchanged", got)
+	}
+}
+
+func TestEnvFor_AChildGetsGOMAXPROCSOfTheGivenShare(t *testing.T) {
+	inLane(t, 14, "1")
+	in := []string{"PATH=/bin"}
+	got := EnvFor(2, in)
+	if !slices.Equal(got, []string{"PATH=/bin", "GOMAXPROCS=2"}) {
+		t.Errorf("EnvFor(2) = %q, want GOMAXPROCS=2 and not the lane share of 14", got)
+	}
+	if len(in) != 1 {
+		t.Errorf("EnvFor changed the caller's env to %q", in)
+	}
+}
+
+func TestEnvFor_AZeroShareLeavesTheEnvAlone(t *testing.T) {
+	if got := EnvFor(0, nil); got != nil {
+		t.Errorf("EnvFor(0, nil) = %q, want nil so the child inherits", got)
+	}
+}
+
+func TestEnvFor_ANilEnvInheritsTheProcessEnvironment(t *testing.T) {
+	t.Setenv("LANEBUDGET_PROBE", "1")
+	got := EnvFor(2, nil)
+	if !slices.Contains(got, "LANEBUDGET_PROBE=1") || got[len(got)-1] != "GOMAXPROCS=2" {
+		t.Errorf("EnvFor(2, nil) = %q, want the process environment and then GOMAXPROCS=2", got)
+	}
+}
+
+func TestArgsFor_AOneCPUShareStillBoundsTheChild(t *testing.T) {
+	got := ArgsFor(1, []string{"test", "./x"})
+	if want := []string{"test", "-p", "1", "-parallel", "1", "./x"}; !slices.Equal(got, want) {
+		t.Errorf("ArgsFor(1) = %q, want %q", got, want)
+	}
+}
+
+func TestEnvFor_ASharedEnvWithSpareCapacityIsNeverWrittenThrough(t *testing.T) {
+	in := make([]string, 1, 4)
+	EnvFor(2, in)
+	if spare := in[:2][1]; spare != "" {
+		t.Errorf("EnvFor wrote %q into the caller's spare capacity, concurrent children would race", spare)
+	}
+}

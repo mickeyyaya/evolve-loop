@@ -63,8 +63,9 @@ func Current() int {
 	return Procs(hostCPUs(), spawn)
 }
 
-func Args(args []string) []string {
-	procs := Current()
+func Args(args []string) []string { return ArgsFor(Current(), args) }
+
+func ArgsFor(procs int, args []string) []string {
 	if procs == 0 || !isGoTest(args) {
 		return args
 	}
@@ -78,8 +79,9 @@ func Args(args []string) []string {
 	return append(out, args[1:]...)
 }
 
-func Env(env []string) []string {
-	procs := Current()
+func Env(env []string) []string { return EnvFor(Current(), env) }
+
+func EnvFor(procs int, env []string) []string {
 	if procs == 0 {
 		return env
 	}

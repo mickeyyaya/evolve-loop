@@ -267,10 +267,10 @@ func hasGoACSTree(moduleDir string) bool {
 	return true
 }
 
-func defaultGoExec(ctx context.Context, moduleDir, pkgPattern string, env []string) (string, error) {
-	cmd := sysexec.Command(ctx, "go", lanebudget.Args([]string{"test", "-json", "-tags", "acs", "-count=1", pkgPattern})...)
+func defaultGoExec(ctx context.Context, moduleDir, pkgPattern string, env []string, procs int) (string, error) {
+	cmd := sysexec.Command(ctx, "go", lanebudget.ArgsFor(procs, []string{"test", "-json", "-tags", "acs", "-count=1", pkgPattern})...)
 	cmd.Dir = moduleDir
-	cmd.Env = lanebudget.Env(env)
+	cmd.Env = lanebudget.EnvFor(procs, env)
 	cmd.WaitDelay = 30 * time.Second
 	out, err := cmd.CombinedOutput()
 	return string(out), err
