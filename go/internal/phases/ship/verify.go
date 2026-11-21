@@ -136,6 +136,9 @@ func verifyClass(ctx context.Context, opts *Options, res *RunResult) error {
 		if err := verifyAuditBinding(ctx, opts, res); err != nil {
 			return err
 		}
+		if err := refuseStaleDerived(ctx, opts, res); err != nil {
+			return err
+		}
 		return runPersonaLint(ctx, opts, res)
 
 	case ClassRelease:

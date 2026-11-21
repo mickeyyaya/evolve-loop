@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -262,12 +263,16 @@ func stageEntryWith(ctx context.Context, git gitFn, worktree, entry string) erro
 	return err
 }
 
-func goInputsFor(ctx context.Context, worktree string) derived.GoInputDirs {
+func staleDerivedEntries(ctx context.Context, worktree string, changed []string, warn io.Writer) []derived.Entry {
 	dirs, err := derived.ResolveGoInputs(ctx, worktree)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[orchestrator] WARN build-derived-regen: %v; only the path inputs decide staleness\n", err)
+		fmt.Fprintf(warn, "[derived] WARN %v; only the path inputs decide which derived entries are stale\n", err)
 	}
-	return dirs
+	return derived.Stale(changed, dirs)
+}
+
+func LaneDerivedGenerator(worktree string) derived.Generator {
+	return DerivedWorktree(worktree).Run
 }
 
 const maxRebaseContinueSteps = 100

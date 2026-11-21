@@ -54,6 +54,15 @@ var recoveryChain = []recoveryHandler{
 		},
 	},
 	{
+		name: "derived-stale-rebuild",
+		match: func(b Blocker) (string, bool) {
+			if b.Code == "DERIVED_STALE" && b.Class == "precondition" {
+				return "build", true
+			}
+			return "", false
+		},
+	},
+	{
 		name: "ship-local-debugger",
 		match: func(b Blocker) (string, bool) {
 			if shipLocalCodes[b.Code] {

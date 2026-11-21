@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/derived"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
@@ -103,6 +104,8 @@ type Options struct {
 	shipLock func(path string) (release func(), err error)
 
 	baseRun baseattr.Runner
+
+	derivedRun derived.Generator
 
 	Signals *signalcenter.Center
 
