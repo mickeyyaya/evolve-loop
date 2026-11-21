@@ -17,6 +17,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shipjournal"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shipwindow"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -78,6 +79,8 @@ type Options struct {
 	PluginRoot string
 
 	ShipBinaryPath string
+
+	ShipWindow shipwindow.Options
 
 	Env map[string]string
 
@@ -256,7 +259,8 @@ func shipVerified(ctx context.Context, opts *Options, res *RunResult) (RunResult
 }
 
 func verifyAndLandInShipWindow(ctx context.Context, opts *Options, res *RunResult) (RunResult, bool, error) {
-	defer enterShipWindow(ctx, opts, res)()
+	ctx, release := enterShipWindow(ctx, opts, res)
+	defer release()
 	return verifyAndLand(ctx, opts, res)
 }
 

@@ -40,6 +40,9 @@ func logTo(res *RunResult) func(string) {
 }
 
 func pushWithRepair(ctx context.Context, opts *Options, res *RunResult, req landing.PushRequest) error {
+	if err := requireShipWindow(ctx, res); err != nil {
+		return err
+	}
 	req.DryRun, req.RepairAttempted, req.Log = opts.DryRun, opts.repairAttempted[core.CodeGitPushRejected], logTo(res)
 	out, err := opts.landing().Push(ctx, req)
 	if out.RepairAttempted {

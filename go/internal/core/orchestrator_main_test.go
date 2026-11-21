@@ -19,6 +19,7 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	backoffSleep = func(time.Duration) {}
+	defaultShipWindowTicker = func(time.Duration) (<-chan time.Time, func()) { return nil, func() {} }
 	if err := gotooltest.LimitProcess(); err != nil {
 		fmt.Fprintf(os.Stderr, "TestMain: %v\n", err)
 		os.Exit(1)
