@@ -79,6 +79,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		timingOwner.flushPhaseTimings()
 	}()
 
+	fl := r.learning(&state, &cs, &result, &phaseTimings)
 	cursor := newResumeCursor(startPhase)
 	shipRecoveries := 0
 	dispatches := map[Phase]int{}
@@ -172,12 +173,15 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 				continue
 			}
 			phaseErr := fmt.Errorf("phase %s: %w", next, shipErr)
-			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, phaseErr.Error(), cs.PhaseStartedAt))
+			o.diagnoseDispatchFailure(ctx, fl.failing(next, shipErr, attempts))
+			o.failPhase(ctx, fl.failing(next, phaseErr, attempts), phaseOutcomeFrom(next, resp, attempts, phaseErr.Error(), cs.PhaseStartedAt))
+			dispatch.noteLoginWall(next, walkedWall(shipErr))
 			return result, phaseErr
 		}
 		if !IsVerdict(resp.Verdict) {
 			ferr := fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict)
-			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, ferr.Error(), cs.PhaseStartedAt))
+			o.writePhaseFailureDiag(cs.WorkspacePath, string(next), cycle, ferr, attempts)
+			o.failPhase(ctx, fl.failing(next, ferr, attempts), phaseOutcomeFrom(next, resp, attempts, ferr.Error(), cs.PhaseStartedAt))
 			return result, ferr
 		}
 		o.normalizeBuildWorktree(ctx, next, cs, req.ProjectRoot)
@@ -192,15 +196,11 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 		}
 		dispatch.noteLoginWall(next, walkedWall(err))
 		if ending, ok := resumedEndOutcome(err, next, resp, attempts, cs.PhaseStartedAt); ok {
-			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, ending)
-			o.recordFailureLearning(ctx, failureLearningRequest{
-				CycleRequest: req, Cycle: cycle, Failed: next, Err: err, Attempt: max(attempts, 1),
-				State: &state, CycleState: &cs, Context: ctxSnap, Env: envSnap, Result: &result, Timings: &phaseTimings,
-			})
+			o.failPhase(ctx, fl.failing(next, err, attempts), ending)
 			return result, wrapCycleLevelError(next, err)
 		}
 		if err != nil {
-			o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, err.Error(), cs.PhaseStartedAt))
+			o.failPhase(ctx, fl.failing(next, err, attempts), phaseOutcomeFrom(next, resp, attempts, err.Error(), cs.PhaseStartedAt))
 			return result, err
 		}
 		o.latchShip(req.ProjectRoot, &cs, next, resp.Verdict)
@@ -209,7 +209,7 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 			reentry, abortErr := o.routeAfterExplanationRefresh(&cs, next, requiresBuild, refreshErr)
 			if abortErr != nil {
 				phaseErr := fmt.Errorf("resume refresh Build explanation after %s: %w", next, abortErr)
-				o.recordPhaseOutcome(&result, &phaseTimings, cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempts, phaseErr.Error(), cs.PhaseStartedAt))
+				o.failPhase(ctx, fl.failing(next, phaseErr, attempts), phaseOutcomeFrom(next, resp, attempts, phaseErr.Error(), cs.PhaseStartedAt))
 				return result, phaseErr
 			}
 			if reentry != "" {
@@ -310,6 +310,13 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 	}
 
 	return result, nil
+}
+
+func (r *resumeExecution) learning(state *State, cs *CycleState, result *CycleResult, timings *[]phaseTimingEntry) failureLearningRequest {
+	return failureLearningRequest{
+		CycleRequest: r.request, Cycle: r.cycle, State: state, CycleState: cs,
+		Context: r.contextSnapshot, Env: r.envSnapshot, Result: result, Timings: timings,
+	}
 }
 
 func sealResumedBuildEntry(next Phase, projectRoot string, cs CycleState, cycle int, base func(CycleState, int) (predicateBase, error)) (predicateBase, error) {
