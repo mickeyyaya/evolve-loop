@@ -1,5 +1,5 @@
 # attempt 1 (lane env, contended)
-# go test -race -count=1 -timeout 14m0s -p 4 -parallel 4 -tags integration ./internal/widget/...
+# go test -race -count=1 -timeout 20m -p 4 -parallel 4 -tags integration ./internal/widget/...
 # exit: 1
 
 --- FAIL: TestFlaky (0.00s)
@@ -7,7 +7,7 @@ FAIL	pkg	1.0s
 
 
 # attempt 2 (serialized retake)
-# go test -race -count=1 -timeout 14m0s -p 4 -parallel 4 -tags integration ./internal/widget/...
+# go test -race -count=1 -timeout 20m -p 4 -parallel 4 -tags integration ./internal/widget/...
 # exit: 0
 
 ok
