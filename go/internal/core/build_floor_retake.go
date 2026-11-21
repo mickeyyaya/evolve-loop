@@ -61,7 +61,7 @@ const (
 )
 
 func floorTestPackages(paths []string, warn io.Writer) []string {
-	return floorScopedPackages(changedGoTestPackages(paths), warn)
+	return floorScopedPackages(floorChangedPackages(paths), warn)
 }
 
 func (in ReviewInput) retakeFloorRun(label, first string, covered []string, rerun func() (string, bool)) (string, bool) {
