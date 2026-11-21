@@ -1,6 +1,7 @@
 package sandbox
 
 import (
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -61,12 +62,14 @@ func TestBwrapPrefix_ShadowMasksNothing(t *testing.T) {
 }
 
 func TestBwrapPrefix_TheExecMaskFollowsTheParentBindAndTheReadDenials(t *testing.T) {
+	w := t.TempDir()
+	repo := filepath.Join(w, "repo")
 	cfg := Config{
-		RepoRoot: "/w/repo", WritePaths: []string{"", "/w"}, DenyReadPaths: []string{"", "/w/repo/private"},
-		ExecDenyPaths: []string{"/w/bin/claude"}, ExecDenyEnforce: true,
+		RepoRoot: repo, WritePaths: []string{"", w}, DenyReadPaths: []string{"", repo + "/private"},
+		ExecDenyPaths: []string{w + "/bin/claude"}, ExecDenyEnforce: true,
 	}
 	argv := strings.Join(BwrapPrefix(cfg), " ")
-	order := []string{"--bind /w /w", "--bind /w/repo /w/repo", "--tmpfs /w/repo/private --chmod 000 /w/repo/private --remount-ro /w/repo/private", "--cap-drop ALL", "--unshare-net", "--ro-bind /dev/null /w/bin/claude"}
+	order := []string{"--bind " + w + " " + w, "--bind " + repo + " " + repo, "--tmpfs " + repo + "/private --chmod 000 " + repo + "/private --remount-ro " + repo + "/private", "--cap-drop ALL", "--unshare-net", "--ro-bind /dev/null " + w + "/bin/claude"}
 	last := -1
 	for _, want := range order {
 		at := strings.Index(argv, want)
@@ -75,7 +78,7 @@ func TestBwrapPrefix_TheExecMaskFollowsTheParentBindAndTheReadDenials(t *testing
 		}
 		last = at
 	}
-	if strings.Count(argv, "--bind /w /w") != 1 {
+	if strings.Count(argv, "--bind "+w+" "+w+" ") != 1 {
 		t.Fatalf("a write path that holds the repo is bound once, before the repo: %s", argv)
 	}
 }

@@ -338,7 +338,7 @@ func BwrapPrefix(cfg Config) []string {
 	}
 	for _, wp := range cfg.WritePaths {
 		if coversRepository(wp, cfg.RepoRoot) {
-			out = append(out, "--bind", wp, wp)
+			out = append(out, writeBindFlag(wp), wp, wp)
 		}
 	}
 	if cfg.RepoRoot != "" {
@@ -358,7 +358,7 @@ func BwrapPrefix(cfg Config) []string {
 		if strings.Contains(wp, "*") {
 			wp = filepath.Dir(wp)
 		}
-		out = append(out, "--bind", wp, wp)
+		out = append(out, writeBindFlag(wp), wp, wp)
 	}
 	for _, dp := range cfg.DenyPaths {
 		if dp != "" {
@@ -398,6 +398,13 @@ func bwrapExecMasks(cfg Config) []string {
 		}
 	}
 	return out
+}
+
+func writeBindFlag(path string) string {
+	if pathExists(path) {
+		return "--bind"
+	}
+	return "--bind-try"
 }
 
 func coversRepository(path, repo string) bool {

@@ -8,7 +8,7 @@
 
 ## Design
 
-- `GenerateSBPL`, `GenerateBwrapArgv` and `BwrapPrefix` are pure functions, so unit tests run on any host. `BwrapPrefix` serves a caller that composes the inner argv later. `GenerateBwrapArgv` is the backward-compatible form.
+- `GenerateSBPL`, `GenerateBwrapArgv` and `BwrapPrefix` build the profile from the `Config` alone, so unit tests run on any host. The bwrap generator only reads the file system to check that a path exists. `BwrapPrefix` serves a caller that composes the inner argv later. `GenerateBwrapArgv` is the backward-compatible form.
 - `Probe` checks the host for the binary and measures if it applies. It is cached once per process. The bridge's `ShouldWrap` and preflight therefore share one measured value, and the capability exec runs at most once.
 - `Sandbox` is the runtime-dispatching `Exec` wrapper. It degrades to a plain exec with a stderr NOTE when the host has no sandbox binary.
 - `DetectNested` and `ConfinementSatisfied` are the two halves of the confinement decision. `ShouldWrap` decides if to try the wrapper.
@@ -41,6 +41,8 @@
 - SBPL rule order matters, because a later rule overrides an earlier one for overlapping subpaths. The order follows bash. A deny on the repo, followed by per-path write allows, yields a read-only repo with cycle-specific write zones.
 - In the bwrap prefix, a broad scratch grant such as `/tmp` must precede a read-only repository beneath it. Otherwise the later parent grant reopens the whole repo.
 - Overlays on writable binds use `--ro-bind`, not `--ro-bind-try`. `--ro-bind-try` silently discards a mandatory restriction. Other CLI state dirs are re-bound with `--bind-try`, because not every host has every CLI directory. REPL boot can update auth, cache and config under HOME.
+- A write grant that is missing at launch gets `--bind-try`, not `--bind`. The reason is that bwrap fails the whole launch when the source of a `--bind` does not exist. A grant that already exists keeps `--bind`, so a wrong path stays visible. The check is one `pathExists` call at wrap time. A path that disappears between the check and the mount still fails the launch.
+- On Linux, bwrap does not mount a `--bind-try` source that is missing. Under the read-only repository, the cell cannot create that path. On macOS, SBPL lets the cell create the leaf when its parent exists. The two hosts therefore differ for a grant that the cell creates later.
 - Network isolation comes from bwrap's namespace, not from allow and deny rules.
 
 ## Findings

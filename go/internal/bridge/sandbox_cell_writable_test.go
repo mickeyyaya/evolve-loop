@@ -149,7 +149,8 @@ func bwrapCellWritable(argv []string, path string) bool {
 			continue
 		}
 		if withinDir(argv[i+n], path) {
-			writable = argv[i] == "--bind" || argv[i] == "--bind-try"
+			_, missing := os.Stat(argv[i+1])
+			writable = argv[i] == "--bind" || (argv[i] == "--bind-try" && missing == nil)
 		}
 		i += n
 	}
