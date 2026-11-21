@@ -283,7 +283,7 @@ func emitShipLanded(opts *Options, in landing.Intent) {
 }
 
 func (s *worktreeShip) unwindUnlessResumable(in landing.Intent, err error) error {
-	if se, ok := core.AsShipError(err); ok && se.Class == core.ShipClassTransient {
+	if resumableAtPush(err) {
 		s.logf("[ship] LANDING: the push of %s had a transient failure; main did not move, and a retry resumes at the push", in.CommitSHA)
 		return err
 	}
@@ -294,6 +294,11 @@ func (s *worktreeShip) unwindUnlessResumable(in landing.Intent, err error) error
 		return errors.Join(err, merr)
 	}
 	return err
+}
+
+func resumableAtPush(err error) bool {
+	se, ok := core.AsShipError(err)
+	return ok && se.Class == core.ShipClassTransient && se.Code != core.CodeGitFleetRebaseNeeded
 }
 
 func (s *worktreeShip) unwindLane(in landing.Intent, why string) error {

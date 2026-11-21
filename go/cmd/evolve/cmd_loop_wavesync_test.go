@@ -421,3 +421,13 @@ func TestSyncMainAtWaveBoundary_ABlockedFastForwardRestoresThePreparedStamps(t *
 		t.Errorf("warn = %q, want the restore named", warn.String())
 	}
 }
+
+func TestSyncMainAtWaveBoundary_AFetchConfigThatOmitsMainStillRefreshesOriginMain(t *testing.T) {
+	origin, runtime := syncFixture(t)
+	gitrun(t, runtime, "config", "--unset-all", "remote.origin.fetch")
+	originAdvance(t, origin)
+	var warn bytes.Buffer
+	if synced, _ := syncMainFromOriginAtWaveBoundary(context.Background(), runtime, &warn); !synced {
+		t.Fatalf("a plain fetch left origin/main stale: %s", warn.String())
+	}
+}

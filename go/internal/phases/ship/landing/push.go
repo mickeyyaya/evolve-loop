@@ -40,6 +40,7 @@ const (
 	RepairAlreadyPushed RepairOutcome = "already-pushed"
 	RepairPushRetried   RepairOutcome = "push-retried"
 	RepairNeedsReaudit  RepairOutcome = "needs-reaudit"
+	RepairNeedsRebind   RepairOutcome = "needs-rebind"
 )
 
 var transportBackoff = []time.Duration{2 * time.Second, 4 * time.Second, 8 * time.Second}
@@ -188,8 +189,31 @@ func (l *Landing) repairPush(ctx context.Context, req PushRequest, rejected *shi
 		emitLog(req.Log, "[ship] REPAIR: push retry after fetch succeeded (origin was an ancestor — fast-forward)")
 		return nil
 	}
+	if l.localBranchBehind(ctx, req, originRef) {
+		out.RepairOutcome = RepairNeedsRebind
+		return rebindOrigin(req, originRef)
+	}
 	out.RepairOutcome = RepairNeedsReaudit
 	return divergedOrigin(req, originRef, head)
+}
+
+func (l *Landing) localBranchBehind(ctx context.Context, req PushRequest, originRef string) bool {
+	if req.Site != SiteWorktree {
+		return false
+	}
+	localRef := "refs/heads/" + req.Branch
+	local, err := l.Capture(ctx, "rev-parse", localRef)
+	if err != nil || strings.TrimSpace(local) == "" || strings.TrimSpace(local) == originRef {
+		return false
+	}
+	return l.IsAncestor(ctx, strings.TrimSpace(local), originRef)
+}
+
+func rebindOrigin(req PushRequest, originRef string) *shiperr.ShipError {
+	return fail(stepPush, shiperr.CodeGitFleetRebaseNeeded, shiperr.ShipClassTransient,
+		fmt.Sprintf("ship: origin rejected the push of %s because local %s is behind origin/%s; ship syncs the plane to origin, then the lane rebinds onto it", req.Commit, req.Branch, req.Branch),
+		shiperr.BranchKey, req.Branch, "origin_ref", originRef, "commit", req.Commit,
+		"repair_attempted", string(shiperr.CodeGitPushRejected), shiperr.RepairOutcomeKey, string(RepairNeedsRebind))
 }
 
 func divergedOrigin(req PushRequest, originRef, head string) *shiperr.ShipError {

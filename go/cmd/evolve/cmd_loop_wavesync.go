@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
-	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxstamps"
+	"github.com/mickeyyaya/evolve-loop/go/internal/mainsync"
 	"github.com/mickeyyaya/evolve-loop/go/internal/plane"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -71,70 +71,71 @@ func syncMainFromOriginAtWaveBoundary(ctx context.Context, projectRoot string, w
 	if _, _, code, err := g.Capture(sctx, "remote", "get-url", "origin"); err != nil || code != 0 {
 		return false, nil
 	}
-	if _, stderr, code, err := g.Capture(sctx, "fetch", "-q", "origin", "main"); err != nil || code != 0 {
-		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: fetch origin failed (rc=%d %v: %s) — planning against the local main\n", code, err, strings.TrimSpace(stderr))
-		return false, nil
+	res := mainsync.Run(sctx, g, mainsync.Policy{Gate: waveCIGate(projectRoot, warn), Around: waveInboxStamps(warn)})
+	return reportWaveSync(warn, res)
+}
+
+func reportWaveSync(warn io.Writer, res mainsync.Result) (synced bool, halt error) {
+	rel := res.Relation
+	switch res.Outcome {
+	case mainsync.OutcomeFetchFailed:
+		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: fetch origin failed (rc=%d %v: %s) — planning against the local main\n", res.Code, res.Err, res.Stderr)
+	case mainsync.OutcomeRelationFailed:
+		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: %v — planning against the local main\n", res.Err)
+	case mainsync.OutcomeGated:
+		return false, res.Err
+	case mainsync.OutcomeAhead:
+		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: %s; the next lane ship's push publishes them\n", rel)
+	case mainsync.OutcomeDiverged:
+		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: %s\n", rel)
+		return false, fmt.Errorf("wave-boundary sync: %s", rel)
+	case mainsync.OutcomeFastForwarded:
+		fmt.Fprintf(warn, "[loop] wave-boundary sync: fast-forwarded main to origin/main (%.12s)\n", rel.Remote)
+		reportAbsorbed(warn, "[loop] wave-boundary sync", res.Absorbed)
+		warnAbsorbFailure(warn, res.AbsorbErr)
+		return true, nil
 	}
-	rel, err := g.RelationToRemote(sctx, "origin/main")
-	if err != nil {
-		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: %v — planning against the local main\n", err)
-		return false, nil
-	}
-	if rel.Kind != gitexec.RelationDiverged {
-		red, failed, err := mainCIRedForSHA(sctx, projectRoot, rel.Remote)
+	return false, nil
+}
+
+func waveCIGate(projectRoot string, warn io.Writer) func(context.Context, gitexec.MainRelation) error {
+	return func(ctx context.Context, rel gitexec.MainRelation) error {
+		red, failed, err := mainCIRedForSHA(ctx, projectRoot, rel.Remote)
 		switch {
 		case err != nil:
 			fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: main CI status unavailable (%v) — proceeding without false-green or false-red classification\n", err)
 		case red:
-			return false, fmt.Errorf("%w at origin/main %.12s: %s", errMainCIRed, rel.Remote, strings.Join(failed, ", "))
+			return fmt.Errorf("%w at origin/main %.12s: %s", errMainCIRed, rel.Remote, strings.Join(failed, ", "))
+		}
+		return nil
+	}
+}
+
+func waveInboxStamps(warn io.Writer) func(context.Context, gitexec.Git) func(mainsync.Result) {
+	return func(ctx context.Context, g gitexec.Git) func(mainsync.Result) {
+		plan := prepareInboxStampsForFastForward(ctx, g, warn)
+		return func(res mainsync.Result) {
+			if res.Outcome == mainsync.OutcomeBlocked {
+				warnBlockedFastForward(ctx, g, warn, res)
+				restoreInboxStampsAfterBlockedFastForward(g.Dir, plan, warn)
+				return
+			}
+			replayInboxStampsAfterFastForward(g.Dir, plan, warn)
 		}
 	}
-	switch rel.Kind {
-	case gitexec.RelationCurrent:
-		return false, nil
-	case gitexec.RelationAhead:
-		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: %s; the next lane ship's push publishes them\n", rel)
-		return false, nil
-	case gitexec.RelationDiverged:
-		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: %s\n", rel)
-		return false, fmt.Errorf("wave-boundary sync: %s", rel)
-	}
-	if !fastForwardWithInboxStamps(sctx, g, warn) {
-		return false, nil
-	}
-	fmt.Fprintf(warn, "[loop] wave-boundary sync: fast-forwarded main to origin/main (%.12s)\n", rel.Remote)
-	return true, nil
 }
 
-func fastForwardWithInboxStamps(ctx context.Context, g gitexec.Git, warn io.Writer) bool {
-	plan := prepareInboxStampsForFastForward(ctx, g, warn)
-	if !fastForwardMain(ctx, g, warn) {
-		restoreInboxStampsAfterBlockedFastForward(g.Dir, plan, warn)
-		return false
-	}
-	replayInboxStampsAfterFastForward(g.Dir, plan, warn)
-	absorbRootCopiesAfterFastForward(g.Dir, warn)
-	return true
-}
-
-func absorbRootCopiesAfterFastForward(root string, warn io.Writer) {
-	absorbed, err := inboxmover.AbsorbRootCopies(inboxmover.Options{ProjectRoot: root})
-	reportAbsorbed(warn, "[loop] wave-boundary sync", absorbed)
+func warnAbsorbFailure(warn io.Writer, err error) {
 	if err != nil {
 		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: %v — the planner keeps the root copy off the lane menu while the claim holds it\n", err)
 	}
 }
 
-func fastForwardMain(ctx context.Context, g gitexec.Git, warn io.Writer) bool {
-	_, stderr, code, err := g.Capture(ctx, "merge", "--ff-only", "origin/main")
-	if err == nil && code == 0 {
-		return true
-	}
-	fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: local tracked changes block the fast-forward (rc=%d: %s) — resolve the dirt (or console-lease it) rather than shipping it\n", code, strings.TrimSpace(stderr))
+func warnBlockedFastForward(ctx context.Context, g gitexec.Git, warn io.Writer, res mainsync.Result) {
+	fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: local tracked changes block the fast-forward (rc=%d: %s) — resolve the dirt (or console-lease it) rather than shipping it\n", res.Code, res.Stderr)
 	if blocking := blockingInboxFiles(ctx, g); len(blocking) > 0 {
 		fmt.Fprintf(warn, "[loop] WARN: wave-boundary sync: %d plane-side inbox file(s) block it: %s — remove the plane copy, then run evolve sync-main, which lands the loop's own stamps (runtime-reference: the console route at a boundary)\n", len(blocking), strings.Join(blocking, ", "))
 	}
-	return false
 }
 
 func prepareInboxStampsForFastForward(ctx context.Context, g gitexec.Git, warn io.Writer) inboxstamps.Plan {
