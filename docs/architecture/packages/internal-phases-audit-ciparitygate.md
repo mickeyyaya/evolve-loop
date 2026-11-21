@@ -59,11 +59,12 @@
 
 ## Decision
 
-- **The tier gives `go test` its own timeout: the tier budget less one minute.** `tierTimeout` derives it from `Timeouts.TierAttempt` (15 minutes, so `-timeout 14m0s`), and `tierArgs` is the only place that writes the flag. Both attempts call `tierArgs` with the same budget, so the retake gets the same value.
-- **Why.** Without `-timeout`, Go kills each package test binary at its default 10 minutes. `./cmd/evolve` was killed at 600 s, before the 15-minute budget ended. The audit saw six `panic: test timed out` lines and no `--- FAIL` line, and it failed the cycle as an infrastructure failure (cycles 2576, 2585 and 2589). A timeout below the budget makes `go test` report the verdict itself: its panic names the running test, so the offender markers can read it.
-- **Why one minute.** The margin lets the test binary dump its goroutines and exit, and lets `go test` print the package line, before the context deadline sends the kill. A budget at or under the margin passes the budget itself, because `-timeout 0` turns the timeout off.
+- **The tier passes `go test` the shared `-timeout`: `addedtests.PackageTimeout` (20 minutes).** `tierArgs` is the only place that writes the flag, and both attempts call it, so the retake gets the same value. The repo has one home for the go test timeout, and a guard (`TestGoTestTimeouts_AreTheSharedPackageBudget`) fails any other value in pipeline code. A timeout of its own here was a second home.
+- **Why.** Without `-timeout`, Go kills each package test binary at its default 10 minutes. `./cmd/evolve` was killed at 600 s, before the tier budget ended. The audit saw six `panic: test timed out` lines and no `--- FAIL` line, and it failed the cycle as an infrastructure failure (cycles 2576, 2585 and 2589).
+- **The tier budget is longer than that timeout.** `TierAttempt` defaults to `PackageTimeout` plus a one-minute margin (21 minutes), derived in `tierAttemptBudget`. Thus `go test` reports its own verdict first: its panic names the running test, and the offender markers can read it. The margin lets the test binary dump its goroutines and exit before the context sends the kill. Pinned by `TestDefaultTimeouts_TierAttemptOutlivesThePackageTimeout`.
 - **Limit.** `go test -timeout` is a clock for each package binary. It starts after the build. The context deadline covers the whole run, so a slow build can still reach the deadline first. The existing deadline arms (`deadline_with_markers`, `AUDIT_CIPARITY_TIER_DEADLINE_NO_VERDICT`) stay as the backstop.
-- **The other steps need no flag.** `ACSDurable` and `Apicover` run `go test` with an 8-minute budget, under the 10-minute default, so the default cannot fire first. `GoVet` runs no tests. If one of these budgets goes over 10 minutes, it must pass `-timeout` through the same `tierTimeout` rule.
+- **The other steps need no flag.** `ACSDurable` and `Apicover` run `go test` with an 8-minute budget, under the 10-minute default, so the default cannot fire first. `GoVet` runs no tests. If one of these budgets goes over 10 minutes, it must pass `addedtests.PackageTimeout` too.
+- **The base-red attribution re-run is not in this change.** `baseattr` already derives its `-timeout` from the context deadline.
 
 ## Invariants
 
@@ -71,7 +72,7 @@
 - The retake lock lives under `ProjectRoot`, never the per-lane worktree. Pinned by `TestRequest_HasExactlyTheDeclaredFields` and `TestAcquireLock_TableOverAnInjectedClock`.
 - Attempt 1 is on disk in `integration-tier.log` before the lock is sought, so a kill during a contended wait never loses it. Pinned by `TestSignals_NullObjectLiveAccessorAndStreamGolden`.
 - `tierLog.path` is set on the first successful write and never cleared, so a later append failure keeps the pointer to the attempt already on disk. Pinned by `TestTierLog_FailuresAreCodedAndTheEarlierPointerStands`.
-- Every run of the tier passes `-timeout` equal to the budget less the margin. Pinned by `TestIntegrationTier_FirstAttemptPassesGoTestATimeoutUnderItsBudget`, `TestIntegrationTier_RetakePassesTheSameTimeout` and `TestTierTimeout_AFloorKeepsABudgetUnderTheMarginPositive`.
+- Every run of the tier passes `-timeout` equal to `addedtests.PackageTimeout`, and the default tier budget is longer than it. Pinned by `TestIntegrationTier_FirstAttemptPassesTheSharedPackageTimeout`, `TestIntegrationTier_RetakePassesTheSameSharedPackageTimeout` and `TestDefaultTimeouts_TierAttemptOutlivesThePackageTimeout`.
 - The order of `tierArgs` is an on-disk contract through the log header. Pinned by `TestTierLog_BytesMatchTheGoldenForBothOutcomes` and `TestWholeRepoGates_ArgVectorsMatchTheGolden`.
 - A clean five-gate run emits nothing and writes nothing to stderr; every FAIL emits exactly one `GATE_FAILED`. Pinned by `TestGates_CleanRunEmitsNothing_AndEveryFailEmitsOneGateFailed`.
 - `warn` panics on an odd key/value count before emitting, never silently dropping a field. Pinned by `TestWarn_OddTrailingKeyPanicsBeforeEmitting`.
@@ -86,9 +87,10 @@
 - Each run of the tier uses `TierEnv()`, which has no ambient variable. Pinned by `TestTierEnv_IsTheEnvironmentOfEachTierAttempt`.
 - A panic on the stderr of the retake gets no base run. Pinned by `TestIntegrationTier_APanicOnTheStderrOfTheRetakeGetsNoAttribution`.
 - A red fails as before unless each red test is red on the lane base. Pinned by `TestIntegrationTier_ARedThatIsNotAllBaseRedFailsAsBefore` and `TestIntegrationTier_ARedWithNoNamedVerdictGetsNoAttribution`.
-- The package stays a leaf. It imports the standard library and ten declared internal packages (`TestImportGraph_LeafImportsOnlyTheDeclaredPackages`).
+- The package stays a leaf. It imports the standard library and eleven declared internal packages (`TestImportGraph_LeafImportsOnlyTheDeclaredPackages`).
   - The ninth is `lanebudget`, a leaf that gives each `go test` gate the lane CPU budget ([internal-lanebudget](internal-lanebudget.md)).
   - The tenth is `baseattr`, a leaf that gives the types of the attribution option ([internal-baseattr](internal-baseattr.md)).
+  - The eleventh is `addedtests`, a leaf that holds the shared `PackageTimeout` constant.
   - The package stays in the clean-code limits (`TestLimits_FunctionsFilesAndNestingStayWithinTheBar`).
   - `apicover_named_test.go` names each export, because the apicover completeness predicate and `apicover -enforce` count only package-local tests.
 

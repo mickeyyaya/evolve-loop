@@ -6,6 +6,8 @@ import (
 	"slices"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/addedtests"
 )
 
 func timeoutValue(t *testing.T, args []string) string {
@@ -17,11 +19,9 @@ func timeoutValue(t *testing.T, args []string) string {
 	return args[at+1]
 }
 
-func tierArgvs(t *testing.T, budget time.Duration, script []step) [][]string {
+func tierArgvs(t *testing.T, script []step) [][]string {
 	t.Helper()
 	root, _ := goWorktree(t)
-	timeouts := DefaultTimeouts()
-	timeouts.TierAttempt = budget
 	var argvs [][]string
 	idx := 0
 	run := func(_ context.Context, _, _ string, args, _ []string, _ io.Reader, so, _ io.Writer) (int, error) {
@@ -31,45 +31,56 @@ func tierArgvs(t *testing.T, budget time.Duration, script []step) [][]string {
 		_, _ = io.WriteString(so, s.Out)
 		return s.Code, nil
 	}
-	g, _ := observed(t, run, fixedSet("./internal/widget/..."), WithTimeouts(timeouts))
+	g, _ := observed(t, run, fixedSet("./internal/widget/..."))
 	_, _ = g.IntegrationTier(tierRequest(root, t.TempDir()))
 	return argvs
 }
 
-func TestIntegrationTier_FirstAttemptPassesGoTestATimeoutUnderItsBudget(t *testing.T) {
+func TestIntegrationTier_FirstAttemptPassesTheSharedPackageTimeout(t *testing.T) {
 	t.Parallel()
-	argvs := tierArgvs(t, 15*time.Minute, []step{{0, "ok\n"}})
+	argvs := tierArgvs(t, []step{{0, "ok\n"}})
 	if len(argvs) != 1 {
 		t.Fatalf("calls = %d, want 1", len(argvs))
 	}
-	if got := timeoutValue(t, argvs[0]); got != "14m0s" {
-		t.Errorf("-timeout = %s, want the 15m budget less the 1m margin", got)
+	if got := timeoutValue(t, argvs[0]); got != addedtests.PackageTimeout {
+		t.Errorf("-timeout = %s, want addedtests.PackageTimeout %s", got, addedtests.PackageTimeout)
 	}
 }
 
-func TestIntegrationTier_RetakePassesTheSameTimeout(t *testing.T) {
+func TestIntegrationTier_RetakePassesTheSameSharedPackageTimeout(t *testing.T) {
 	t.Parallel()
-	argvs := tierArgvs(t, 30*time.Minute, []step{{1, "--- FAIL: TestFlaky (0.00s)\n"}, {0, "ok\n"}})
+	argvs := tierArgvs(t, []step{{1, "--- FAIL: TestFlaky (0.00s)\n"}, {0, "ok\n"}})
 	if len(argvs) != 2 {
 		t.Fatalf("calls = %d, want 2", len(argvs))
 	}
 	for i, argv := range argvs {
-		if got := timeoutValue(t, argv); got != "29m0s" {
-			t.Errorf("attempt %d -timeout = %s, want the 30m budget less the 1m margin", i+1, got)
+		if got := timeoutValue(t, argv); got != addedtests.PackageTimeout {
+			t.Errorf("attempt %d -timeout = %s, want addedtests.PackageTimeout %s", i+1, got, addedtests.PackageTimeout)
 		}
 	}
 }
 
-func TestTierTimeout_AFloorKeepsABudgetUnderTheMarginPositive(t *testing.T) {
+func TestDefaultTimeouts_TierAttemptOutlivesThePackageTimeout(t *testing.T) {
 	t.Parallel()
-	cases := map[time.Duration]time.Duration{
-		15 * time.Minute: 14 * time.Minute,
-		time.Minute:      time.Minute,
-		time.Nanosecond:  time.Nanosecond,
+	pkg, err := time.ParseDuration(addedtests.PackageTimeout)
+	if err != nil {
+		t.Fatal(err)
 	}
-	for budget, want := range cases {
-		if got := tierTimeout(budget); got != want {
-			t.Errorf("tierTimeout(%s) = %s, want %s; zero would disable the go test timeout", budget, got, want)
+	budget := DefaultTimeouts().TierAttempt
+	if budget <= pkg {
+		t.Fatalf("TierAttempt %s must exceed the go test timeout %s, or the context kills the run before go test reports a verdict", budget, pkg)
+	}
+	if budget != pkg+tierAttemptMargin {
+		t.Errorf("TierAttempt = %s, want the package timeout %s plus the %s margin", budget, pkg, tierAttemptMargin)
+	}
+}
+
+func TestBudgetOver_PanicsOnAPackageTimeoutThatIsNotADuration(t *testing.T) {
+	t.Parallel()
+	defer func() {
+		if recover() == nil {
+			t.Error("a package timeout that does not parse must stop the build of the default budget, not yield a zero budget")
 		}
-	}
+	}()
+	budgetOver("twenty")
 }

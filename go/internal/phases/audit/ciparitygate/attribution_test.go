@@ -180,7 +180,7 @@ func TestIntegrationTier_ADeadlineRedGetsNoAttribution(t *testing.T) {
 
 func TestTierTestFlags_AreTheFlagsOfTheTierRun(t *testing.T) {
 	t.Parallel()
-	args := tierArgs(nil, DefaultTimeouts().TierAttempt)
+	args := tierArgs(nil)
 	for _, flag := range tierTestFlags {
 		if !slices.Contains(args, flag) {
 			t.Errorf("the base run flag %s is not in the tier run %v", flag, args)

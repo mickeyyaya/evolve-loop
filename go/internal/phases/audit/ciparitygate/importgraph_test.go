@@ -10,6 +10,7 @@ import (
 
 var allowedImports = map[string]bool{
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock": true,
+	"github.com/mickeyyaya/evolve-loop/go/internal/addedtests":     true,
 	"github.com/mickeyyaya/evolve-loop/go/internal/apicover":       true,
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr":       true,
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity":       true,
@@ -41,7 +42,7 @@ func TestImportGraph_LeafImportsOnlyTheDeclaredPackages(t *testing.T) {
 			switch {
 			case allowedImports[path]:
 			case strings.Contains(path, "/internal/"):
-				t.Errorf("%s imports %s: the gates are a leaf — stdlib plus the ten declared packages only", name, path)
+				t.Errorf("%s imports %s: the gates are a leaf — stdlib plus the eleven declared packages only", name, path)
 			case strings.Contains(strings.SplitN(path, "/", 2)[0], "."):
 				t.Errorf("%s imports third-party %s: stdlib only", name, path)
 			}
