@@ -1,6 +1,6 @@
 # The release keeps the README and the site current
 
-> Status: Part built, 2026-11-07. Operator: "Add the readme and html page update as part of release process". Sections 4.1 and 4.2 are built. The gate of section 4.3 is deferred, because two architecture reviews refused its design. Section 3 records why.
+> Status: built, 2026-11-07. Earlier status: Part built, 2026-11-07. Operator: "Add the readme and html page update as part of release process". Sections 4.1 and 4.2 are built. The gate of section 4.3 is deferred, because two architecture reviews refused its design. Section 3 records why.
 
 ## 1. The problem
 
@@ -121,3 +121,16 @@ Requirements for a later design, from the two reviews:
 | Wiring | `TestBuild_AnExpandedRootFileGetsTheVersion` and `TestLoad_ExpandsTheVersionInEachCopy`. |
 | One home | `TestTheSiteVersionHasOneHome` fails on a literal copy. |
 | Signal | `checkSiteVersion` reports the found and the expected version. |
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| 4.1 One version home (`BumpSiteVersion`, `product.version`, `checkSiteVersion`) | done | [#1362](https://github.com/mickeyyaya/evolve-loop/pull/1362), [`6ee11c4`](https://github.com/mickeyyaya/evolve-loop/commit/6ee11c4c0); `landing/shared/content.json:3` | none |
+| 4.2 Content review step in the publish skill | done | `skills/publish/SKILL.md:34` | none |
+| 4.3 Content review gate | done | cycle 2210, [`75affaa`](https://github.com/mickeyyaya/evolve-loop/commit/75affaae0); `go/internal/releasepreflight/content_review.go` | none |
+| 4.4 Work that stays by hand | not applicable (a manual list) | none | none |
+
+All three parts are on main. The Status line of 2026-11-07 said that the gate was deferred. Section 4.3 and the code show that cycle 2210 built it, so the earlier status was stale. The section 3 text still says "defers the gate". It records the decision and was not rewritten. No inbox item is open, and none is needed.
+
+The `Head` field of `launchrecord.Record` stays a console follow-up, as section 4.3 says. It has no open item. It is unverified if this gap matters.

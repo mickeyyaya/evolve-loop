@@ -1,6 +1,6 @@
 # Plan: concurrent edits — one entry, one file, so that parallel lanes do not meet in the same lines
 
-- **Status:** proposed, 2026-11-17. Amended the same day: section 11 changes the components and the order. Amended 2026-11-18: section 12 starts C2 again.
+- **Status:** partly built, 2026-11-21 (C2 done, C6 and C7 partial, C3 to C5 open, C1 and C8 dropped). Earlier status: proposed, 2026-11-17. Amended the same day: section 11 changes the components and the order. Amended 2026-11-18: section 12 starts C2 again.
 - **Research:** [Concurrent edits: where lane changes collide in the code](../research/concurrent-edit-layout-2026-11.md). **Decision:** no ADR yet. D1 and D2 add a layout rule to the code conventions. No decision here changes admission.
 - **Related:** [the console builds only what a lane cannot build](console-build-or-route-2026-11.md). Its component K5 changes admission so that two items in different files of `cmd/evolve` both admit. This plan does not replace K5. C6 moves code into smaller packages, so each admission cell gets smaller with no admission change. K5 stays in its plan and runs after C6 only when the waiting items stay above the target of §8. The landing side stays as [concurrent cycle landing](concurrent-cycle-landing-2026-10.md) designed it.
 
@@ -288,3 +288,18 @@ The train is protected, so the console builds C2. The red tests above are the ga
 - C2 does not change the fleet rebase. It already regenerates (F12.5).
 - C2 does not resolve a conflict in a source file, or a conflict where a source file and a derived output both conflict.
 - The test of F12.2 ran on one git version (2.54). C2 does not depend on a merge driver.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| C1 conflicted files in the signals | dropped (section 11: the signals already name each file, F2.9) | none | none |
+| C2 train regenerates derived conflicts | done | [#1558](https://github.com/mickeyyaya/evolve-loop/pull/1558), [`36dee80`](https://github.com/mickeyyaya/evolve-loop/commit/36dee80b35769e24e3cdd34d3616ce4266a09bb7); [#1580](https://github.com/mickeyyaya/evolve-loop/pull/1580), [`f13a5f0`](https://github.com/mickeyyaya/evolve-loop/commit/f13a5f0ddb76f02d3574138b45ba91c301b2d3ed); `go/internal/integration/compose.go:55`, `go/cmd/evolve/cmd_integration_regen.go` | none (consumed) |
+| C3 serial tests declare in their own file | not started | none; `go/internal/paralleltest/paralleltest.go` still reads the serial maps | `edit-layout-c3-serial-tests-declare-in-place` |
+| C4 verbs self-register | not started (merged into admission K2) | none | `cmd-evolve-self-registering-verbs` |
+| C5 gate lists as fragments | not started (deferred in section 11) | none | `edit-layout-c5-gate-lists-as-fragments` |
+| C6 split `cmd/evolve` by verb group | partial: inbox, agent and land (pr-ci) moved; gc, wave, land rest and the spine design open | cycle 2503, [`5ed6d76`](https://github.com/mickeyyaya/evolve-loop/commit/5ed6d767432bb82a339e95152dc5832413118bdf) (inboxcmd); cycle 2495, [`fb493ae`](https://github.com/mickeyyaya/evolve-loop/commit/fb493ae1ae2cfc23cd3b2a9d03dbdddcd13f637d) (agentcmd); cycle 2564, [`ca8b6f0`](https://github.com/mickeyyaya/evolve-loop/commit/ca8b6f025676462ddc5ff46dccc1007e2cf7caae) (landcmd pr-ci); `go/internal/cli/` | `split-cmd-evolve-gccmd`, `split-cmd-evolve-wavecmd`, `split-cmd-evolve-landcmd-rest`, `split-cmd-evolve-spine-design` |
+| C7 split hot package notes | partial: one note for each moved group; `cmd-evolve.md` is still one note | `docs/architecture/packages/internal-cli-inboxcmd.md`, `internal-cli-landcmd.md` | none (rides with each C6 item) |
+| C8 mergiraf in shadow | dropped (section 11) | none | none |
+
+The train regeneration of C2 is on main. The split of `cmd/evolve` runs one group for each boundary, and four of its items are open. C3, C4 and C5 are not built, and each has an open item. Admission K1 landed in [`295d242`](https://github.com/mickeyyaya/evolve-loop/commit/295d242043582038be26009b7a4bc164683c7287) (item `admission-file-cells-for-leaf-packages`, consumed), so C3 is now the next step of the new order. Every unfinished component has an open item or was dropped, so no follow-up draft is needed.

@@ -1,6 +1,6 @@
 # Plan: the fleet admission window follows the load, the memory and the swap of the host
 
-- **Status:** proposed, 2026-11-20. Built at stage `shadow` by default. The reviewed design is in `.evolve/evidence/design.md` of the build worktree.
+- **Status:** built, 2026-11-21 (6 of 6 components on main at stage `shadow`; rollout steps 4 and 5 not done). Earlier status: proposed, 2026-11-20. Built at stage `shadow` by default. The reviewed design is in `.evolve/evidence/design.md` of the build worktree.
 - **Related plans:** [wave-orchestrator-2026-10.md](wave-orchestrator-2026-10.md), [pool-resupply-2026-10.md](pool-resupply-2026-10.md).
 - **Package notes:** [internal-hostpressure](../architecture/packages/internal-hostpressure.md), [internal-orchestrator](../architecture/packages/internal-orchestrator.md), [internal-policy](../architecture/packages/internal-policy.md), [cmd-evolve](../architecture/packages/cmd-evolve.md), [cmd-hostsampler](../architecture/packages/cmd-hostsampler.md).
 
@@ -92,3 +92,18 @@ The controller acts on admission only. It never signals, pauses or stops a runni
 - The idle load of 23.6 makes the default thresholds clamp the cap at idle. The shadow stage exists to find this before it costs a lane.
 - The window and the controller are two states. The window admits the lower of its landing size and the host ceiling, so neither can lift the other.
 - A reader that fails for a long time leaves the cap where it is. The blind code names the fault.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| H1 parsers, reader, pure decision | done | [#1598](https://github.com/mickeyyaya/evolve-loop/pull/1598), [`d4b2f26`](https://github.com/mickeyyaya/evolve-loop/commit/d4b2f264a27b9ad42b186491edaa60b7092ba92e); `go/internal/hostpressure/decide.go` | none |
+| H2 policy block and validation | done | [#1598](https://github.com/mickeyyaya/evolve-loop/pull/1598); `go/internal/policy/fleet_adaptive.go` | none |
+| H3 `SetCeiling`, `HostCapped`, `Kick` | done | [#1598](https://github.com/mickeyyaya/evolve-loop/pull/1598); `go/internal/orchestrator/window.go:54` | none |
+| H4 idle cause and underfill skip | done | [#1598](https://github.com/mickeyyaya/evolve-loop/pull/1598); `go/internal/orchestrator/host_pressure_test.go` | none |
+| H5 signal codes | done | [#1598](https://github.com/mickeyyaya/evolve-loop/pull/1598); `docs/architecture/signal-codes.md` | none |
+| H6 sampling goroutine, `SizedWidth` | done | [#1598](https://github.com/mickeyyaya/evolve-loop/pull/1598); `go/cmd/evolve/cmd_loop_hostpressure.go`, `go/internal/policy/fleet.go:164` | none |
+| Rollout step 2: policy at stage `shadow` | done | [#1606](https://github.com/mickeyyaya/evolve-loop/pull/1606), [`1214752`](https://github.com/mickeyyaya/evolve-loop/commit/1214752b2); `.evolve/policy.json:140` | none |
+| Rollout steps 3 to 5: set thresholds, flip to `enforce`, set `fleet.count` to 12 | not started | `.evolve/policy.json` still has `fleet.count` 8 and `min_lanes` 8 | none |
+
+All six code components are on main. The controller runs in `shadow`. Steps 3 to 5 need two waves of `host-pressure.ndjson`, so they have not started. No open inbox item tracks them. A follow-up draft is in `followups/fleet-host-adaptive-enforce-and-12-lanes.json`.

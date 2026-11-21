@@ -1,6 +1,6 @@
 # Plan: every phase agent queries the code index through `evolve code`, a CLI layer over a swappable backend
 
-- **Status:** proposed, 2026-10-17. K1, K2, K3, K5 and K6 are built, and K6 replaced K2 on 2026-10-26. K4a and K4b are open, and each has an inbox item (section 6).
+- **Status:** partly built, 2026-11-21 (4 of 6 components on main; K4a open; K4b not decided). Earlier status: proposed, 2026-10-17. K1, K2, K3, K5 and K6 are built, and K6 replaced K2 on 2026-10-26. K4a and K4b are open, and each has an inbox item (section 6).
 - **Research:** [code-index-cli-2026-10](../research/code-index-cli-2026-10.md). **Design:** [code-index-cli](../architecture/code-index-cli.md). **Decision:** [ADR-0138](../architecture/adr/0138-phase-agents-query-the-code-index-through-an-evolve-cli-not-mcp.md).
 
 ## Table of contents
@@ -159,3 +159,17 @@ The order is K1, K3, K2, K4a, K4b, K5. K6 replaces the K2 step and can land at a
 
 - **Q1 (resolved):** D7 names `agents/evolve-debugger.md`. K4a checks that the bug-reproduction and fault-localization personas are the same files.
 - **Q2:** do the tdd and auditor phases also get the commands? We propose not in the first trial: they review the work of another phase, and the trial measures the builders first.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| K1 `evolve code` and the trail adapter | done | [`fa211d6`](https://github.com/mickeyyaya/evolve-loop/commit/fa211d625) (2026-10-17); `go/cmd/evolve/cmd_code.go` | none |
+| K2 boundary refresh step | superseded by K6 (2026-10-26) | [`1f44a45`](https://github.com/mickeyyaya/evolve-loop/commit/1f44a45a8) | none |
+| K3 usage log and `evolve code usage` | done | [#931](https://github.com/mickeyyaya/evolve-loop/pull/931), [`8b8aad7`](https://github.com/mickeyyaya/evolve-loop/commit/8b8aad74b); `go/internal/codeindex/usagelog` | none |
+| K4a persona text for the four commands | not started: no `evolve code` text in the three persona files | none | `code-index-cli-k4a-persona-commands` |
+| K4b gate for K4a | not started: operator decision pending | none | none (draft `code-index-cli-k4b-gate-persona-change`; the item left in [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443)) |
+| K5 removal of the MCP registrations | done | console action, 2026-10-17, no repo change; note in `docs/conventions/cli-only-no-mcp.md` | none |
+| K6 `sync-main` refreshes the index, stale warning | done | [`1f44a45`](https://github.com/mickeyyaya/evolve-loop/commit/1f44a45a8); `go/cmd/evolve/cmd_code_freshness.go` | none |
+
+K4a has an open item. K4b has no open item and waits on K4a. The items of this plan were tracked in a docs commit on 2026-10-27 ([`56b8d65`](https://github.com/mickeyyaya/evolve-loop/commit/56b8d6579)).

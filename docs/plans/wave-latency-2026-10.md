@@ -1,6 +1,6 @@
 # Plan: a wider wave, a faster build and gates that test once
 
-- **Status:** accepted, 2026-10-19. The operator chose the three decisions of §4 on 2026-10-19.
+- **Status:** partly built, 2026-11-21 (5 of 7 components done; W3 is superseded by W4; W5 is built at stage `shadow`). Earlier status: accepted, 2026-10-19. The operator chose the three decisions of §4 on 2026-10-19.
 - **Research:** [wave-latency-2026-10](../research/wave-latency-2026-10.md). **Decision:** [ADR-0143](../architecture/adr/0143-admission-holds-only-shared-edits-and-the-ship-gate-owns-api-drift.md).
 - **Related:** [ADR-0139](../architecture/adr/0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md) (the wave orchestrator), [ADR-0105](../architecture/adr/0105-identity-preserving-fleet-rebase.md) (the identity rebase), [ADR-0136](../architecture/adr/0136-each-model-tier-walks-separate-quota-pools-and-agy-runs-argon-medium-at-deep-and-top.md) (quota pools per tier).
 
@@ -137,3 +137,17 @@ C2 ties C1 on the total. It is the only design with both a gain and a risk score
 - D1 trusts the composed-tree gate of the ship. A defect that the tests do not cover can still pass it.
 - The lease does not guarantee one ship at a time: a lane whose context ends in the wait ships unleased. Since 2026-10-19 the ship phase holds the lease over the binding check and the push. A fleet-rebase recovery holds it over the rebase, the composed-tree gates and the re-ship ([internal-shipwindow](../architecture/packages/internal-shipwindow.md)).
 - The model time of D4 is an estimate from different tasks (F3.3).
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| W0 `evolve wave latency` | done | [#997](https://github.com/mickeyyaya/evolve-loop/pull/997) ([`77e4ed2`](https://github.com/mickeyyaya/evolve-loop/commit/77e4ed2e7719a576afd9453f95decf1c6e2cfc2a)); `go/internal/lanetime` | none (consumed) |
+| W1 optimistic admission at shadow | done | cycle commit [`ca763e7`](https://github.com/mickeyyaya/evolve-loop/commit/ca763e7c23214c70449e0e704ce09e116057f4b2) | none (consumed) |
+| W1b ship record of optimistic admissions | done | [`d876329`](https://github.com/mickeyyaya/evolve-loop/commit/d87632964e7c6aec3f6f84c4b87420169b766093) | none (consumed) |
+| W2 admission to `enforce` | done | [#1243](https://github.com/mickeyyaya/evolve-loop/pull/1243) ([`3b69714`](https://github.com/mickeyyaya/evolve-loop/commit/3b69714c8)); `.evolve/policy.json:133` | none |
+| W3 claude first for the builder now | superseded by W4 | The builder chain in `.evolve/policy.json` is now agy, agy-claude, claude; W4 orders by headroom | none |
+| W4 headroom-aware family order | done | [#999](https://github.com/mickeyyaya/evolve-loop/pull/999) ([`1f0de9f`](https://github.com/mickeyyaya/evolve-loop/commit/1f0de9fc029642a6c2ab8813366b5c4681a18e4f)) | none (consumed) |
+| W5 shared verdict store | built at stage shadow | [#998](https://github.com/mickeyyaya/evolve-loop/pull/998) ([`b44bb1b`](https://github.com/mickeyyaya/evolve-loop/commit/b44bb1bdb4a164436c4112619b27e190fc46a604)); `go/internal/phases/ship/scanshadow.go` | none: the move to enforce has no item |
+
+The W5 ship still runs at stage `shadow` as far as the code shows. No `.evolve/policy.json` key for the store stage was found, so the stage is unverified. The move of the ship to `enforce` after one wave with 0 mismatches has no open inbox item. A follow-up draft is written. The wave-level goal (above 2.1 live lanes, above 1.4 ships per hour) has no recorded measure: unverified.

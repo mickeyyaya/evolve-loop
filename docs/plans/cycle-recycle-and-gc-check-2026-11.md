@@ -1,6 +1,6 @@
 # Plan: each cycle ends with a mandatory recycle step, and gc checks each host resource it owns
 
-- **Status:** proposed, 2026-11-20. Round 2 with the in-session fixes of its review (sections 11 and 12 list each finding and its fix). The design review comes before any build.
+- **Status:** partly built, 2026-11-21 (1 of 12 component rows on main). Earlier status: proposed, 2026-11-20. Round 2 with the in-session fixes of its review (sections 11 and 12 list each finding and its fix). The design review comes before any build.
 - **Design:** [internal-gc](../architecture/packages/internal-gc.md), [internal-gcpolicy](../architecture/packages/internal-gcpolicy.md), [the shadow stage contract](../architecture/shadow-stage-contract.md). **Earlier plan:** [gc closes the legacy gap](gc-closes-the-legacy-gap-2026-11.md).
 - **Evidence:** the measurements and the manual recovery of 2026-11-20 (section 2), and the incident record "salvage bundles filled the disk and hung a loop test" in [PR #1584](https://github.com/mickeyyaya/evolve-loop/pull/1584).
 
@@ -317,3 +317,25 @@ The patch check `agent-adversarial-review-20261120T004321Z-0bc6` verified the fi
 | MEDIUM-2: the apply re-check still reads the hub `HEAD` | X1a retargets `deleteSquashed` and uses `update-ref -d` |
 | MEDIUM-3: the step runs twice | D15: the step is idempotent on its record |
 | LOW-1, LOW-2 | D1 cites the FAIL stamp and states the parked exit |
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| X0 thin bundles | done | cycle 2558, [`dad6bdf`](https://github.com/mickeyyaya/evolve-loop/commit/dad6bdf3482ca3b084aafe568be4da3a764578e8); `go/internal/gc/salvage.go` | none (consumed) |
+| X1a check registry: worktrees | not started | none | `recycle-x1a-check-registry-worktrees` |
+| X1b check registry: run dirs | not started | none | `recycle-x1b-check-registry-run-dirs` |
+| X1c check registry: cache | not started | none | `recycle-x1c-check-registry-cache` |
+| X1d check registry: temp | not started | none | `recycle-x1d-check-registry-temp` |
+| X1e check registry: processes | not started | none | `recycle-x1e-check-registry-processes` |
+| X2 trim counts executable dirs | not started | none | `recycle-x2-gocache-counts-executable-dirs` |
+| X3 leaf writer and `evolve archive restore` | not started | none; no `archive restore` verb in `go/cmd/evolve` | `recycle-x3-archive-leaf-writer` |
+| X4 mandatory recycle step | not started | none | `recycle-x4-mandatory-recycle-step` |
+| X5 continuation reads the leaf | not started | none | `recycle-x5-continuation-reads-the-leaf` |
+| X6 size cap, migration, retention | not started | none | `recycle-x6-salvage-retention-and-migration` |
+| X7 temp shape registry | not started | none; `pipelineTempRe` is still in `go/internal/gc` | `recycle-x7-temp-shape-registry` |
+| X8 test tmux socket reap | not started | none; `ReapOrphanSockets` predates this plan (`go/internal/swarm/reap_orphans.go`) | `recycle-x8-test-tmux-socket-reap` |
+| X9 loop runs host checks | not started | none | `recycle-x9-loop-runs-host-checks` |
+| X10 reports and integrity rows | not started | none | `recycle-x10-reports-and-integrity-rows` |
+
+Only X0 is on main. The plan is still under design review, and the other components wait for it. Every unfinished component has an open inbox item, so no follow-up draft is needed.

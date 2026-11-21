@@ -1,6 +1,6 @@
 # Plan: a correction round stops on a proven blocker and sends the item to the console
 
-- **Status:** built, 2026-10-19.
+- **Status:** built, 2026-10-19 (7 of 7 components on main). Earlier status: built, 2026-10-19.
 - **Design:** [blocker-exit.md](../architecture/blocker-exit.md). **Decision:** this plan (no ADR; the change adds an exit to the ADR-0117 floor loop). **Research:** §2 of this plan.
 
 ## Table of contents
@@ -164,3 +164,17 @@ A note from the coordinator on the same day added a rule: "keep its core phase-a
 
 - The general loop of the operator can reuse `BlockerProver` for other phases. Each phase must supply its own `Explainable` function.
 - A route for a cycle with more than one committed item. Today the route needs exactly one item, as the TDD route does.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| K1 `coverstrict.belowFloor` | done | [#983](https://github.com/mickeyyaya/evolve-loop/pull/983), [`b1e702d`](https://github.com/mickeyyaya/evolve-loop/commit/b1e702dd0); `go/internal/coverstrict/coverstrict.go:129` | none |
+| K2 `BlockerProver`, `BlockerRouteDiagnostic` | done | [#983](https://github.com/mickeyyaya/evolve-loop/pull/983), [`b1e702d`](https://github.com/mickeyyaya/evolve-loop/commit/b1e702dd0); `go/internal/core/blocker_proof.go` | none |
+| K3 build caller and loop exit | done | [#983](https://github.com/mickeyyaya/evolve-loop/pull/983), [`b1e702d`](https://github.com/mickeyyaya/evolve-loop/commit/b1e702dd0); `go/internal/core/build_blocker_exit.go` | none |
+| K4 floor notes | done | [#983](https://github.com/mickeyyaya/evolve-loop/pull/983), [`b1e702d`](https://github.com/mickeyyaya/evolve-loop/commit/b1e702dd0); `go/internal/core/floor_blocker_notes.go` | none |
+| K5 code, disposition and classify precedence | done | [#983](https://github.com/mickeyyaya/evolve-loop/pull/983), [`b1e702d`](https://github.com/mickeyyaya/evolve-loop/commit/b1e702dd0); `go/internal/cycleclassify/classify.go`, `go/internal/cyclestate/result.go` | none |
+| K6 console route wiring proof | done | [#983](https://github.com/mickeyyaya/evolve-loop/pull/983), [`b1e702d`](https://github.com/mickeyyaya/evolve-loop/commit/b1e702dd0); `go/internal/cycleoutcome/blocker_route_test.go` | none |
+| K7 manifest entries | done | [#983](https://github.com/mickeyyaya/evolve-loop/pull/983), [`b1e702d`](https://github.com/mickeyyaya/evolve-loop/commit/b1e702dd0); `go/internal/guards/integrity_surface.go` | none |
+
+One change delivered all seven components on 2026-10-19. Nothing is left. The handoff plan reuses this exit for its H5 blocker proof.

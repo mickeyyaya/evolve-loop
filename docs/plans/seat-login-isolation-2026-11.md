@@ -1,6 +1,7 @@
 # Plan: A seat cannot end the login of the operator
 
-- **Status:** decided. The operator answered "C" on 2026-11-05 (Q2), and said "follow the research best option and start to build the code" on 2026-11-06 (Q1). The decision record and the spec are written. The first stage protocol failed four reviews, and the operator's rule "once we failed to 4th review, it should trigger the redesign" replaced it. The redesign is the token file as the stage. ADR-0163 reads Proposed until the operator moves it to Accepted.
+- **Status:** partly built, 2026-11-21 (5 of 9 components on main, 2 partial, 2 not started or unverified). Earlier status: decided.
+- **Earlier status, in full:** The operator answered "C" on 2026-11-05 (Q2), and said "follow the research best option and start to build the code" on 2026-11-06 (Q1). The decision record and the spec are written. The first stage protocol failed four reviews, and the operator's rule "once we failed to 4th review, it should trigger the redesign" replaced it. The redesign is the token file as the stage. ADR-0163 reads Proposed until the operator moves it to Accepted.
 - **Decision:** [ADR-0163](../architecture/adr/0163-a-seat-holds-a-narrow-token-in-its-own-directory-and-the-token-file-is-the-stage.md). **Design:** [seat-login](../architecture/seat-login.md).
 - **Research:** [claude-login-split-2026-11](../research/claude-login-split-2026-11.md).
 - **Related:** [llm-isolation](../architecture/llm-isolation.md), [operating-policy](../operations/operating-policy.md).
@@ -171,3 +172,19 @@ Alongside: **L0** records which store moves first at the next failure. **L8** co
 | Q2 | On 2026-11-03 the operator told the console that no cell gets a credential, and that the pipeline holds it behind one source for each OS. The repo has no record of this. C breaks this as written, and D does not. Is a narrow token in the cell an accepted exception? | Decided on 2026-11-05. The operator answered "C". So a narrow token in the cell is an accepted exception to that rule. |
 | Q3 | Do the stores hold different logins? | Answered on 2026-11-05 (F3.7): the Keychain holds a token, and the file holds an empty one. |
 | Q4 | Why the rise on 11-02, and what caused the console clusters of 10-17 to 10-20? | Open. The expiry in L0 is the first evidence. |
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| L0: measure (`evolve auth store-times`) | done | [#1361](https://github.com/mickeyyaya/evolve-loop/pull/1361), [`ee11593`](https://github.com/mickeyyaya/evolve-loop/commit/ee1159322); `go/cmd/evolve/cmd_auth.go:23` | none |
+| L1: seat directory | done | [#1361](https://github.com/mickeyyaya/evolve-loop/pull/1361); `go/internal/bridge/seat_launch.go`, `seat_settings.go` | none |
+| L2: live proof across an expiry | not started (a live run by the operator; no record found) | none | `2026-11-05T07-27-07Z-sandboxed-seats-cannot-save-a-refreshed-login` |
+| L3: sandbox deny of the stored login | partial: the sandbox adapter and the wrap changed in #1361; the contract row for `.credentials.json` and the Keychain result are unverified | [#1361](https://github.com/mickeyyaya/evolve-loop/pull/1361); `go/internal/adapters/sandbox/sandbox.go` | same item |
+| L4: token holder (`seatlogin`, `seat-token set`/`clear`) | done | [#1361](https://github.com/mickeyyaya/evolve-loop/pull/1361); `go/internal/seatlogin`, `go/cmd/evolve/cmd_auth_seat_token.go` | none |
+| L5: login failure class | done | [#1317](https://github.com/mickeyyaya/evolve-loop/pull/1317), [`234b34e`](https://github.com/mickeyyaya/evolve-loop/commit/234b34ec2); `go/internal/bridge/login_pattern_anchor_test.go` | none |
+| L6: readers | done | [#1375](https://github.com/mickeyyaya/evolve-loop/pull/1375), [`7e6bfa8`](https://github.com/mickeyyaya/evolve-loop/commit/7e6bfa8f8); `go/internal/tokenusage/defaultresolver.go` | none |
+| L7: stage (parameter seat, then holder) | partial: the parameter and the verbs are on main; the `set` at a boundary is unverified | [#1361](https://github.com/mickeyyaya/evolve-loop/pull/1361) | same item |
+| L8: count auth errors by place | not started: no verb found | none | none (draft `seat-login-l8-auth-errors-by-place`) |
+
+ADR-0163 reads Proposed on main, and the plan is decided and mostly built. The ADR status line looks stale. This review did not change it. What is left is the live proof L2, the `set` of the holder at a boundary, the L3 contract row and L8. The open item above is the one master item for the login fault. L8 has no item of its own, so a draft is ready.

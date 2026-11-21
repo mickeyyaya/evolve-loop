@@ -1,6 +1,6 @@
 # Plan: lanes spend their time on work, not on gates that wait, repeat or fail for host reasons
 
-- **Status:** proposed, 2026-11-16.
+- **Status:** partly built, 2026-11-21 (6 of 8 components on main). Earlier status: proposed, 2026-11-16.
 - **Research:** [Gate, ship and retry waste](../research/gate-ship-retry-waste-2026-11.md). **Decision:** no ADR for Stage 1, because it changes no boundary and no guarantee. Stage 2 (the scoped re-check at `enforce`) gets an ADR, because it changes what a gate proves.
 - **Specs that change:** the package notes of each package that a component changes (section 6).
 
@@ -152,3 +152,18 @@ The health readings of each boundary hold these numbers.
 1. Must the full post-landing suite on main (research P2, TAP) come before the scoped re-check at `enforce`, or with it?
 2. The `-count=1` rule exists because tests read files through `..`. The registry of tree-reading tests lists them now. Can the shared build cache come back for the other packages?
 3. Does the verify lock (F1.3) stay after S1, or can the coverage run take a live share too?
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| S1 live-width CPU share | done, 2026-11-17 | [#1499](https://github.com/mickeyyaya/evolve-loop/pull/1499) [`7d48417`](https://github.com/mickeyyaya/evolve-loop/commit/7d4841722) (`go/internal/lanebudget/lanebudget_test.go`, `go/internal/fleet/pool_livewidth_test.go`, `go/internal/phases/audit/ciparitygate/tier_retake_share_test.go`) | none |
+| S2 capacity class for a deadline kill | done, 2026-11-17 | [#1500](https://github.com/mickeyyaya/evolve-loop/pull/1500) [`ee9432a`](https://github.com/mickeyyaya/evolve-loop/commit/ee9432ac2) (`go/internal/core/ship_recovery_capacity_test.go`) | none |
+| S3 base attribution of a red composed gate | done, 2026-11-17 | [#1513](https://github.com/mickeyyaya/evolve-loop/pull/1513) [`ac8cb42`](https://github.com/mickeyyaya/evolve-loop/commit/ac8cb424c) (`go/internal/core/composed_gate_attribution_test.go`) | none |
+| S4 binding check first and composition receipt | not started: none of the three named tests exists in `go/` | none | gate-ship-s4-binding-first-receipt |
+| S6 two-stage build floor | done, 2026-11-17 | [#1502](https://github.com/mickeyyaya/evolve-loop/pull/1502) [`d195127`](https://github.com/mickeyyaya/evolve-loop/commit/d195127e0) (`go/internal/core/build_floor_stages_test.go`) | none |
+| S7 host minutes and load sampler | done, 2026-11-16 | cycle 2428 [`415232e`](https://github.com/mickeyyaya/evolve-loop/commit/415232ea8) (`go/internal/cyclespend/hostminutes_test.go`) | none |
+| S8 scoped re-check at shadow | done, 2026-11-17 | cycle 2450 [`ced71cd`](https://github.com/mickeyyaya/evolve-loop/commit/ced71cdd2) (`go/internal/scopedset`), wired at `go/cmd/evolve/cmd_composition_shadow.go:25` | none |
+| S5 explanation-doc fix in place (Stage 2) | not started: no `TestExplanationCorrection_` test exists | none | none (draft: gate-ship-s5-explanation-fix-in-place) |
+
+Stage 1 is on main except S4, which has an open item. S5 and the Stage 2 parts (scoped re-check at `enforce`, FIFO ticket, shared build cache) wait for two waves of measures. I found no record of the section 8 measures, so the gate for Stage 2 is unverified. S5 has no inbox item, so I wrote a draft. The plan names `TestPool_WritesTheLiveWidthAtLaneStartAndEnd`, but the test file `pool_livewidth_test.go` may use another name. That name is unverified.

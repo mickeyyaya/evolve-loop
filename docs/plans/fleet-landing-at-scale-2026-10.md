@@ -1,6 +1,7 @@
 # Plan: fleet landings stay fast from 2 to 200 concurrent lanes
 
-- **Status:** proposed, 2026-10-13. S0 (these documents) is in review in the docs lane `cl-merge-scale`. ADR-0147 (proposed) amends this design on 2026-10-20: [§7.1](#71-status-after-adr-0147) marks the rows that it supersedes.
+- **Status:** partly built, 2026-11-21 (S0, S3, S4, S5 and S14 on main; S1 dropped; S9 to S12 superseded; 8 of 18 rows open). Earlier status: proposed, 2026-10-13.
+  - Detail of the earlier status: proposed, 2026-10-13. S0 (these documents) is in review in the docs lane `cl-merge-scale`. ADR-0147 (proposed) amends this design on 2026-10-20: [§7.1](#71-status-after-adr-0147) marks the rows that it supersedes.
   - S3 and S4 are merged and unwired (#889).
   - **S5 is built (2026-10-16), in shadow.** The ship scan keys each package result and reads and writes the verdict store. It signals each hit and each escape, and one summary for each scan. The dial is `gates.scan_cache_gate` (default `shadow`).
   - Limit of S5: the scan has no producer of test logs yet. Every key is a whole-tree key, so a hit needs an identical tree. The S5 exit of 500 hits needs that producer first (see §12, Q6).
@@ -435,3 +436,28 @@ It runs each policy (today, A, B, C, E and W) at N = 2, 20 and 200, for 24 simul
 - **Q7.** Does a package timeout count as an escape? S5 counts any failed package whose key hit. A timeout on a loaded host then raises an escape that is a load fault, and the S5 exit needs zero escapes.
   - A retried package is a second case. S5 settles each key once for each scan. A first-run failure that a green alone re-run clears thus raises an escape that is flake noise.
   - S6 must discount the escapes of retried packages before it uses the escape count as a gate.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| S0 documents | done | [#886](https://github.com/mickeyyaya/evolve-loop/pull/886), [`55837593f`](https://github.com/mickeyyaya/evolve-loop/commit/55837593f) | none |
+| S1 fast-forward check first | dropped (reason in section 7) | none | none |
+| S2 process shards | not started | none | none |
+| S3 `internal/testkey` | done, unwired pure function | [#889](https://github.com/mickeyyaya/evolve-loop/pull/889), [`83b3409f7`](https://github.com/mickeyyaya/evolve-loop/commit/83b3409f7) | none |
+| S4 `internal/testverdict` | done, store | [#889](https://github.com/mickeyyaya/evolve-loop/pull/889), [`83b3409f7`](https://github.com/mickeyyaya/evolve-loop/commit/83b3409f7) | none |
+| S5 scan with keys, shadow | done in shadow; no test-log producer (Q6) | [#900](https://github.com/mickeyyaya/evolve-loop/pull/900), [`21cacf0b8`](https://github.com/mickeyyaya/evolve-loop/commit/21cacf0b8); dial `ScanCacheGate` at `go/internal/policy/routing_gates.go:74` | none |
+| S6 scan with keys, enforce | not started; waits for S5 exit | none | none |
+| S7 test input map | not started | none | none |
+| S8 test-seconds ratchet | not started | none | none |
+| S9 verify off the head | superseded by ADR-0147 prefix check I3 | `wave-integration-i3-prefix-check-ejection`: [`67f531f`](https://github.com/mickeyyaya/evolve-loop/commit/67f531fcac35a41002f12ac780ac295066144790) (cycle landing), I3b [#1580](https://github.com/mickeyyaya/evolve-loop/pull/1580) | none |
+| S10 order by conflict graph | superseded by I1 order score | `wave-integration-i1-order-score`: [`0dc815909`](https://github.com/mickeyyaya/evolve-loop/commit/0dc815909c3078ea8acb6c7f159e61ed09623053) (cycle landing) | none |
+| S11 group commit | superseded by I5 batch PR (not yet built) | none | `wave-integration-i5-batch-pr` |
+| S12 T3 review off the head | superseded by ADR-0147 | none | none |
+| S13 `landingsim` | not started (no package on main) | none | none |
+| S14 cells and admission | done in shadow, as O3 of the wave-orchestrator plan | [#925](https://github.com/mickeyyaya/evolve-loop/pull/925), [`522221b69`](https://github.com/mickeyyaya/evolve-loop/commit/522221b69) | none |
+| S15 fresh base at audit | not started (unverified: no named symbol found) | none | none |
+| S16 live benchmark | not started | none | none |
+| S17 landing line in wave status | not started | none | none |
+
+Eight rows (S2, S6, S7, S8, S13, S15, S16, S17) are unfinished and have no open inbox item. The item `landing-plans-reconcile-with-adr-0147` that is to decide them sits in quarantine, not in the open inbox. A follow-up draft exists: `fleet-landing-s-rows-after-adr-0147`. S11 waits for the open item I5. The S5 exit needs a test-log producer (Q6) before S6 can enforce.

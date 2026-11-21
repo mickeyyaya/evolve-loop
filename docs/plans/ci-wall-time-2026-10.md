@@ -1,6 +1,6 @@
 # Plan: CI wall time falls from about 24 to about 9 minutes, and every run keeps the data that shows why
 
-- **Status:** accepted, 2026-10-17 (the operator approved it with "Ok"). Amended 2026-10-19 with C15 and C16 (§6b).
+- **Status:** partly built, 2026-11-21 (18 of 20 components on main or superseded; C13 and C14 not started). Earlier status: accepted, 2026-10-17 (the operator approved it with "Ok"). Amended 2026-10-19 with C15 and C16 (§6b).
 - **Research:** [ci-wall-time-2026-10](../research/ci-wall-time-2026-10.md). **Earlier campaign:** [test-system-efficiency-2026-10](test-system-efficiency-2026-10.md). **Decision:** [ADR-0135](../architecture/adr/0135-ci-measures-itself-before-it-changes-its-shape.md). **Design:** [ci-telemetry-and-critical-path](../architecture/ci-telemetry-and-critical-path.md).
 
 ## Table of contents
@@ -497,3 +497,30 @@ Each component is one PR, merged at a wave boundary. Each one follows the usual 
 - **Q5:** does the macOS runner gain from `-p 2` or `-p 4`? C13 must record its CPU first (F3.23).
 - **Q6 (operator):** queue option D, a GitHub merge queue. It tests one merge group before it lands, so a merge train makes fewer main runs. It changes the console merge flow at each boundary. Proposed: decide after C15 and C16 are measured.
 - **Q7 (operator):** queue option E, more macOS slots from a paid GitHub plan (P7.1). It raises the cap of 5, but the demand stays the same. Proposed: decide after C2, because C2 holds each slot for less time.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| C0 artifact upload and `testlatency` floor | done | [#913](https://github.com/mickeyyaya/evolve-loop/pull/913), [`639504f`](https://github.com/mickeyyaya/evolve-loop/commit/639504fd2) | none |
+| C0b rusage wrapper and runner sampler | done | [#928](https://github.com/mickeyyaya/evolve-loop/pull/928), [`18e4da0`](https://github.com/mickeyyaya/evolve-loop/commit/18e4da0f7); `go/cmd/testrusage`, `go/cmd/hostsampler` | none |
+| C1 `evolve ci telemetry` report | done | cycle 2066, [`eff18a9`](https://github.com/mickeyyaya/evolve-loop/commit/eff18a9d7); `go/internal/citelemetry` | none |
+| C2 macOS runs the darwin set only | done | [#1002](https://github.com/mickeyyaya/evolve-loop/pull/1002), [`3be2170`](https://github.com/mickeyyaya/evolve-loop/commit/3be2170ad); `go/.darwin-set`, `.github/workflows/macos-weekly.yml` | none |
+| C3 skills-drift build sharing | done | [#935](https://github.com/mickeyyaya/evolve-loop/pull/935), [`fa029ac`](https://github.com/mickeyyaya/evolve-loop/commit/fa029acb8) | none |
+| C4 `cmd/evolve` serial chain | done | cycle 2411, [`b3724ac`](https://github.com/mickeyyaya/evolve-loop/commit/b3724ac1b) | none |
+| C5 `bridge` injected clock | superseded by C10 (section 6a, correction 1) | see C10 | none |
+| C5b `bridge` self-match guard windows | done | [#935](https://github.com/mickeyyaya/evolve-loop/pull/935), [`fa029ac`](https://github.com/mickeyyaya/evolve-loop/commit/fa029acb8); `go/internal/bridge/selfmatch_guard_prefilter_test.go` | none |
+| C6 e2e step runs only `e2e` tests | done | [#940](https://github.com/mickeyyaya/evolve-loop/pull/940), [`7a74e2a`](https://github.com/mickeyyaya/evolve-loop/commit/7a74e2a7d) | none |
+| C7 `GORACE` exit sleep off | done | [#940](https://github.com/mickeyyaya/evolve-loop/pull/940), [`7a74e2a`](https://github.com/mickeyyaya/evolve-loop/commit/7a74e2a7d) | none |
+| C8 deliverable read grace is settable | done | cycle 2227, [`aa66166`](https://github.com/mickeyyaya/evolve-loop/commit/aa661665f) | none |
+| C9 one parse per test binary | done | cycle 2228, [`845c2dc`](https://github.com/mickeyyaya/evolve-loop/commit/845c2dc35) | none |
+| C10 `bridge` tick-loop tests | done | cycle 2112, [`e011e88`](https://github.com/mickeyyaya/evolve-loop/commit/e011e886d) | none |
+| C11 vet and gofmt once per GOOS | done | [#940](https://github.com/mickeyyaya/evolve-loop/pull/940), [`7a74e2a`](https://github.com/mickeyyaya/evolve-loop/commit/7a74e2a7d) | none |
+| C12 telemetry report fixes B1 to B4 | done | cycle 2100, [`5df4d30`](https://github.com/mickeyyaya/evolve-loop/commit/5df4d30ff) | none |
+| C13 macOS CPU sampler and spawn counts | not started: `go/cmd/hostsampler` has only `linux.go` | none | `ci-wall-time-c13-macos-cpu-and-spawn-counts` |
+| C14 fewer `git` spawns on macOS | not started; waits on C13 and decision D23 | none | none (draft `ci-wall-time-c14-fewer-git-spawns-on-macos`) |
+| C15 cancel superseded runs | done | [#988](https://github.com/mickeyyaya/evolve-loop/pull/988), [`3795979`](https://github.com/mickeyyaya/evolve-loop/commit/3795979b2) | none |
+| C16 inbox-only changes skip the Go matrix | done | [#988](https://github.com/mickeyyaya/evolve-loop/pull/988), [`3795979`](https://github.com/mickeyyaya/evolve-loop/commit/3795979b2) | none |
+| C17 `timeout-minutes` on every `go.yml` job | done | [`8a49763`](https://github.com/mickeyyaya/evolve-loop/commit/8a4976300) (2026-10-26) | none |
+
+C13 has an open item, and C14 waits on it. C14 has no open item: the plan section 6e lists none, and the inbox holds none. The wall time goal (about 9 minutes) and the weekly macOS run have no measured result in this review: unverified. The last landing was C4 on 2026-11-16.

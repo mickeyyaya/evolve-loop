@@ -1,6 +1,6 @@
 # Plan: the loop gets more room to improve itself, one verified tier at a time
 
-- **Status:** proposed, 2026-11-16. Tier A is approved for a build; Tier B and Tier C wait for the measurements of section 8.
+- **Status:** built, 2026-11-17 (Tier A on main; Tier B and C not started by design). Earlier status: proposed, 2026-11-16. Tier A is approved for a build; Tier B and Tier C wait for the measurements of section 8.
 - **Research:** [Self-evolving loops: how much the loop may change itself, and how it heals](../research/self-evolving-loop-autonomy-2026-11.md). **Decision:** no ADR for Tier A, because it changes no boundary. Tier B gets an ADR that amends [ADR-0155](../architecture/adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md) and [ADR-0157](../architecture/adr/0157-the-loop-works-its-own-code-a-narrow-fence-and-held-proposals.md).
 - **Specs that change:** the package notes of `internal/cycleoutcome`, `internal/committedset`, `internal/inboxbatch`, `internal/inboxcurator`, `internal/inboxmover`, `internal/phases/triage` and `internal/triagedecision`.
 
@@ -155,3 +155,15 @@ The refusal of a gate-weakening diff is already on main: `gateclass`, `core.Gate
 1. Intake accepted a path that does not exist on main (`inboxmover/mover.go`, cycle 2415). PR #1492 corrected the `files` of the items of cycles 2415 and 2417. Must intake refuse such a path, or only warn as `inbox lint` does today? A refusal blocks a feature item that adds a new file.
 2. The 144 operator and intake routes hold most of the console mass. The operator decides if a one-time review of them comes before Tier B.
 3. `inbox curate` proposals need the operator. How many proposals in each boundary can the operator judge?
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| A1 landed claim | done, 2026-11-17 | [#1494](https://github.com/mickeyyaya/evolve-loop/pull/1494) [`19ef9ec`](https://github.com/mickeyyaya/evolve-loop/commit/19ef9ecb1) (`go/internal/cycleoutcome/nowork_landed_test.go`, `go/internal/inboxmover/lane_menu_partition_test.go`) | none |
+| A2 protected path to `protected_files` | done, 2026-11-17 | [#1494](https://github.com/mickeyyaya/evolve-loop/pull/1494) [`19ef9ec`](https://github.com/mickeyyaya/evolve-loop/commit/19ef9ecb1) (`TestApplyNoWork_AProtectedDropStampsTheConfirmedPath`) | none |
+| A3 `routed_by` stamp and reroute table | done, 2026-11-17 | [#1494](https://github.com/mickeyyaya/evolve-loop/pull/1494) [`19ef9ec`](https://github.com/mickeyyaya/evolve-loop/commit/19ef9ecb1) (`inboxbatch/fieldowner.go:70`, `go/internal/inboxcurator/reroute_test.go`) | none |
+| A4 boundary consume of a checked claim | done, 2026-11-17 | [#1494](https://github.com/mickeyyaya/evolve-loop/pull/1494) [`19ef9ec`](https://github.com/mickeyyaya/evolve-loop/commit/19ef9ecb1) (`TestCurate_AnItemWithACheckedLandedShaGetsADeterministicConsume`) | none |
+| Tier B ADR and held-proposal admission | not started: gated on two waves of the section 8 measures | none | none |
+
+Tier A is on main in PR 1494. Tier B waits for the measures of section 8. I found no record of those measures, so the gate is unverified. The Tier B ADR has no inbox item. It is a decision for the operator after two waves, so I filed no draft. Open question 1 (intake refuses a missing path) is not answered in the code that I read.

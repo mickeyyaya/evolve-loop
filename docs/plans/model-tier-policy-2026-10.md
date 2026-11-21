@@ -1,6 +1,6 @@
 # Plan: each model tier has one purpose, one chain across separate quota pools, and Gemini 4 Argon (Medium) for agy at deep and top
 
-- **Status:** accepted, 2026-10-17 (the operator approved it).
+- **Status:** partly built, 2026-11-21 (6 of 9 components on main; P4 and Q3 partial; Q5 not started). Earlier status: accepted, 2026-10-17 (the operator approved it).
 - **Note (2026-11-20):** `cli_routing.default` is `claude, agy, agy-claude`. `agents.builder` is `agy, agy-claude, claude` at `balanced` on `Gemini 4 Hydrogen (High)`. `tiers.deep` is `claude, agy, agy-claude` with `share_pct` 50 ([ADR-0150](../architecture/adr/0150-the-deep-tier-gives-its-first-family-a-fixed-share-of-the-seats-and-paces-it-by-its-week-window.md)). `tiers.top` is `agy-claude, claude`.
 - **Research:** [model-tier-policy-2026-10](../research/model-tier-policy-2026-10.md). **Decision:** [ADR-0136](../architecture/adr/0136-each-model-tier-walks-separate-quota-pools-and-agy-runs-argon-medium-at-deep-and-top.md). **Spec of record:** [model-routing](../reference/model-routing.md), section "The tier policy". **Earlier work:** [cli-routing-table-2026-10](cli-routing-table-2026-10.md) and [ADR-0119](../architecture/adr/0119-one-routing-table-one-resolver.md). **Bridge rule:** every component that queries a CLI follows [bridge-factory-2026-10](bridge-factory-2026-10.md); its §8 names the layer of each component.
 
@@ -291,3 +291,19 @@ The order is P1, P2, Q4, Q1, Q5, Q2, P4, Q3, P5.
 - **Q1:** keep `fast` unused, or try it on `context-condense` only? We propose to keep it unused until the CI telemetry exists.
 - **Q2:** does `top` need a different chain from `deep`? We propose one chain until a profile uses `top`.
 - **Q3:** which verb writes `catalog.tier_pins`? The `evolve cli-routing` verbs write only `cli_routing`. We propose a direct edit of `.evolve/policy.json` in a reviewed PR, as for the other `catalog` keys, until a verb exists.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| P1 agy `top` maps to Argon (Medium) | done | cycle 2134, [`e78eb6f`](https://github.com/mickeyyaya/evolve-loop/commit/e78eb6f0c); `go/internal/bridge/agy_model_names_test.go:44`; item consumed in [#1580](https://github.com/mickeyyaya/evolve-loop/pull/1580) | none |
+| P2 `catalog.tier_pins` | done | [#1471](https://github.com/mickeyyaya/evolve-loop/pull/1471), [`b06bcc6`](https://github.com/mickeyyaya/evolve-loop/commit/b06bcc650); `go/internal/policy/merge_catalog.go`, `go/internal/modelquery/query.go` | none |
+| Q1 `/usage` reader for agy 1.4.0 pools | done | [`1052816`](https://github.com/mickeyyaya/evolve-loop/commit/105281615) | none |
+| Q2 Argon pool bench | done | [#987](https://github.com/mickeyyaya/evolve-loop/pull/987), [`716e9bd`](https://github.com/mickeyyaya/evolve-loop/commit/716e9bd2a) | none |
+| Q3 order families by headroom | partial: `go/internal/cliroute/headroom.go` orders only agents whose rule sets `order: headroom`, not each tier chain | [#999](https://github.com/mickeyyaya/evolve-loop/pull/999), [`1f0de9f`](https://github.com/mickeyyaya/evolve-loop/commit/1f0de9fc0) (build seat); ADR-0150 covers the `deep` share in [`6af3ead`](https://github.com/mickeyyaya/evolve-loop/commit/6af3eadb1) | none (draft `model-tier-policy-q3-tier-wide-headroom-order`) |
+| Q4 model on every agy launch | done | cycle 2139, [`5b25551`](https://github.com/mickeyyaya/evolve-loop/commit/5b25551a1) | none |
+| Q5 `evolve models capacity` | not started: no `capacity` subcommand in `go/cmd/evolve/cmd_models*.go` | none; the item was removed in [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443) | none (draft `model-tier-policy-q5-models-capacity`) |
+| P4 `agy` back in `deep` and `top` | partial: `agy` is in `tiers.deep` (`.evolve/policy.json:94`); `tiers.top` is `agy-claude, claude` | [`6af3ead`](https://github.com/mickeyyaya/evolve-loop/commit/6af3eadb1). Related open PR: [#1628](https://github.com/mickeyyaya/evolve-loop/pull/1628) (agy top pin), link unverified | none |
+| P5 advisor rule for `deep` builds | done | cycle 2243, [`3b79479`](https://github.com/mickeyyaya/evolve-loop/commit/3b79479ca); `go/internal/config/deep_build_risk.go` | none |
+
+Q5 has no open item and no PR: the item left the inbox in #1443 without a build. Q3 has no open item and needs a decision: ADR-0150 `share_pct` may replace it. P4 has no open item for the `top` chain. The G2 to G4 measures have no recorded result in this review: unverified.

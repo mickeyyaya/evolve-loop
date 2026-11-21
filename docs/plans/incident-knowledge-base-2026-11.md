@@ -1,6 +1,6 @@
 # Plan: incident reports in the knowledge base, opened from the signal center and traced to their evidence
 
-- **Status:** proposed, 2026-11-18. Revised the same day after the design review (round 1).
+- **Status:** partly built, 2026-11-21 (5 of 13 components on main, 1 PR open, 1 in review, 6 not started). Earlier status: proposed, 2026-11-18. Revised the same day after the design review (round 1).
 - **Research:** [incident reports as a knowledge base that traces back to the evidence](../research/incident-knowledge-base-2026-11.md). **Amends:** [the issue-record plan](issue-record-skill-2026-11.md). Components I4, I5 and I7 of this plan replace its K4, K5 and K6. **Decision:** no ADR. The record schema is data in one package, and the spec is section 6.
 - **Skills:** [issue-record](../../skills/issue-record/SKILL.md), [issue-analyze](../../skills/issue-analyze/SKILL.md) and [docs-write](../../skills/docs-write/SKILL.md).
 
@@ -244,3 +244,23 @@ The design review of 2026-11-18 blocked the evidence capture five times: round 1
 Under the rule "blocked more than three times means a redesign", D4 is now a level-triggered sweep over the stored incidents. It needs no hook on any producer, a failed copy runs again, and the threshold is a predicate of the sweep. The guards are the I4 and I5 tests.
 
 The review of the sweep and the storage modes then found six gaps of specification, each with a fix. The gaps were a 20-entry window, the homes of the stage state and two size rules. The others were a heavy import, an entropy rule with no parameters and a sweep with no lock. D16 and D18 now close them, and the dependency line moves the join into `incidentcapture`. Under the convergence rule, no fourth round runs. Each build item pins these rules with its red tests, and each build gets its own code review.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| I1 template and procedure | in review | none yet; the build is in review | `incident-kb-i1-template-and-skill` |
+| I2 `internal/incidentkb`, `issue check`, `list` | done | cycle 2530, [`2343835`](https://github.com/mickeyyaya/evolve-loop/commit/234383500cc7a7a113a70a9889b950ed247c6a6b); `go/internal/incidentkb/check.go` | none |
+| I3 redact, bundle, `issue evidence add` | done | cycle 2496, [`883c2ed`](https://github.com/mickeyyaya/evolve-loop/commit/883c2ed5a6a661652c43b5d7e858d6dbd5d688bd); `go/internal/redact/redact.go` | none |
+| I12 `internal/evidencex` extract | done | cycle 2502, [`4468539`](https://github.com/mickeyyaya/evolve-loop/commit/446853962f50df71bef18ab0115adf0958a98798) | none |
+| I13 `EvidenceArchive` port and zstd adapter | done | cycle 2537, [`a467cc8`](https://github.com/mickeyyaya/evolve-loop/commit/a467cc81ba0c09789b89e06b22ae722d623ca2e1); `go/internal/evidencex/archive.go` | none |
+| I4 `incidentcapture`, capture sweep | not started | none; no `go/internal/incidentcapture` | `incident-kb-i4-capture-sweep` |
+| I5 levels, `INCIDENT_RECORD_DUE` | not started | none; the code is absent from `go` | `incident-kb-i5-levels-and-due` |
+| I11 blocked-state rules | not started | none | `incident-kb-i11-blocked-state-rules` |
+| I6 three stale detectors | not started | none | `incident-kb-i6-stale-detectors` |
+| I7 `record_doc` and refused close | built, PR open | [#1624](https://github.com/mickeyyaya/evolve-loop/pull/1624) | `incident-kb-i7-record-doc` |
+| I8 graph and recall | done | [#1577](https://github.com/mickeyyaya/evolve-loop/pull/1577), [`0c2fbec`](https://github.com/mickeyyaya/evolve-loop/commit/0c2fbec2c), cycle 2533; `go/internal/kbgraph/kbgraph.go:178` | none |
+| I9 `verify`, `due`, boundary steps | not started | none | `incident-kb-i9-verify-and-due` |
+| I10 gate wiring proofs | not started | none | `incident-kb-i10-gate-wiring` |
+
+The record, the bundle, the extract pipeline, the archive and the graph are on main. The capture sweep, the due levels, the detectors, the verify step and the gate wiring are not built. Each has an open inbox item. I7 waits for its pull request to merge. I1 is in review. Every unfinished component has an open item, so no follow-up draft is needed.
