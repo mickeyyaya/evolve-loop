@@ -484,6 +484,7 @@ Every phase without write permission (registry `writes_source=false`: audit, adv
 > - A marker with `resume-in=` has a known wake time. A marker without it has none, and the operator resumes by hand.
 > - `evolve wave note add TEXT | list [--json] | clear` keeps notes as files in `.evolve/waves/notes/`.
 > - Policy block `wave`: `max_cycles` (1), `history_k` (3), `standing_goal` (`.evolve/wave-goal.md`), `facts_max_cycles` (20 newest cycles in the facts) and `health_drivers` (`["claude-tmux"]`; `[]` turns the health check off). The defaults are `policy.DefaultWave*`.
+> - `evolve wave checkin [--json] [--project-root P]` decides if the running wave is healthy, from the records. It exits 0 (CONTINUE), 3 (BRAKE), 4 (FIX-LOCAL), 2 (read failure) or 10 (usage), and it writes nothing. See [wave-operations.md](wave-operations.md) §2.
 >
 > **The dispatch postmortem (2026-10-10, [ADR-0130](../architecture/adr/0130-a-retry-carries-the-evidence-of-the-attempt-it-replaces.md)):** a phase dispatch can end abnormally in the agent session, for example with exit 81 and the cause `pane_lost`. Then the runner writes `<run>/<phase>-attempt-<n>-postmortem.json`. A quota wall, an exhausted account, exit 85 or 87, a boot timeout and a launch refusal get no record. The next dispatch of the phase, a retry or a resume, gets the section `## Previous attempts of this phase (stated by the evolve runtime)` after its cycle context. A failure to read or collect a record is the WARN `RUNNER_ATTEMPT_POSTMORTEM_FAILED`, and the dispatch goes on without the section.
 >

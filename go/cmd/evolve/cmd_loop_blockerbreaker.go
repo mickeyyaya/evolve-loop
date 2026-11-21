@@ -19,14 +19,7 @@ func blockerBreakerHalt(evolveDir, projectRoot string, batchStartCycle int, stde
 	inboxcmd.ReconcileConsumedFingerprints(evolveDir, stderr)
 	inboxcmd.ReconcileConsumedBindings(projectRoot, evolveDir, stderr)
 	acked := breakerAckedFingerprints(evolveDir, stderr)
-	v := core.EvaluateBlockerBreaker(digests, core.BlockerBreakerConfig{
-		GuardClassCeiling:           fp.Thresholds.GuardClassHaltCeiling,
-		IdenticalFingerprintCeiling: fp.Thresholds.IdenticalFingerprintHaltCeiling,
-		UnexplainedCeiling:          fp.Thresholds.UnexplainedFailuresHaltCeiling,
-		ConsecutiveFailuresCeiling:  fp.Thresholds.ConsecutiveFailuresHaltCeiling,
-		AckedFingerprints:           acked,
-		LaneDeferredCycles:          core.LaneDeferredCycleSet(deferrals),
-	})
+	v := core.EvaluateBlockerBreaker(digests, blockerBreakerConfig(fp.Thresholds, acked, deferrals))
 	if v.Halt {
 		latest := 0
 		for _, d := range digests {
@@ -42,6 +35,17 @@ func blockerBreakerHalt(evolveDir, projectRoot string, batchStartCycle int, stde
 		return haltPipelineBlocker(evolveDir, projectRoot, latest, "lane-provisioning", v, stderr, signals), true
 	}
 	return noWorkHandoffHalt(evolveDir, projectRoot, fp.Thresholds, acked, stderr, signals)
+}
+
+func blockerBreakerConfig(th policy.FailureThresholds, acked map[string]bool, deferrals []core.LaneDeferralRecord) core.BlockerBreakerConfig {
+	return core.BlockerBreakerConfig{
+		GuardClassCeiling:           th.GuardClassHaltCeiling,
+		IdenticalFingerprintCeiling: th.IdenticalFingerprintHaltCeiling,
+		UnexplainedCeiling:          th.UnexplainedFailuresHaltCeiling,
+		ConsecutiveFailuresCeiling:  th.ConsecutiveFailuresHaltCeiling,
+		AckedFingerprints:           acked,
+		LaneDeferredCycles:          core.LaneDeferredCycleSet(deferrals),
+	}
 }
 
 func breakerFailurePolicy(evolveDir string, stderr io.Writer) policy.SystemFailurePolicy {

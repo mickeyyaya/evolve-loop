@@ -1,0 +1,1 @@
+{"cycle":2579,"fingerprint":"audit|verdict-fail|5bf4cc13a2ec","pre_class":"verdict-fail","recurrence":0,"class_fingerprint":"audit|verdict-fail|class-a6bc95e37eec","class_layer":"pipeline-code","class_recurrence":10,"class_recorded_at":"2026-11-20T23:38:24.96005Z","class_route":"console","class_route_reason":"floor: recurrence 10 \u003e= 3 — the defect survived prior fixes"}

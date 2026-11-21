@@ -1,0 +1,9 @@
+{
+  "category": "verdict-incoherence",
+  "level": "system",
+  "evidence": "audit-report.md verdict PASS (3 rounds, same tree 35e95ef), acs-verdict.json green=272 red=0; audit-fail-reason.json records verdict-conflict forced FAIL by the integration-tier gate only; integration-tier.log: 'panic: test timed out after 10m0s', FAIL go/cmd/evolve 601.397s, no --- FAIL line, serialized retake also 600.925s; ciparitygate/tier.go:28 passes no -timeout while TierAttempt=15m",
+  "justification": "the pipeline gate's argv lets go test's 10m default override its own 15m budget, so a PASS lane is recorded FAIL; the task code is not at fault",
+  "action": "halt-and-diagnose",
+  "fix_type": "pipeline-repair",
+  "schema_version": 1
+}

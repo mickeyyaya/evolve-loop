@@ -1,0 +1,12 @@
+{
+  "number": 185,
+  "run_id": "20261121T081737Z",
+  "goal_hash": "c33fcfc65739db11ebe0085b7871cc17803eccfc8366eab20ef06e51de50e390",
+  "goal_path": "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/waves/wave-185-goal.md",
+  "goal_bytes": 2389,
+  "main_sha": "23c32f42926c3dcde2c2da08401c897afd66275a",
+  "cycle_floor": 2580,
+  "pid": 13795,
+  "log_path": "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/logs/20261121T081737Z/loop.log",
+  "started_at": "2026-11-21T16:26:01.802487+08:00"
+}

@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+const EventsFile = "abnormal-events.jsonl"
+
 type Severity string
 
 const (
@@ -64,7 +66,7 @@ type Writer struct {
 
 func NewWriter(workspace string) *Writer {
 	return &Writer{
-		path: filepath.Join(workspace, "abnormal-events.jsonl"),
+		path: filepath.Join(workspace, EventsFile),
 		now:  time.Now,
 	}
 }

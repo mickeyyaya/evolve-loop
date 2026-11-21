@@ -1,0 +1,20 @@
+{
+  "cycle": 2575,
+  "run_id": "01M7XBCV92W28D73HQ7PCXF1FD",
+  "audit_artifact_sha256": "5a85e484c292200c44b07c9604110627a34f9bef08c7e87e5c3fd5a3fb815b66",
+  "audited_tree": "979c6f8aa3c350d9f2bea2e7b0dd89bf0b8a11a7",
+  "lane_tree": "d165dcdba3b4e312041f9d5a238eaef76beaf703",
+  "worktree_base_sha": "bca87621231f3a25e5a70b90bf5644ae7dd944a3",
+  "commit_sha": "e776d6e4a821499d26f2eddebd99353806179656",
+  "commit_tree": "d1625566e69a4aed0bd1e7ead100faa05dbed44e",
+  "consumed_paths": [
+    ".evolve/inbox/2026-11-03T09-52-33Z-claude-cloud-driver-launch-confirmation-hardening.json",
+    ".evolve/inbox/consumed/2026-11-03T09-52-33Z-claude-cloud-driver-launch-confirmation-hardening.json"
+  ],
+  "explanation_view_sha256": "65d42a270cf10ec83b8591e29e6b001e8f7e649f7a659c4aedd2e10d36401bd7",
+  "pre_main": "bca87621231f3a25e5a70b90bf5644ae7dd944a3",
+  "branch": "main",
+  "lane_branch": "cycle-cd3ae73e-2575",
+  "status": "complete",
+  "completed_at": "2026-11-21T01:26:50Z"
+}
