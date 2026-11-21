@@ -46,7 +46,7 @@ Call `evolve` if on PATH; otherwise `./go/bin/evolve`. Only `apply` (and `comple
 4. **Recommend.** Run `evolve setup recommend --json`. It returns `available_families`, `cross_family_ok` and `presets[]`.
    - Each preset has a full per-phase `assignments[]` (`role`, `cli`, `tier`, `model`, `differs_from_default`, `warning`) plus a `description`.
    - `default` names the recommended preset.
-   - The binary already applied every rule (envelope clamp, `allowed_clis`, availability, cross-family split). You do NOT re-derive any of this.
+   - The binary already applied every rule (envelope clamp, `allowed_clis` or the floor family, availability, cross-family split). You do NOT re-derive any of this.
    - A `degraded` preset has an unsatisfiable phase (for example, no authed CLI). Surface it, but don't pick it.
 
 4b. **Live latest-model probe.** Run `evolve setup latest --json`. It is read-only.

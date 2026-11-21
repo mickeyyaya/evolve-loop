@@ -178,6 +178,7 @@ var serialTests = map[string]string{
 	"main.TestCLIRoutingUnset_FloorsRemovesOneFamilyOrTheWholeKey":                                                    "sets env through a helper",
 	"main.TestCLIRoutingShow_EveryShippedProfileKeepsItsResolvedRoute":                                                "sets the process-global model catalog dir through cli-routing show",
 	"main.TestCLIRoutingUnset_TheEffortKeyClearsOnlyTheEffort":                                                        "sets env through a helper",
+	"main.TestCLIRouting_CheckOnAnAgyOnlyTableReportsOnlyTheRouter":                                                   "sets the process-global model catalog dir through cli-routing check",
 	"main.TestCLIRouting_UsageErrorsExitTwo":                                                                          "calls process-global setter SetModelCatalogDirFn",
 	"main.TestCLIUpdateWiring_ABootTimeoutWithADrainedWindowIsAVerifiedQuotaCauseAndBenchesUntilTheReset":             "swaps seam usageEvidenceFn",
 	"main.TestCLIUpdateWiring_ABootTimeoutWithHealthyUsageStaysABootTimeout":                                          "swaps seam usageEvidenceFn",

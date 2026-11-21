@@ -24,6 +24,7 @@ func Apply(rep DetectReport, cfg PresetConfig, presetName string, existingPolicy
 	if err != nil {
 		return nil, err
 	}
+	floors := policy.DefaultFloors()
 	for _, a := range preset.Assignments {
 		if a.Warning != "" {
 			return nil, fmt.Errorf("setup apply: preset %q is degraded for phase %q (%s); refusing to write an unsatisfiable pin",
@@ -33,6 +34,7 @@ func Apply(rep DetectReport, cfg PresetConfig, presetName string, existingPolicy
 		if perr != nil {
 			continue
 		}
+		prof = floors.Clamp(a.Role, prof)
 		if !a.DiffersFromDefault {
 			delete(pins, a.Role)
 			continue
