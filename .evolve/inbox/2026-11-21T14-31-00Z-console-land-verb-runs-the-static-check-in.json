@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "A fixture where a file changed after the gate makes the verb exit 3 with COMMIT_GATE_STALE and the next action, through the real entry point. The test is red before the verb exists.",
+    "A fixture where refs/pull/N/head differs from the branch head makes the verb refuse before record-pr and run record-pr zero times.",
+    "A fixture with SELF_SHA_TAMPERED makes the verb build from a clean detached checkout, require authorized: provenance and remove the checkout. A run with a provenance that is not verified exits 3 and never passes --operator.",
+    "A call with a skipped step (record-pr with no gate record for the tree) exits 3 and names the skipped step.",
+    "The verb has no flag that skips the commit gate or the prefix gate."
+  ],
+  "created_at": "2026-11-21T14:31:00Z",
+  "files": [
+    "go/cmd/evolve/cmd_ship.go",
+    "go/cmd/evolve/cmd_ship_pr.go",
+    "go/cmd/evolve/cmd_resetsha.go",
+    "go/cmd/evolve/cmd_integration_batch.go",
+    "go/internal/commitgate/reviewstore.go",
+    "docs/operations/console-checkin-sop.md"
+  ],
+  "fix": "Design review first. Add the verb evolve console land --reviewers run:<label>,... --message M [--pr-body-file F] [--project-root P]. It runs these steps in order and stops at the first failure: check that git status shows no untracked or unstaged path (B2); run evolve commit-gate run; run evolve ship --class manual --pr; read git ls-remote origin refs/pull/N/head and compare it with the head of the branch; run evolve integration record-pr --pr N --reviewed from the runtime root. It keeps one step record file under .evolve so a skipped step is refused (a record-pr call with no gate record of the same tree SHA exits 3). Fixed recoveries: COMMIT_GATE_STALE prints the next action fresh seats on the final tree and a new gate with new labels, and never reuses a label; SELF_SHA_TAMPERED builds a binary from a clean detached checkout of the branch head, runs reset-sha with it, and refuses unless the output says authorized: provenance, then ships with that binary and removes the checkout; no override flag exists. Exit 0 is landed and recorded, 3 is refused with the step named, 2 is a read failure, 10 is usage.",
+  "id": "console-land-verb-runs-the-static-check-in",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Part B of docs/operations/console-checkin-sop.md has the landing steps: the commit gate on the final staged tree (B5), the ship with its PR (B6) and the record of the PR in the train (B7). The console runs them by hand. Known slips: a stale gate after one more edit (COMMIT_GATE_STALE), a ship from a stale binary (SELF_SHA_TAMPERED), and a record-pr run before refs/pull/N/head equals the headRefOid.",
+  "title": "One verb runs steps B5 to B7 of the console check-in SOP in order and refuses on a skipped step",
+  "weight": 0.7
+}

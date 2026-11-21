@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/addedtests"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -65,8 +66,22 @@ type Timeouts struct {
 	GoVet, ACSDurable, Apicover, TierAttempt, TierLockWait time.Duration
 }
 
+const tierAttemptMargin = time.Minute
+
+func tierAttemptBudget() time.Duration {
+	return budgetOver(addedtests.PackageTimeout)
+}
+
+func budgetOver(packageTimeout string) time.Duration {
+	pkg, err := time.ParseDuration(packageTimeout)
+	if err != nil {
+		panic("the go test package timeout is not a duration: " + err.Error())
+	}
+	return pkg + tierAttemptMargin
+}
+
 func DefaultTimeouts() Timeouts {
-	return Timeouts{GoVet: 4 * time.Minute, ACSDurable: 8 * time.Minute, Apicover: 8 * time.Minute, TierAttempt: 15 * time.Minute, TierLockWait: ciparity.TierLockWait}
+	return Timeouts{GoVet: 4 * time.Minute, ACSDurable: 8 * time.Minute, Apicover: 8 * time.Minute, TierAttempt: tierAttemptBudget(), TierLockWait: ciparity.TierLockWait}
 }
 
 type ChangedSetFunc func(projectRoot string, cycle int) ([]string, bool)

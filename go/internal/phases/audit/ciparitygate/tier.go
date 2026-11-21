@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/addedtests"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -25,7 +26,7 @@ func tierProcs() int {
 
 func tierArgs(pkgs []string) []string {
 	p := strconv.Itoa(tierProcs())
-	return append([]string{"test", "-race", "-count=1", "-p", p, "-parallel", p, "-tags", "integration"}, pkgs...)
+	return append([]string{"test", "-race", "-count=1", "-timeout", addedtests.PackageTimeout, "-p", p, "-parallel", p, "-tags", "integration"}, pkgs...)
 }
 
 type attempt struct {

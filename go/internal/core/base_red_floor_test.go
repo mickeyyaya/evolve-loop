@@ -328,7 +328,7 @@ func TestReportAttributed_TheSignalCarriesTheMainRedKeysAndTheDuration(t *testin
 
 func TestCoverTestArgs_UsesTheSharedTagFlags(t *testing.T) {
 	t.Parallel()
-	if got := coverTestArgs("/p", []string{"./a"}, []string{"integration"}); !slices.Contains(got, "integration") {
+	if got := coverTestArgs(0, "/p", []string{"./a"}, []string{"integration"}); !slices.Contains(got, "integration") {
 		t.Errorf("coverTestArgs does not use the shared flags: %v", got)
 	}
 }

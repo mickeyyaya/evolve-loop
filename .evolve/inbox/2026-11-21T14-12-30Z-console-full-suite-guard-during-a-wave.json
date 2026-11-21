@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "With a live wave fixture and one held slot, a second full-suite request is refused with the holder named, through the real entry point.",
+    "With no live wave the request runs.",
+    "The refusal text names the rule and the wave pid."
+  ],
+  "created_at": "2026-11-21T14:12:30Z",
+  "files": [
+    "go/cmd/evolve/cmd_wave_stop.go",
+    "go/internal/lanebudget/lanebudget.go",
+    "docs/operations/wave-operations.md"
+  ],
+  "fix": "Design review first: the home of the guard is open, because a console agent runs go test in its own shell, not through evolve. Design review first. A console verb that starts a full suite takes a console suite slot while a wave runs (loop pid alive). A second request is refused with the holder named. The review agents start their suites through the same verb or the same slot.",
+  "id": "console-full-suite-guard-during-a-wave",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "During wave 185 the console ran three review agents in parallel. Each ran a full race suite and one reported a host load of 70 to 120. The standing rule is at most one console full suite during a wave. It is a memory note, so no agent knew it.",
+  "title": "A second console full test suite during a live wave is refused with the reason",
+  "weight": 0.6
+}

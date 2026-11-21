@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "grep finds no Escalator in go/",
+    "failure_disposition has no step or cap key and policy.json still loads",
+    "the plan note 'Open: the dormant Escalator seam' is closed"
+  ],
+  "created_at": "2026-11-21T09:46:31Z",
+  "files": [
+    "go/internal/recurrence/ledger.go",
+    "go/internal/recurrence/backfill.go",
+    "go/internal/policy/policy_disposition.go",
+    "go/internal/core/failurelearning/recurrence.go",
+    "go/cmd/evolve/cmd_lessons.go",
+    "go/acs/cycle1818/predicates_test.go"
+  ],
+  "fix": "Delete recurrence.Escalator, EscalationPolicy.Step, Cap and Target, the esc parameter of RecordClosure, the policy keys failure_disposition.step and cap (with a policy migration note), and update the acs/cycle1818 predicate that names them by archiving it per the A2 retention rule",
+  "id": "recurrence-escalator-seam-and-disposition-keys-removed",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "summary": "After P5 no composition root reads failure_disposition.step or cap, and both production callers of RecordClosure pass a nil Escalator. The Escalator.Bump seam is a typed weight writer that the weight-write scan cannot see. The docs internal-policy.md, internal-recurrence.md and the P5 plan notes already say a follow-up removes it.",
+  "title": "remove the dormant recurrence Escalator seam, EscalationPolicy.Target and the failure_disposition step and cap keys (inbox plan P5 follow-up)",
+  "weight": 0.5
+}

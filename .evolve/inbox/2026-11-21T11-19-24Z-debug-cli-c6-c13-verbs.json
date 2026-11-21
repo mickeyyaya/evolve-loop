@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "debug cycle 2157 prints reason, salvage read and next commands in a golden test",
+    "The contract harness shows 0 state changes",
+    "Each next entry runs from another directory and exits 0 or 1"
+  ],
+  "created_at": "2026-11-21T11:19:24Z",
+  "files": [
+    "go/internal/debugview",
+    "go/internal/cyclefacts/cyclefacts.go",
+    "go/cmd/evolve/cmd_debug.go",
+    "go/internal/agentclass/table.go"
+  ],
+  "fix": "Design review first (ADR-0162). Then build the source-kind table (C6) and internal/debugview with Cycles and Brief, the state rules and the next check (C7 to C10). Add the verbs debug cycles and debug cycle as read-only class A rows (C11, C12). Check each next entry (C13).",
+  "id": "debug-cli-c6-c13-verbs",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "summary": "Rows C6 to C13 of docs/plans/debug-cli-2026-11.md are not built. C1 to C4 are on main (33c7d8848). No debugview package and no cmd_debug.go exist. Today the console reads many files by hand to learn why one cycle failed. That is console toil on every blocker.",
+  "title": "Debug CLI: evolve debug cycle prints the reason, the salvage read and the next commands of one cycle",
+  "weight": 0.4
+}

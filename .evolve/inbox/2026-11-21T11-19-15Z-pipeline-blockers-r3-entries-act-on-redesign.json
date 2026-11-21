@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Each entry has a wiring test",
+    "At shadow the flow does not change and the signal fires",
+    "An equality test reads each whole signal text",
+    "A message with a missing cause fails the helper"
+  ],
+  "created_at": "2026-11-21T11:19:15Z",
+  "deps": [
+    "pipeline-blockers-r1-one-block-count"
+  ],
+  "files": [
+    "go/internal/core/audit_repair_convergence.go",
+    "go/cmd/evolve/cmd_convergence.go",
+    "go/internal/signalcenter/",
+    "docs/architecture/signal-codes.md"
+  ],
+  "fix": "Make audit repair (go/internal/core/audit_repair_convergence.go), the code-review loop and evolve convergence decide act on ActionRedesign. At shadow the flow stays and the signal fires. Add CONVERGENCE_REDESIGN and CONVERGENCE_TO_OPERATOR with six signal parts. Add a text equality helper in signalcenter (plan P2).",
+  "id": "pipeline-blockers-r3-entries-act-on-redesign",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Plan pipeline-blockers R3 and R6 are not built. No CONVERGENCE_REDESIGN code exists in the Go code. Without entries that act on ActionRedesign, the new rung changes nothing. Signals must also name cause, evidence and next step.",
+  "title": "Audit repair, code review and evolve convergence decide act on redesign, with six-part signal text",
+  "weight": 0.5
+}

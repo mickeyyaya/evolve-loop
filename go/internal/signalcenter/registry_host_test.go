@@ -13,3 +13,11 @@ func TestRegistry_HostDiskLowBelongsToTheHostModule(t *testing.T) {
 		t.Errorf("a registered WARN code must normalize without drift: %v %+v", drift, normalized)
 	}
 }
+
+func TestRegistry_HostVerifyLockWaitBelongsToTheHostModule(t *testing.T) {
+	t.Parallel()
+	owner, registered := IsRegistered(CodeHostVerifyLockWait)
+	if !registered || owner != ModuleHost || !CodeHostVerifyLockWait.BelongsTo(ModuleHost) {
+		t.Fatalf("owner = %q, registered = %v, want %s registered by %s", owner, registered, CodeHostVerifyLockWait, ModuleHost)
+	}
+}

@@ -125,9 +125,9 @@
     "stage": "enforce"
   },
   "fleet": {
-    "count": 8,
+    "count": 5,
     "plan_source": "triage",
-    "min_lanes": 8,
+    "min_lanes": 5,
     "orchestrator": {
       "stage": "enforce",
       "admission": "enforce",
@@ -135,7 +135,7 @@
         "cmd/evolve"
       ],
       "window": {
-        "start": 8,
+        "start": 5,
         "min": 4,
         "adaptive": {
           "stage": "shadow"

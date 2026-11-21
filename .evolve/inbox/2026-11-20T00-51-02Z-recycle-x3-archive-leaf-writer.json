@@ -5,12 +5,12 @@
     "The manifest hash verifies"
   ],
   "continuation": {
-    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2576",
-    "branch": "cycle-cd3ae73e-2576",
-    "snapshot_sha": "7fd3fd768e268de6c58491cc6972ee3073075bec",
-    "base_sha": "63f36a9357898ca756cd09e7f945ceb628905b29",
-    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2576/audit-fail-reason.json",
-    "cycle": 2576
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2589",
+    "branch": "cycle-cd3ae73e-2589",
+    "snapshot_sha": "54453c1ec96464705cb5c72582e0d4aeb4b98643",
+    "base_sha": "23c32f42926c3dcde2c2da08401c897afd66275a",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2589/audit-fail-reason.json",
+    "cycle": 2589
   },
   "created_at": "2026-11-20T00:51:02Z",
   "deps": [

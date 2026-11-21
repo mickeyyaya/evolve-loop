@@ -299,6 +299,10 @@ func NewDefaultWithStageCompact(br core.Bridge, prm *prompts.Loader, stage confi
 }
 
 func NewDefaultWithStageCompactSpec(br core.Bridge, prm *prompts.Loader, stage config.Stage, compact bool, spec *config.DeliverableKindSpec, opts ...Option) *Phase {
+	return New(defaultConfig(br, prm, stage, compact, spec, opts...))
+}
+
+func defaultConfig(br core.Bridge, prm *prompts.Loader, stage config.Stage, compact bool, spec *config.DeliverableKindSpec, opts ...Option) Config {
 	cfg := Config{
 		SolutionSpec:           spec,
 		Bridge:                 br,
@@ -310,12 +314,12 @@ func NewDefaultWithStageCompactSpec(br core.Bridge, prm *prompts.Loader, stage c
 		PhaseIO:                stage,
 		CompactPrompts:         compact,
 	}
-	cfg.GenerateVerdict = func(req core.PhaseRequest) error { return generateACSVerdictWith(req) }
+	cfg.GenerateVerdict = func(req core.PhaseRequest) error { return generateACSVerdictWith(req, centerOf(cfg.Signals)) }
 	for _, o := range opts {
 		o(&cfg)
 	}
 	ciParity{signals: cfg.Signals}.wire(&cfg)
-	return New(cfg)
+	return cfg
 }
 
 func verifyExplanationDocumentation(req core.PhaseRequest) error {
@@ -359,12 +363,19 @@ func gofmtCheckDefault(req core.PhaseRequest) ([]string, error) {
 	return codequality.UnformattedGoFiles(codequality.ModuleDir(root))
 }
 
-func generateACSVerdictWith(req core.PhaseRequest) error {
+func centerOf(signals func() *signalcenter.Center) *signalcenter.Center {
+	if signals == nil {
+		return nil
+	}
+	return signals()
+}
+
+func generateACSVerdictWith(req core.PhaseRequest, signals *signalcenter.Center) error {
 	root := req.Worktree
 	if root == "" {
 		root = req.ProjectRoot
 	}
-	v, err := acssuite.Run(acssuite.Options{Root: root, ProjectRoot: req.ProjectRoot, Cycle: req.Cycle})
+	v, err := acssuite.Run(acssuite.Options{Root: root, ProjectRoot: req.ProjectRoot, Cycle: req.Cycle, Signals: signals})
 	if err != nil {
 		return fmt.Errorf("acssuite run: %w", err)
 	}

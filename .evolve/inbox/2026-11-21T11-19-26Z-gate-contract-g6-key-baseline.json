@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A new site of a body with two baseline sites fails the gate",
+    "Two lanes that each remove one key merge clean",
+    "A lane diff of the baseline file fails the gate"
+  ],
+  "created_at": "2026-11-21T11:19:26Z",
+  "files": [
+    "go/.test-dup-baseline",
+    "go/internal/testdup/",
+    "go/internal/gateregistry/seed_testdup.go"
+  ],
+  "fix": "Hold one key per baseline site (body hash and site) in go/.test-dup-baseline. Treat it as an authority input. Only the boundary prune writes it. Register the change in go/internal/gateregistry/seed_testdup.go.",
+  "id": "gate-contract-g6-key-baseline",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "go/.test-dup-baseline holds only count=330 and a date (checked 2026-11-21). Every lane that removes or adds a duplicate edits the same count line. Two lanes then conflict at landing. The gate also cannot say which site is new.",
+  "title": "Gate contract G6: testdup baseline holds keys, so two lanes merge clean",
+  "weight": 0.5
+}

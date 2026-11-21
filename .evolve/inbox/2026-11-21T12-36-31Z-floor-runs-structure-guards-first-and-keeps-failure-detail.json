@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "A test through BuildHandoffFloor.Failures: a fixture worktree adds a top-level test without t.Parallel() in a package with the guard and also carries a static finding; the result names the test and the full-suite runner stub records 0 calls; red without the change",
+    "A test in go/internal/core/build_floor_retake_test.go: output with a '--- FAIL:' line, the line 'does not call t.Parallel and is not listed as serial' and 20 KB of later noise; floorFailureDiagnostic holds that line and stays under its size cap; red without the change",
+    "A test that a self-check ending past its deadline or with no receipt emits a signal",
+    "ste-lint and the build floor pass on the change; changed functions at 100% coverage"
+  ],
+  "created_at": "2026-11-21T12:36:31Z",
+  "files": [
+    "go/internal/core/build_handoff_floor.go",
+    "go/internal/core/phase_bindings_selfcheck.go",
+    "go/internal/core/build_floor_retake.go",
+    "go/internal/core/build_floor_reviewer.go",
+    "go/internal/core/builder_selfcheck.go",
+    "go/cmd/evolve/parallel_default_test.go"
+  ],
+  "fix": "Design first. (1) Add a fast structure-guard step to the static tier of the floor: for each changed package with a registered guard (cmd/evolve: TestParallelDefault_), run only 'go test -count=1 -run ^<guard>' and report the full output; the self-check and the final floor then show it with other static findings. (2) goTestFailureLines also keeps the indented lines that follow each '--- FAIL:' line up to a cap, and floorFailureDiagnostic keeps them before the tail. (3) Emit a signal when the self-check is skipped, cut off by its deadline, or ends with no receipt. Red-first tests through the real floor entry point; 100% coverage of changed functions.",
+  "id": "floor-runs-structure-guards-first-and-keeps-failure-detail",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Cycles 2583 and 2508 (and 2466) failed at build with TestParallelDefault_EveryTopLevelTestIsParallelOrListedSerial (go/cmd/evolve/parallel_default_test.go:13) after 1 correction. The guard runs alone in about 13 s, but the floor runs it only inside the 5 to 11 minute ./cmd/evolve suite, and BuildHandoffFloor.Failures skips the test tier when any static finding exists (go/internal/core/build_handoff_floor.go:39-44). So the in-session self-check returned only an STE finding (2583) or a protected-path finding (2508). goTestFailureLines keeps only '--- FAIL:' and 'FAIL' lines (go/internal/core/build_floor_retake.go:172-182) and floorFailureDiagnostic cuts to 400 bytes (go/internal/core/build_floor_reviewer.go:191-206), so the line naming the failed test was dropped. Receipt absent in 26 of 45 builder-selfcheck-findings.json. Record: docs/incidents/2026-11-21-cycle-2583-parallel-guard-after-last-correction.md. Cost: two lost cycles of about 4 hours each.",
+  "title": "The build floor runs the structure guards of a changed package first and keeps the failed-test detail lines",
+  "weight": 0.65
+}

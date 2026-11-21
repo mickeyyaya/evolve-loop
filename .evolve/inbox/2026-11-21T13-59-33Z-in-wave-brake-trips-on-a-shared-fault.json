@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "A red-first test through the loop coordinator: a fixture wave whose lanes write the same abnormal-event kind past the bound engages the brake mid-wave, and the pool launches no new lane.",
+    "A replay of the wave 185 signal log at stage shadow records a would-trip before 10:00Z.",
+    "On a trip, one blocker item is routed to the console and one signal names the fault class, the lanes and the evidence.",
+    "Waves 184 and earlier, replayed, do not trip on their normal signal volume."
+  ],
+  "created_at": "2026-11-21T13:59:33Z",
+  "files": [
+    "go/cmd/evolve/cmd_loop_window.go",
+    "go/cmd/evolve/cmd_loop_orchestrator.go",
+    "go/cmd/evolve/cmd_loop_blockerbreaker.go",
+    "go/internal/policy/policy.go",
+    "docs/operations/wave-operations.md"
+  ],
+  "fix": "Design review first. Add an in-wave breaker in the loop coordinator that reads the signal center while the wave runs. It trips when one fault class recurs across lanes past a bound in a window (for example the same abnormal-event kind in 3 or more lanes, or the same failure fingerprint in 2 or more cycles), or when the wave is older than a bound with lanes live and no ship. On a trip it engages the loop-stop brake (the pool stops backfill through poolHalted), emits one signal that names the fault, the lanes and the evidence, and routes one blocker item to the console (ORCHESTRATOR_BLOCKER_ROUTED, which the console listener takes). Bounds live in failure_policy.thresholds. Start at stage shadow and record would-trip events, then flip to enforce on a verified record.",
+  "id": "in-wave-brake-trips-on-a-shared-fault",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Operator 2026-11-21: on consistent failure, pause all tasks and fix the blocking issue first. Today no breaker can see a fault that slows every lane. The zero-ship breaker counts whole waves in fleet mode and runs only at the wave boundary (go/cmd/evolve/cmd_loop_window.go, zeroShipHalt before the next wave), so a wave that keeps running is never counted. The pipeline-blocker breaker counts completed cycle failures. The system-failure halt needs a cycle to signal one. Wave 185 ran 5.5 hours with 8 lanes and 0 of 9 cycles shipped. In that time the host verification lock timed out 73 times (verify-single-flight-unavailable abnormal events, cycles 2582 to 2590), LOOP_ORCH_LANE_STALLED fired 9 times and the shadow fleet window voted to widen (LOOP_ORCH_HOST_PRESSURE cap 7 to 8, 13:55Z). No signal fed a brake, and the operator engaged it by hand. The same build-floor guard failure also recurred in cycles 2466, 2508 and 2583 across three waves with no brake.",
+  "title": "A shared fault across lanes engages the brake mid-wave and routes the blocker to the console",
+  "weight": 0.8
+}

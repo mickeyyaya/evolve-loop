@@ -20,7 +20,7 @@ func TestApicoverNamed_EveryExportIsNamedAndExercised(t *testing.T) {
 	}
 	var req Request = Request{1, "/p", "/w", "/ws"}
 	var timeouts Timeouts = DefaultTimeouts()
-	if timeouts.TierAttempt != 15*time.Minute {
+	if timeouts.TierAttempt != 21*time.Minute {
 		t.Fatal("DefaultTimeouts")
 	}
 	var set ChangedSetFunc = fixedSet("./internal/p/...")

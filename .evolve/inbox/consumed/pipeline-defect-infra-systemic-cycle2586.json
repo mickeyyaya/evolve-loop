@@ -1,0 +1,26 @@
+{
+  "connects_to": [
+    "docs/architecture/adr/0072-system-failure-policy-and-halt.md",
+    ".evolve/pipeline-escalation.json",
+    "/Users/danleemh/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2586"
+  ],
+  "consumed": {
+    "at": "2026-11-21T19:03:09Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "analyzed: a re-audit after a fleet rebase judged the stale lane tree while the kernel verdict on the rebased tree was PASS; folded into the open item ship-race-starves-a-slow-cycle as acceptance; the ship-race roots are fixed by #1616 and #1617"
+  },
+  "created_at": "2026-11-21T17:00:28Z",
+  "fix": "Root-cause the pipeline failure described by the recorded evidence: orchestrator-classified infra-systemic: kernel acs-verdict.json (sha256 408e78be) records PASS (green_count=270, red_count=0, ship_eligible=true, TestC2586_006 exit 0) while audit-report.md declared FAIL (class infrastructure-transient) from manual pane run acs-verdict.candidate.3392555492.json (red_count=1); audit-stdout.clean.txt:3 sets EVOLVE_PROJECT_ROOT without EVOLVE_WORKTREE_ROOT, causing go/cmd/evolve/cmd_signals.go:86 signalDocRoot() to check main bb188fc77 signal-codes.md against lane cfdb5f97d binary after ship-error.json GIT_FLEET_REBASE_NEEDED. Add a regression test that reproduces it. Do NOT retry the halted task until the pipeline is fixed.",
+  "id": "pipeline-defect-infra-systemic-cycle2586",
+  "injected_by": "loop-escalation",
+  "kind": "pipeline-repair",
+  "notes": "Auto-filed by the ADR-0072 halt at 2026-11-21T17:00:28Z. Evidence: orchestrator-classified infra-systemic: kernel acs-verdict.json (sha256 408e78be) records PASS (green_count=270, red_count=0, ship_eligible=true, TestC2586_006 exit 0) while audit-report.md declared FAIL (class infrastructure-transient) from manual pane run acs-verdict.candidate.3392555492.json (red_count=1); audit-stdout.clean.txt:3 sets EVOLVE_PROJECT_ROOT without EVOLVE_WORKTREE_ROOT, causing go/cmd/evolve/cmd_signals.go:86 signalDocRoot() to check main bb188fc77 signal-codes.md against lane cfdb5f97d binary after ship-error.json GIT_FLEET_REBASE_NEEDED",
+  "origin": "cycle",
+  "priority": "P0",
+  "priority_class": "stability",
+  "root_cause": "The system-failure signal reported: orchestrator-classified infra-systemic: kernel acs-verdict.json (sha256 408e78be) records PASS (green_count=270, red_count=0, ship_eligible=true, TestC2586_006 exit 0) while audit-report.md declared FAIL (class infrastructure-transient) from manual pane run acs-verdict.candidate.3392555492.json (red_count=1); audit-stdout.clean.txt:3 sets EVOLVE_PROJECT_ROOT without EVOLVE_WORKTREE_ROOT, causing go/cmd/evolve/cmd_signals.go:86 signalDocRoot() to check main bb188fc77 signal-codes.md against lane cfdb5f97d binary after ship-error.json GIT_FLEET_REBASE_NEEDED. Preserve this evidence while identifying the pipeline cause.",
+  "summary": "ADR-0072 system-failure halt at cycle 2586 (category=infra-systemic). Evidence: orchestrator-classified infra-systemic: kernel acs-verdict.json (sha256 408e78be) records PASS (green_count=270, red_count=0, ship_eligible=true, TestC2586_006 exit 0) while audit-report.md declared FAIL (class infrastructure-transient) from manual pane run acs-verdict.candidate.3392555492.json (red_count=1); audit-stdout.clean.txt:3 sets EVOLVE_PROJECT_ROOT without EVOLVE_WORKTREE_ROOT, causing go/cmd/evolve/cmd_signals.go:86 signalDocRoot() to check main bb188fc77 signal-codes.md against lane cfdb5f97d binary after ship-error.json GIT_FLEET_REBASE_NEEDED. This is a PIPELINE defect, not a task failure — diagnose the reported failure before retrying the task.",
+  "title": "PIPELINE DEFECT (infra-systemic): the loop halted — orchestrator-classified infra-systemic: kernel acs-verdict.json (sha256 408e78be) records PASS (green_count=270, red_count=0, ship_eligible=true, TestC2586_006 exit 0) while audit-report.md declared FAIL (class infrastructure-transient) from manual pane run acs-verdict.candidate.3392555492.json (red_count=1); audit-stdout.clean.txt:3 sets EVOLVE_PROJECT_ROOT without EVOLVE_WORKTREE_ROOT, causing go/cmd/evolve/cmd_signals.go:86 signalDocRoot() to check main bb188fc77 signal-codes.md against lane cfdb5f97d binary after ship-error.json GIT_FLEET_REBASE_NEEDED",
+  "weight": 0.99
+}

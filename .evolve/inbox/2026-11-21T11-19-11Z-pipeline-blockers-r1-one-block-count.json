@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "A subject at four blocks returns ActionRedesign; at three it does not",
+    "A second count at four returns ActionToOperator",
+    "A journey through a real resume keeps the count",
+    "A seat cannot write the count"
+  ],
+  "created_at": "2026-11-21T11:19:11Z",
+  "files": [
+    "go/internal/convergence/decide.go",
+    "go/internal/convergence/convergence.go",
+    "go/internal/cyclestate/"
+  ],
+  "fix": "Hold one block count per subject in the host record. A seat cannot write it. It survives resume. Add ActionRedesign and ActionToOperator to convergence. Decide returns ActionRedesign past three blocks. A second count past three returns ActionToOperator. Reuse the breaker data where it fits.",
+  "id": "pipeline-blockers-r1-one-block-count",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "The operator rule says a subject blocked more than three times goes to redesign, never to round four. Main does not hold that count. go/internal/convergence/convergence.go:54-62 has no redesign action. Decision.Redesign at line 137 is a list of text lines. The ceilings in go/internal/core/blocker_breaker.go count fingerprints, not one subject across rounds, rebuilds, cycles and resumes. Repeated fix rounds waste cycles.",
+  "title": "Convergence redesign rung: one host block count per subject, and Decide returns ActionRedesign past three blocks",
+  "weight": 0.6
+}
