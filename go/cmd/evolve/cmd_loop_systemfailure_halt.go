@@ -6,10 +6,11 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-const systemFailureHaltExitCode = 4
+const systemFailureHaltExitCode = orchestrator.SystemFailureHaltExit
 
 func cycleRunExitCode(res cyclestate.CycleResult) int {
 	if sf := res.SystemFailure; sf != nil && sf.Halt {

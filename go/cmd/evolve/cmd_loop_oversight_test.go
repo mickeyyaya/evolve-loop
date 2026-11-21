@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -221,5 +222,33 @@ func TestOrchestratedRun_AWaveStopThatMeetsTheRunCapNamesTheOperatorStop(t *test
 	}
 	if n := len(supplyEvents(t, b, evolveDir, orchestrator.CodePoolUnderfilled)); n != 0 {
 		t.Errorf("%s events = %d, want 0 after an operator stop", orchestrator.CodePoolUnderfilled, n)
+	}
+}
+
+func TestOrchestratedRun_ASystemFailureHaltLaneStopsTheBackfill(t *testing.T) {
+	t.Parallel()
+	src := newScriptedOversightSource()
+	b, evolveDir, _ := oversightCoordinator(t, src)
+	fc := oversightFleet("enforce")
+	fc.Count, fc.Concurrency = 2, 1
+	var mu sync.Mutex
+	var launched []string
+	launch := func(_ context.Context, spec fleet.CycleSpec) (int, error) {
+		mu.Lock()
+		launched = append(launched, spec.Scope[0])
+		mu.Unlock()
+		return systemFailureHaltExitCode, nil
+	}
+	res := b.orchestratedRun(fc, launch, 2)(context.Background(), []fleet.Todo{{ID: "first"}, {ID: "second"}}, noResupply)
+	if len(launched) != 1 || launched[0] != "first" || !errors.Is(res[1].Err, fleet.ErrNeverLaunched) {
+		t.Errorf("launched = %v results = %+v, want only first: the halt lane stops the backfill", launched, res)
+	}
+	if got := supplyEvents(t, b, evolveDir, orchestrator.CodeHaltDraining); len(got) != 1 || got[0].Severity != signalcenter.SeverityIncident {
+		t.Errorf("%s events = %+v, want one INCIDENT", orchestrator.CodeHaltDraining, got)
+	}
+	for _, e := range supplyEvents(t, b, evolveDir, orchestrator.CodePoolIdle) {
+		if e.Fields["cause"] != string(orchestrator.CauseSystemHalt) {
+			t.Errorf("idle cause = %q, want %q", e.Fields["cause"], orchestrator.CauseSystemHalt)
+		}
 	}
 }

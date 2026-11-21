@@ -38,6 +38,7 @@ const (
 	CodeLandingUnlocated          signalcenter.Code = "LOOP_ORCH_LANDING_UNLOCATED"
 	CodeHostPressure              signalcenter.Code = "LOOP_ORCH_HOST_PRESSURE"
 	CodeHostBlind                 signalcenter.Code = "LOOP_HOST_PRESSURE_BLIND"
+	CodeHaltDraining              signalcenter.Code = "LOOP_ORCH_HALT_DRAINING"
 )
 
 const (
@@ -70,6 +71,7 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeEjectionBriefFailed, "oversight (ADR-0147 I3) failed to send the ejection brief (no brief port, unreadable file, or send error). Lane cells stay held, and the lane misses why its deliverable returned; WARN. Fields: fields.lane, cycle, error")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLandingUnlocated, "oversight received a landing or seal for a cycle that no live lane holds. It runs landing-state cleanup, counts nothing, and acts on no lane; WARN. fields.cycle, event")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeHostPressure, "the host-pressure controller (fleet.orchestrator.window.adaptive) decided an admission cap from host load, memory and swap. One event per change of the cap; shadow sets applied false and leaves the window alone; INFO. Fields: fields.old, new, sized, cause (pressure_high, pressure_low or hold), load1, cpus, load_per_core, mem_available_pct, swap_used_mb, score, stage, applied")
+	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeHaltDraining, "a lane exited with the ADR-0072 system-failure halt code, so the pool stops its backfill and drains: the running lanes seal and the wave ends. INCIDENT. Fields: fields.todo, rc, cause (system_halt), live")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeHostBlind, "the host-pressure reader failed smooth_samples times in a row, so the controller holds the cap and cannot see the host. Published once per failed streak; WARN. Fields: fields.error, os")
 }
 

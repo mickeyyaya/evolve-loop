@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"strings"
 	"sync"
@@ -357,5 +358,76 @@ func TestPool_AStoppedLaneWithNoClaimsIsReapedAndNotTriedAgain(t *testing.T) {
 	}
 	if res[0].ExitCode != 143 {
 		t.Errorf("result = %+v, want the stopped lane's own exit with no second try", res[0])
+	}
+}
+
+func TestPool_NoBackfillAfterSystemFailureHalt(t *testing.T) {
+	g, events := newGatedLaunch(), &eventLog{}
+	drained := make(chan struct{})
+	publish := func(e signalcenter.Event) {
+		events.publish(e)
+		if e.Code == CodeHaltDraining {
+			close(drained)
+		}
+	}
+	done := runPool(Pool{Target: 2, Launch: g.launch, Publish: publish}, todosNamed("a", "b", "c", "d"))
+	startN(t, g, 2)
+
+	g.finish("a", SystemFailureHaltExit)
+	select {
+	case <-drained:
+	case <-time.After(5 * time.Second):
+		g.finish("b", 0)
+		<-done
+		t.Fatalf("timed out waiting for %s", CodeHaltDraining)
+	}
+	g.finish("b", 0)
+	results := <-done
+
+	for i := 2; i < 4; i++ {
+		if !errors.Is(results[i].Err, fleet.ErrNeverLaunched) {
+			t.Errorf("results[%d] = %+v, want ErrNeverLaunched after the system-failure halt", i, results[i])
+		}
+	}
+	if n := len(events.withCode(CodeLaneBackfilled)); n != 0 {
+		t.Errorf("%s events = %d, want 0", CodeLaneBackfilled, n)
+	}
+	draining := events.withCode(CodeHaltDraining)
+	if len(draining) != 1 || draining[0].Severity != signalcenter.SeverityIncident {
+		t.Fatalf("%s events = %+v, want one INCIDENT", CodeHaltDraining, draining)
+	}
+	wantFields := map[string]string{"todo": "a", "rc": "4", "cause": string(CauseSystemHalt), "live": "1"}
+	if !reflect.DeepEqual(draining[0].Fields, wantFields) {
+		t.Errorf("%s fields = %v, want %v", CodeHaltDraining, draining[0].Fields, wantFields)
+	}
+	for _, c := range fieldsOf(events, CodePoolIdle, "cause") {
+		if c != string(CauseSystemHalt) {
+			t.Errorf("idle cause = %q, want %q", c, CauseSystemHalt)
+		}
+	}
+}
+
+func TestPool_HaltDrainingWithNoOtherLiveLaneReportsZeroLive(t *testing.T) {
+	g, events := newGatedLaunch(), &eventLog{}
+	done := runPool(Pool{Target: 1, Launch: g.launch, Publish: events.publish}, todosNamed("a", "b"))
+	if got := waitStart(t, g); got != "a" {
+		t.Fatalf("first launched = %q, want a", got)
+	}
+	g.finish("a", SystemFailureHaltExit)
+	results := <-done
+	if !errors.Is(results[1].Err, fleet.ErrNeverLaunched) {
+		t.Errorf("results[1] = %+v, want ErrNeverLaunched", results[1])
+	}
+	draining := events.withCode(CodeHaltDraining)
+	wantFields := map[string]string{"todo": "a", "rc": "4", "cause": string(CauseSystemHalt), "live": "0"}
+	if len(draining) != 1 || !reflect.DeepEqual(draining[0].Fields, wantFields) {
+		t.Errorf("%s events = %+v, want one event with fields %v", CodeHaltDraining, draining, wantFields)
+	}
+}
+
+func TestPool_NilLaunchIsNotWrapped(t *testing.T) {
+	results := Pool{Target: 1}.Run(context.Background(), []fleet.Todo{{ID: "a"}})
+	if len(results) != 1 || results[0].ExitCode != -1 || results[0].Err == nil {
+		t.Fatalf("results = %+v, want a single nil-launch failure result instead of a panic", results)
 	}
 }

@@ -74,8 +74,8 @@ func TestIdleCause_EachTransitionNamesOneCauseOfTheClosedSet(t *testing.T) {
 	}
 }
 
-func TestIdleCause_TheClosedSetHasSevenCauses(t *testing.T) {
-	want := []IdleCause{"family_held", "run_cap", "supply_empty", "admission_refused", "bench", "operator_stop", "host_pressure"}
+func TestIdleCause_TheClosedSetHasEightCauses(t *testing.T) {
+	want := []IdleCause{"family_held", "run_cap", "supply_empty", "admission_refused", "bench", "operator_stop", "host_pressure", "system_halt"}
 	if len(IdleCauses) != len(want) {
 		t.Fatalf("IdleCauses = %v, want %v", IdleCauses, want)
 	}
@@ -135,7 +135,7 @@ func TestPool_TransitionPublishesTheCauseOfAnIdleTransition(t *testing.T) {
 }
 
 func TestIdleCauseList_NamesEveryCauseOfTheClosedSet(t *testing.T) {
-	want := "family_held, run_cap, supply_empty, admission_refused, bench, operator_stop or host_pressure"
+	want := "family_held, run_cap, supply_empty, admission_refused, bench, operator_stop, host_pressure or system_halt"
 	if idleCauseList != want {
 		t.Errorf("idleCauseList = %q, want %q", idleCauseList, want)
 	}
@@ -163,5 +163,18 @@ func TestPool_ABrakedPoolPastItsRunCapNamesTheOperatorStop(t *testing.T) {
 	}
 	if n := len(events.withCode(CodePoolUnderfilled)); n != 0 {
 		t.Errorf("%s events = %d, want 0: an operator stop is not an underfill", CodePoolUnderfilled, n)
+	}
+}
+
+func TestIdleCause_SystemHaltIsNotOperatorStop(t *testing.T) {
+	halted := &atomic.Bool{}
+	halted.Store(true)
+	pool := Pool{sysHalt: halted}
+	stopped := fleet.PoolTransition{Kind: fleet.PoolIdle, Pending: 3, Stopped: true}
+	if got := pool.idleCause(stopped); got != CauseSystemHalt || !got.Valid() {
+		t.Errorf("idleCause = %q, want %q: a system-failure halt is not an operator stop", got, CauseSystemHalt)
+	}
+	if got := (Pool{}).idleCause(stopped); got != CauseOperatorStop {
+		t.Errorf("idleCause without a halt = %q, want %q", got, CauseOperatorStop)
 	}
 }

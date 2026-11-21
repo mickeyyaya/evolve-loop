@@ -4,13 +4,18 @@
     "TestIdleCause_SystemHaltIsNotOperatorStop",
     "The wave ends when the last running cycle seals after a halt"
   ],
+  "consumed": {
+    "at": "2026-11-21T21:39:31Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "continuation": {
-    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2585",
-    "branch": "cycle-cd3ae73e-2585",
-    "snapshot_sha": "a59f0ac68037940d10e6de35b340cde72ee84ab9",
     "base_sha": "23c32f42926c3dcde2c2da08401c897afd66275a",
+    "branch": "cycle-cd3ae73e-2585",
+    "cycle": 2585,
     "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2585/audit-fail-reason.json",
-    "cycle": 2585
+    "snapshot_sha": "a59f0ac68037940d10e6de35b340cde72ee84ab9",
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2585"
   },
   "created_at": "2026-11-20T10:06:22Z",
   "files": [
@@ -23,6 +28,18 @@
   "kind": "bug",
   "origin": "console",
   "priority_class": "stability",
+  "released_continuations": [
+    {
+      "base_sha": "23c32f42926c3dcde2c2da08401c897afd66275a",
+      "branch": "cycle-cd3ae73e-2585",
+      "cycle": 2585,
+      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2585/audit-fail-reason.json",
+      "reason": "ship-consume-",
+      "released_at": "2026-11-21T21:39:31Z",
+      "snapshot_sha": "a59f0ac68037940d10e6de35b340cde72ee84ab9",
+      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2585"
+    }
+  ],
   "summary": "Wave 182: after LOOP_SYSTEM_FAILURE_HALT at 23:26:22Z the pool backfilled lanes at 23:26:22Z and 23:36:28Z, then idled 3h38m with cause=operator_stop (go/internal/orchestrator/idle_cause.go:19-22,50-53; go/internal/orchestrator/pool.go:83) until the wave ended at 03:19Z.",
   "title": "after a system-failure halt the pool still backfills lanes and idles for hours labelled operator_stop",
   "weight": 0.8

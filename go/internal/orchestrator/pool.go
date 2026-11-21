@@ -7,12 +7,15 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/admission"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
+
+const SystemFailureHaltExit = 4
 
 const ParkReason = "deadline twice"
 
@@ -47,6 +50,8 @@ type Pool struct {
 	FamilyHolds   *FamilyHolds
 	Benched       func() bool
 	LiveWidthFile string
+
+	sysHalt *atomic.Bool
 }
 
 var transitionCodes = map[fleet.PoolTransitionKind]signalcenter.Code{
@@ -75,18 +80,46 @@ func (p Pool) Run(ctx context.Context, backlog []fleet.Todo) []fleet.Result {
 	if next != nil {
 		next = in.Gate(next)
 	}
+	p.sysHalt = new(atomic.Bool)
+	live := new(atomic.Int64)
 	launch := p.Launch
 	if p.Leases != nil {
 		launch = p.Leases.Watch(p.Launch, p.recover)
 	}
+	launch = p.watchSystemHalt(launch, live)
 	cfg := fleet.PoolConfig{Target: p.Target, Concurrency: p.Concurrency, MaxLaunches: p.MaxLanes, LiveWidthFile: p.LiveWidthFile,
-		Halted: func() bool { return in.Stopped() || (p.Halted != nil && p.Halted()) },
+		Halted: func() bool { return p.systemHalted() || in.Stopped() || (p.Halted != nil && p.Halted()) },
 		Next:   next, Kick: in.Wake(), Window: p.admissionWindow(), Resupply: p.Resupply,
 		Prepare: func(td fleet.Todo, spec fleet.CycleSpec) (fleet.CycleSpec, bool) {
 			in.Hold(td.ID)
-			return p.prepare(td, spec)
+			prepared, ok := p.prepare(td, spec)
+			if ok {
+				live.Add(1)
+			}
+			return prepared, ok
 		}}
 	return fleet.RunPool(ctx, cfg, backlog, launch, p.transition)
+}
+
+func (p Pool) systemHalted() bool {
+	return p.sysHalt != nil && p.sysHalt.Load()
+}
+
+func (p Pool) watchSystemHalt(launch fleet.LaunchFn, live *atomic.Int64) fleet.LaunchFn {
+	if launch == nil {
+		return nil
+	}
+	return func(ctx context.Context, spec fleet.CycleSpec) (int, error) {
+		code, err := launch(ctx, spec)
+		remaining := live.Add(-1)
+		if code == SystemFailureHaltExit && p.sysHalt.CompareAndSwap(false, true) {
+			todo := strings.Join(spec.Scope, ",")
+			p.Publish.emit("Pool.Run", CodeHaltDraining, signalcenter.SeverityIncident,
+				"lane "+todo+" exited with the system-failure halt code: the pool stops its backfill and drains",
+				map[string]string{"todo": todo, "rc": strconv.Itoa(code), "cause": string(CauseSystemHalt), "live": strconv.FormatInt(max(remaining, 0), 10)})
+		}
+		return code, err
+	}
 }
 
 func refusedResults(n int, err error) []fleet.Result {
@@ -135,7 +168,7 @@ func (p Pool) transition(t fleet.PoolTransition) {
 	if t.Kind == fleet.PoolLaunched || t.Kind == fleet.PoolBackfilled {
 		p.FamilyHolds.forget(t.Todo)
 	}
-	if idleOrHeld && cause != CauseHostPressure && p.MinLanes > 0 && t.Live < p.MinLanes && (p.Halted == nil || !p.Halted()) {
+	if idleOrHeld && cause != CauseHostPressure && cause != CauseSystemHalt && p.MinLanes > 0 && t.Live < p.MinLanes && (p.Halted == nil || !p.Halted()) {
 		uFields := map[string]string{
 			"live":      strconv.Itoa(t.Live),
 			"target":    strconv.Itoa(t.Target),
