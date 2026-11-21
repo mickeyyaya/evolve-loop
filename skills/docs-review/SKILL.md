@@ -95,6 +95,8 @@ Report the findings first, most severe first. Each finding has this form:
 
 End with the counts and the checks that ran: `docs-review: 2 HIGH, 1 MEDIUM, 0 LOW; ste-lint 0, links 0 broken, citations 14/14`.
 
+Write the counts of an earlier review round in words, never as `N SEVERITY` pairs. The run reads two or more pairs at the start of a line as the counts of this report.
+
 Then the commit gate takes the capability: `evolve commit-gate run --reviewers run:<label>`. Run this review with `git diff --cached | evolve agent run docs-review --json`, and the label is `run_label` of its output. The plain name `docs-review` passes the gate, but `evolve integration record-pr --reviewed` refuses it. Attest it only when this review ran.
 
 ## Anti-patterns

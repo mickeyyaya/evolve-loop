@@ -23,7 +23,7 @@ const CodeVerdictParseDefect signalcenter.Code = "REVIEW_AGENT_RUN_VERDICT_PARSE
 const verdictSection = "Verdict"
 
 func init() {
-	signalcenter.RegisterCode(signalcenter.ModuleReview, CodeVerdictMismatch, "evolve agent run found a failing report body when the verdict field passes. The body states FAIL, states no verdict, or lists a CRITICAL or HIGH finding. The run verdict is FAIL. run_id names the run. Fields: fields.field_verdict, fields.stated, fields.critical, fields.high")
+	signalcenter.RegisterCode(signalcenter.ModuleReview, CodeVerdictMismatch, "evolve agent run found a failing report body when the verdict field passes. The body states FAIL, states no verdict, or lists a CRITICAL or HIGH finding. The run verdict is FAIL. run_id names the run. Fields: fields.field_verdict, fields.stated, fields.critical, fields.high, fields.critical_declared, fields.high_listed, fields.high_declared, fields.declared_line")
 	signalcenter.RegisterCode(signalcenter.ModuleReview, CodeVerdictParseDefect, "evolve agent run found no stated verdict in a review report that lists no CRITICAL or HIGH finding. The parser or report format has a defect. The run verdict stays FAIL. run_id names the run, and fields.field_verdict names the field verdict")
 }
 
@@ -31,6 +31,7 @@ type derivedVerdict struct {
 	verdict     string
 	stated      string
 	findings    reportdoc.SeverityCounts
+	source      reportdoc.BlockingSource
 	mismatch    bool
 	parseDefect bool
 }
@@ -66,7 +67,7 @@ func reportVerdict(spec phasespec.PhaseSpec, field, report string) derivedVerdic
 		return derivedVerdict{verdict: field}
 	}
 	stated, counted := statedVerdict(report)
-	d := derivedVerdict{verdict: field, stated: stated, findings: reportdoc.CountSeverities(counted)}
+	d := derivedVerdict{verdict: field, stated: stated, findings: reportdoc.CountSeverities(counted), source: reportdoc.TraceBlocking(counted)}
 	if field != core.VerdictPASS && field != core.VerdictWARN {
 		return d
 	}
@@ -90,6 +91,8 @@ func mismatchEvent(r standaloneRun, field string, d derivedVerdict) signalcenter
 		Fields: map[string]string{
 			"field_verdict": field, "stated": stated,
 			"critical": strconv.Itoa(d.findings.Critical), "high": strconv.Itoa(d.findings.High),
+			"critical_declared": strconv.Itoa(d.source.CriticalDeclared), "high_listed": strconv.Itoa(d.source.HighListed),
+			"high_declared": strconv.Itoa(d.source.HighDeclared), "declared_line": d.source.DeclaredLine,
 		},
 	}
 }

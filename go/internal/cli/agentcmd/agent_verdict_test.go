@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"maps"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -62,7 +63,7 @@ func TestAgentRun_AReportThatListsOneHighIsAFailVerdictThoughTheFieldSaysPass(t 
 	if defects := parseDefectSignals(center); len(defects) != 0 {
 		t.Errorf("parse defect signals = %+v, want none for a report that lists a real HIGH", defects)
 	}
-	wantFields := map[string]string{"field_verdict": "PASS", "stated": "PASS", "critical": "0", "high": "1"}
+	wantFields := map[string]string{"field_verdict": "PASS", "stated": "PASS", "critical": "0", "high": "1", "critical_declared": "0", "high_listed": "1", "high_declared": "0", "declared_line": ""}
 	if !maps.Equal(signals[0].Fields, wantFields) {
 		t.Errorf("signal fields = %+v, want %+v", signals[0].Fields, wantFields)
 	}
@@ -358,5 +359,47 @@ func TestReportVerdict_AVisibleVerdictKeepsAFencedExampleFindingUncounted(t *tes
 
 	if got.verdict != core.VerdictPASS || got.mismatch || got.findings.Blocking() != 0 {
 		t.Errorf("reportVerdict = %+v, want PASS, no mismatch and no blocking finding for a fenced example", got)
+	}
+}
+
+func recoveredRun0962(t *testing.T) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("..", "..", "reportdoc", "testdata", "review-run-0962.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(raw)
+}
+
+func TestAgentRun_RecoveredRun0962StaysPass(t *testing.T) {
+	env, code, center, _ := runWithSignals(t, threatModel+recoveredRun0962(t))
+
+	if env.Verdict != core.VerdictPASS || code != 0 {
+		t.Fatalf("verdict %q exit %d, want PASS and exit 0", env.Verdict, code)
+	}
+	if signals := mismatchSignals(center); len(signals) != 0 {
+		t.Errorf("mismatch signals = %+v, want none", signals)
+	}
+	if env.Findings != (reportdoc.SeverityCounts{Low: 2}) {
+		t.Errorf("envelope findings = %+v, want two LOW", env.Findings)
+	}
+}
+
+func TestAgentRun_MismatchSignalNamesTheDeclaringLine(t *testing.T) {
+	declaring := "Counts: 1 HIGH, 2 MEDIUM. " + strings.Repeat("x", 300)
+	report := threatModel + "## Findings\nNone.\n" + declaring + "\n## Verdict\nPASS\n"
+
+	env, code, center, _ := runWithSignals(t, report)
+
+	signals := mismatchSignals(center)
+	if env.Verdict != core.VerdictFAIL || code != exitFail || len(signals) != 1 {
+		t.Fatalf("verdict %q exit %d signals %d, want FAIL, exit 1 and one signal", env.Verdict, code, len(signals))
+	}
+	f := signals[0].Fields
+	if f["high_declared"] != "1" || f["high_listed"] != "0" || f["critical_declared"] != "0" {
+		t.Errorf("signal fields = %+v, want high_declared=1 high_listed=0 critical_declared=0", f)
+	}
+	if want := string([]rune(declaring)[:reportdoc.MaxSourceLineRunes]); f["declared_line"] != want {
+		t.Errorf("declared_line = %q, want the declaring line cut to %d runes", f["declared_line"], reportdoc.MaxSourceLineRunes)
 	}
 }
