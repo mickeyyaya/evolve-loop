@@ -16,6 +16,7 @@ import (
 const (
 	ruleDefault   = "default"
 	ruleProfile   = "profile"
+	rulePinned    = "profile-pinned"
 	agentsPrefix  = "agents:"
 	workPrefix    = "work:"
 	afterChainOn  = "other_clis"
@@ -131,8 +132,11 @@ func (t Table) ruleFor(agent string, sel roleSel) (string, []string) {
 
 func (t Table) selectRule(agent string, sel roleSel, prof *profiles.Profile, allowed []string) (selection, *RuleError) {
 	rule, chain := t.ruleFor(agent, sel)
-	if rule == ruleProfile {
+	switch {
+	case rule == ruleProfile:
 		chain = profileChain(prof)
+	case prof != nil && prof.CLIPinned && !strings.HasPrefix(rule, agentsPrefix):
+		rule, chain = rulePinned, leadWith(prof.CLI, chain)
 	}
 	kept, dropped := partition(chain, allowed)
 	if strings.HasPrefix(rule, agentsPrefix) && len(dropped) > 0 {

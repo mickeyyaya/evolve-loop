@@ -299,7 +299,7 @@ Resume with: claude --teleport session_<id>
 
 How a launch runs:
 
-1. A phase dispatch or `evolve agent run <profile>` reaches `claude-cloud` when the profile or a `cli_routing` rule names it. The route goes through `Engine.LaunchArgs`, as for each driver.
+1. A phase dispatch or `evolve agent run <profile>` reaches `claude-cloud` when a `cli_routing.agents` rule names it. It also reaches it when the profile sets `cli_pinned`, as `cloud-builder` does. The route goes through `Engine.LaunchArgs`, as for each driver.
 2. The driver reads the repository of the worktree, else of the project root. An unpushed branch or another host gives exit 2, the reason on stderr and one `BRIDGE_CLOUD_LAUNCH_REFUSED` signal.
 3. The driver starts a private tmux session (`evolve-cloud-…`) with the I-2 environment of the manifest. The pane runs `claude --cloud "$(cat <workspace>/cloud-prompt.txt)"`.
 4. The driver reads the pane once each second, up to `deadline_s` (120). The two confirmation lines give the session. An `Error:` line gives exit 10 with the text of the CLI.
@@ -1210,7 +1210,7 @@ The console runs builds and reviews as in-process Claude Code subagents (F1.10).
 | Review | `code-simplifier`, `go-reviewer`, `architecture-reviewer`, `docs-review` | `cli_routing.default` (agy first) | the launch record of each run |
 | Review on the Claude floor | `code-reviewer` | the Claude floor | the launch record |
 | Audit of a diff | `adversarial-review` (no profile is named `auditor`) | the Claude floor | the launch record |
-| Build | `console-builder` with `--worktree` and `--writable` | `cli_routing.agents.console-builder`: Claude first | the launch record and the fenced worktree |
+| Build | `console-builder` with `--worktree` and `--writable` | `cli_routing.agents.console-builder`: Claude first. `cloud-builder` starts on `claude-cloud` (`cli_pinned`). | the launch record and the fenced worktree |
 
 - Each `evolve agent run` writes `.evolve/agent-runs/<run label>.json`. The record names the profile, the driver, the family, the model and the tree state before and after the run.
 - `evolve commit-gate run --reviewers run:<run label>` attests a review from its record. The record must have a driver and no `FAIL` verdict, and both tree states must equal the staged tree. The attestation lists each run under `review_runs`.

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridgechain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute/cliroutetest"
@@ -43,7 +44,7 @@ func goldenRouter(t *testing.T, v cliroutetest.Variant, pol policy.Policy, profi
 	t.Helper()
 	router, _, err := cliroute.Build(cliroute.Setup{
 		Policy: pol, Profiles: profiles.NewFromDir(profileDir), Options: []cliroute.CompileOption{cliroute.WithOverrides(v.Overrides(agents))},
-		Host: cliroute.Host{Discover: v.RawDiscover, Bench: func(root, label string, plan llmroute.Plan) llmroute.Plan {
+		Host: cliroute.Host{Discover: v.RawDiscover, CloudHosts: bridge.CloudRemoteHosts, Bench: func(root, label string, plan llmroute.Plan) llmroute.Plan {
 			return bridgechain.ApplyCLIHealthBench(root, label, plan, cliroutetest.Now, nil)
 		}},
 	})

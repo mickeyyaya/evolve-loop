@@ -16,6 +16,7 @@ Each profile is a JSON object. All fields listed below.
 | `name` | string | Role name (matches filename without `.json`) |
 | `role` | string | Pipeline role: `scout`, `builder`, `auditor`, `tdd-engineer`, `orchestrator`, … |
 | `cli` | string | Target CLI binary (`claude`). Builder locked to `claude` until adapter parity. |
+| `cli_pinned` | bool | When true, `cli` leads the chain of the `default` or `work` rule. An `agents.<name>` rule still wins. Used by `cloud-builder`. |
 
 ### Model selection
 

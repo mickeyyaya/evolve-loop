@@ -81,6 +81,12 @@ var dataFileReads = []DataFileRead{
 		"TestModelClassifierProfile_GrantMatchesTheArtifactOfTheWorkspace",
 		"TestRouter_EveryLaunchOfTheAdvisorStaysOnClaudeModels",
 	}}},
+	{Path: ".evolve/policy.json", TestSelection: TestSelection{Package: "./internal/cliroute", Tests: []string{
+		"TestResolve_TheTrackedPolicyAndCloudBuilderProfileStartOnTheCloudSeatThenFollowTheDefault",
+	}}},
+	{Path: ".evolve/profiles/", TestSelection: TestSelection{Package: "./internal/cliroute", Tests: []string{
+		"TestResolve_TheTrackedPolicyAndCloudBuilderProfileStartOnTheCloudSeatThenFollowTheDefault",
+	}}},
 	{Path: WholeRepository, TestSelection: TestSelection{Package: "./cmd/evolve", Tests: []string{
 		"TestAgentRunBridge_TheSeatPromptHoldsTheRequiredSectionsOfThePhaseContract",
 		"TestAgentRun_EachDiffReviewerRunsOnANonClaudeFamily",
