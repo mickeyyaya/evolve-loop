@@ -10,6 +10,11 @@
     "go/internal/bridge/manifests/agy-tmux.json",
     "go/internal/bridge/manifest.go"
   ],
+  "consumed": {
+    "at": "2026-11-21T02:20:33Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-09-09T00:10:00Z",
   "fix": "Delete model_tier_map from agy.json, add \"model_tier_map_from\": \"agy-tmux\", and add a relational test (LoadManifest(\"agy\") table == loadManifestRaw(\"agy-tmux\") table; raw agy.json declares none). Sweep readers of LoadManifest(\"agy\") for any that need the raw map. claude-p is NOT in scope: it legitimately declares no map (tiers are its selectors).",
   "id": "agy-tier-map-single-source",

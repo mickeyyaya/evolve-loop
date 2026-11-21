@@ -62,6 +62,8 @@ func seatHome(t *testing.T) string {
 	t.Helper()
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
+	os.Unsetenv("CLAUDE_CONFIG_DIR")
 	return home
 }
 

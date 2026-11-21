@@ -99,6 +99,7 @@ var serialTests = map[string]string{
 	"bridge.TestAgyEveryLaunch_ResolvedTierAndRawModelAreUnchanged":                           "swaps seam modelCatalogDirFn",
 	"bridge.TestAgyEveryLaunch_UnresolvedTierRealizesTheManifestFastModel":                    "swaps seam modelCatalogDirFn",
 	"bridge.TestAgyModelTierAutoSentinelCarriesFastModel":                                     "swaps seam modelCatalogDirFn",
+	"bridge.TestAgyHeadlessManifest_PointsAtFamilyTable":                                      "swaps seam modelCatalogDirFn",
 	"bridge.TestAgyModelTierDeepRealizesModelFlag":                                            "swaps seam modelCatalogDirFn",
 	"bridge.TestAgyModelTierResolvesThroughCatalogOverlay":                                    "swaps seam modelCatalogDirFn",
 	"bridge.TestAgyModelTierUnknownTierPassthrough":                                           "swaps seam modelCatalogDirFn",
