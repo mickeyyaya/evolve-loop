@@ -10,7 +10,7 @@
 > - **Run workspace**: `.evolve/ephemeral/agent-runs/<run label>`, the only directory that the run writes.
 > - **Report**: the primary artifact of the profile, for example `adversarial-review-report.md`.
 > - **Launch record**: `.evolve/agent-runs/<run label>.json`, the record of the driver, the family, the model and the tree that one run saw (§7).
-> - **Build seat**: the profile `console-builder`, the one profile that writes source in a standalone run (§8).
+> - **Build seat**: the profile `console-builder`, one of two profiles that write source in a standalone run, with `cloud-builder` (§8).
 
 ## Table of contents
 
@@ -221,7 +221,7 @@ The console ran its builds and its reviews in-process, outside the bridge. Thus 
 
 - **A review seat** is each read-only review profile: `code-simplifier`, `code-reviewer`, `go-reviewer`, `architecture-reviewer` (X10) and `docs-review` (X11). `cli_routing` routes each one like any seat.
 - **The audit of a diff** is `adversarial-review`. No profile is named `auditor`: the built-in `audit` phase reads cycle state.
-- **The build seat** is `console-builder`. Its routing data puts Claude first (`cli_routing.agents.console-builder`), and another family holds the seat when the operator changes that chain.
+- **The build seat** is `console-builder`, or `cloud-builder` for a cloud session that delivers a pull request. The routing data of `console-builder` puts Claude first (`cli_routing.agents.console-builder`), and another family holds the seat when the operator changes that chain.
 - `--worktree DIR` runs the agent in DIR. DIR must be absolute and a linked git worktree (`plane.Classify`), so a seat never runs in the main checkout.
 - A profile is a writer when `core.PhaseWritesSource` marks it, or when its sandbox can write outside the run workspace. A writer runs only when all of these are true:
   - its sandbox is enabled and `read_only_repo`, and each write grant is under `{worktree_path}` or `.evolve/runs/cycle-*`;

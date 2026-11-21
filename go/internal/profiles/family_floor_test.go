@@ -32,7 +32,7 @@ func TestClaudeFamilyFloor(t *testing.T) {
 			t.Errorf("profile %s: Get failed (%v) — it cannot be checked, so it cannot be trusted", name, err)
 			continue
 		}
-		if family(p.CLI) != "claude" {
+		if family(p.CLI) != "claude" || p.CLIPinned {
 			continue
 		}
 		claudeCount++
