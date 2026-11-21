@@ -77,3 +77,13 @@ func TestInit_RegistersTheEnvRefusedCodeInModuleIsolation(t *testing.T) {
 		t.Fatal("the kind isolation.env must be known")
 	}
 }
+
+func TestInit_RegistersTheReadUnmeasuredCode(t *testing.T) {
+	t.Parallel()
+	if m, ok := signalcenter.IsRegistered(CodeReadUnmeasured); !ok || m != signalcenter.ModuleIsolation {
+		t.Fatalf("%s registered=%v module=%q, want module isolation", CodeReadUnmeasured, ok, m)
+	}
+	if CodeReadUnmeasured != "ISOLATION_READ_UNMEASURED" || !CodeReadUnmeasured.Valid() {
+		t.Fatalf("code %q must be valid and carry the module prefix", CodeReadUnmeasured)
+	}
+}

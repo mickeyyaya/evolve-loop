@@ -1317,6 +1317,7 @@ The contract reuses the shape of [llm-quality-indexes.md](llm-quality-indexes.md
 | `ISOLATION_I9_VIOLATION` | I-9 | none at run time; the matrix test is its guard |
 | `ISOLATION_CONTEXT_REQUIRED_UNOPENED` | I-4 | built (CX3): the bridge, when a cell closes without a read of a required entry of its index; kind `isolation.context`, INFO ([cell-context-index.md](cell-context-index.md) §8) |
 | `ISOLATION_CONTEXT_BUDGET_OVER` | I-4 | built (CX3): the bridge, when required entries of a layer passed its token budget; kind `isolation.context`, WARN ([cell-context-index.md](cell-context-index.md) §6) |
+| `ISOLATION_READ_UNMEASURED` | I-5 | built: the bridge, when the read report of a cell is incomplete; kind `isolation.context`, WARN, or INFO for a cancelled launch ([cell-context-index.md](cell-context-index.md) §8) |
 | `ISOLATION_REQUEST_REFUSED` | I-3 | built: the request channel, when the validator or the orchestrator agent refuses a request; kind `isolation.request.decision`, WARN (§7.2.1) |
 | `ISOLATION_REQUEST_FAILED` | I-3 | built: the request channel, when the dispatch of an approved request fails; kind `isolation.request.decision`, WARN (§7.2.1) |
 
