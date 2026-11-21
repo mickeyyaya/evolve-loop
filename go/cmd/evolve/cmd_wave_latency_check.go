@@ -35,6 +35,7 @@ type latencyItem struct {
 	Title         string   `json:"title"`
 	Summary       string   `json:"summary"`
 	Fix           string   `json:"fix"`
+	Files         []string `json:"files"`
 	Acceptance    []string `json:"acceptance"`
 	Source        string   `json:"source"`
 }
@@ -101,6 +102,7 @@ func latencyBreachItem(run []lanetime.Verdict) latencyItem {
 		Title:         fmt.Sprintf("Wave latency budget exceeded in waves %s", list),
 		Summary:       fmt.Sprintf("evolve wave latency --check found waves %s in breach in a row: %s. A wave with a quota pause, a loop stop_reason or an operator brake does not count. The bounds are wave_latency.min_live_share and wave_latency.max_gate_share in policy.json.", list, strings.Join(run[len(run)-1].Reasons, "; ")),
 		Fix:           fmt.Sprintf("Run evolve wave latency --wave %s, find where the live lanes or the host gate time went, and fix the cause at its source.", waves[len(waves)-1]),
+		Files:         []string{"go/internal/lanetime/check.go", "go/cmd/evolve/cmd_wave_latency_check.go"},
 		Acceptance: []string{
 			"evolve wave latency --check reports the newest wave ok or left out",
 			"The cause has a regression test that fails before the fix and passes after it",

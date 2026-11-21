@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
 )
@@ -168,5 +170,27 @@ func TestWaveLatencyCheck_ReportsWhatItCannotRead(t *testing.T) {
 		if rc != exitIO || !strings.Contains(h.stderr.String(), wavePrefix) {
 			t.Errorf("%s: rc = %d stderr %q, want exitIO with the wave prefix", name, rc, h.stderr.String())
 		}
+	}
+}
+
+func TestWaveLatencyCheck_BreachItemDeclaresFixSurface(t *testing.T) {
+	t.Parallel()
+	p := checkPlane(t, checkWave{live: 4}, checkWave{live: 4}, checkWave{live: 2})
+	h := newWaveHarness()
+
+	if rc := h.run("latency", "--check", "--project-root", p.root); rc != 0 {
+		t.Fatalf("rc = %d, stderr %s", rc, h.stderr.String())
+	}
+	scan, err := inboxbatch.ScanDir(filepath.Join(p.evolveDir(), "inbox"))
+	if err != nil || len(scan.Warnings) > 0 || len(scan.Items) != 1 {
+		t.Fatalf("scan = %+v, err = %v", scan, err)
+	}
+	it := scan.Items[0]
+	if !it.HasDeclaredSurface() {
+		t.Errorf("HasDeclaredSurface() = false (files=%v)", it.Files)
+	}
+	want := []string{"go/internal/lanetime/check.go", "go/cmd/evolve/cmd_wave_latency_check.go"}
+	if !slices.Equal(it.Files, want) {
+		t.Errorf("files = %v, want %v", it.Files, want)
 	}
 }
