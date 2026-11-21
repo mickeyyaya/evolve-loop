@@ -14,6 +14,11 @@
 - The flag helpers `TakeFlagValue` and `TakeProjectRoot` live in `cmd/evolve/cmdutil`, because `main` and this package both use them.
 - `main` calls five exported functions: `ReconcileConsumedFingerprints`, `ReconcileConsumedBindings`, `CheckInboxTrailerBytes`, `ReadInboxItemObject` and `SplitForbidden`.
 
+- `intakeItem` is the one intake of the verb `inbox add` and of the filer of the request channel. It takes the inbox lock (`.bump.lock` of `inboxfile`), checks the overlap, and files the item. It returns the result or a typed error.
+- An item fault is a `*RefusedError`, which wraps `agentrequest.ErrItemRefused` and the cause (for example `*inboxcurator.OverlapError`). Any other error is a fault of the pipeline. Only `intakeFailure` of the verb maps the error to an exit code. A replay of the same `source` and id returns the item that exists.
+- The host functions come from `intakeInput`, so the filer works in the cycle process, where the globals of `host()` are not set.
+- `NewFiler(deps, stderr)` returns an `agentrequest.FileFunc`, and `cmd/evolve` wires it into the channel. The filer files an item with the origin `cycle` and a `source`. A `*RefusedError` is a fault of the item. Its cause has no advice for the flags of the verb.
+
 ## Invariants
 
 - The exit codes and the output of each verb are the same as before the move (`TestC2466_003_TheInboxVerbBehavesTheSameThroughTheProductionBinary`).

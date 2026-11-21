@@ -44,11 +44,44 @@ func RequestKind(name string) string {
 
 func ValidRequestName(name string) bool { return requestName.MatchString(name) }
 
-var requiredArgs = map[string][]string{
-	KindDispatch: {"role"},
-	KindInboxAdd: {"id", "title", "kind", "fix", "priority_class", "acceptance-1"},
+type ArgSpec struct {
+	Name     string
+	Numbered bool
 }
 
-func RequiredArgs(kind string) []string { return slices.Clone(requiredArgs[kind]) }
+var argSpecs = map[string][]ArgSpec{
+	KindDispatch: {{Name: "role"}},
+	KindInboxAdd: {{Name: "id"}, {Name: "title"}, {Name: "kind"}, {Name: "fix"}, {Name: "priority_class"},
+		{Name: "acceptance", Numbered: true}, {Name: "files", Numbered: true}},
+}
 
-func ArgKinds() []string { return slices.Sorted(maps.Keys(requiredArgs)) }
+var numberedArg = regexp.MustCompile(`^([a-z_]+)-([0-9]+)$`)
+
+func ArgSpecs(kind string) []ArgSpec { return slices.Clone(argSpecs[kind]) }
+
+func RequiredArgs(kind string) []string {
+	var out []string
+	for _, spec := range argSpecs[kind] {
+		if spec.Numbered {
+			out = append(out, spec.Name+"-1")
+		} else {
+			out = append(out, spec.Name)
+		}
+	}
+	return out
+}
+
+func ParseArg(kind, key string) (name string, n int, ok bool) {
+	for _, spec := range argSpecs[kind] {
+		if !spec.Numbered && spec.Name == key {
+			return key, 0, true
+		}
+		if m := numberedArg.FindStringSubmatch(key); spec.Numbered && m != nil && m[1] == spec.Name {
+			n, err := strconv.Atoi(m[2])
+			return spec.Name, n, err == nil
+		}
+	}
+	return "", 0, false
+}
+
+func ArgKinds() []string { return slices.Sorted(maps.Keys(argSpecs)) }

@@ -210,7 +210,7 @@ func TestRequiredArgs_GiveACopyForEachKindWithAnExecutor(t *testing.T) {
 		t.Fatalf("dispatch args = %v", got)
 	}
 	got := RequiredArgs(KindInboxAdd)
-	if !slices.Equal(got, []string{"id", "title", "kind", "fix", "priority_class", "acceptance-1"}) {
+	if !slices.Equal(got, []string{"id", "title", "kind", "fix", "priority_class", "acceptance-1", "files-1"}) {
 		t.Fatalf("inbox-add args = %v", got)
 	}
 	got[0] = "changed"
@@ -239,5 +239,44 @@ func TestArgKinds_ListTheKindsThatHaveRequiredArgs(t *testing.T) {
 	t.Parallel()
 	if got := ArgKinds(); !slices.Equal(got, []string{KindDispatch, KindInboxAdd}) {
 		t.Fatalf("ArgKinds() = %v, want the sorted kinds of the required-args table", got)
+	}
+}
+
+func TestParseArg_KnowsTheScalarAndTheNumberedArgsOfAKindAndNoOther(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		kind, key, name string
+		n               int
+		ok              bool
+	}{
+		{KindInboxAdd, "title", "title", 0, true},
+		{KindInboxAdd, "acceptance-3", "acceptance", 3, true},
+		{KindInboxAdd, "files-12", "files", 12, true},
+		{KindInboxAdd, "acceptance", "", 0, false},
+		{KindInboxAdd, "title-1", "", 0, false},
+		{KindInboxAdd, "weight", "", 0, false},
+		{KindInboxAdd, "role", "", 0, false},
+		{KindDispatch, "role", "role", 0, true},
+		{KindDispatch, "files-1", "", 0, false},
+		{"code-refresh", "id", "", 0, false},
+	} {
+		name, n, ok := ParseArg(tc.kind, tc.key)
+		if name != tc.name || n != tc.n || ok != tc.ok {
+			t.Errorf("ParseArg(%q, %q) = %q, %d, %v; want %q, %d, %v", tc.kind, tc.key, name, n, ok, tc.name, tc.n, tc.ok)
+		}
+	}
+}
+
+func TestArgSpecs_GiveACopyAndRequiredArgsDeriveFromThem(t *testing.T) {
+	t.Parallel()
+	var specs []ArgSpec = ArgSpecs(KindInboxAdd)
+	specs[0].Name = "changed"
+	if ArgSpecs(KindInboxAdd)[0].Name != "id" || len(ArgSpecs("code-refresh")) != 0 {
+		t.Fatal("the accessor returns a copy, and a kind with no executor has no specs")
+	}
+	for _, key := range RequiredArgs(KindInboxAdd) {
+		if _, _, ok := ParseArg(KindInboxAdd, key); !ok {
+			t.Errorf("required arg %q is not an accepted arg of its own kind", key)
+		}
 	}
 }

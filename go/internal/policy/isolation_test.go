@@ -253,14 +253,14 @@ func TestParse_RefusesADispatchRequestsBlockThatNoReaderCanApply(t *testing.T) {
 
 func TestIsolationInboxRequests_DefaultsAndOverrides(t *testing.T) {
 	t.Parallel()
-	if got, want := (policy.Policy{}).IsolationInboxRequests(), (policy.InboxRequestsPolicy{Stage: policy.RequestStage("enforce"), PerCycle: 8}); got != want {
+	if got, want := (policy.Policy{}).IsolationInboxRequests(), (policy.InboxRequestsPolicy{Stage: policy.RequestStage("enforce"), PerCycle: 8, DefaultWeight: 0.5}); got != want {
 		t.Fatalf("defaults = %+v, want %+v", got, want)
 	}
-	p, err := policy.Parse([]byte(`{"isolation":{"inbox_requests":{"stage":"shadow","per_cycle":2}}}`))
+	p, err := policy.Parse([]byte(`{"isolation":{"inbox_requests":{"stage":"shadow","per_cycle":2,"default_weight":0.25}}}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := p.IsolationInboxRequests(), (policy.InboxRequestsPolicy{Stage: policy.RequestStage("shadow"), PerCycle: 2}); got != want {
+	if got, want := p.IsolationInboxRequests(), (policy.InboxRequestsPolicy{Stage: policy.RequestStage("shadow"), PerCycle: 2, DefaultWeight: 0.25}); got != want {
 		t.Fatalf("overrides = %+v", got)
 	}
 }
@@ -268,10 +268,11 @@ func TestIsolationInboxRequests_DefaultsAndOverrides(t *testing.T) {
 func TestParse_RefusesAnInboxRequestsBlockThatNoReaderCanApply(t *testing.T) {
 	t.Parallel()
 	for body, want := range map[string]string{
-		`{"isolation":{"inbox_requests":{"stage":"loud"}}}`:       `stage "loud"`,
-		`{"isolation":{"inbox_requests":{"per_cycle":-1}}}`:       "per_cycle",
-		`{"isolation":{"inbox_requests":{"default_weight":0.5}}}`: "unknown policy key",
-		`{"isolation":{"inbox_requests":{"roles":["builder"]}}}`:  "unknown policy key",
+		`{"isolation":{"inbox_requests":{"stage":"loud"}}}`:        `stage "loud"`,
+		`{"isolation":{"inbox_requests":{"per_cycle":-1}}}`:        "per_cycle",
+		`{"isolation":{"inbox_requests":{"default_weight":1.5}}}`:  "default_weight",
+		`{"isolation":{"inbox_requests":{"default_weight":-0.1}}}`: "default_weight",
+		`{"isolation":{"inbox_requests":{"roles":["builder"]}}}`:   "unknown policy key",
 	} {
 		_, err := policy.Parse([]byte(body))
 		if err == nil || !strings.Contains(err.Error(), want) {

@@ -314,7 +314,11 @@ The path from a request to a result:
 
 The agent does not wait in its turn for the decision. The pipeline reads the requests at the handoff of the phase. A later phase, a retry or the next item of the lineage reads the result through the index.
 
-As built (item `isolation-dispatch-request-channel`): the channel runs the kind `dispatch` only. It refuses each other kind with the precondition `kind`, until item `cli-agent-tool-surface` adds their executors. The steps, the policy and the records are in [llm-isolation.md](llm-isolation.md) §7.2.1.
+As built (item `isolation-dispatch-request-channel`): the channel runs the kind `dispatch`. It refuses each kind that has no executor with the precondition `kind`. The steps, the policy and the records are in [llm-isolation.md](llm-isolation.md) §7.2.1.
+
+As built (item `agent-request-inbox-add-has-no-executor`): the kind `inbox-add` has an executor. It runs no judge. The intake of `evolve inbox add` decides.
+
+The args of the request are `id`, `title`, `kind`, `fix`, `priority_class`, `acceptance-<n>` and `files-<n>`, and `acceptance-1` and `files-1` are required. The `why` becomes the `summary`. The pipeline sets the weight, the origin `cycle` and the `source` `request:<cycle>/<name>`. An arg that is not in the list, such as `weight`, is refused with the precondition `args`.
 
 ### 4.4 Enforcement
 
@@ -345,9 +349,9 @@ Each request and each decision is a signal of the module `isolation` ([llm-isola
 | Kind | Severity | Code | When | Fields |
 |---|---|---|---|---|
 | `isolation.request` | INFO | none | the validator reads a request | `request`, `kind`, `verb`, `role`, `cell`, `depth` |
-| `isolation.request.decision` | INFO | none | the orchestrator approves, or the pipeline runs the verb | `request`, `kind`, `role`, `decision`, `result`, `stage` |
-| `isolation.request.decision` | WARN | `ISOLATION_REQUEST_REFUSED` | the validator or the orchestrator refuses | `request`, `kind`, `role`, `decision`, `precondition`, `reason`, `stage` |
-| `isolation.request.decision` | WARN | `ISOLATION_REQUEST_FAILED` | the dispatch of an approved request fails | the fields of the row above |
+| `isolation.request.decision` | INFO | none | the orchestrator approves, the pipeline runs the verb, or the pipeline files the item | `request`, `kind`, `role`, `decision`, `result`, `stage`, `request_path`, `item_id`, `item_path` |
+| `isolation.request.decision` | WARN, or INCIDENT for `inbox-add` | `ISOLATION_REQUEST_REFUSED` | the validator or the orchestrator refuses | `request`, `kind`, `role`, `decision`, `precondition`, `reason`, `stage`, `request_path` |
+| `isolation.request.decision` | WARN, or INCIDENT for `inbox-add` | `ISOLATION_REQUEST_FAILED` | the executor of an approved request fails | the fields of the row above |
 | `isolation.violation` | WARN | `ISOLATION_I3_VIOLATION` | an `R` or `D` verb refuses in a cell (§4.4) | `rule` is `verb.class.r` or `verb.class.d`, and `target` is the verb |
 
 The last row closes a gap of X4. As built (X17e), each violation of the class gate emits it: `action=logged` at `shadow`, and `action=refused` at `enforce`. The request signals of the first four rows are built (item `isolation-dispatch-request-channel`). A signal names no `family`, because the channel reads the request file and not the launch of the cell.
