@@ -12,6 +12,7 @@
 - `RunCI(args, stdin, stdout, stderr, deps)` dispatches `ci classify`, `ci watch`, `ci telemetry` and `ci darwin-set`.
 - `go/cmd/evolve/cmd_pr.go` and `go/cmd/evolve/cmd_ci.go` are the only non-test `cmd_pr*` and `cmd_ci*` files left in `main`. `cmd_pr.go` builds `Deps` with `landDeps()`, and both shims hand over to `RunPR` and `RunCI`.
 - `Deps` holds five functions from `main`: `ResolveRoot`, `PrintVerbJSON`, `NewSignalCenter`, `DarwinSet` and `RefreshWorktree`. Both entrypoints store the `Deps` value in `current`, and handlers read it through helper wrappers.
+- `MainCIFetcher(root, warn)` gives the CI source of the ship phase: `ciwatch.NewGHClassifySource(root, module).LatestRunOn`. It reads the module path from `go/go.mod`, and an unreadable `go.mod` gets one WARN line on `warn`.
 - The shared flag parser (`CLIFlags`), `GHIn` and `PlaneLiveRuns` live in `go/cmd/evolve/cmdutil` so `main` and `landcmd` share one copy.
 
 ## Invariants

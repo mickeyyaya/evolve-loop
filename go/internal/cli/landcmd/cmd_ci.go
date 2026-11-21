@@ -148,6 +148,14 @@ func ciClassifyOptions(root string, rerun bool, stderr io.Writer) (ciwatch.Class
 	}, nil
 }
 
+func MainCIFetcher(root string, warn io.Writer) ciwatch.Fetcher {
+	modulePath, err := goModulePath(filepath.Join(root, ciModuleDir, "go.mod"))
+	if err != nil {
+		fmt.Fprintf(warn, "evolve ship: WARN: %v; the main-red stop reads the CI run without the module path\n", err)
+	}
+	return ciwatch.NewGHClassifySource(root, modulePath).LatestRunOn
+}
+
 func goModulePath(goMod string) (string, error) {
 	f, err := os.Open(goMod)
 	if err != nil {
