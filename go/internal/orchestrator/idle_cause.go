@@ -18,9 +18,10 @@ const (
 	CauseBench            IdleCause = "bench"
 	CauseOperatorStop     IdleCause = "operator_stop"
 	CauseHostPressure     IdleCause = "host_pressure"
+	CauseDiskFloor        IdleCause = "disk_floor"
 )
 
-var IdleCauses = []IdleCause{CauseFamilyHeld, CauseRunCap, CauseSupplyEmpty, CauseAdmissionRefused, CauseBench, CauseOperatorStop, CauseHostPressure}
+var IdleCauses = []IdleCause{CauseFamilyHeld, CauseRunCap, CauseSupplyEmpty, CauseAdmissionRefused, CauseBench, CauseOperatorStop, CauseHostPressure, CauseDiskFloor}
 
 var idleCauseList = func() string {
 	names := make([]string, len(IdleCauses))
@@ -50,6 +51,8 @@ func (p Publish) emitIdle(code signalcenter.Code, reason string, fields map[stri
 
 func (p Pool) idleCause(t fleet.PoolTransition) IdleCause {
 	switch {
+	case t.Held:
+		return CauseDiskFloor
 	case t.Stopped:
 		return CauseOperatorStop
 	case t.Capped:

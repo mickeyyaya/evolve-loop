@@ -133,7 +133,10 @@
       "admission": "enforce",
       "window": {
         "start": 8,
-        "min": 4
+        "min": 4,
+        "adaptive": {
+          "stage": "shadow"
+        }
       }
     }
   },
@@ -145,6 +148,8 @@
     }
   ],
   "gc": {
+    "disk_floor_gb": 25,
+    "disk_warn_gb": 40,
     "go_cache_ttl_hours": 24,
     "mode": "enforce",
     "runs": {

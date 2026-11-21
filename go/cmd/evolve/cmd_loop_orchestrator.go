@@ -97,6 +97,7 @@ func (b *loopBatchCoordinator) orchestratorPool(fc policy.FleetConfig, launch fl
 		Locate:        laneLocator(b.cfg.ProjectRoot),
 		Publish:       b.deps.Signals.Emit,
 		Halted:        b.poolHalted,
+		Hold:          b.floorHold,
 		Benched:       b.dispatchBenched,
 		Stage:         fc.Orchestrator.Stage,
 		Window:        b.laneWindow(fc),
