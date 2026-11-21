@@ -7,6 +7,11 @@ All notable changes to this project will be documented in this file.
 - **The reader.** `evolve logs digest|events|failures|index|show --cycle N` reads the log layers D0 to D3. Each verb stops at its line budget (D0 40, D1 and D2 200, D3 150). It ends with a truncation line that names a narrower query. No verb returns a whole file.
 - **`log_access`.** `phase.json` accepts `log_access` (layers, categories, scope, line budget). With `--as PHASE`, a read outside the declared layers records `LOG_ACCESS_SHADOW` (WARN, module `log`) and goes on. The prompt of a phase that declares `log_access` gets the D0 digest and one instruction to use `evolve logs`.
 - Plan: [logging-and-process-hygiene-2026-10.md](docs/plans/logging-and-process-hygiene-2026-10.md) (§6.2 to §6.4). Docs: [internal-logread](docs/architecture/packages/internal-logread.md).
+## Added — the segment manifest of the ledger seal (ledger restructure C11, 2026-11-21)
+
+- **The seal line.** Each `segment_seal` line now carries `summary` (seq and time range, cycles, kind counts, raw and gz sha, line count, last line sha) and `manifest_sha256`. Old readers ignore the two new keys.
+- **The manifest.** `Seal` writes `ledger-segments/manifest.jsonl`, one line for each segment, before it appends the anchor. A missing or changed manifest is built again from the segments, and the result must match the previous seal. A mismatch stops the seal before it writes anything.
+- Plan: [ledger-restructure-2026-10.md](docs/plans/ledger-restructure-2026-10.md) (C11). Docs: [internal-adapters-ledger](docs/architecture/packages/internal-adapters-ledger.md).
 
 ## Added — the wave latency check (latency gates T6, 2026-11-14)
 

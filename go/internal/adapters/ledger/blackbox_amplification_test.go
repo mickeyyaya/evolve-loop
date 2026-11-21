@@ -59,11 +59,17 @@ func TestSealKeepTailZeroStillProducesDeepVerifiableLedger(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading segments dir after Seal(0): %v", err)
 	}
-	if len(segments) != 1 {
-		t.Fatalf("Seal(0) wrote %d segments, want 1", len(segments))
+	var names []string
+	for _, e := range segments {
+		if e.Name() != "manifest.jsonl" {
+			names = append(names, e.Name())
+		}
 	}
-	if !strings.HasSuffix(segments[0].Name(), ".jsonl.gz") {
-		t.Fatalf("segment name %q does not use .jsonl.gz suffix", segments[0].Name())
+	if len(names) != 1 {
+		t.Fatalf("Seal(0) wrote %d segments, want 1", len(names))
+	}
+	if !strings.HasSuffix(names[0], ".jsonl.gz") {
+		t.Fatalf("segment name %q does not use .jsonl.gz suffix", names[0])
 	}
 }
 
