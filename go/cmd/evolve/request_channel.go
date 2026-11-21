@@ -11,6 +11,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/agentrequest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/agentcmd"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cli/inboxcmd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -46,7 +47,7 @@ func requestHandoff(pol policy.Policy, agent agentSeat, emit func(signalcenter.E
 		return agentrequest.Result{Report: run.Report, RunLabel: run.RunLabel, Workspace: run.Workspace}, err
 	}
 	ch := agentrequest.Channel{
-		Executors: agentrequest.Executors(pol, agentrequest.DispatchDeps{Judge: judge, Run: dispatch, Now: time.Now}),
+		Executors: agentrequest.Executors(pol, agentrequest.DispatchDeps{Judge: judge, Run: dispatch, File: inboxcmd.NewFiler(inboxDeps(), stderr), Now: time.Now}),
 		Emit:      emit,
 		Now:       time.Now,
 	}

@@ -37,6 +37,7 @@ type harness struct {
 	runErr   error
 	maxDepth int
 	judgeErr error
+	filer    *fakeFiler
 }
 
 func newHarness(t *testing.T) *harness {
