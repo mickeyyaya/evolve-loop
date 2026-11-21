@@ -138,6 +138,10 @@ The hooks are defence in depth, because they fire only in Claude Code panes. The
   - `ciparity` (`ciparity.go`, the coverage-profile argv);
   - `pkg/acsassert` (`go_tests.go`);
   - `releasepreflight` (`releasepreflight.go`, args from its caller).
+- **The guard tests build their repositories with `gittest.Fixture`.** `gitRepo` in `docdelete_uncommitted_test.go` builds its repository with `gittest.Fixture`, with `commit.gpgsign` set to `false`. The reason is in [internal-gittest.md](internal-gittest.md). The rule is in [internal-rawgitratchet.md](internal-rawgitratchet.md).
+  - `TestGitRepo_CommitStartsNoDetachedMaintenanceWriter` pins the result. With `GIT_TRACE2_EVENT` set, the fixture commit starts no `maintenance` or `gc` child.
+  - Before the change, the commit started `git maintenance run --auto --quiet --detach`. That child can write under `.git` after the test ends and make the cleanup fail.
+  - After the change, 8 parallel processes ran `-test.count=25` of `TestDocDelete_` and `TestNeverCommitted_`. The result was 8/8 PASS.
 - **The suite is hermetic because the guards read no environment.** A guard's decision comes from its constructor arguments and cycle state; the one read is `$HOME`, taken once by `NewRole`. No shell the suite runs from can turn a deny into an allow. Pinned by `TestGuards_ReadNoEnvironmentButHome`, an AST scan of the package's non-test files. Role fixtures use non-`/tmp` paths such as `/work/wt/cycle-20`, because on Linux `t.TempDir()` sits under `/tmp`, where the always-safe rule decides before cycle state is read. A fixture whose workspace must not exist on disk serves its cycle state from the `cycleStateOnly` stub, since `WriteCycleState` mirrors run state into the workspace.
 
 ## Findings
