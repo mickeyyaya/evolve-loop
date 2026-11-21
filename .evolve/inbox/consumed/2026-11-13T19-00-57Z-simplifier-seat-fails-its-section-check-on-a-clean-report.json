@@ -4,6 +4,12 @@
     "The seat prompt carries the required headings that phase.json declares (a test over the composed prompt).",
     "Docs: the runner package note changes in STE; 100% coverage on each changed function; zero code comments."
   ],
+  "consumed": {
+    "at": "2026-11-21T01:00:11Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "done on main (PR #1461, dfbbd3fe1): TestAgentRunBridge_TheSeatPromptHoldsTheRequiredSectionsOfThePhaseContract (go/cmd/evolve/cmd_agent_contract_test.go:36) proves the seat prompt carries the required sections; TestAgent­Run_AReportWithoutTheRequiredHeadingRecordsTheMissingSectionAndKeepsTheFile covers criterion 1. A console build in dev/cl-b050 found no change needed."
+  },
   "created_at": "2026-11-13T19:00:57Z",
   "files": [
     "go/internal/phases/runner/dispatch.go",

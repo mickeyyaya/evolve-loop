@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Red first: a test with an inline source of an empty Test function makes emptytests.Check fail and name file, line and function; a body with t.Skip(reason) passes; a parse error fails the scan.",
+    "The build handoff floor and the ship repo-contract pack run the guard, proven by a test through the real floor entry that refuses a lane diff adding an empty test.",
+    "The guard reports 0 offenders on main.",
+    "100% coverage on each changed function, zero code comments, and the package note docs/architecture/packages/internal-emptytests.md in STE."
+  ],
+  "created_at": "2026-11-21T00:02:56Z",
+  "files": [
+    "go/internal/emptytests/emptytests.go",
+    "go/internal/gateregistry/seed_emptytests.go",
+    "go/internal/repocontract/repocontract.go",
+    "docs/architecture/packages/internal-emptytests.md"
+  ],
+  "fix": "Rebuild the cl-c13 work as a new linear branch from origin/main: go/internal/emptytests (Scan skips vendor, testdata, dot and underscore directories; a parse error fails the guard; a qualifying Test, Fuzz or Benchmark function with zero statements offends; t.Skip with a reason passes), a gate registry seed in the rawgitratchet pattern, and the repo-contract pack entry so the build handoff floor and ship run it. Reuse gotestname for the ignored-directory rule if it holds that rule, so the rule keeps one home.",
+  "id": "empty-test-body-guard-in-the-build-floor",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "ADR-0158 decision 19 asks for a guard against vacuous tests: in cycle 2035 empty test bodies such as func TestX(t *testing.T) {} passed every audit (docs/research/cost-aware-repair-2026-10.md F1.9, F1.10). No deterministic gate states the rule. acsnames only checks that a named test exists, so an empty test satisfies it. An earlier console build (uncommitted, worktree dev/cl-c13 on base 16bf6ff08) wrote the library go/internal/emptytests, a gate registry seed and repo-contract wiring, with a design in dev/cl-c13/DESIGN.md. Main has 0 offenders outside testdata today.",
+  "title": "A gate refuses a Go test, fuzz or benchmark function with an empty body",
+  "weight": 0.6
+}
