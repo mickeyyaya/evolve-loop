@@ -865,7 +865,7 @@ A worked example: the build pane of an agy cell runs `echo x > go/internal/guard
 
 | Hook guarantee | CLI-neutral layer | Where |
 |---|---|---|
-| `guard role`: a cycle does not change the control plane | the sandbox denies each write of a protected path (new); the ship tripwire refuses a cycle diff that touches a protected path (exists) | `bridge.Deps.withProtectedWrites`, `sandbox.writeProtectedWriteRules`; `ship.verifyNoControlPlaneEdits` (`go/internal/phases/ship/integrity.go:11`) |
+| `guard role`: a cycle does not change the control plane | the sandbox denies each write of a protected path (new). The build floor rejects a build that touches one (exists). The ship tripwire refuses a cycle diff that touches one (exists) | `bridge.Deps.withProtectedWrites`, `sandbox.writeProtectedWriteRules`; `core.ProtectedSurfaceFloorChecks` (wired in `productionStaticFloorChecks`, `go/cmd/evolve/cmd_cycle_config.go:46`); `ship.verifyNoControlPlaneEdits` (`go/internal/phases/ship/integrity.go:11`) |
 | `guard role`: a phase writes only its workspace and its worktree | the sandbox write grants (exist); the fence of a read-only phase restores each write outside its writable paths (exists) | `go/internal/bridge/sandbox_paths.go`; `go/internal/phases/runner/worktree_fence.go:12` |
 | `guard ship`: only `evolve ship` lands a commit | the sandbox grants the write of the own branch ref only, not of `main` (exists); the ship binds the audit to the tree (exists) | `bridge.sandboxGitWritePaths`; `go/internal/phases/ship/` |
 | `guard docdelete`: no delete of committed docs | the ship refuses the deletion of a file under `docs/` or `knowledge-base/` (exists) | `ship.refuseCommittedDocDeletion` (`go/internal/phases/ship/committed_doc_guard.go:17`) |
@@ -962,6 +962,30 @@ The tests:
 - The real proof: a cell at `shadow` runs `git ls-remote https://github.com/<repo>` with a helper stub that writes a marker. The stub does not start, and the marker does not appear.
 - `TestReadIsolation_ShadowDeniesTheSecretClass` (SBPL) and `TestSandboxWrap_ShadowMasksTheSecretClassOnLinux` (`bwrap`, with an absent entry that gets no mask). At `shadow` the run and raw rules still only report.
 - The contract test `TestAgentSandboxContract_ShadowReportsTheExecAndLetsItRun` (`bridge/sandbox_contract_integration_test.go:340`) keeps its exec half: the stub `claude` still runs at `shadow`. Its read half changes: the unrelated cycle and the raw log still read, and `$HOME/.ssh/id_fixture` is refused.
+
+### 9.3 A protected file written through a shell cannot ship (2026-11-21, proven)
+
+Question: a builder writes a protected file through a shell command and does not revert it. Can the cycle ship that change? No. In cycle 2157 (third try) a builder wrote a protected file through a shell. This section states which layer holds such a write.
+
+Three layers hold it, and they are the same for each local family (`claude-p`, `claude-tmux`, `codex`, `codex-tmux`, `agy`, `agy-tmux`, `agy-claude-tmux`, `ollama-tmux`). The sandbox wrap does not read the CLI for a protected write, so no manifest carries a rule for it.
+
+| Layer | What it does | Runs when |
+|---|---|---|
+| Sandbox deny | The shell write fails with `Operation not permitted` (§9.1). | `isolation.i7.stage` is `enforce`. At the default `shadow` it only reports. |
+| Build handoff floor | `core.ProtectedSurfaceFloorChecks` rejects the build handoff and names the path. | At the build handoff, when `workflow.build_floor` is on (the default). It does not run for a later writer such as the `audit_fix` rung. |
+| Ship tripwire | `ship.verifyNoControlPlaneEdits` refuses the diff with `CodeControlPlaneViolation`. | Each `--class cycle` ship, at each stage. |
+
+At the live default (`shadow`) with `workflow.build_floor` set to false, the ship tripwire holds alone. A floor rejection does not always end the cycle by itself: the `audit_fix` rung can deliver a build that has only prescribable residuals. A protected-path failure is not a prescribable residual, so the build still aborts.
+
+`claude-cloud` is outside this guarantee. It has no local sandbox wrap, no build floor and no `--class cycle` ship. Its deliverable is a GitHub pull request, and console review and the manual merge path hold it.
+
+The proofs are these tests:
+
+- `TestAShellWrittenProtectedFileIsHeldByTheBuildFloorAndTheShipTripwire` (`go/internal/phases/ship`, build tag `integration`): a `sh -c` write to `go/internal/guards/role.go` stays in a real git worktree. The floor rejects the handoff and the tripwire refuses the ship, and both name the path. The test reads the floor and `verifyClass` from the production code, so a mutation of the protected-surface list, of `protectedSurfaceFailures` or of `verifyClass` fails it.
+- `TestSandboxWrap_EveryLocalManifestFamilyGetsTheProtectedWriteDenyAtEnforce` (`go/internal/bridge`): each embedded manifest with a local transport gets the same deny rules, so a new family needs no test edit. Row N10 stays the one real-OS row.
+- `TestProductionBuildFloorChecks_RefusesAProtectedFileThroughTheRealManifest` (`go/cmd/evolve`) pins the production wiring of the floor.
+- `TestBuildFloorResidual_AnUnprescribableResidualAbortsAsToday` has one row for a protected-path failure beside a coverage residual.
+- `TestVerifyNoControlPlaneEdits_RejectsGateEdit`, `TestVerifyNoControlPlaneEdits_RejectsUntrackedGate` and `TestVerifyNoControlPlaneEdits_RejectsTrackedGateModification` (`go/internal/phases/ship/integrity_test.go`) pin the tripwire alone.
 
 ## 10. Routing data
 
