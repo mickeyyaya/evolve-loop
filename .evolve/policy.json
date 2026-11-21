@@ -131,6 +131,9 @@
     "orchestrator": {
       "stage": "enforce",
       "admission": "enforce",
+      "file_cells": [
+        "cmd/evolve"
+      ],
       "window": {
         "start": 8,
         "min": 4,
