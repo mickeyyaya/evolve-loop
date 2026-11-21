@@ -9,6 +9,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispositionrouter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -52,10 +53,10 @@ func applyEscalationBoundary(evolveDir string, cycle int, stderr io.Writer, sign
 }
 
 func moverReweight(evolveDir string, signals *signalcenter.Center) func(id string, weight float64) error {
+	root, _ := paths.ProjectRootOf(evolveDir)
 	opts := inboxmover.Options{
-		ProjectRoot: filepath.Dir(evolveDir),
+		ProjectRoot: root,
 		InboxDir:    filepath.Join(evolveDir, "inbox"),
-		LedgerPath:  filepath.Join(evolveDir, "ledger.jsonl"),
 		Signals:     signals,
 	}
 	return func(id string, weight float64) error {

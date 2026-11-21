@@ -8,6 +8,8 @@ import (
 	"sort"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 const seededFiles = 4
@@ -44,11 +46,6 @@ func ageAll(t *testing.T, files []string, ages ...time.Duration) {
 	}
 }
 
-func exists(p string) bool {
-	_, err := os.Stat(p)
-	return err == nil
-}
-
 func TestTrim_RemovesEveryFilePastTheAgeAndTheEmptyKeyDirectories(t *testing.T) {
 	t.Parallel()
 	root, files := seededStore(t)
@@ -77,7 +74,7 @@ func TestTrim_KeepsFreshFilesWhenNoCapIsSet(t *testing.T) {
 		t.Fatalf("fresh files stay; got %+v", rep)
 	}
 	for _, f := range files {
-		if !exists(f) {
+		if !acsassert.PathExists(f) {
 			t.Fatalf("%s was removed", f)
 		}
 	}
@@ -95,11 +92,11 @@ func TestTrim_TheSizeCapRemovesTheOldestFirstUntilTheRestFits(t *testing.T) {
 
 	rep := Trim(root, epoch, 14*24*time.Hour, total-1, os.Remove)
 
-	if rep.Files != 1 || exists(files[3]) {
+	if rep.Files != 1 || acsassert.PathExists(files[3]) {
 		t.Fatalf("one byte over the cap removes only the oldest file; got %+v", rep)
 	}
 	for _, f := range files[:3] {
-		if !exists(f) {
+		if !acsassert.PathExists(f) {
 			t.Fatalf("%s is newer and must stay", f)
 		}
 	}
@@ -114,7 +111,7 @@ func TestTrim_ADryRunRemoverCountsTheSamePlanAndLeavesEveryFile(t *testing.T) {
 		t.Fatalf("the preview counts every aged file; got %+v", real)
 	}
 	for _, f := range files {
-		if !exists(f) {
+		if !acsassert.PathExists(f) {
 			t.Fatalf("a no-op remover must leave %s", f)
 		}
 	}

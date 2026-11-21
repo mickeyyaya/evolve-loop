@@ -3,22 +3,16 @@
 package cycle86
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-func pathExists(p string) bool {
-	_, err := os.Stat(p)
-	return err == nil
-}
-
 func TestC86_CarryoverShipRefusedDismissed(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	state := filepath.Join(root, ".evolve", "state.json")
-	if !pathExists(state) {
+	if !acsassert.PathExists(state) {
 		t.Skip("state.json missing — skip cycle-86 ship-refused dismissed")
 	}
 	if acsassert.FileContainsAny(state, "abnormal-ship-refused-c86") {
@@ -29,7 +23,7 @@ func TestC86_CarryoverShipRefusedDismissed(t *testing.T) {
 func TestC86_CarryoverTurnOverrunDismissed(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	state := filepath.Join(root, ".evolve", "state.json")
-	if !pathExists(state) {
+	if !acsassert.PathExists(state) {
 		t.Skip("state.json missing — skip cycle-86 turn-overrun dismissed")
 	}
 	if acsassert.FileContainsAny(state, "abnormal-turn-overrun-c86") {
@@ -49,10 +43,10 @@ func TestC86_InboxC2C4Processed(t *testing.T) {
 	for _, f := range expected {
 		rootFile := filepath.Join(inbox, f)
 		procFile := filepath.Join(processed, f)
-		if pathExists(rootFile) {
+		if acsassert.PathExists(rootFile) {
 			t.Errorf("%s: still in root inbox", rootFile)
 		}
-		if !pathExists(procFile) {
+		if !acsassert.PathExists(procFile) {
 			t.Skipf("%s: not found in processed/ (cycle-86 not run)", procFile)
 		}
 	}
@@ -61,7 +55,7 @@ func TestC86_InboxC2C4Processed(t *testing.T) {
 func TestC86_NoNewTestBuildAbnormal(t *testing.T) {
 	root := acsassert.RepoRoot(t)
 	log := filepath.Join(root, ".evolve", "runs", "cycle-86", "abnormal-events.jsonl")
-	if !pathExists(log) {
+	if !acsassert.PathExists(log) {
 		return
 	}
 	hasForbiddenAgent := acsassert.FileContainsAny(log,
@@ -84,7 +78,7 @@ func TestC86_RegressionSuite86Passes(t *testing.T) {
 	}
 	for _, name := range expected {
 		p := filepath.Join(suiteDir, name)
-		if !pathExists(p) {
+		if !acsassert.PathExists(p) {
 			t.Skipf("%s missing — skip cycle-86 regression-suite", p)
 		}
 	}
