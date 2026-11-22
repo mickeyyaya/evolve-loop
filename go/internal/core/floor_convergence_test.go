@@ -453,6 +453,9 @@ func TestRunCycleFromPhase_AResumedAuditRejectionIsLearnedFrom(t *testing.T) {
 	if _, rerr := os.Stat(filepath.Join(root, ".evolve", "runs", "cycle-9", "failure-digest.json")); rerr != nil {
 		t.Fatalf("a resumed rejection of any phase must write the failure digest: %v", rerr)
 	}
+	if retro := o.runners[PhaseRetro].(*fakeRunner); retro.calls != 1 {
+		t.Errorf("retro runner calls = %d, want the retrospective dispatched once for the typed rejection", retro.calls)
+	}
 }
 
 func TestRunCycleFromPhase_AResumedFurtherCorrectionReportsABudgetThatHoldsIt(t *testing.T) {
