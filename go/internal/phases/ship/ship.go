@@ -31,6 +31,7 @@ type Config struct {
 	RepoContract     RepoContractFunc
 	Signals          *signalcenter.Center
 	Integration      *Integration
+	StageEvidence    StageOpener
 }
 
 type RepoContractFunc func(ctx context.Context, gate, root, baseRef, workspace string, stderr io.Writer, cleared func([]string)) error
@@ -45,6 +46,7 @@ type Phase struct {
 	repoContract     RepoContractFunc
 	signals          *signalcenter.Center
 	integration      *Integration
+	stageEvidence    StageOpener
 }
 
 func New(c Config) *Phase {
@@ -56,7 +58,7 @@ func New(c Config) *Phase {
 	if repoContract == nil {
 		repoContract = runRepoContractGateAt
 	}
-	return &Phase{runner: c.Runner, nowFn: nowFn, sleep: c.Sleep, phaseIO: c.PhaseIO, manifestGate: c.ManifestGate, repoContractGate: c.RepoContractGate, repoContract: repoContract, signals: c.Signals, integration: c.Integration}
+	return &Phase{runner: c.Runner, nowFn: nowFn, sleep: c.Sleep, phaseIO: c.PhaseIO, manifestGate: c.ManifestGate, repoContractGate: c.RepoContractGate, repoContract: repoContract, signals: c.Signals, integration: c.Integration, stageEvidence: c.StageEvidence}
 }
 
 func (p *Phase) Name() string { return phaseName }
@@ -125,6 +127,7 @@ func (p *Phase) shipOptions(req core.PhaseRequest, msg string) Options {
 		Sleep:                           p.sleep,
 		Signals:                         p.signals,
 		Integration:                     p.integration,
+		StageEvidence:                   p.stageEvidence,
 	}
 }
 

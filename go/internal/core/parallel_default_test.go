@@ -279,6 +279,7 @@ var serialRequiredTests = map[string]string{
 	"core.TestRunCycle_AnUndeliveredPromptAtEveryAttemptDoesNotPauseForQuota":                                     swapsQuotaBoundaryCheckpointer,
 	"core.TestRunCycleFromPhase_AWalledResumedDispatchNamesItsWalk":                                               swapsQuotaBoundaryCheckpointer,
 	"core.TestRunCycleFromPhase_WalledResumedCorrection_Defers":                                                   swapsQuotaBoundaryCheckpointer,
+	"core.TestFailedCycleEvidenceIsSealedAndScored":                                                               swapsQuotaBoundaryCheckpointer,
 	"core.TestRunCycle_ALedgerFaultDoesNotLoseTheQuotaPause":                                                      swapsQuotaBoundaryCheckpointer,
 	"core.TestRunCycle_AWalledPauseHandsTheWalkedCLIsToTheCheckpoint":                                             swapsQuotaBoundaryCheckpointer,
 	"core.TestRunCycle_AllFamilies85_CheckpointsAndDefers":                                                        swapsQuotaBoundaryCheckpointer,

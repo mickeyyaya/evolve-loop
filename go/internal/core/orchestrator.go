@@ -257,6 +257,9 @@ type Orchestrator struct {
 	verdictCacheLookupHook func(sha string, skipped bool, matched bool, entry verdictcache.Entry)
 
 	currentRunID atomic.Value
+
+	stageEvidence StageEvidence
+	stageSessions sync.Map
 }
 
 type Option func(*Orchestrator)
@@ -549,9 +552,9 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (_ CycleR
 		current:        PhaseStart,
 		lastVerdict:    VerdictPASS,
 		retryConfig:    o.retryConfig,
-		workflowConfig: o.workflowConfig,
+		workflowConfig: o.workflowConfig, stage: o.beginStageSession(init.cycle),
 	}
-	defer func() { cleanup(cr.preserveWorktree, cr.cycleCompletedNormally) }()
+	defer func() { cr.releaseRun(cleanup, retErr) }()
 	defer o.releaseShipWindow()
 	defer func() { cr.abnormalEpilogue(retErr) }()
 	defer func() { cr.checkpointInterruptedPhase(retErr) }()
