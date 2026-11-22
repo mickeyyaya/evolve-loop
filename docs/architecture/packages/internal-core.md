@@ -569,6 +569,10 @@ The reasons that the comments of the decision, disposition, dossier, failure-lea
 The reasons that the comments of the orchestrator, phase advisor, phase binding, self-check and graduation files carried. The code and the tests state the what.
 
 - **Orchestrator wiring.**
+  - `WithStageEvidence` wires the `StageRecorder` and `StageSealer` ports of shadow-contract K2. `RunCycle` and the resume entry open one recorder session when the cycle number is known. Both close and seal it in a `defer` on every exit path, so a failed, parked or cancelled cycle seals too. A hard kill is the one exit that cannot seal. The orphan seal (K2f) is to repair it.
+    - The seal runs on a context without the cancel of the cycle, bounded by `stageSealBudget`. The `exit` of the seal is `completed`, `failed`, `parked`, `deadline` or `unended`.
+    - A seal that fails emits `ORCHESTRATOR_STAGE_EVIDENCE_FAULT` and never changes the verdict of the cycle. A cycle with no decision seals nothing and stays quiet.
+    - `emitLadderDecision` is the emit site of the key `workflow.retry_ladder.stage`. It records the fields of the signal and `would_stop`.
   - `PhaseBoundaryCheckpointer` and `QuotaBoundaryCheckpointer` are package-level hooks set by the checkpoint package, because core cannot import it without a cycle.
   - `specFor` canonicalizes the phase name before the lookup, so the core and router spellings of one phase cannot miss each other.
     - The registry is the single source of truth and wins over `builtinControlSpec`.

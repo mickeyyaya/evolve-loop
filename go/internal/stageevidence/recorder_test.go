@@ -547,7 +547,7 @@ func TestCausePrecedenceNamesTheStrongestFault(t *testing.T) {
 		return stageevidence.Record{Session: s, Kind: stageevidence.KindClose, Fields: f}
 	}
 	gap := map[string]string{"counter." + keyA: "3"}
-	faulted := map[string]string{"fault": stageevidence.FaultWriteFailed}
+	faulted := map[string]string{"fault": stageevidence.CauseWriteFailed}
 	cases := []struct {
 		name string
 		recs []stageevidence.Record

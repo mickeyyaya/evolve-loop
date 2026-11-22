@@ -2,6 +2,7 @@ package ship
 
 import (
 	"context"
+	"maps"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -101,7 +102,9 @@ func (h heldCheck) recordShadow(rec heldproposal.Record) error {
 		h.logf("[ship] HELD-PROPOSAL: %v", err)
 		recordErr = err.Error()
 	}
-	h.emitShadow(rec, recordErr)
+	evidence := maps.Clone(h.emitShadow(rec, recordErr))
+	evidence["would_hold"] = "true"
+	h.opts.recordStage(h.cycle, StageKeyHeldProposals, evidence)
 	return nil
 }
 
@@ -147,11 +150,13 @@ func (h heldCheck) judge(approval heldproposal.Approval, found bool, tree string
 	return verdict, nil
 }
 
-func (h heldCheck) emitShadow(rec heldproposal.Record, recordErr string) {
+func (h heldCheck) emitShadow(rec heldproposal.Record, recordErr string) map[string]string {
+	fields := map[string]string{"cycle": strconv.Itoa(h.cycle), "tree": rec.Tree, "reasons": strings.Join(rec.Reasons, ","), "record_error": recordErr}
 	h.opts.Signals.Emit(signalcenter.Event{
 		Cycle: h.cycle, RunID: h.opts.RunID, Phase: "ship", Module: signalcenter.ModuleShip, Origin: "refuseUnapprovedHeldProposal",
 		Kind: signalcenter.KindShipWarning, Severity: signalcenter.SeverityInfo, Code: CodeHoldShadow,
 		Reason: "shadow: enforce would hold this landing for the operator",
-		Fields: map[string]string{"cycle": strconv.Itoa(h.cycle), "tree": rec.Tree, "reasons": strings.Join(rec.Reasons, ","), "record_error": recordErr},
+		Fields: fields,
 	})
+	return fields
 }

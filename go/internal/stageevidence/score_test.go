@@ -69,9 +69,9 @@ func (m memoryChain) ReadChain(context.Context, string) (stageevidence.Chain, er
 
 func wantCases() []stageevidence.Case {
 	return []stageevidence.Case{
-		{Class: stageevidence.ClassEscape, Cycle: 1, Seq: 1},
-		{Class: stageevidence.ClassFalseStop, Cycle: 2, Seq: 2},
-		{Class: stageevidence.ClassConflict, Cycle: 3, Seq: 3},
+		{Class: stageevidence.ClassEscape, ID: 1, Seq: 1},
+		{Class: stageevidence.ClassFalseStop, ID: 2, Seq: 2},
+		{Class: stageevidence.ClassConflict, ID: 3, Seq: 3},
 	}
 }
 
@@ -89,8 +89,8 @@ func TestVerdictRecomputesFromFixtureChain(t *testing.T) {
 	if !slices.Equal(got.Cases, wantCases()) {
 		t.Errorf("cases = %+v, want %+v", got.Cases, wantCases())
 	}
-	if got.Version != currentVersion || got.FirstCycle != 1 || got.LastCycle != 4 {
-		t.Errorf("version %q range %d to %d, want %q 1 to 4", got.Version, got.FirstCycle, got.LastCycle, currentVersion)
+	if got.Version != currentVersion || got.FirstID != 1 || got.LastID != 4 {
+		t.Errorf("version %q range %d to %d, want %q 1 to 4", got.Version, got.FirstID, got.LastID, currentVersion)
 	}
 	if got.ChainDigest != chain.Records[len(chain.Records)-1].Hash {
 		t.Errorf("chain digest %q is not the hash of the last record", got.ChainDigest)
@@ -206,8 +206,8 @@ func TestIncompleteAndLateEvidenceNeverCount(t *testing.T) {
 	if got.Decisions != 2 {
 		t.Errorf("decisions = %d, want 2: an incomplete cycle and a late record never count", got.Decisions)
 	}
-	if !slices.Equal(got.IncompleteCycles, []int{1}) {
-		t.Errorf("incomplete cycles = %v, want [1]", got.IncompleteCycles)
+	if !slices.Equal(got.IncompleteScopes, []string{"cycle-1"}) {
+		t.Errorf("incomplete scopes = %v, want [cycle-1]", got.IncompleteScopes)
 	}
 	if len(got.Late) != 1 || got.Late[0].ID != 3 || got.Late[0].Seq != 3 {
 		t.Errorf("late = %+v, want the one record of cycle 3 seq 3 listed", got.Late)
@@ -282,5 +282,29 @@ func TestEveryKeyGetsAScorer(t *testing.T) {
 		if scorer == nil || scorer.Name() == "" {
 			t.Errorf("ScorerFor(%q) = %v, want a named scorer", key, scorer)
 		}
+	}
+}
+
+func TestCasesAndIncompleteScopesNameTheirScopeSoEqualIdsStayApart(t *testing.T) {
+	t.Parallel()
+	pool := decision(2, 1, currentVersion, map[string]string{"would_stop": "true"})
+	pool.Scope = stageevidence.ScopePool
+	cycle := decision(2, 1, currentVersion, map[string]string{"would_stop": "true"})
+	chain := stageevidence.Chain{
+		Records: linked([]stageevidence.Record{pool, cycle}),
+		Outcomes: []stageevidence.Outcome{
+			{Scope: stageevidence.ScopePool, ID: 2, Shipped: true},
+			{ID: 2, Shipped: true},
+			{Scope: stageevidence.ScopeCurator, ID: 2, Incomplete: true},
+			{ID: 9, Incomplete: true},
+			{ID: 3, Incomplete: true},
+		},
+	}
+	got := stageevidence.Score(chain, currentVersion, gatecontract.Promotion{MinDecisions: 1}, stageevidence.DefaultScorer())
+	if len(got.Cases) != 2 || got.Cases[0].ScopeKey() != (stageevidence.ScopeKey{Kind: stageevidence.ScopePool, ID: 2}) || got.Cases[1].ScopeKey() != stageevidence.CycleScope(2) {
+		t.Errorf("cases = %+v, want one pool-2 case and one cycle-2 case", got.Cases)
+	}
+	if want := []string{"curator-2", "cycle-3", "cycle-9"}; !slices.Equal(got.IncompleteScopes, want) {
+		t.Errorf("incomplete scopes = %v, want %v ordered by kind then id", got.IncompleteScopes, want)
 	}
 }
