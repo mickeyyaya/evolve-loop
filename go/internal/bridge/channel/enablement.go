@@ -1,19 +1,8 @@
 package channel
 
-import "strings"
+import "github.com/mickeyyaya/evolve-loop/go/internal/policy"
 
-func ResolveStage(raw string) string {
-	switch s := strings.ToLower(strings.TrimSpace(raw)); s {
-	case "":
-		return "shadow"
-	case "0":
-		return "off"
-	case "off", "shadow", "enforce":
-		return s
-	default:
-		return "off"
-	}
-}
+func ResolveStage(raw string) string { return policy.ResolveIsolationStage(raw) }
 
 func Enabled(stage string) bool {
 	return stage == "enforce"

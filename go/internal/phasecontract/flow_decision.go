@@ -29,13 +29,8 @@ const (
 )
 
 func ParseFlowStage(s string) (FlowStage, bool) {
-	switch stage := FlowStage(s); stage {
-	case "", FlowStageLegacy:
-		return FlowStageLegacy, true
-	case FlowStageShadow, FlowStageEnforce:
-		return stage, true
-	}
-	return FlowStageLegacy, false
+	stage, ok := policy.ResolveFlowStage(s)
+	return FlowStage(stage), ok
 }
 
 func FlowStageAt(projectRoot string, warn io.Writer) FlowStage {
