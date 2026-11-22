@@ -710,7 +710,9 @@ failure — no new bypass env vars, no rebase, no force-push, no content deletio
     at `transport_retry` and stays transient, so the retry resumes the intent.
   - Any other rejection is a race: one fetch and one ff retry when origin is an ancestor of the
     pushed commit. A diverged origin becomes `needs-reaudit`, and a worktree ship unwinds the lane
-    first.
+    first. A local main that is only behind origin becomes `needs-rebind`
+    (`GIT_FLEET_REBASE_NEEDED`). The ship fast-forwards the local main in the ship window,
+    unwinds the lane, and the recovery rebinds it onto the synced main.
 
   The message ends with git's own words, never `<nil>`.
 - **No push, no PASS** (`GIT_LANE_NOT_ON_ORIGIN`): a lane with nothing to commit can hold a stranded

@@ -143,3 +143,44 @@ func TestEnterShipWindow_BreakingAHungHolderWarnsAndSignals(t *testing.T) {
 		t.Fatalf("signals=%+v, want %s naming the broken holder", *events, CodeShipWindowLeaseBroken)
 	}
 }
+
+func TestEnterShipWindow_TheReturnedContextMarksTheWindowOnlyWhenTheLeaseIsTaken(t *testing.T) {
+	t.Parallel()
+	readOnly := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(readOnly, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(filepath.Join(readOnly, ".evolve"), 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(filepath.Join(readOnly, ".evolve"), 0o755) })
+	for name, tc := range map[string]struct {
+		opts Options
+		held bool
+	}{
+		"lease taken":                 {opts: Options{Class: ClassCycle, ProjectRoot: t.TempDir()}, held: true},
+		"acquire fails on a live ctx": {opts: Options{Class: ClassCycle, ProjectRoot: readOnly}},
+		"manual class":                {opts: Options{Class: ClassManual, ProjectRoot: t.TempDir()}},
+		"cycle dry run":               {opts: Options{Class: ClassCycle, DryRun: true, ProjectRoot: t.TempDir()}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ctx, release := enterShipWindow(context.Background(), &tc.opts, &RunResult{})
+			defer release()
+			if got := shipwindow.Held(ctx); got != tc.held {
+				t.Fatalf("Held(ctx)=%v, want %v", got, tc.held)
+			}
+		})
+	}
+}
+
+func TestEnterShipWindow_AnAlreadyHeldContextIsReturnedUnchanged(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	outer := heldWindow(t, root)
+	ctx, release := enterShipWindow(outer, &Options{Class: ClassCycle, ProjectRoot: root}, &RunResult{})
+	defer release()
+	if ctx != outer || !shipwindow.Held(ctx) {
+		t.Fatal("a nested entry must reuse the held window, not queue behind its own lease")
+	}
+}

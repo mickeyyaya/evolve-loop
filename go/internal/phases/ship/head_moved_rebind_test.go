@@ -115,3 +115,21 @@ func TestVerifyAuditBinding_AMovedMainIsHeadMovedWithoutACarryForThatHead(t *tes
 		wantShipErr(t, err, core.CodeAuditBindingHeadMoved, core.ShipClassPrecondition, "git HEAD has moved since audit")
 	})
 }
+
+func TestVerifyAndLandInShipWindow_TheSyncTraceReachesTheReturnedResultWhenMainMoved(t *testing.T) {
+	t.Parallel()
+	c := auditedLaneThenMainMoved(t)
+	opts := auditOpts(t, c.lane.repo)
+	opts.ActiveWorktree = c.lane.worktree
+	opts.Class = ClassCycle
+
+	out, landed, err := verifyAndLandInShipWindow(context.Background(), opts, &RunResult{})
+
+	wantShipErr(t, err, core.CodeAuditBindingHeadMoved, core.ShipClassPrecondition, "carry not re-bound: no identical-rebase carry names audit "+c.ref)
+	if landed {
+		t.Fatal("landed = true, want a failed ship")
+	}
+	if !containsLog(out, "main sync") {
+		t.Errorf("returned logs = %v, want the main sync trace on the result the caller reads", out.Logs)
+	}
+}

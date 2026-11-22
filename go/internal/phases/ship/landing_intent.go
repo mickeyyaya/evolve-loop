@@ -19,6 +19,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shipjournal"
+	"github.com/mickeyyaya/evolve-loop/go/internal/shipwindow"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -283,7 +284,7 @@ func emitShipLanded(opts *Options, in landing.Intent) {
 }
 
 func (s *worktreeShip) unwindUnlessResumable(in landing.Intent, err error) error {
-	if se, ok := core.AsShipError(err); ok && se.Class == core.ShipClassTransient {
+	if resumableAtPush(s.ctx, err) {
 		s.logf("[ship] LANDING: the push of %s had a transient failure; main did not move, and a retry resumes at the push", in.CommitSHA)
 		return err
 	}
@@ -294,6 +295,14 @@ func (s *worktreeShip) unwindUnlessResumable(in landing.Intent, err error) error
 		return errors.Join(err, merr)
 	}
 	return err
+}
+
+func resumableAtPush(ctx context.Context, err error) bool {
+	se, ok := core.AsShipError(err)
+	if !ok || se.Class != core.ShipClassTransient {
+		return false
+	}
+	return se.Code != core.CodeGitFleetRebaseNeeded || shipwindow.HeldErr(ctx) != nil
 }
 
 func (s *worktreeShip) unwindLane(in landing.Intent, why string) error {

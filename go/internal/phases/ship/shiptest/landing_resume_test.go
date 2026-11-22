@@ -128,16 +128,16 @@ func TestRun_AResumeDeclinesOnADivergedOriginAndUnwindsTheLaneToTheAuditedShape(
 
 	res, err := runShip(t, l.Repo, l.options(sysexec.DefaultRunner, &shiptest.SleepLog{}))
 
-	se := shiptest.WantShipErr(t, err, core.CodeGitPushRejected, core.ShipClassPrecondition, "")
-	if se.Debug["repair_outcome"] != "needs-reaudit" || !containsLog(res, "does not resume: origin/main") {
-		t.Errorf("Debug[repair_outcome] = %q, logs %q: the resume declines on the diverged origin before it pushes the stale commit", se.Debug["repair_outcome"], res.Logs)
+	se := shiptest.WantShipErr(t, err, core.CodeGitFleetRebaseNeeded, core.ShipClassTransient, "")
+	if se.Debug["repair_outcome"] != "needs-rebind" || !containsLog(res, "does not resume: origin/main") {
+		t.Errorf("Debug[repair_outcome] = %q, logs %q: the resume declines on the moved origin before it pushes the stale commit, and a plane main behind origin routes to the rebind", se.Debug["repair_outcome"], res.Logs)
 	}
 	l.wantAuditedShape(t)
 	if status := l.Intent(t)["status"]; status != "unwound" {
 		t.Errorf("intent status %v, want unwound", status)
 	}
-	if shiptest.RemoteHeadSHA(t, l.Repo) != diverged || shiptest.HeadSHA(t, l.Repo) != l.Base {
-		t.Errorf("origin=%s main=%s, want origin untouched at %s and main at its pre-landing tip %s", shiptest.RemoteHeadSHA(t, l.Repo), shiptest.HeadSHA(t, l.Repo), diverged, l.Base)
+	if shiptest.RemoteHeadSHA(t, l.Repo) != diverged || shiptest.HeadSHA(t, l.Repo) != diverged {
+		t.Errorf("origin=%s main=%s, want origin untouched at %s and the plane main synced to it, never to the lane commit", shiptest.RemoteHeadSHA(t, l.Repo), shiptest.HeadSHA(t, l.Repo), diverged)
 	}
 }
 
