@@ -17,11 +17,11 @@
 
 | | Count |
 |---|---|
-| Incidents mapped | 80 |
-| Distinct failure modes (coverage-map rows) | 128 |
+| Incidents mapped | 81 |
+| Distinct failure modes (coverage-map rows) | 130 |
 | ✅ covered (a test fails if the bug comes back) | 89 |
 | 🟡 partial (related test, doesn't pin the exact mode) | 11 |
-| ❌ none (no regression test) | 28 |
+| ❌ none (no regression test) | 30 |
 | ⛔ untestable (external infra / live CLI) | 0 |
 
 These counts are tallies of the coverage map's rows, so they move with it: a new
@@ -37,7 +37,9 @@ Recounted on 2026-11-16: the record of the test leak under `go/` adds two rows. 
 
 Recounted on 2026-11-21: the 11 records of wave 183 add 11 incidents and 13 rows. Three rows are covered and 10 rows have no test yet. The covered rows are the cycle-2558 ratchet row, the cycle-2558 build-floor row and the TDD-floor row. PR #1597 and PR #1601 landed through batch PR #1604.
 
-The map now holds 80 incidents and 128 rows. Of these, 89 are covered, 11 are partial and 28 have no test. Before these rows, main held 69 incidents and 115 rows. Of these, 86 were covered, 11 partial and 18 with no test. PR #1597 had flipped two of them to covered.
+The record of cycle 2583 (2026-11-21) adds 1 incident and 2 rows, both with no test yet.
+
+The map now holds 81 incidents and 130 rows. Of these, 89 are covered, 11 are partial and 30 have no test. Before these rows, main held 69 incidents and 115 rows. Of these, 86 were covered, 11 partial and 18 with no test. PR #1597 had flipped two of them to covered.
 
 **Historical baseline.** The 2026-05-29 13-agent parallel sweep counted 14
 incidents and 73 distinct failure modes: 40 covered, 20 partial, 10 with no
@@ -177,6 +179,8 @@ not the coverage map, which is the hand-maintained per-incident record.
 | [2026-11-20 — five signal roots publish nothing to the event bus](2026-11-20-five-signal-roots-publish-nothing-to-the-event-bus.md) | `publisher.Roles()` lacks `integration`, `auth`, `queue`, `latency` and `retire`, and the guard checks a hand-written list of 7 roles | `events/publisher/publisher.go` (`Roles`), `cmd/evolve/cmd_root_guard_test.go` | ❌ | proposal: inbox item `signal-roots-under-unregistered-roles-publish-nothing` (`TestRootSignalCenter_EveryCallSiteRoleIsAPublisherRole`) |
 | [2026-11-20 — tests and predicates that wait on host time failed on a loaded host](2026-11-20-tests-and-predicates-that-wait-on-host-time-failed-on-a-loaded-host.md) | the ACS predicate `TestC2560_006` required a macOS kernel to user time ratio below 1.2 and measured 1.31 on a loaded host | `acs/cycle2560` (not on main) | ❌ | proposal: inbox items `core-tests-cut-git-starts-salvage-without-ratio-gate` and `triage-defer-unreachable-host-timing-ratio-criteria` |
 | 2026-11-20 — tests and predicates that wait on host time failed on a loaded host | `TestRun_StopSignalEndsRunAndClosesFile` sends the stop after a sleep of 80 ms and expects a sample, so it fails on a loaded runner | `cmd/hostsampler/main_test.go` | ❌ | proposal: inbox item `hostsampler-stop-test-stops-after-a-counted-read` |
+| [2026-11-21 cycle 2583 parallel guard after the last correction](2026-11-21-cycle-2583-parallel-guard-after-last-correction.md) | the floor runs a structure guard only inside the 5 to 11 minute package suite. A static finding skips that test tier. A correction that adds tests without `t.Parallel()` thus meets the guard only in the final floor | `core/build_handoff_floor.go`, `core/phase_bindings_selfcheck.go` | ❌ | proposal: inbox item `floor-runs-structure-guards-first-and-keeps-failure-detail` |
+| 2026-11-21 cycle 2583 parallel guard after the last correction | the floor text keeps only `--- FAIL:` and `FAIL` lines inside 400 bytes, so the line that names the failed test is dropped | `core/build_floor_retake.go`, `core/build_floor_reviewer.go` | ❌ | proposal: the same inbox item |
 | [2026-11-20 — inbox withdraw refused items that carry lifecycle stamps](2026-11-20-inbox-withdraw-refused-items-that-carry-lifecycle-stamps.md) | the boundary runbook chose `withdraw` for items that carry lifecycle stamps, and the verb refused 5 of them | console runbook, `inboxmover/lifecycle/withdraw.go` (`refuseLifecycleStamps`) | ❌ | none: the refusal is by design; the runbook check is the control |
 | [2026-11-20 — a parked lane never resumed after the main-red stop released](2026-11-20-a-parked-lane-never-resumed-after-the-main-red-stop-released.md) | `pool.resupply` skips an id that is in `known`, and `pool.settle` never clears it, so the lead todo of a paused scope is dropped | `fleet/pool.go` (`add`, `resupply`, `settle`) | ❌ | proposal: inbox item `pool-relaunches-a-parked-lane-after-the-main-red-stop-releases` (`TestPoolResupply_RelaunchesAParkedLeadAfterItsLaneExited`) |
 
