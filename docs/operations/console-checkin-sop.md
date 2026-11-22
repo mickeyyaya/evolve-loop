@@ -15,7 +15,7 @@ Related documents: [wave-operations.md](wave-operations.md) for the mechanics an
 *Implication:* a check-in must run on a timer and on each wake. Step A9 arms a watch for the stall code today.
 
 **F1.3** The console ran three review agents in parallel during the live wave. One reported a host load of 70 to 120. Source: [the retrospective of PR #1651](https://github.com/mickeyyaya/evolve-loop/pull/1651), file `docs/retrospectives/wave-185-verification-lock-stall.md`, M3.
-*Implication:* the console limits for suites and seats are numbers in step A8.
+*Implication:* the console limits for suites and seats are numbers in step A8 limits.
 
 **F1.4** The console applied backlog dispositions in a zsh loop with a loop variable named `path`. The variable is tied to `PATH`, so each tool except the evolve binary vanished, and 18 resolutions lost their evidence. Source: [the incident of 2026-11-19](../incidents/2026-11-19-the-console-applied-the-backlog-dispositions-with-two-errors.md), F1.1.
 *Implication:* rule R3 below. Print the full argument list before a state-changing call.
@@ -27,7 +27,7 @@ The operator rule of 2026-11-21: "When we bump into consistent failure, we need 
 - **Check-in:** one pass over the steps of Part A.
 - **Wave age:** the time from the `run_id` of `evolve wave status --json` to the time now, both in UTC. The `run_id` has the form `20261121T081737Z`.
 - **Outcome:** the result of a step. It is OK, BRAKE or FIX-LOCAL.
-- **GAP:** a reading that no verb gives today. The step names the item that adds it. A GAP step gives no shell command, because the project forbids scratch scripts.
+- **GAP:** a reading that the verb `E wave checkin` does not give, or cannot gather. The step names the hand step to run. A hand step gives a shell command only when a verb exists, because the project forbids scratch scripts.
 - **R:** the runtime root of the hub, `<hub>/runtime` ([workspace-layout.md](workspace-layout.md)). **E:** `R/go/bin/evolve`. **W:** the dev worktree of the change.
 
 ## Rules for every step
@@ -39,86 +39,63 @@ The operator rule of 2026-11-21: "When we bump into consistent failure, we need 
 5. **R5.** Read the whole output and the exit code of a state-changing command. Never pipe it into `tail` or `head`.
 6. **R6.** Chain dependent commands with `&&`, never with `;`.
 7. **R7.** Run each command with the runtime binary `E`. A different binary gives a warning in `wave next` ([wave-operations.md](wave-operations.md) §3).
-8. **R8.** The outcome of a GAP step is OK. Write "GAP A3" (or the step id) in the check-in note. After the item `wave-checkin-verb-runs-the-static-sop` lands, run `E wave checkin --json --project-root R` and take the reading of the step from its output.
+8. **R8.** The outcome of a GAP step is OK. Write "GAP" and the step id in the check-in note. Run the hand step that the action names.
 
 ## Part A: the wave check-in
 
-Run Part A when a console watch wakes, and at each whole hour of wave age until the stall wake of the item `wave-watch-wakes-on-a-stall` exists. Run the steps A1 to A10 in order. The outcome rule after A10 gives the action.
+Run Part A when a console watch wakes, and at each whole hour of wave age until the stall wake of the item `wave-watch-wakes-on-a-stall` exists. Run A0 first. Then run the hand steps in order. The outcome rule after the hand steps gives the action.
 
-### The decision table
+### A0: the verb
+
+- **Command:** `E wave checkin --json --project-root R`. Read the whole output and the exit code (rule R5).
+- **Read:** `.outcome` and `.steps[]` of the report. The verb prints no `.data` envelope. Each step has `.id`, `.reading`, `.threshold`, `.result` and `.action`.
+- **Step ids:** A1 is the loop and the brake. A2 is ships against wave age. A3 is a repeated failure. A4 is one abnormal-event kind in many cycles.
+- **More step ids:** A5 is lane stalls. A6 is main CI. `A8-disk` and `A8-load` are the host. A7, `A8-seats`, A9 and A10 are GAP steps.
+- **Thresholds:** the verb holds no number that this page copies. Each threshold is a key of the block `wave.checkin` in `policy.json`: `wave.checkin.stall_min_age_minutes`, `wave.checkin.stall_min_live_lanes`, `wave.checkin.min_ships_per_hour`, `wave.checkin.abnormal_min_cycles`, `wave.checkin.abnormal_min_events`, `wave.checkin.stall_lines`, `wave.checkin.stall_window_minutes`, `wave.checkin.load_per_core_limit` and `wave.checkin.load_sustained_minutes`. The failure ceilings of A3 are in `failure_policy.thresholds`, and the disk floor is `gc.disk_floor_gb`. The report prints the value in force in the threshold of each step. Read the value there. Do not apply a number from memory.
+- **Why the verb and not a hand count:** a replay of the healthy wave 184 showed a fault. The first hand thresholds of this page gave a false BRAKE for A3, A4 and A5. A3 now uses the fingerprint rule of the loop breaker. A4 uses a volume rule over several cycles. A5 counts the lines of a silent lane in a window of time. The same replay gives CONTINUE for wave 184 and BRAKE for wave 185 (PR #1661).
+
+| Exit code | Outcome | Action |
+|---|---|---|
+| 0 | CONTINUE | Go to the hand steps. When A1 gave "loop not running", end Part A. When A1 reads BRAKE-HELD, each step with a BRAKE reading gives HELD. The exit code is then 0, or 4 when a FIX-LOCAL step is present. Start no wave, and do not run the BRAKE procedure again. |
+| 3 | BRAKE | Run the BRAKE procedure. Write the step ids with the result BRAKE in the incident record. A step with the reading "unmapped reading" is a BRAKE by design. |
+| 4 | FIX-LOCAL | Run the FIX-LOCAL actions of the steps with the result FIX-LOCAL. Then go to the hand steps. |
+| 2 | read failure | The verb cannot read a record. Read stderr, fix the cause and run A0 again. This is not an outcome. Do not go on until a run exits 0, 3 or 4. |
+| 10 | usage error | Fix the arguments and run A0 again. |
+
+When the loop does not run (A1), the verb skips the other steps and exits 0. End Part A. Start a wave only at a boundary, with [wave-operations.md](wave-operations.md) §3.
+
+A step with the result GAP is a reading that the verb does not give or cannot gather. The action of the step names the hand step. Run that hand step below.
+
+- **A2 GAP:** read `E wave status` and the loop signals by hand.
+- **A8-load GAP:** too few samples. Read `sysctl -n vm.loadavg`. That reading replaces the step for this check-in, and no rerun is needed.
+
+### The hand steps
+
+The verb does not cover these steps. Run them in order after A0, also when the exit code is 0. When A1 gave "loop not running", skip them.
 
 | Step | Command | Read | Threshold and outcome |
 |---|---|---|---|
-| A1 | `E status --json --project-root R` | `.data.loop.running`, `.data.loop.brake_engaged` | running false: end Part A. Running true and brake true: BRAKE-HELD, go to A2. Both read as expected: OK. |
-| A2 | `E wave status --json --project-root R` | `.data.run_id`, `.data.pool_live`, `.data.measures.cost.shipped_cycles` | wave age 2 h or more, shipped 0 and pool_live 4 or more: STALL, BRAKE. Wave age 4 h or more, pool_live 4 or more and shipped under 2: SLOW, BRAKE. |
-| A3 | GAP (rule R8) | the failure class of each cycle, the fingerprint of each failure | Outcome OK, note "GAP A3". The verb will give: the same class in 2 or more cycles, or the same fingerprint in 2 or more waves: REPEAT, BRAKE. |
-| A4 | GAP (rule R8) | the count of one abnormal-event kind over the cycles of the wave | Outcome OK, note "GAP A4". The verb will give: 3 or more cycles: SHARED FAULT, BRAKE. |
-| A5 | `E signals tail --channel loop --code LOOP_ORCH_LANE_STALLED --project-root R` | the lines with a time at or after the wave start | 3 or more lines: STALL, BRAKE. |
-| A6 | `E status --json --project-root R` | `.data.ci.items[]` of `required.yml` on `main`: `status`, `conclusion` | completed and success: OK. Completed and failure: FIX-LOCAL. Not completed: OK, and run no batch. |
-| A7 | `E wave status --json --project-root R`, then `E clihealth usage --json --project-root R` | `.data.seats[].state` and `.data.benched` (wave status); `windows[].exhausted`, `windows[].percent_used` (clihealth usage) | Run the usage command only when a seat is `blocked` or `.data.benched` is not empty. `exhausted` true: note it, OK. `exhausted` false and the seat `blocked`: go to A5. |
-| A8 | `df -g R` and `sysctl -n vm.loadavg` | free GiB, load average of 1 minute | free under 10 GiB: FIX-LOCAL. Load 50 or more at two check-ins in a row: BRAKE. |
+| A6b | `E status --json --project-root R` | `.data.prs.items[]` with `checks` `failing` | Each such PR: `E ci classify pr:<N> --json --project-root R`. Exit 0: add `--rerun`. Other exit: Part B for that PR. |
+| A7 | `E wave status --json --project-root R`, then `E clihealth usage --json --project-root R` | `.data.seats[].state` and `.data.benched` (wave status); `windows[].exhausted`, `windows[].percent_used` (clihealth usage) | Run the usage command only when a seat is `blocked` or `.data.benched` is not empty. `exhausted` true: note it, OK. `exhausted` false and the seat `blocked`: read the seat lines of A5. |
+| A8 limits | the console limits below | the count of console suites and seats | Over a limit: start nothing new. |
 | A9 | `ps -axo pid=,etime=,command=` | one line for each console watch | a watch with no line: FIX-LOCAL, arm it now. |
 | A10 | `E inbox list --status console --json --project-root R` | the ids that a wake line names | each named id: take it. |
 
 After A10, apply the outcome rule:
 
-1. When any step gave BRAKE and A1 did not give BRAKE-HELD, run the BRAKE procedure.
-2. When any step gave FIX-LOCAL, run the FIX-LOCAL actions in the order of the steps.
+1. When A0 exited 3, run the BRAKE procedure. An exit 3 never comes with a BRAKE-HELD reading in A1.
+2. When A0 exited 4, or A6b or A9 gave FIX-LOCAL, run the FIX-LOCAL actions in step order.
 3. In all other cases, the outcome is CONTINUE: arm the watches of A9 again and end the check-in.
 
-### A1: loop and brake state
+### A5 seat lines
 
-- **Command:** `E status --json --project-root R`
-- **Read:** `.data.loop.running` and `.data.loop.brake_engaged`.
-- **Action by reading:**
-  - `running` is false: no wave runs. End Part A. Start a wave only at a boundary, with [wave-operations.md](wave-operations.md) §3.
-  - `running` is true and `brake_engaged` is true: the state is BRAKE-HELD. The running cycles finish. Go to A2. Do not start a wave. Do not run the BRAKE procedure again.
-  - `running` is true and `brake_engaged` is false: go to A2.
-- **Evidence:** the live status of 2026-11-21 14:15Z showed `running=true brake=true cycle=2590`, which is BRAKE-HELD.
+When A5 gives BRAKE, or A7 finds a blocked seat, run `E wave status --project-root R` and read each `seat:` line. Copy the lines into the incident record. Do not decide a cause from them.
 
-### A2: ships against wave age and live lanes
+### A6 and A8 disk: the FIX-LOCAL actions of the verb
 
-- **Command:** `E wave status --json --project-root R`
-- **Read:** `.data.run_id` (wave start), `.data.pool_live` (live lanes), `.data.measures.cost.shipped_cycles` and `.data.measures.cost.started_cycles`.
-- **Threshold:** wave age of 2 h or more, `shipped_cycles` of 0 and `pool_live` of 4 or more. The reason for 2 h: the median time to a verdict was 60.5 min in wave 183 and 52.6 min in wave 184 (`.data.runs[].measures.cost.median_llm_minutes_to_verdict`). Two hours is more than two medians.
-- **Action:** a match is STALL. The outcome is BRAKE. No match: OK.
-- **Evidence:** wave 185 matched at 10:17Z and no action was taken until 13:58Z. Wave 184 shipped 5 of 8.
-- **Slow rule:** wave age of 4 h or more, `pool_live` of 4 or more and `shipped_cycles` under 2 is SLOW. The outcome is BRAKE. The reason: the medians to a verdict were 60.5 min in wave 183 and 52.6 min in wave 184 (`.data.runs[].measures.cost`). Four hours is about four medians. Wave 184 shipped 5 of 8 cycles. This interim rule ends when the verb of the first follow-up item adds a ship-rate threshold.
-
-### A3: the same failure repeats
-
-- **Reading:** GAP: needs item `wave-checkin-verb-runs-the-static-sop`. No verb prints the failure class of each cycle of a wave. `evolve wave status` prints only the top class (`.data.health.top_fail_class`).
-- **Threshold:** the same failure class in 2 or more cycles of the wave. The key `failure_policy.thresholds.repeat_ceiling` has the value 2 for the same case in the pipeline. The same fingerprint in 2 or more waves is also REPEAT.
-- **Action:** a match is BRAKE.
-- **Note:** `evolve kb graph recurrences <fingerprint>` counts the recurrences of a known fingerprint. The source of the fingerprint for each cycle is not verified. The item must name it.
-
-### A4: one abnormal-event kind in many cycles
-
-- **Reading:** GAP: needs item `wave-checkin-verb-runs-the-static-sop`. Each cycle writes `abnormal-events.jsonl` in its run directory. No verb counts one `event_type` over the cycles of a wave.
-- **Threshold:** 3 or more cycles with the same `event_type`, for example `verify-single-flight-unavailable`. Wave 185 had 75 such events in 9 cycles.
-- **Action:** a match is SHARED FAULT. The outcome is BRAKE.
-- **Until the verb exists:** A5 gives the same result for the wave 185 case, because 9 lane stalls fired with the lock timeouts.
-
-### A5: lane stalls
-
-- **Command:** `E signals tail --channel loop --code LOOP_ORCH_LANE_STALLED --project-root R`
-- **Read:** the lines whose time (first column) is at or after the wave start. Count them. The loop publishes one line for each stalled lane. The key `fleet.orchestrator.stall_minutes` (default 30) sets the stall.
-- **Threshold:** 3 or more lines in the wave.
-- **Action:** a match is STALL. The outcome is BRAKE. With 1 or 2 lines: OK, and write the lane names in the check-in note.
-- **Then read the seat lines:** run `E wave status --project-root R` and read each `seat:` line. Copy the lines into the incident record. Do not decide a cause from them.
-- **Evidence:** wave 185 had 9 lines from 09:09:43Z.
-
-### A6: main CI and the integration batch
-
-- **Command:** `E status --json --project-root R`
-- **Read:** the item of `.data.ci.items[]` with `workflow` `required.yml` and `branch` `main`. Read `status` and `conclusion`.
-- **Action by reading:**
-  - `status` is not `completed`: OK. Start no integration batch. A batch needs a complete and green main run.
-  - `conclusion` is `success`: OK.
-  - `conclusion` is `failure`: run `E ci classify <run-id> --json --project-root R`. The run id is the last part of the `url`. Exit 0 means a retry is safe: run `E ci classify <run-id> --rerun --project-root R`. Any other exit: FIX-LOCAL. Land the fix with `evolve integration batch --main-red-fix <PR>` at the next boundary.
-  - `.data.ci.available` is false: FIX-LOCAL. Run `E doctor probe gh` and read the result.
-- **Also read:** each PR of the console with `checks` `failing` in `.data.prs.items[]`. Run `E ci classify pr:<N> --json --project-root R`. Exit 0: add `--rerun`. Other exit: Part B for that PR.
+- **Main CI (A6):** the verb names the run id. Run `E ci classify <run-id> --json --project-root R`. Exit 0 means a retry is safe: run `E ci classify <run-id> --rerun --project-root R`. Any other exit: land the fix with `evolve integration batch --main-red-fix <PR>` at the next boundary. When main CI is not completed, run no batch: a batch needs a complete and green main run. When the CI reading is unavailable, run `E doctor probe gh` and read the result.
 - **Rules:** code PRs merge only at a boundary. The batch rules are in [the console PR train](wave-operations.md#the-console-pr-train). The merge window is in [wave-operations.md](wave-operations.md) §5.
+- **Disk (A8):** free space under the floor `gc.disk_floor_gb`: run `E gc --project-root R`. The verb releases only finished cycles and orphans. Read the new free space. When it is still under the floor, run `go clean -cache`. The key `preflight.min_free_gib` makes `wave next` refuse a launch. The reason for the floor: the Go build cache reached 138 GB and left 273 MB free on 2026-11-03.
 
 ### A7: CLI usage
 
@@ -127,21 +104,15 @@ After A10, apply the outcome rule:
 - **Read:** each `windows[].exhausted` and `windows[].percent_used`.
 - **Action by reading:**
   - `exhausted` is true: the family is out of quota. Write it in the check-in note. The pool walks to the next family. Take no other action.
-  - `exhausted` is false in each window and the seat is `blocked`: the block is not quota. Run A5 and read its seat lines.
+  - `exhausted` is false in each window and the seat is `blocked`: the block is not quota. Read the seat lines of A5.
   - `percent_used` is 95 or more in a window: write it in the status report. The operator rule of 2026-11-06 says that usage is no reason for a brake.
 - **Evidence:** on 2026-11-21 the seats were taken for a quota block. Usage was not exhausted ([the retrospective of PR #1651](https://github.com/mickeyyaya/evolve-loop/pull/1651), file `docs/retrospectives/wave-185-verification-lock-stall.md`, M5).
 - **Limit:** a seat that waits for the host lock shows `blocked` ([the retrospective of PR #1651](https://github.com/mickeyyaya/evolve-loop/pull/1651), file `docs/retrospectives/wave-185-verification-lock-stall.md`, S7). The item `verify-lock-holder-gets-the-host-budget` fixes that.
 
-### A8: host and console load
+### A8 limits: console suites and seats
 
-- **Disk command:** `df -g R`. Read the `Avail` column in GiB.
-  - Under 10 GiB: FIX-LOCAL. Run `E gc --project-root R`. The verb releases only finished cycles and orphans. Read the new `Avail`. When it is still under 10 GiB, run `go clean -cache`.
-  - The key `preflight.min_free_gib` (default 1.0) makes `wave next` refuse a launch. The 10 GiB threshold is new. It starts in this page. The reason: the Go build cache reached 138 GB and left 273 MB free on 2026-11-03.
-- **Load command:** `sysctl -n vm.loadavg`. Read the first number (load of 1 minute). Read the CPU count with `sysctl -n hw.ncpu`.
-  - Under 50: OK. The idle load of this host is 23.6 on 14 cores, so a ratio to the CPU count gives false alarms.
-  - 50 or more: do not start a console suite or a seat. Write the value in the check-in note. When the value is 50 or more at two check-ins in a row, the outcome is BRAKE. The reason: the loads of 50 to 75 on 2026-11-14 and 70 to 120 on 2026-11-21 came from unbudgeted gates.
-- **Console limits:** the console runs at most 1 full suite at any time. It runs at most 8 build seats and at most 4 review seats at any time. It runs one seat for each worktree.
-  - The count of console suites and seats: GAP: needs item `console-full-suite-guard-during-a-wave` for suites, and item `wave-checkin-verb-runs-the-static-sop` for seats. Until they exist, keep one line for each started seat in the check-in note. Start the next suite only when the line of the last suite has a verdict.
+- **Console limits:** the console runs at most 1 full suite at any time. It runs at most 8 build seats and at most 4 review seats at any time. It runs one seat for each worktree. While A0 gives BRAKE for the host load, start no console suite and no seat.
+- **Count:** no verb counts the console suites and seats. Keep one line for each started seat in the check-in note. Start the next suite only when the line of the last suite has a verdict. The item `console-full-suite-guard-during-a-wave` adds the guard for suites.
 - **Evidence:** [the retrospective of PR #1651](https://github.com/mickeyyaya/evolve-loop/pull/1651), file `docs/retrospectives/wave-185-verification-lock-stall.md`, M3.
 
 ### A9: the console watches
@@ -157,21 +128,21 @@ Four watches must run. Read `ps -axo pid=,etime=,command=` and find one line for
 
 - **Action:** a watch with no line is FIX-LOCAL. Start it now, under a monitor. `wave watch` ends when the loop ends, so start it again after each `wave next`.
 - **Rule:** after each wake, arm the watch again before you handle the wake.
-- **Limit:** the channel `signals` is best-effort. A1 to A10 read the state at each check-in, so a lost line does not hide a task.
+- **Limit:** the channel `signals` is best-effort. Each check-in reads the state again, so a lost line does not hide a task.
 
 ### A10: console-routed tasks
 
 - **Command:** `E inbox list --status console --json --project-root R`
 - **Read:** the ids that the wake lines `INBOX_ITEM_ROUTED_CONSOLE` and `ORCHESTRATOR_BLOCKER_ROUTED` name.
 - **Action:** take each named id at once. Run `E inbox show <id> --project-root R`, then start Part B for its fix. Do not ask the operator.
-- **Standing backlog:** the console list holds items that no wake named. Take the top item with `E inbox rank --list console --top 1 --project-root R` only when A1 to A9 gave OK.
+- **Standing backlog:** the console list holds items that no wake named. Take the top item with `E inbox rank --list console --top 1 --project-root R` only when A0 and the hand steps gave CONTINUE.
 
 ### The BRAKE procedure
 
 Run the steps in order. The reading that caused the BRAKE is the trigger.
 
 1. **Engage the brake.** Run `E loop-stop --json --project-root R`. Read the exit code. Exit 0 is the expected value. The running cycles finish. Do not run `--wait` in this step, and do not kill a process.
-2. **Capture the evidence.** Save these outputs before any change: `E wave status --json`, `E wave supply --json`, `E wave latency --json`, `E signals tail --channel loop --code LOOP_ORCH_LANE_STALLED`, and the seat lines of `E wave status`. Start the [issue-record skill](../../skills/issue-record/SKILL.md) with them.
+2. **Capture the evidence.** Save these outputs before any change: `E wave checkin --json`, `E wave status --json`, `E wave supply --json`, `E wave latency --json`, `E signals tail --channel loop --code LOOP_ORCH_LANE_STALLED`, and the seat lines of `E wave status`. Start the [issue-record skill](../../skills/issue-record/SKILL.md) with them.
 3. **File the blocker.** Write one item JSON with `route` `console-manual`. Use the fields of step B8. Run `E inbox add --file <item.json> --project-root R`. A mid-wave edit, route or withdraw is refused, so add a new item and do not edit an old one.
 4. **Fix console-first.** Write the design document, then the architecture review, then the build. No build seat starts before the review passes. Each change goes through Part B.
 5. **Merge at a boundary only.** Run `E loop-stop --wait --timeout 10m --project-root R`. Exit 0 means no cycle is live. Exit 1 means a cycle is live: do not merge, and run the same command again after the next wake.
@@ -179,7 +150,7 @@ Run the steps in order. The reading that caused the BRAKE is the trigger.
 
 ### The FIX-LOCAL actions
 
-Run the actions of the steps with the outcome FIX-LOCAL, in step order. The action of each step is in its section. A FIX-LOCAL action never stops the loop.
+Run the actions of the steps with the outcome FIX-LOCAL, in step order. The actions of A6 and the disk of A8 are above. The action of A9 is in its section. A FIX-LOCAL action never stops the loop.
 
 ## Part B: the change check-in
 
@@ -241,8 +212,10 @@ For Go code, run these commands from `W/go`, with `GOTOOLCHAIN=go1.23.12` for th
 6. `go test -count=1 -tags acs ./acs/regression/protectedsurface/...` exits 0. Run it when the change touches a gate or a guard file.
 7. `E floor run --root W` prints `PASS` for each tier. Read [runtime-reference.md](runtime-reference.md), "evolve floor run", for the tiers.
 8. `E cover changed --base origin/main --root W` exits 0. Each changed function must have 100% coverage.
+9. For every code change, run `go test -count=1 ./internal/guards/ ./internal/testaudit/ ./test/...` from `W/go`. It exits 0. The commit gate does not run these suites. On 2026-11-21 they caught a sleep-sync test, four error-text-match tests and a private `go test -timeout` in CI only.
+10. For every code change, run `GOTOOLCHAIN=go1.23.12 go test -count=1 -coverprofile <file> <changed packages>` from `W/go`. Then run `E cover changed --base origin/main --profile <file>`. It exits 0. CI runs `cover-changed` in the Go 1.23 job. Run every test of the changed functions: a `-run` filter that omits one gives a false refusal.
 
-- **Suite limit:** the steps 3 and 7 can run a full suite. While a wave runs, start one only when A8 allows it, and run at most 1.
+- **Suite limit:** the steps 3 and 7 can run a full suite. While a wave runs, start one only when A8 limits allow it, and run at most 1.
 - **Ratchets:** the tier `ratchet` of the floor runs the whole-tree ratchets (`rawgitratchet`, `sizeratchet` and the test duplicate check). Run it after you stage a resolved conflict.
 - **Recovery:** a red command: fix the cause, run `git -C W add -A`, run B3 again. Never weaken a gate. Read the failed step name first ([wave-operations.md](wave-operations.md) §5 and the standing rule on CI red).
 
@@ -309,16 +282,15 @@ For Go code, run these commands from `W/go`, with `GOTOOLCHAIN=go1.23.12` for th
 
 ## What this page does not do
 
-- It does not give a verb. The two items below add the verbs. Until they exist, an LLM follows this page by hand.
+- It gives the readings of Part A through `evolve wave checkin` (PR #1661). The steps that the verb does not cover, and the whole of Part B, an LLM still follows by hand until the items below land.
 - It does not read the cause of a stall. Part A stops the wave. The incident record finds the cause.
-- It does not move a threshold into policy. The new thresholds are 2 h, 4 lanes, 3 lines, 3 cycles, 10 GiB and a load of 50. They start here. The item `wave-checkin-verb-runs-the-static-sop` moves them to `policy.json`.
+- It holds no threshold of A2 to A5 and A8 disk and load. The keys `wave.checkin.*` in `policy.json` are the one home of those numbers.
 - The `gh` rule: the operator allowed the console to run `gh` on 2026-11-17 for tasks like a close of a superseded PR. A seat never runs `gh`. A merge goes only through the integration batch.
 
 ## Follow-up items
 
 | Item | What it adds |
 |---|---|
-| `wave-checkin-verb-runs-the-static-sop` | One verb that runs each step of Part A from the records. It prints one action and an exit code. It has the GAP readings of A3, A4 and A8. |
 | `console-land-verb-runs-the-static-check-in` | One verb that runs the steps B5 to B7 in order, with the fixed recoveries. It refuses when a step was skipped. |
 | `wave-watch-wakes-on-a-stall` | A wake on a stall. It ends the hourly trigger of Part A. |
 | `console-full-suite-guard-during-a-wave` | The guard for the limit of 1 console suite. |
