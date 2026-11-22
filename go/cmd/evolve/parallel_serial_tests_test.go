@@ -825,6 +825,7 @@ var serialTests = map[string]string{
 	"main.TestSyncMainAtWaveBoundary_AlreadyCurrentIsQuietNoop":                                                            "sets env through a helper",
 	"main.TestSyncMainAtWaveBoundary_DirtyTrackedFileWarnsBlockedNotDiverged":                                              "sets env through a helper",
 	"main.TestSyncMainAtWaveBoundary_DiscardsInboxStampsOriginSupersededAndFastForwards":                                   "sets env through a helper",
+	"main.TestSyncMainAtWaveBoundary_AFetchConfigThatOmitsMainStillRefreshesOriginMain":                                    "sets env through a helper",
 	"main.TestSyncMainAtWaveBoundary_FastForwards":                                                                         "sets env through a helper",
 	"main.TestSyncMainAtWaveBoundary_LocalAheadOnlyIsNotReportedAsFastForward":                                             "sets env through a helper",
 	"main.TestSyncMainAtWaveBoundary_LocalAheadSkipsLoudly":                                                                "sets env through a helper",
