@@ -22,7 +22,10 @@ type shedRecord struct {
 }
 
 func ShedDeclinedContinuation(opts Options, cycle int, declined continuation.Continuation) ([]string, error) {
-	opts.resolveOpts()
+	opts, err := opts.resolved()
+	if err != nil {
+		return nil, err
+	}
 	if declined.SnapshotSHA == "" {
 		return nil, nil
 	}

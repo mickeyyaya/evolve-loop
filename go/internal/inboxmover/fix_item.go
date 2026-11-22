@@ -6,8 +6,11 @@ import (
 )
 
 func ConsumeFixItem(opts Options, id string, p PromoteOpts) error {
-	opts.resolveOpts()
-	_, err := Locate(opts.InboxDir, id)
+	opts, err := opts.resolved()
+	if err != nil {
+		return err
+	}
+	_, err = Locate(opts.InboxDir, id)
 	if errors.Is(err, ErrNotFound) {
 		return nil
 	}
