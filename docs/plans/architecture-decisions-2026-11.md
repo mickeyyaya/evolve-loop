@@ -242,8 +242,8 @@ Each code component needs 100% coverage on changed lines, no code comment and th
 | AD3-5 retire four design items | done: the four ids are in `inbox/consumed` | none | none |
 | AD4-1 H9 `output_digest` stamp | done | [#1332](https://github.com/mickeyyaya/evolve-loop/pull/1332), [`bc711a9`](https://github.com/mickeyyaya/evolve-loop/commit/bc711a9fa); `go/internal/core/handoff_reviewer.go:64` | none |
 | AD4-2 handoff doc update | done | [#1332](https://github.com/mickeyyaya/evolve-loop/pull/1332) | none |
-| AD4-3 merge #1070 and run the ratchet check | unverified: no commit for #1070 found by this review | none | none |
+| AD4-3 merge #1070 and run the ratchet check | dropped (operator, 2026-11-22) | none | none: PR #1070 is not found; the AD4-4 item owns the ratchet merge. Old status: unverified; this review found no commit for #1070 |
 | AD4-4 ratchet step merges its own PR | not started: no `ratchet_merge` key in the policy code | none | 2026-11-03T00-33-18Z-arch-decisions-ad4-4-the-ratchet-step-merges-its-own-pr |
-| AD4-5 ratchet docs and `enforce` | not started (needs AD4-4) | none | none (waits for AD4-4) |
+| AD4-5 ratchet docs and `enforce` | dropped (operator, 2026-11-22) | none | none: the docs and the flip follow AD4-4 and its shadow evidence; the AD4-4 item covers them. Old status: not started; it needs AD4-4 |
 
-The inbox and handoff parts (D2, D3 and D4a) are mostly on main. The credential parts of D1 are mostly open: AD1-3, AD1-5 to AD1-8 and AD1-10. D2b (AD2-5, AD2-9), AD3-2 and AD4-4 are open items too. AD3-3, AD3-4 and AD4-5 have no open item, and AD3-3 and AD3-4 have drafts. AD4-3 is unverified. The item AD1-1 and AD1-9 consumes came as bookkeeping, so their code evidence is the test and the doc state.
+The inbox and handoff parts (D2, D3 and D4a) are mostly on main. The credential parts of D1 are mostly open: AD1-3, AD1-5 to AD1-8 and AD1-10. D2b (AD2-5, AD2-9), AD3-2 and AD4-4 are open items too. AD3-3 and AD3-4 have no open item, and they have drafts. The operator dropped AD4-3 and AD4-5 on 2026-11-22. The item AD1-1 and AD1-9 consumes came as bookkeeping, so their code evidence is the test and the doc state.

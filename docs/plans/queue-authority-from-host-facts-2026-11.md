@@ -235,11 +235,11 @@ The goal of the whole plan: the next review of each PR has 0 CRITICAL findings o
 | Component | Status | Change lists | Open item |
 |---|---|---|---|
 | K1 record type and `LanePin` | done | PR 1 landed as direct commits: [`caba5fb`](https://github.com/mickeyyaya/evolve-loop/commit/caba5fb88), [`0cbfd3f`](https://github.com/mickeyyaya/evolve-loop/commit/0cbfd3f5f), [`6274bf5`](https://github.com/mickeyyaya/evolve-loop/commit/6274bf52e) (2026-11-06); `go/internal/committedset/lanerecord.go` | none |
-| K2 drift signal on each exit path | partial: `LaneDrift` is on main (`lanerecord.go:116`); the exit-path wiring (D18) is unverified | same commits | none |
-| K3 deny and contract rows | partial: unverified. No `.evolve/lineage` deny found in the sandbox or guard code | none found | none |
+| K2 drift signal on each exit path | dropped (operator, 2026-11-22) | same commits | none: unverified and no failed cycle cited. Old status: partial; `LaneDrift` is on main (`lanerecord.go:116`), and the exit-path wiring (D18) is unverified |
+| K3 deny and contract rows | dropped (operator, 2026-11-22) | none found | none: unverified and no failed cycle cited. Old status: partial and unverified; no `.evolve/lineage` deny was found in the sandbox or guard code |
 | K4 write failure and symlink refusal | not started: no symlink refusal or mode 0444 in `lanerecord.go` | none | none (draft `queue-authority-k4-record-write-failure-and-symlink`) |
 | K5 reference guard | done | `go/internal/committedset/lanepin_reader_guard_test.go`, `lanepin_guard_forms_test.go` (the 8 planted forms); [`6274bf5`](https://github.com/mickeyyaya/evolve-loop/commit/6274bf52e) | none |
-| T1 route at triage | partial: `protectedroute.go` predates the plan ([`7e1bf2f`](https://github.com/mickeyyaya/evolve-loop/commit/7e1bf2f57)); the D7 detection rule is unverified | none specific | none |
+| T1 route at triage | dropped (operator, 2026-11-22) | none specific | none: the D7 rule is unverified and no failed cycle is cited. Old status: partial; `protectedroute.go` predates the plan ([`7e1bf2f`](https://github.com/mickeyyaya/evolve-loop/commit/7e1bf2f57)), and the D7 detection rule is unverified |
 | T2 typed reason | not started: `RouteConsoleRequest` still takes a string `Reason` (`go/internal/cli/inboxcmd/cmd_inbox_route_console.go:44`) | none | none (draft `queue-authority-t2-typed-console-route-reason`) |
 | M1 mover refusal and PASS path | done | cycle 2386, [`af0b776`](https://github.com/mickeyyaya/evolve-loop/commit/af0b77607a5c55553ae2ffe77628619ed1dfdc92); `inboxmover.FilterPromotionScope` used at `go/internal/phases/ship/postship.go:189`; item `promote-inbox-reads-agent-lists-outside-the-lane-pin` | none |
 | B1 breaker | not started: no host-fault disposition for the breaker found | none | none (draft `queue-authority-b1-breaker-charges-prebuild-failures`) |
@@ -247,4 +247,4 @@ The goal of the whole plan: the next review of each PR has 0 CRITICAL findings o
 
 The Status line of 2026-11-05 said that no code was on main. That was stale: PR 1 (K1, K5 and part of K2) landed on 2026-11-06, and M1 landed in cycle 2386. ADR-0160 and `queue-trust-root.md` read Proposed, so their status lines look stale.
 
-This review did not change them. K4, T2, B1 and B2 are not built and have no open inbox item. Four drafts are ready. K3 and T1 need a check, and no draft covers them.
+This review did not change them. K4, T2, B1 and B2 are not built and have no open inbox item. Four drafts are ready. The operator dropped K2, K3 and T1 on 2026-11-22.

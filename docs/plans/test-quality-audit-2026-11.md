@@ -236,8 +236,8 @@ The date and the owner of goal 3 follow the count. The console sets the date in 
 | T7 structure-pin fix batches | done | cycle 2552, [`5cd11df`](https://github.com/mickeyyaya/evolve-loop/commit/5cd11df69984e97814e3b75d3cab6e356ae912d7) | none |
 | T8 `acs/` predicate batches | not started | none | `test-audit-t8a-acs-predicates-early`, `test-audit-t8b-acs-predicates-mid`, `test-audit-t8c-acs-predicates-late` |
 | T10 fix-item admission checks | not started | none | `test-audit-t10-fix-item-checks` |
-| T9 `apicover_named_test.go` files | partial: first batches landed; 165 files remain on main | cycle 2514, [`c6c8eae`](https://github.com/mickeyyaya/evolve-loop/commit/c6c8eaedb81f2a83f2219aa1206948e4583c058d); cycle 2564, [`ca8b6f0`](https://github.com/mickeyyaya/evolve-loop/commit/ca8b6f025676462ddc5ff46dccc1007e2cf7caae) | none |
+| T9 `apicover_named_test.go` files | dropped (operator, 2026-11-22) | cycle 2514, [`c6c8eae`](https://github.com/mickeyyaya/evolve-loop/commit/c6c8eaedb81f2a83f2219aa1206948e4583c058d); cycle 2564, [`ca8b6f0`](https://github.com/mickeyyaya/evolve-loop/commit/ca8b6f025676462ddc5ff46dccc1007e2cf7caae) | none: coverage hygiene with no failed cycle cited; the 165 remaining files stay a background task. Old status: partial; the first batches landed, and 165 files remain on main |
 
-The tooling and the first fix batches are on main. T6 for `go/cmd/evolve`, T8 and T10 have open items. The build floor now runs the test-audit ratchet ([#1597](https://github.com/mickeyyaya/evolve-loop/pull/1597)). The ship backstop does not run it yet, and the item `ship-backstop-runs-the-test-audit-ratchet` tracks that. T9 is in progress, and the count of remaining files is unverified.
+The tooling and the first fix batches are on main. T6 for `go/cmd/evolve`, T8 and T10 have open items. The build floor now runs the test-audit ratchet ([#1597](https://github.com/mickeyyaya/evolve-loop/pull/1597)). The ship backstop does not run it yet, and the item `ship-backstop-runs-the-test-audit-ratchet` tracks that. The operator dropped T9 on 2026-11-22.
 
-T9 has no open inbox item. A follow-up draft is in `followups/test-audit-t9-apicover-named-tests-remaining.json`.
+The follow-up draft `followups/test-audit-t9-apicover-named-tests-remaining.json` stays unfiled.

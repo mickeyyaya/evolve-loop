@@ -136,6 +136,6 @@ Move `cover_changed.stage` to `enforce` only when all of these are true:
 | CI step in `go.yml` | done | [`300c7cf`](https://github.com/mickeyyaya/evolve-loop/commit/300c7cfeb) | none |
 | Loop build floor and `cover_changed` policy key | done; stage default is `enforce` (`go/internal/policy/budgets_recovery.go:233`) | [`f66e987`](https://github.com/mickeyyaya/evolve-loop/commit/f66e987a6), item `cycle-ship-enforces-cover-changed` | none (item consumed) |
 | Commit-gate Go lane (D2, Q1) | not started; no `covchanged` use in `go/internal/commitgate` | none | none |
-| Section 8 condition M4: one test run feeds floor checks | unverified: no evidence found | none | none |
+| Section 8 condition M4: one test run feeds floor checks | dropped (operator, 2026-11-22) | none | none: no evidence of the condition and no failure cited. Old status: unverified; no evidence found |
 
-The verb, the make target, the CI step and the loop floor are on main. The floor stage is now `enforce`, as the operator decided on 2026-10-27. The commit-gate lane (D2, Q1) is not built and has no open inbox item. A follow-up draft exists: `commit-gate-go-lane-runs-cover-changed`. The M4 condition of section 8 is unverified.
+The verb, the make target, the CI step and the loop floor are on main. The floor stage is now `enforce`, as the operator decided on 2026-10-27. The commit-gate lane (D2, Q1) is not built and has no open inbox item. A follow-up draft exists: `commit-gate-go-lane-runs-cover-changed`. The operator dropped the M4 condition of section 8 on 2026-11-22.

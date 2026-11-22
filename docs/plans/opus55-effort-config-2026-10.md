@@ -152,6 +152,6 @@ If a condition is false, deep stays at `medium`.
 | Effort sweep (arm A, arm B, decision rule) | not started: no sweep record exists | none | none (draft `opus55-effort-sweep`) |
 | Follow-up `effort-config-followups` (seven LOW clean-ups) | dropped: retired, not built, by the inbox review of 2026-11-20 | [`fd36f33`](https://github.com/mickeyyaya/evolve-loop/commit/fd36f3334) (PR 1605, bookkeeping) | none |
 | Later: move `phaseidentity` to a neutral leaf, headless system note | dropped: item `phaseidentity-neutral-leaf` retired on 2026-11-20 | none | none |
-| Later: `cli-routing explain` variant drift, line-length guard for pasted text | not started | none | none |
+| Later: `cli-routing explain` variant drift, line-length guard for pasted text | dropped (operator, 2026-11-22) | none | none: no failed cycle and no measured need. Old status: not started |
 
-The policy now differs from the plan table: `tdd-engineer` runs at `high` since [`b7d0c6a`](https://github.com/mickeyyaya/evolve-loop/commit/b7d0c6a44) (#981). The measured sweep never ran. It has no open item, and a draft exists. The two small items under "Later" have no open item, and they are low value.
+The policy now differs from the plan table: `tdd-engineer` runs at `high` since [`b7d0c6a`](https://github.com/mickeyyaya/evolve-loop/commit/b7d0c6a44) (#981). The measured sweep never ran. It has no open item, and a draft exists. The operator dropped both small items under "Later" on 2026-11-22.
