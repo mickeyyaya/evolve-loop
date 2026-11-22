@@ -25,6 +25,7 @@ const (
 	replayMessage  = "chore(inbox): the loop's inbox stamps replayed onto origin's edits"
 	moveMessage    = "chore(inbox): the loop's quarantine moves from the plane"
 	quarantineDir  = Pathspec + "quarantine/"
+	consumedDir    = Pathspec + "consumed/"
 	statusCodeSize = 3
 )
 
@@ -55,7 +56,14 @@ type Plan struct {
 	Retired    []Stamp
 	Replay     []Stamp
 	Superseded []Stamp
+	Dropped    []Dropped
 	prepared   []Stamp
+}
+
+type Dropped struct {
+	Path  string
+	Key   string
+	Value json.RawMessage
 }
 
 func Classify(ctx context.Context, g Git) (Partition, error) {
@@ -76,6 +84,9 @@ func Classify(ctx context.Context, g Git) (Partition, error) {
 		}
 		path := entry[statusCodeSize:]
 		stamp, ok, err := tree.lifecycleOnlyChange(ctx, g, entry[:2], path)
+		if err == nil && !ok {
+			stamp, ok, err = tree.consoleEdit(ctx, g, entry[:2], path)
+		}
 		if err != nil {
 			return Partition{}, err
 		}
@@ -104,6 +115,14 @@ type worktree struct {
 }
 
 func (w worktree) lifecycleOnlyChange(ctx context.Context, g Git, status, path string) (Stamp, bool, error) {
+	return w.editBetween(ctx, g, status, path, inboxmover.IsMoverWritten)
+}
+
+func (w worktree) consoleEdit(ctx context.Context, g Git, status, path string) (Stamp, bool, error) {
+	return w.editBetween(ctx, g, status, path, consoleEditable)
+}
+
+func (w worktree) editBetween(ctx context.Context, g Git, status, path string, writable func(string) bool) (Stamp, bool, error) {
 	if !strings.HasPrefix(path, Pathspec) || !isModification(status) {
 		return Stamp{}, false, nil
 	}
@@ -115,14 +134,18 @@ func (w worktree) lifecycleOnlyChange(ctx context.Context, g Git, status, path s
 	if !ok {
 		return Stamp{}, false, nil
 	}
-	stamp, ok := stampBetween(path, head, now)
+	stamp, ok := stampBetween(path, head, now, writable)
 	return stamp, ok && len(stamp.Set)+len(stamp.Removed) > 0, nil
 }
 
-func stampBetween(path string, head, now map[string]json.RawMessage) (Stamp, bool) {
+func consoleEditable(key string) bool {
+	return inboxbatch.RoleOf(key).Owner != inboxbatch.AuthorOwned
+}
+
+func stampBetween(path string, head, now map[string]json.RawMessage, writable func(string) bool) (Stamp, bool) {
 	stamp := Stamp{Path: path, Set: map[string]json.RawMessage{}}
 	for _, key := range changedKeys(head, now) {
-		if !inboxmover.IsMoverWritten(key) || (inboxbatch.RoleOf(key).IsGrowOnly() && !grows(head[key], now[key])) {
+		if !writable(key) || (inboxbatch.RoleOf(key).IsGrowOnly() && !grows(head[key], now[key])) {
 			return Stamp{}, false
 		}
 		if value, present := now[key]; present {
@@ -135,10 +158,19 @@ func stampBetween(path string, head, now map[string]json.RawMessage) (Stamp, boo
 }
 
 func (w worktree) quarantineMove(ctx context.Context, g Git, status, path string) (Move, bool, error) {
+	for _, dir := range []string{quarantineDir, consumedDir} {
+		if move, ok, err := w.movedInto(ctx, g, dir, status, path); ok || err != nil {
+			return move, ok, err
+		}
+	}
+	return Move{}, false, nil
+}
+
+func (w worktree) movedInto(ctx context.Context, g Git, dir, status, path string) (Move, bool, error) {
 	if status != " D" || filepath.Dir(path) != filepath.Clean(Pathspec) {
 		return Move{}, false, nil
 	}
-	to := quarantineDir + filepath.Base(path)
+	to := dir + filepath.Base(path)
 	now, ok := decodeFields(w.read(to))
 	if !ok {
 		return Move{}, false, nil
@@ -147,7 +179,7 @@ func (w worktree) quarantineMove(ctx context.Context, g Git, status, path string
 	if err != nil || !headOK {
 		return Move{}, false, err
 	}
-	_, ok = stampBetween(path, head, now)
+	_, ok = stampBetween(path, head, now, inboxmover.IsMoverWritten)
 	return Move{Path: path, QuarantinePath: to}, ok, nil
 }
 
@@ -246,6 +278,9 @@ func (r remoteSide) itemAt(ctx context.Context, path string) (remoteItem, error)
 func (p *Plan) sortChanged(stamp Stamp, origin remoteItem) {
 	p.prepared = append(p.prepared, stamp)
 	replay := withoutFieldsOriginChanged(stamp, origin)
+	if origin.present {
+		p.Dropped = append(p.Dropped, droppedFrom(stamp, replay)...)
+	}
 	switch {
 	case !origin.present:
 		p.Retired = append(p.Retired, stamp)
@@ -254,6 +289,21 @@ func (p *Plan) sortChanged(stamp Stamp, origin remoteItem) {
 	default:
 		p.Replay = append(p.Replay, replay)
 	}
+}
+
+func droppedFrom(stamp, replay Stamp) []Dropped {
+	var dropped []Dropped
+	for _, key := range slices.Sorted(maps.Keys(stamp.Set)) {
+		if _, carried := replay.Set[key]; !carried {
+			dropped = append(dropped, Dropped{Path: stamp.Path, Key: key, Value: stamp.Set[key]})
+		}
+	}
+	for _, key := range stamp.Removed {
+		if !slices.Contains(replay.Removed, key) {
+			dropped = append(dropped, Dropped{Path: stamp.Path, Key: key})
+		}
+	}
+	return dropped
 }
 
 func withoutFieldsOriginChanged(stamp Stamp, origin remoteItem) Stamp {

@@ -429,12 +429,12 @@ func TestSyncMain_AnOperatorEditToAnInboxItemStillRefuses(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(item), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(item, []byte(`{"id":"x","weight":0.5}`), 0o644); err != nil {
+	if err := os.WriteFile(item, []byte(`{"id":"x","weight":0.5,"notes":"a"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	smGit(t, repo, "add", "-f", ".evolve/inbox")
 	smGit(t, repo, "commit", "-q", "-m", "inbox")
-	if err := os.WriteFile(item, []byte(`{"id":"x","weight":0.9}`), 0o644); err != nil {
+	if err := os.WriteFile(item, []byte(`{"id":"x","weight":0.5,"notes":"b"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -442,9 +442,9 @@ func TestSyncMain_AnOperatorEditToAnInboxItemStillRefuses(t *testing.T) {
 	code := runSyncMain([]string{"--project-root", repo}, nil, &out, &errb)
 
 	if code == 0 || !strings.Contains(errb.String(), ".evolve/inbox/x.json") {
-		t.Errorf("sync-main = %d (stderr %q), want a refusal naming the hand-edited item: a weight change is not the mover's write", code, errb.String())
+		t.Errorf("sync-main = %d (stderr %q), want a refusal naming the hand-edited item: a notes change is neither a curated field nor a stamp", code, errb.String())
 	}
-	if b, _ := os.ReadFile(item); string(b) != `{"id":"x","weight":0.9}` {
+	if b, _ := os.ReadFile(item); string(b) != `{"id":"x","weight":0.5,"notes":"b"}` {
 		t.Errorf("x.json = %s, want the operator's edit untouched", b)
 	}
 }

@@ -96,7 +96,7 @@ func git(repo *gittest.Repo) gitexec.Git {
 func TestClassify_AStampChangesOnlyFieldsTheMoverWrites(t *testing.T) {
 	w := newWorld(t)
 	w.planeStamps(t)
-	write(t, w.plane, curatedItem, `{"id":"curated","weight":0.7,"failure_count":1}`)
+	write(t, w.plane, curatedItem, `{"id":"curated","weight":0.5,"notes":"hand-written","failure_count":1}`)
 	write(t, w.plane, sourceFile, "package x\n\nvar Dirty = 1\n")
 
 	partition, err := Classify(context.Background(), git(w.plane))
@@ -108,7 +108,7 @@ func TestClassify_AStampChangesOnlyFieldsTheMoverWrites(t *testing.T) {
 	}
 	want := Partition{Stamps: []Stamp{stampOf(contestedItem), stampOf(retiredItem), stampOf(untouchedItem)}, Other: []string{curatedItem, sourceFile}}
 	if err != nil || !reflect.DeepEqual(partition, want) {
-		t.Errorf("Classify = (%+v, %v), want %+v: a stamp changes route, routed_* and failure_count only; the operator's weight edit and the source file are other dirt", partition, err, want)
+		t.Errorf("Classify = (%+v, %v), want %+v: a stamp changes route, routed_* and failure_count only; a hand-written notes field and the source file are other dirt", partition, err, want)
 	}
 }
 

@@ -379,6 +379,12 @@ func TestQueueApply_NamesTheTrackedChangesThatTheNextSyncMainRefuses(t *testing.
 	if _, err := writeQueuedRequest(root, req); err != nil {
 		t.Fatal(err)
 	}
+	original := queueHandlers["inbox"]
+	t.Cleanup(func() { queueHandlers["inbox"] = original })
+	queueHandlers["inbox"] = func([]string, io.Reader, io.Writer, io.Writer) int {
+		contractUnitWrite(t, root, ".evolve/inbox/2026-10-27T00-00-00Z-cli-inbox-show.json", `{"id":"cli-inbox-show","notes":"written by hand"}`)
+		return cliExitOK
+	}
 	events := captureQueueEvents(t)
 	var stdout, stderr bytes.Buffer
 

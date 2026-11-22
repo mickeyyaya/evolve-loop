@@ -66,7 +66,7 @@ func runSyncMain(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 
 	human := humanWriter(stdout, asJSON)
 	landing := stampLanding{root: absRoot, stdout: human, stderr: stderr}
-	merge := func() int { return mergeOrigin(git, branch, stderr) }
+	merge := func() int { return mergeOriginClearingCopies(git, absRoot, branch, human, stderr) }
 	if code := landing.aroundMerge("origin/"+branch, stamps, merge); code != 0 {
 		return code
 	}
@@ -151,6 +151,11 @@ func fetchSyncBranch(root, branch string, stderr io.Writer) error {
 		return fmt.Errorf("git fetch origin %s failed: rc=%d err=%v: %s", branch, code, err, strings.TrimSpace(gitErr))
 	}
 	return nil
+}
+
+func mergeOriginClearingCopies(git func(...string) (string, error), root, branch string, stdout, stderr io.Writer) int {
+	removeUntrackedCopiesOfOrigin(git, root, "origin/"+branch, stdout)
+	return mergeOrigin(git, branch, stderr)
 }
 
 func mergeOrigin(git func(...string) (string, error), branch string, stderr io.Writer) int {
@@ -253,6 +258,7 @@ func (l stampLanding) prepare(remoteRef string, stamps []inboxstamps.Stamp) (inb
 func (l stampLanding) replay(plan inboxstamps.Plan) int {
 	reportInboxStamps(l.stdout, "dropped %d inbox stamp(s) on items origin retired", plan.Retired)
 	reportInboxStamps(l.stdout, "origin superseded %d inbox stamp(s), changing every field they set", plan.Superseded)
+	reportDroppedEdits(l.stdout, plan.Dropped)
 	err := plan.ApplyReplay(l.root)
 	if err == nil {
 		err = plan.CommitReplay(context.Background(), gitexec.Default(l.root))
@@ -274,6 +280,16 @@ func (l stampLanding) restore(plan inboxstamps.Plan) {
 func reportInboxStamps(w io.Writer, format string, stamps []inboxstamps.Stamp) {
 	if len(stamps) > 0 {
 		fmt.Fprintf(w, "sync-main: "+format+": %s\n", len(stamps), strings.Join(inboxstamps.Paths(stamps), ", "))
+	}
+}
+
+func reportDroppedEdits(w io.Writer, dropped []inboxstamps.Dropped) {
+	for _, d := range dropped {
+		value := "removed"
+		if d.Value != nil {
+			value = string(d.Value)
+		}
+		fmt.Fprintf(w, "sync-main: kept origin's %s on %s and dropped the console edit (%s)\n", d.Key, d.Path, value)
 	}
 }
 
