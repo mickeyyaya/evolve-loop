@@ -322,7 +322,7 @@ func TestRepoContractFloorJudge_AnUnreadableChangeRunsTheCoarseSet(t *testing.T)
 	}
 }
 
-func TestRepoContractStages_EachCallerGetsItsOwnWords(t *testing.T) {
+func TestRepoContractStage_EachCallerGetsItsOwnWords(t *testing.T) {
 	t.Parallel()
 
 	in := func(t *testing.T) ReviewInput {
@@ -350,7 +350,37 @@ func TestRepoContractStages_EachCallerGetsItsOwnWords(t *testing.T) {
 	}
 }
 
-func TestRepoContractStages_AnUnnamedExitCarriesTheCallersStage(t *testing.T) {
+func TestRepoContractStage_ACallerDefinedStageSpeaksInItsOwnFieldsAndNoOtherCallersWords(t *testing.T) {
+	t.Parallel()
+
+	custom := RepoContractStage{
+		Name:      "probe-stage",
+		Subject:   "probe",
+		Refusal:   "the probe refuses a red suite",
+		FixBefore: "the probe retries",
+		Rerun:     "re-run the probe",
+	}
+	in := ReviewInput{Phase: string(PhaseBuild), Worktree: worktreeWithModule(t)}
+	lines, err := RepoContractJudge(custom, ratchetRedPack().run)(context.Background(), in)
+	if err != nil {
+		t.Fatalf("a named red is a refusal line, not a fault; got %v", err)
+	}
+	if len(lines) != 1 {
+		t.Fatalf("a named red refuses once; got %v", lines)
+	}
+	for _, want := range []string{custom.Refusal, "fix the change before " + custom.FixBefore} {
+		if !strings.Contains(lines[0], want) {
+			t.Errorf("the refusal speaks with the stage's %q; got %q", want, lines[0])
+		}
+	}
+	for _, other := range []RepoContractStage{BuildFloorStage(), CommitGateStage()} {
+		if strings.Contains(lines[0], other.Refusal) {
+			t.Errorf("the refusal must not borrow %q from another stage; got %q", other.Refusal, lines[0])
+		}
+	}
+}
+
+func TestRepoContractStage_AnUnnamedExitCarriesTheCallersStage(t *testing.T) {
 	t.Parallel()
 
 	unnamed := &fakeRepoContractPack{err: errors.New("exit status 2")}
