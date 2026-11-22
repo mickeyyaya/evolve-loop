@@ -158,14 +158,50 @@ func TestRetryingDirtyPaths_StopsWhenTheContextIsCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	started := time.Now()
 	_, err := retryingDirtyPaths(failing)(ctx, t.TempDir())
 
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("a cancelled context must end the retries with its error; got %v", err)
 	}
-	if calls.Load() != 1 || time.Since(started) >= snapshotRetryBackoff {
-		t.Fatalf("calls=%d elapsed=%v: the retry slept or read again after cancellation", calls.Load(), time.Since(started))
+	if calls.Load() != 1 {
+		t.Fatalf("calls=%d: the retry read again after cancellation", calls.Load())
+	}
+}
+
+func TestWithSnapshotRetries_ACancelledContextNeverSleeps(t *testing.T) {
+	t.Parallel()
+	var sleeps []time.Duration
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := withSnapshotRetries(ctx, func(d time.Duration) { sleeps = append(sleeps, d) }, func() error {
+		return errors.New("git status failed")
+	})
+
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("a cancelled context must end the retries with its error; got %v", err)
+	}
+	if len(sleeps) != 0 {
+		t.Fatalf("slept %v after cancellation", sleeps)
+	}
+}
+
+func TestWithSnapshotRetries_BacksOffLinearlyBetweenReads(t *testing.T) {
+	t.Parallel()
+	var sleeps []time.Duration
+	reads := 0
+
+	err := withSnapshotRetries(context.Background(), func(d time.Duration) { sleeps = append(sleeps, d) }, func() error {
+		reads++
+		return errors.New("git status failed")
+	})
+
+	if err == nil || reads != snapshotAttempts {
+		t.Fatalf("reads=%d err=%v: want %d reads then the last error", reads, err, snapshotAttempts)
+	}
+	want := []time.Duration{snapshotRetryBackoff, 2 * snapshotRetryBackoff}
+	if len(sleeps) != len(want) || sleeps[0] != want[0] || sleeps[1] != want[1] {
+		t.Fatalf("sleeps=%v want %v", sleeps, want)
 	}
 }
 
