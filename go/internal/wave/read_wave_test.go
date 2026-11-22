@@ -81,17 +81,22 @@ func TestReadWave_TheMembersAreTheUnionOfTheCyclesAboveTheFloorTheResumedAndTheS
 	p.write(".evolve/runs/cycle-12/run.json", `{"cycle_id":12,"phase":"build"}`)
 	p.write(".evolve/runs/cycle-3/run.json", `{"cycle_id":3,"phase":"scout"}`)
 	p.write("knowledge-base/cycles/cycle-5.json", `{"cycle":5,"final_verdict":"PASS"}`)
+	p.write("knowledge-base/cycles/cycle-4.json", `{"cycle":4,"final_verdict":"FAIL"}`)
+	emitResume(t, p.root, shipEpoch.Add(time.Minute), 4)
 	emitResume(t, p.root, shipEpoch.Add(time.Minute), 5)
 	emitResume(t, p.root, shipEpoch.Add(time.Minute), 12)
 	landCycles(t, p.root, shipEpoch.Add(2*time.Minute), 7)
 
 	got := wave.ReadWave(p.root, shadowWindow(10))
 
-	if want := []int{5, 7, 12}; !reflect.DeepEqual(cycleIDs(got), want) {
+	if want := []int{4, 5, 7, 12}; !reflect.DeepEqual(cycleIDs(got), want) {
 		t.Fatalf("members %v, want %v", cycleIDs(got), want)
 	}
-	if got.Cycles[0].Verdict != "PASS" {
-		t.Errorf("the resumed cycle 5 reads its dossier: verdict %q, want PASS", got.Cycles[0].Verdict)
+	if failed := got.Cycles[0]; failed.Verdict != "FAIL" || !failed.Resumed || failed.Shipped {
+		t.Errorf("the resumed failed cycle 4 is a member that did not ship: %+v", failed)
+	}
+	if got.Cycles[1].Verdict != "PASS" {
+		t.Errorf("the resumed cycle 5 reads its dossier: verdict %q, want PASS", got.Cycles[1].Verdict)
 	}
 	if !reflect.DeepEqual(got.Ships, []int{7}) {
 		t.Errorf("ships %v, want [7]: a resume is not a ship", got.Ships)

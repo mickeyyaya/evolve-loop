@@ -7,8 +7,7 @@ import (
 
 func (cr *cycleRun) reviewAndGuard(next Phase, dr *dispatchResult) (loopAction, error) {
 	if phaseErr := cr.prepareForReview(next, dr); phaseErr != nil {
-		cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt))
-		cr.recordFailureLearning(next, phaseErr, 1)
+		cr.failPhase(phaseOutcomeFrom(next, dr.resp, dr.attemptCount, phaseErr.Error(), cr.cs.PhaseStartedAt), phaseErr, 1)
 		return loopAbort, phaseErr
 	}
 
