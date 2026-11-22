@@ -24,8 +24,8 @@ func ReleaseContinuationBinding(opts Options, scopeID, reason, releasedBy string
 
 func ReleaseContinuationBindingFor(opts Options, req ReleaseRequest) (continuation.Continuation, bool, error) {
 	scopeID, reason, releasedBy := req.ScopeID, req.Reason, req.By
-	opts.resolveOpts()
-	if err := cycleWorktreeRefusal(opts.InboxDir); err != nil {
+	opts, err := opts.resolved()
+	if err != nil {
 		return continuation.Continuation{}, false, err
 	}
 	if strings.TrimSpace(scopeID) == "" {
@@ -114,12 +114,15 @@ func cycleFromDirName(name string) int {
 	return n
 }
 
-func ReconcileConsumedBindings(opts Options) (released []string) {
-	opts.resolveOpts()
+func ReconcileConsumedBindings(opts Options) (released []string, err error) {
+	opts, err = opts.resolved()
+	if err != nil {
+		return nil, err
+	}
 	dir := filepath.Join(opts.InboxDir, "consumed")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil
+		return nil, nil
 	}
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
@@ -151,5 +154,5 @@ func ReconcileConsumedBindings(opts Options) (released []string) {
 			released = append(released, id)
 		}
 	}
-	return released
+	return released, nil
 }
