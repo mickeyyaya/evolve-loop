@@ -164,6 +164,6 @@ The refusal of a gate-weakening diff is already on main: `gateclass`, `core.Gate
 | A2 protected path to `protected_files` | done, 2026-11-17 | [#1494](https://github.com/mickeyyaya/evolve-loop/pull/1494) [`19ef9ec`](https://github.com/mickeyyaya/evolve-loop/commit/19ef9ecb1) (`TestApplyNoWork_AProtectedDropStampsTheConfirmedPath`) | none |
 | A3 `routed_by` stamp and reroute table | done, 2026-11-17 | [#1494](https://github.com/mickeyyaya/evolve-loop/pull/1494) [`19ef9ec`](https://github.com/mickeyyaya/evolve-loop/commit/19ef9ecb1) (`inboxbatch/fieldowner.go:70`, `go/internal/inboxcurator/reroute_test.go`) | none |
 | A4 boundary consume of a checked claim | done, 2026-11-17 | [#1494](https://github.com/mickeyyaya/evolve-loop/pull/1494) [`19ef9ec`](https://github.com/mickeyyaya/evolve-loop/commit/19ef9ecb1) (`TestCurate_AnItemWithACheckedLandedShaGetsADeterministicConsume`) | none |
-| Tier B ADR and held-proposal admission | not started: gated on two waves of the section 8 measures | none | none |
+| Tier B ADR and held-proposal admission | dropped (operator, 2026-11-22) | none | none: the row is gated on two waves of the section 8 measures; no measured need yet. Old status: not started; gated on two waves of the section 8 measures |
 
-Tier A is on main in PR 1494. Tier B waits for the measures of section 8. I found no record of those measures, so the gate is unverified. The Tier B ADR has no inbox item. It is a decision for the operator after two waves, so I filed no draft. Open question 1 (intake refuses a missing path) is not answered in the code that I read.
+Tier A is on main in PR 1494. The operator dropped Tier B on 2026-11-22: no measured need yet. Open question 1 (intake refuses a missing path) is not answered in the code that I read.

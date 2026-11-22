@@ -148,6 +148,6 @@ The plan audit of 2026-10-27 filed one inbox item for each component, and each i
 | T4 duration ratchet | done | cycle commit [`083a556`](https://github.com/mickeyyaya/evolve-loop/commit/083a5565ebb8e307d0191d9a1b0a3b6d895398d4); `go/.test-latency.json` | none (consumed) |
 | T5 `evolve ci latency check` | not started | No `go/internal/citrend`, and `evolve ci` has no `latency` verb | none: draft `latency-gates-t5-ci-trend-gate` |
 | T6 `evolve wave latency --check` | done | cycle commit [`47a3702`](https://github.com/mickeyyaya/evolve-loop/commit/47a370296fdd76708ea85514bae717ac0432ac44); `go/cmd/evolve/cmd_wave_latency_check.go` | none (consumed) |
-| T7 boundary runs T5 and T6 | partial | cycle commit [`c33a0ee`](https://github.com/mickeyyaya/evolve-loop/commit/c33a0ee552aebe2ec3dfe72f4307ae363b00a4ee); `go/cmd/evolve/cmd_boundary.go:237-238`. The T5 step calls a verb that does not exist | none: closes with T5 |
+| T7 boundary runs T5 and T6 | partial | cycle commit [`c33a0ee`](https://github.com/mickeyyaya/evolve-loop/commit/c33a0ee552aebe2ec3dfe72f4307ae363b00a4ee); `go/cmd/evolve/cmd_boundary.go:237-238`. The T5 step calls a verb that does not exist | `boundary-step-ci-latency-check-calls-a-missing-verb` |
 
 T5 is the one missing part. The boundary step for it is advisory, so it prints a WARN and the boundary goes on. T5 has no open inbox item, and its item is not in the consumed folder. A draft is written. It is unverified here if the T4 ratchet runs in CI.

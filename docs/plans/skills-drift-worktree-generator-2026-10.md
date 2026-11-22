@@ -90,6 +90,6 @@ Unit tests (no tag) pin the decision (`changesSkillsGenerator`), the report pars
 | Residual (a): the host owns the comparison (a render verb) | not started | no `skills render` verb exists on main | `skills-drift-gate-render-verb` (draft) |
 | Residuals (d) and (e): signal event, run context | not started | none | `skills-drift-gate-render-verb` (draft) |
 | Residuals (b) and (f): widen the trigger, one home for the empty-base rule | superseded for (b) by #822; (f) unverified | [#822](https://github.com/mickeyyaya/evolve-loop/pull/822) | none |
-| Residual (c): one registry for the generator prefix | unverified: `ssotPrefix` is no longer in `go/`, so the text may be stale | none | none |
+| Residual (c): one registry for the generator prefix | dropped (operator, 2026-11-22) | none | none: `ssotPrefix` is no longer in `go/`, so the text is stale. Old status: unverified; the text may be stale |
 
 The gate is built and on main, and the trigger is replaced by the host-stamp plan. Residuals (a), (d) and (e) are unfinished. Their item `skills-drift-gate-generator-dependency-closure` was deleted in [`e81715d`](https://github.com/mickeyyaya/evolve-loop/commit/e81715d3e) without a build. No open inbox item covers them now. A draft item, `skills-drift-gate-render-verb`, is ready for filing.
