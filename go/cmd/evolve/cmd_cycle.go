@@ -453,6 +453,7 @@ func newRootSignalCenter(projectRoot, evolveDir string, console io.Writer, opts 
 	signals.Subscribe(listenWhen(legacyProjectRecord, projectStream))
 	signals.Subscribe(listenWhen(pairProjectRecord, projectStream))
 	signals.Subscribe(listenWhen(laneResumed, projectStream))
+	signals.Subscribe(listenWhen(shipWindowBroken, projectStream))
 	signals.Subscribe(signalcenter.ConsoleSink(console))
 	return signals
 }
@@ -468,6 +469,10 @@ func listenWhen(keep func(signalcenter.Event) bool, l signalcenter.Listener) sig
 func cycleStamped(e signalcenter.Event) bool { return e.Cycle != 0 }
 
 func laneResumed(e signalcenter.Event) bool { return e.Code == core.CodeLaneResumed }
+
+func shipWindowBroken(e signalcenter.Event) bool {
+	return e.Code == core.CodeShipWindowLeaseBroken || e.Code == ship.CodeShipWindowLeaseBroken
+}
 
 var legacyProjectKinds = map[signalcenter.Kind]bool{
 	signalcenter.KindPhaseDispatched: true, signalcenter.KindPhaseOutcome: true, signalcenter.KindPhaseAborted: true,

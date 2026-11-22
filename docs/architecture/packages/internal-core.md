@@ -462,6 +462,8 @@
   - `keepShipWindowOnlyForShip` keeps the lease only for a route to Ship. A route to Audit, Build or the end releases it, so no LLM phase holds it.
   - `runPhase` runs the ship in a context marked with `shipwindow.WithHeld`, so the ship does not take the lease again. It releases the lease when the ship returns. `RunCycle` and the resume loop also release it on exit.
   - A canceled wait WARNs and the recovery goes on unleased. A break of a live holder at the TTL emits `ORCHESTRATOR_SHIP_WINDOW_LEASE_BROKEN`.
+  - The lease beats while the orchestrator holds it ([internal-shipwindow](internal-shipwindow.md), D4), so a recovery longer than the TTL keeps it. A lease that the holder lost emits `ORCHESTRATOR_SHIP_WINDOW_LEASE_BROKEN` with `fields.role=holder`, and the re-ship sees the loss at its push check. `WithShipWindowOptions` injects the clock and the ticker for tests. `defaultShipWindowTicker` is a package variable like `backoffSleep`. `TestMain` sets it to an inert ticker once, so that the many orchestrator tests that never set `WithShipWindowOptions` start no real beat.
+  - Pinned also by `TestShipWindow_TwoLanesWithSectionsLongerThanTTLNeverOverlap` and `TestHoldShipWindow_ALostLeaseSignalsTheHolderAndTheReShipSeesIt`.
   - Pinned by `TestRecoverFromShipError_HoldsTheShipWindowFromTheRebaseThroughTheReShip`, `TestRecoverFromShipError_ARebaseRoutedToAuditReleasesTheShipWindow`, `TestRunPhase_OnlyTheShipRunsInsideAHeldWindowAndReleasesIt`, `TestKeepShipWindowOnlyForShip_KeepsTheHoldOnlyForAReShip`, `TestHoldShipWindow_ACanceledWaitRecoversUnleasedWithAWarn`, `TestHoldShipWindow_BreakingAHungHolderSignals` and `TestReleaseShipWindow_AReleaseFailureWarnsAndClearsTheHold`.
 
 ## Core file group 3 rationale
