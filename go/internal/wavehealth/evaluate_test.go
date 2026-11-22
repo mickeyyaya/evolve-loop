@@ -326,6 +326,28 @@ func TestEvaluate_A5CountsTheLaneStallsOfTheWave(t *testing.T) {
 	wantStep(t, Evaluate(s), "A5", ResultOK, "2 ")
 }
 
+func TestEvaluate_A5CountsAStallOnlyWhileItsLaneIsStillSilent(t *testing.T) {
+	t.Parallel()
+	s := healthy()
+	lines := stallLines(3)
+	s.Stalls = Have(lines)
+	wantStep(t, Evaluate(s), "A5", ResultBrake, "; STALL")
+
+	recovered := append([]StallLine(nil), lines...)
+	recovered[1].LastEvent = lines[1].At.Add(time.Minute)
+	s.Stalls = Have(recovered)
+	r := Evaluate(s)
+	wantStep(t, r, "A5", ResultOK, "3 LOOP_ORCH_LANE_STALLED line(s) in the wave; 1 line(s) recovered; lanes lane-0, lane-2")
+	if strings.HasSuffix(step(t, r, "A5").Reading, "STALL") {
+		t.Errorf("two silent lanes are below the threshold: %q", step(t, r, "A5").Reading)
+	}
+
+	atStall := append([]StallLine(nil), lines...)
+	atStall[1].LastEvent = lines[1].At
+	s.Stalls = Have(atStall)
+	wantStep(t, Evaluate(s), "A5", ResultBrake, "; STALL")
+}
+
 func TestEvaluate_A5WithoutAWaveCountsEveryLineUpToNow(t *testing.T) {
 	t.Parallel()
 	s := healthy()

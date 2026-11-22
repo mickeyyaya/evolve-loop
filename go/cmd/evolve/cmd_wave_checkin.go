@@ -17,7 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclefacts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchevents"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopchain"
-	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -103,7 +102,7 @@ func (g checkinGatherer) withWave(snap wavehealth.Snapshot, cur wave.Record) (wa
 		facts.PoolLive = wavehealth.Have(n)
 	}
 	snap.Wave = wavehealth.Have(facts)
-	snap.Stalls = wavehealth.Have(stallLinesOf(read.Loop))
+	snap.Stalls = wavehealth.Have(stallLinesOf(g.plane.root, read, snap.Now))
 	var err error
 	if snap.Abnormal, err = readCycleEvents(g.plane.root, read.Cycles); err != nil {
 		return snap, err
@@ -140,18 +139,6 @@ func signalsUpTo(events []signalcenter.Event, now time.Time) []signalcenter.Even
 			continue
 		}
 		out = append(out, e)
-	}
-	return out
-}
-
-func stallLinesOf(events []signalcenter.Event) []wavehealth.StallLine {
-	out := []wavehealth.StallLine{}
-	for _, e := range events {
-		if e.Code != orchestrator.CodeLaneStalled {
-			continue
-		}
-		at, _ := time.Parse(time.RFC3339Nano, e.TS)
-		out = append(out, wavehealth.StallLine{Lane: e.Fields["todo"], At: at})
 	}
 	return out
 }

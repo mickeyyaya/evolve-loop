@@ -14,6 +14,14 @@ const (
 	StageEnforce = "enforce"
 )
 
+func IsLaneLifecycle(code signalcenter.Code) bool {
+	switch code {
+	case CodeLaneLaunched, CodeLaneExited, CodeLaneBackfilled, CodeLaneLateExit:
+		return true
+	}
+	return false
+}
+
 const (
 	CodeLaneLaunched              signalcenter.Code = "LOOP_ORCH_LANE_LAUNCHED"
 	CodeLaneExited                signalcenter.Code = "LOOP_ORCH_LANE_EXITED"

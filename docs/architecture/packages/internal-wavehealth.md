@@ -22,7 +22,7 @@
 | A2 | Age at or over `stall_min_age_minutes` and live lanes at or over `stall_min_live_lanes`: 0 ships is STALL. Ships each hour under `min_ships_per_hour` is SLOW. Both are BRAKE. | `wave.checkin` |
 | A3 | The blocker breaker of the loop (`core.EvaluateBlockerBreaker`) on the failure digests of the wave. A halt is REPEAT, a BRAKE. The reading lists the failure classes. | `failure_policy.thresholds` |
 | A4 | One kind of WARN or ERROR event with `abnormal_min_events` events in `abnormal_min_cycles` cycles is a SHARED FAULT, a BRAKE. | `wave.checkin` |
-| A5 | `stall_lines` lines of `LOOP_ORCH_LANE_STALLED` inside `stall_window_minutes` is a STALL, a BRAKE. | `wave.checkin` |
+| A5 | `stall_lines` lines of `LOOP_ORCH_LANE_STALLED` inside `stall_window_minutes` is a STALL, a BRAKE. A line counts only while its lane is silent: a line with `LastEvent` after its time is a recovered lane and does not count. | `wave.checkin` |
 | A6 | Main CI: completed success and not completed are OK. Completed failure and an unavailable CI are FIX-LOCAL. Any other reading is BRAKE with the reading `unmapped reading`. | the SOP |
 | A8-disk | Free disk under the floor is FIX-LOCAL. | `gc.disk_floor_gb` |
 | A8-load | Every host sample of `load_sustained_minutes` at or over `load_per_core_limit`, with 2 samples or more, is BRAKE. | `wave.checkin` |
@@ -31,6 +31,8 @@
 `Evaluate` cuts each list at `Now`: the events, the stall lines, the host samples and the failure digests. A replay with a past clock then sees only what the console can see at that time. The ship count and the cycle count are not cut.
 
 One cut sits in the gatherer. The verb cuts the pool signals at `Now` before `wave.PoolLive` reduces them to the live lane count. A caller of `Evaluate` that builds its own snapshot must apply the same cut. A replay test pins it.
+
+One cut sits in the gatherer for A5. `WaveRead.LaneLastEvent` gives `LastEvent` of a stall line: the latest signal of its lane at or before `Now`. The lease made the stall line, so a cycle of the lane counts through `orchestrator.CycleFreshest`, the rule of the lease. A lifecycle signal of the lane counts too, so a lane that exited after its stall is recovered. Wave 186 gave BRAKE at 23:39Z while every live cycle had a signal in the last 10 minutes. This rule removes that false positive.
 
 ## Limits
 
