@@ -283,6 +283,8 @@ The ratchet scans the runtime test files. Old cycle directories under `acs/` are
 
 The ratchet catches a copy in the predicate directory of a cycle at the TDD handoff, not at ship. No phase after TDD can change `go/acs/cycle<N>/`. The TDD handoff floor names each group of equal bodies with a site there. It sends the handoff back to TDD ([incident 2026-11-09](../incidents/2026-11-09-duplicate-ratchet-misses-staged-predicates.md)).
 
+The TDD handoff floor and `evolve phase verify tdd` also run the test-audit check over `go/acs/cycle<N>/`. They call `core.TddTestAuditFailures`. It audits the packages that the Build floor audits, with the same rules and configuration. A finding names the rule and the test. It goes back to TDD ([incident 2026-11-22](../incidents/2026-11-22-the-tdd-floor-did-not-run-the-test-audit-ratchet.md)).
+
 ### 6.5 Predicate helpers
 
 Each cycle wrote its own copy of the same predicate helpers: 597 copies (research F4.2). `pkg/acsassert` gets these helpers:

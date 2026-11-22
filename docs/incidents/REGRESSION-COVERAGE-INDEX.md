@@ -17,9 +17,9 @@
 
 | | Count |
 |---|---|
-| Incidents mapped | 80 |
-| Distinct failure modes (coverage-map rows) | 128 |
-| ✅ covered (a test fails if the bug comes back) | 89 |
+| Incidents mapped | 81 |
+| Distinct failure modes (coverage-map rows) | 129 |
+| ✅ covered (a test fails if the bug comes back) | 90 |
 | 🟡 partial (related test, doesn't pin the exact mode) | 11 |
 | ❌ none (no regression test) | 28 |
 | ⛔ untestable (external infra / live CLI) | 0 |
@@ -37,7 +37,9 @@ Recounted on 2026-11-16: the record of the test leak under `go/` adds two rows. 
 
 Recounted on 2026-11-21: the 11 records of wave 183 add 11 incidents and 13 rows. Three rows are covered and 10 rows have no test yet. The covered rows are the cycle-2558 ratchet row, the cycle-2558 build-floor row and the TDD-floor row. PR #1597 and PR #1601 landed through batch PR #1604.
 
-The map now holds 80 incidents and 128 rows. Of these, 89 are covered, 11 are partial and 28 have no test. Before these rows, main held 69 incidents and 115 rows. Of these, 86 were covered, 11 partial and 18 with no test. PR #1597 had flipped two of them to covered.
+Recounted on 2026-11-22: the record of the TDD floor and the test-audit ratchet adds one incident and one covered row.
+
+The map now holds 81 incidents and 129 rows. Of these, 90 are covered, 11 are partial and 28 have no test. Before these rows, main held 69 incidents and 115 rows. Of these, 86 were covered, 11 partial and 18 with no test. PR #1597 had flipped two of them to covered.
 
 **Historical baseline.** The 2026-05-29 13-agent parallel sweep counted 14
 incidents and 73 distinct failure modes: 40 covered, 20 partial, 10 with no
@@ -179,6 +181,7 @@ not the coverage map, which is the hand-maintained per-incident record.
 | 2026-11-20 — tests and predicates that wait on host time failed on a loaded host | `TestRun_StopSignalEndsRunAndClosesFile` sends the stop after a sleep of 80 ms and expects a sample, so it fails on a loaded runner | `cmd/hostsampler/main_test.go` | ❌ | proposal: inbox item `hostsampler-stop-test-stops-after-a-counted-read` |
 | [2026-11-20 — inbox withdraw refused items that carry lifecycle stamps](2026-11-20-inbox-withdraw-refused-items-that-carry-lifecycle-stamps.md) | the boundary runbook chose `withdraw` for items that carry lifecycle stamps, and the verb refused 5 of them | console runbook, `inboxmover/lifecycle/withdraw.go` (`refuseLifecycleStamps`) | ❌ | none: the refusal is by design; the runbook check is the control |
 | [2026-11-20 — a parked lane never resumed after the main-red stop released](2026-11-20-a-parked-lane-never-resumed-after-the-main-red-stop-released.md) | `pool.resupply` skips an id that is in `known`, and `pool.settle` never clears it, so the lead todo of a paused scope is dropped | `fleet/pool.go` (`add`, `resupply`, `settle`) | ❌ | proposal: inbox item `pool-relaunches-a-parked-lane-after-the-main-red-stop-releases` (`TestPoolResupply_RelaunchesAParkedLeadAfterItsLaneExited`) |
+| [2026-11-22 — the TDD floor did not run the test-audit ratchet](2026-11-22-the-tdd-floor-did-not-run-the-test-audit-ratchet.md) | the TDD handoff floor checked only helper copies. A predicate with a skip that hides an error passed TDD. It failed at Build, where no phase can edit it. Confirmed in cycles 2599 and 2606 | `core/tdd_predicate_floor.go`, `core/build_testaudit_check.go` (`PackageAuditFailures`), `cli/phasecmd/phase_verify.go` | ✅ | `core/tdd_predicate_floor_test.go::TestTddPredicateFloor_RefusesAPredicateThatSkipsToHideAnError` + `cli/phasecmd/phase_verify_tddcomment_test.go::TestPhaseVerifyTDD_PredicateThatSkipsToHideAnError_Exit1` |
 
 ## Prioritized gap backlog (13-agent sweep; agent confidence in parens)
 

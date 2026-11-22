@@ -23,12 +23,32 @@ func testAuditFailures(ctx context.Context, in ReviewInput) []string {
 	if err != nil {
 		return []string{fmt.Sprintf("%sthe changed paths cannot be read (%v) — the audit cannot tell which packages changed; fix the git state and run the floor again", testAuditFloorPrefix, err)}
 	}
+	return auditChangedPaths(ctx, in.Worktree, paths, nil)
+}
+
+func TddTestAuditFailures(ctx context.Context, worktree, base string, cycle int) []string {
+	if worktree == "" {
+		return nil
+	}
+	var predicateDir []string
+	if cycle > 0 {
+		predicateDir = []string{fmt.Sprintf("acs/cycle%d", cycle)}
+	}
+	paths, _ := worktreePathsSince(ctx, worktree, base, "--no-renames")
+	return auditChangedPaths(ctx, worktree, paths, predicateDir)
+}
+
+func auditChangedPaths(ctx context.Context, worktree string, paths, also []string) []string {
 	scope := testaudit.AuditScope(paths)
-	moduleDir := codequality.ModuleDir(in.Worktree)
+	moduleDir := codequality.ModuleDir(worktree)
 	if scope.Whole {
 		return wholeTestAuditFailures(ctx, moduleDir)
 	}
-	if len(scope.Packages) == 0 {
+	return PackageAuditFailures(moduleDir, append(scope.Packages, also...))
+}
+
+func PackageAuditFailures(moduleDir string, pkgs []string) []string {
+	if len(pkgs) == 0 {
 		return nil
 	}
 	cfg, err := testaudit.LoadConfig(moduleDir)
@@ -39,7 +59,7 @@ func testAuditFailures(ctx context.Context, in ReviewInput) []string {
 		return []string{fmt.Sprintf("%sthe audit config of the worktree cannot be loaded: %v", testAuditFloorPrefix, err)}
 	}
 	var out []string
-	for _, problem := range testaudit.Problems(testaudit.CheckPackages(moduleDir, scope.Packages, cfg)) {
+	for _, problem := range testaudit.Problems(testaudit.CheckPackages(moduleDir, pkgs, cfg)) {
 		out = append(out, testAuditLine(problem))
 	}
 	return out

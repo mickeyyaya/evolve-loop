@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/testdup"
 )
 
@@ -27,30 +28,37 @@ func withMandatoryReviewers(next DeliverableReviewer) DeliverableReviewer {
 	return chainReviewer{tddPredicateFloor{}, withMandatoryExplanationReviewer(next)}
 }
 
-func (tddPredicateFloor) Review(_ context.Context, in ReviewInput) ReviewResult {
+func (tddPredicateFloor) Review(ctx context.Context, in ReviewInput) ReviewResult {
 	if in.Phase != string(PhaseTDD) || in.Worktree == "" || in.Cycle <= 0 {
 		return ReviewResult{Approve: true}
 	}
-	moduleDir := filepath.Join(in.Worktree, "go")
+	moduleDir := codequality.ModuleDir(in.Worktree)
+	failures := TddTestAuditFailures(ctx, in.Worktree, floorBase(in), in.Cycle)
+	copyLines, copyFailures := tddHelperCopyFailures(in, moduleDir)
+	if len(failures) == 0 && len(copyFailures) == 0 {
+		return ReviewResult{Approve: true}
+	}
+	lines := append(slices.Clone(failures), copyLines...)
+	failures = append(failures, copyFailures...)
+	reason := fmt.Sprintf("%s%d finding(s) in go/acs/cycle%d/ — no later phase can change these files, so fix them now: use pkg/acsassert (go/acs/README.md §Predicate kit) or the helper named on each line instead of a helper copy (docs/architecture/test-system.md §6.4, §6.5), and remove each weak pattern a test-audit line names (skills/engineering-craft/references/tdd-craft.md):%s%s",
+		tddFloorReasonHead, len(lines), in.Cycle, floorFailureSeparator, strings.Join(lines, floorFailureSeparator))
+	fmt.Fprintf(in.errOut(), "[tdd-floor] REJECT: %s\n", reason)
+	return ReviewResult{Approve: false, Retry: true, Reason: reason, Failures: failures}
+}
+
+func tddHelperCopyFailures(in ReviewInput, moduleDir string) (lines, failures []string) {
 	groups, err := tddHelperCopyGroups(moduleDir, in.Cycle)
 	if err != nil {
 		fmt.Fprintf(in.errOut(), "[tdd-floor] WARN helper-copy check skipped: %v; the ship ratchet still counts the copies\n", err)
-		return ReviewResult{Approve: true}
-	}
-	if len(groups) == 0 {
-		return ReviewResult{Approve: true}
+		return nil, nil
 	}
 	kit := loadTddKit(moduleDir)
-	failures := make([]string, len(groups))
-	lines := make([]string, len(groups))
-	for i, g := range groups {
-		failures[i] = strings.Join(g.Sites, " = ")
-		lines[i] = failures[i] + " — " + tddCopyRemedy(g, in.Cycle, kit)
+	for _, g := range groups {
+		site := strings.Join(g.Sites, " = ")
+		failures = append(failures, site)
+		lines = append(lines, site+" — "+tddCopyRemedy(g, in.Cycle, kit))
 	}
-	reason := fmt.Sprintf("%s%d helper body copy group(s) in go/acs/cycle%d/ — no later phase can change these files, so fix them now: use pkg/acsassert (go/acs/README.md §Predicate kit) or the helper named on each line instead of a copy (docs/architecture/test-system.md §6.4, §6.5):%s%s",
-		tddFloorReasonHead, len(groups), in.Cycle, floorFailureSeparator, strings.Join(lines, floorFailureSeparator))
-	fmt.Fprintf(in.errOut(), "[tdd-floor] REJECT: %s\n", reason)
-	return ReviewResult{Approve: false, Retry: true, Reason: reason, Failures: failures}
+	return lines, failures
 }
 
 func tddHelperCopyGroups(moduleDir string, cycle int) ([]testdup.Group, error) {
