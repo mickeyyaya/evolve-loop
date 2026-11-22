@@ -234,7 +234,7 @@ func TestRepoContractFloor_ARedPackCorrectsTheBuildAndNeverReachesTheAudit(t *te
 func TestUnnamedPackExit_NamesThePackWallTimeAndTheFloorDeadline(t *testing.T) {
 	t.Parallel()
 
-	err := unnamedPackExit(errors.New("signal: killed"), "chatter\n", 95400*time.Millisecond)
+	err := BuildFloorStage().unnamedPackExit(errors.New("signal: killed"), "chatter\n", 95400*time.Millisecond)
 	if err == nil {
 		t.Fatal("an exit that names no test is a WARN, never nil")
 	}
@@ -243,7 +243,7 @@ func TestUnnamedPackExit_NamesThePackWallTimeAndTheFloorDeadline(t *testing.T) {
 			t.Errorf("the WARN names %q; got %q", want, err)
 		}
 	}
-	if got := unnamedPackExit(nil, "", time.Second); got != nil {
+	if got := BuildFloorStage().unnamedPackExit(nil, "", time.Second); got != nil {
 		t.Fatalf("a clean exit has no WARN; got %v", got)
 	}
 }
@@ -319,5 +319,144 @@ func TestRepoContractFloorJudge_AnUnreadableChangeRunsTheCoarseSet(t *testing.T)
 	}
 	if !reflect.DeepEqual(repocontract.ByNameTestsFor(pack.changed[0]), repocontract.ByNameTests()) {
 		t.Fatalf("paths %q must select the coarse set of ByNameTests()", pack.changed[0])
+	}
+}
+
+func TestRepoContractStages_EachCallerGetsItsOwnWords(t *testing.T) {
+	t.Parallel()
+
+	in := func(t *testing.T) ReviewInput {
+		return ReviewInput{Phase: string(PhaseBuild), Worktree: worktreeWithModule(t)}
+	}
+	floorLines, _ := RepoContractFloorJudge(ratchetRedPack().run)(context.Background(), in(t))
+	gateLines, _ := RepoContractJudge(CommitGateStage(), ratchetRedPack().run)(context.Background(), in(t))
+	if len(floorLines) != 1 || len(gateLines) != 1 {
+		t.Fatalf("each caller refuses a named red once; floor %v gate %v", floorLines, gateLines)
+	}
+	for _, want := range []string{"ship runs these repo-wide suites before it pushes and refuses a red one", "fix the change before handoff"} {
+		if !strings.Contains(floorLines[0], want) {
+			t.Errorf("the floor keeps its text %q; got %q", want, floorLines[0])
+		}
+	}
+	for _, want := range []string{"the commit gate refuses a commit while one is red", "fix the change before the commit"} {
+		if !strings.Contains(gateLines[0], want) {
+			t.Errorf("the commit gate names itself with %q; got %q", want, gateLines[0])
+		}
+	}
+	for _, banned := range []string{"ship", "floor", "handoff"} {
+		if strings.Contains(gateLines[0], banned) {
+			t.Errorf("the commit gate's refusal must not claim %q; got %q", banned, gateLines[0])
+		}
+	}
+}
+
+func TestRepoContractStages_AnUnnamedExitCarriesTheCallersStage(t *testing.T) {
+	t.Parallel()
+
+	unnamed := &fakeRepoContractPack{err: errors.New("exit status 2")}
+	in := ReviewInput{Phase: string(PhaseBuild), Worktree: worktreeWithModule(t)}
+	_, floorErr := RepoContractFloorJudge(unnamed.run)(context.Background(), in)
+	_, gateErr := RepoContractJudge(CommitGateStage(), unnamed.run)(context.Background(), in)
+	var floorExit, gateExit *PackExitError
+	if !errors.As(floorErr, &floorExit) || floorExit.Stage != BuildFloorStage() {
+		t.Fatalf("the floor's fault carries the floor's stage; got %v", floorErr)
+	}
+	if !errors.As(gateErr, &gateExit) || gateExit.Stage != CommitGateStage() {
+		t.Fatalf("the commit gate's fault carries the commit gate's stage; got %v", gateErr)
+	}
+	if !errors.Is(gateErr, unnamed.err) {
+		t.Errorf("the fault wraps the pack's own error; got %v", gateErr)
+	}
+	if strings.Contains(gateExit.Stage.Rerun, "ship") || strings.Contains(gateExit.Stage.Subject, "floor") {
+		t.Errorf("the commit gate's words must not claim a ship gate or a floor; got %+v", gateExit.Stage)
+	}
+	if !strings.Contains(gateExit.Stage.Rerun, "re-run the commit gate") {
+		t.Errorf("the commit gate says to re-run the commit gate; got %q", gateExit.Stage.Rerun)
+	}
+}
+
+func TestRepoContractJudge_APackThatOutlivesTheDeadlineIsADeadlineFaultAndNotATestFailure(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	blocking := func(ctx context.Context, _, _ string, _ []string) ([]string, string, error) {
+		<-ctx.Done()
+		return nil, "partial output before the kill\n", ctx.Err()
+	}
+	lines, err := RepoContractJudge(CommitGateStage(), blocking)(ctx, ReviewInput{Phase: string(PhaseBuild), Worktree: worktreeWithModule(t)})
+	var deadline *PackDeadlineError
+	var exit *PackExitError
+	if len(lines) != 0 || !errors.As(err, &deadline) || errors.As(err, &exit) {
+		t.Fatalf("a timeout fails closed as a deadline fault and names no test; lines %v err %v", lines, err)
+	}
+	if deadline.Stage != CommitGateStage() || deadline.Elapsed <= 0 || !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("the fault carries the stage, the elapsed time and the cause; got %+v", deadline)
+	}
+	if !strings.Contains(deadline.Diagnostic, "partial output before the kill") {
+		t.Errorf("the fault keeps the partial output; got %q", deadline.Diagnostic)
+	}
+}
+
+func TestRepoContractJudge_ARedThatTheDeadlineKillLeftNamedStillRefusesAsARed(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	killedAfterARed := func(ctx context.Context, _, _ string, _ []string) ([]string, string, error) {
+		<-ctx.Done()
+		return []string{ratchetRedName}, "", ctx.Err()
+	}
+	for name, judge := range map[string]FloorJudge{
+		"floor":       RepoContractFloorJudge(killedAfterARed),
+		"commit gate": RepoContractJudge(CommitGateStage(), killedAfterARed),
+	} {
+		lines, err := judge(ctx, ReviewInput{Phase: string(PhaseBuild), Worktree: worktreeWithModule(t)})
+		if err != nil || len(lines) != 1 || !strings.Contains(lines[0], ratchetRedName) {
+			t.Errorf("%s: a proven red is a refusal line even when the deadline killed the rest; lines %v err %v", name, lines, err)
+		}
+	}
+}
+
+func TestRepoContractJudge_TheStageNamesTheStderrNoteAndTheNoteReachesTheCallersWriter(t *testing.T) {
+	t.Parallel()
+
+	wt := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(wt, "go"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wt, "go", "go.mod"), []byte("module e2e.local/fixture\n\ngo 1.23\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var sink injectedStderr
+	if _, err := RepoContractJudge(CommitGateStage(), (&fakeRepoContractPack{}).run)(context.Background(), ReviewInput{Worktree: wt, Stderr: &sink}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(sink.String(), "[commit-gate] repo-contract gate: ") {
+		t.Fatalf("the note goes to the caller's writer under the caller's stage; got %q", sink.String())
+	}
+}
+
+func TestRepoContractJudge_ThePolicyWarnAndTheUnreadableChangeNoteSpeakAsTheCallersStageToTheCallersWriter(t *testing.T) {
+	t.Parallel()
+
+	wt := worktreeWithModule(t)
+	if err := os.MkdirAll(filepath.Join(wt, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wt, ".evolve", "policy.json"), []byte("{"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var sink injectedStderr
+	if _, err := RepoContractJudge(CommitGateStage(), (&fakeRepoContractPack{}).run)(context.Background(), ReviewInput{Worktree: wt, Stderr: &sink}); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"[commit-gate] WARN repo-contract gate could not read the policy", "[commit-gate] repo-contract gate: "} {
+		if !strings.Contains(sink.String(), want) {
+			t.Errorf("the caller's writer holds %q; got %q", want, sink.String())
+		}
+	}
+	if strings.Contains(sink.String(), "build-floor") {
+		t.Errorf("the commit gate does not speak as the build floor; got %q", sink.String())
 	}
 }
