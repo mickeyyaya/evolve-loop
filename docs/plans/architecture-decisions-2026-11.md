@@ -1,6 +1,6 @@
 # Plan: record and build the architecture decisions D1 to D4 of 2026-11-03
 
-- **Status:** accepted by the operator, 2026-11-03. Nothing is built yet.
+- **Status:** partly built, 2026-11-21 (16 of 30 components on main, 1 partial, 9 open, 4 not started). Earlier status: accepted by the operator, 2026-11-03. Nothing is built yet.
 - **Research:** [architecture-decisions-2026-11.md](../research/architecture-decisions-2026-11.md). Each finding id below (F1.1, P2.1) points into it.
 - **Specs that each component updates when it lands:** [llm-isolation.md](../architecture/llm-isolation.md), [phase-handoff-contract.md](../architecture/phase-handoff-contract.md), [inbox-curator.md](../architecture/inbox-curator.md), [wave-orchestrator.md](../architecture/wave-orchestrator.md).
 - **ADRs in force:** [ADR-0141](../architecture/adr/0141-every-phase-handoff-is-a-request-build-check-loop-with-three-exits.md), [ADR-0139](../architecture/adr/0139-a-wave-orchestrator-supplies-admits-and-backfills-every-lane.md), [ADR-0154](../architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md), [ADR-0156](../architecture/adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md).
@@ -210,3 +210,40 @@ Each code component needs 100% coverage on changed lines, no code comment and th
 | D3 | Empty commitments exceed 15% of a wave | Build alternates in the lane |
 | D4 | The check re-derives each `met` status from the tree | Drop the `output_digest` field |
 | D4 | The operator lifts the 2026-10-20 rule on direct commits | A direct tighten commit is smaller |
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| AD1-1 process name in read reports | done | `TestReportReadViolations_TheSignalNamesTheReadingProcess` at `go/internal/bridge/read_isolation_test.go:366`; item consumed in [#1580](https://github.com/mickeyyaya/evolve-loop/pull/1580) | none |
+| AD1-2 footer off in manifests | done | [#1492](https://github.com/mickeyyaya/evolve-loop/pull/1492), [`1088737`](https://github.com/mickeyyaya/evolve-loop/commit/1088737ba4d95f704db50a93e9e67209fd6e5b6f) (cycle 2417) | none |
+| AD1-3 cell tool view | partial: the credential-free env is in `go/internal/ipcenv/credentials.go`; the contract rows N8b and N8c are unverified | [#1405](https://github.com/mickeyyaya/evolve-loop/pull/1405), [`657c6a8`](https://github.com/mickeyyaya/evolve-loop/commit/657c6a8f6) | 2026-11-03T00-33-08Z-arch-decisions-ad1-3-the-cell-tool-view-gh-config-dir-git |
+| AD1-4 hermetic test helper | done | cycle 2543, [`200b2f5`](https://github.com/mickeyyaya/evolve-loop/commit/200b2f579ebae55c52a448488f31bf2b2ba8fb50); `go/internal/gittest` | none |
+| AD1-5 secret stage | not started: no `IsolationSecretStage` in the code | none | 2026-11-03T00-33-10Z-arch-decisions-ad1-5-a-separate-stage-for-the-secret |
+| AD1-6 wider secret list | not started: `.cargo/credentials.toml` is not in the Go code | none | 2026-11-03T00-33-10Z-arch-decisions-ad1-6-a-wider-secret-list-git-credentials |
+| AD1-7 `CredentialSource` | not started: no such type in the Go code | none | 2026-11-03T00-33-11Z-arch-decisions-ad1-7-the-credentialsource-interface-and |
+| AD1-8 sandbox layer per OS | not started | none | 2026-11-03T00-33-32Z-arch-decisions-ad1-8-sandbox-layer-per-os |
+| AD1-9 `llm-isolation.md` update | done (unverified: the commit is the consume only) | cycle 2410, [`6ab8319`](https://github.com/mickeyyaya/evolve-loop/commit/6ab831919ed81c1e40da9a0f2b1d816b9081f4e3) | none |
+| AD1-10 `$HOME` allowlist | not started (queued by the plan) | none | 2026-11-03T00-33-31Z-arch-decisions-ad1-10-queued-next-e-the-home-allowlist |
+| AD2-0 data PR: consume, retire, dispositions | done: the 8 retired items are in `inbox/consumed`; the PR is unverified | none | none |
+| AD2-1 `closesinbox` parser | done | cycle 2358, [`8615013`](https://github.com/mickeyyaya/evolve-loop/commit/86150139ce599e091a19e9f02a75f88cea3aafa5); also [#1331](https://github.com/mickeyyaya/evolve-loop/pull/1331) | none |
+| AD2-2 curator reads merged bodies | done | cycle 2374, [`4c2610e`](https://github.com/mickeyyaya/evolve-loop/commit/4c2610edf44078c18f274f971bfdb1d11a4eb57f); `go/internal/inboxcurator/landing.go` | none |
+| AD2-3 `inbox trailer-check` verb | done | cycle 2382, [`cc1f0c2`](https://github.com/mickeyyaya/evolve-loop/commit/cc1f0c2b72f5fbcdc6e473e0a3a17d6a23117f9a) | none |
+| AD2-4 CI step and `pr merge` refusal | done | cycle 2439, [`5064626`](https://github.com/mickeyyaya/evolve-loop/commit/50646266d0a2f250c04b7c75f88e6d5345861e06); `.github/workflows/required.yml:187` | none |
+| AD2-5 curator `enforce` | not started: the item is open | none | 2026-11-03T00-33-32Z-arch-decisions-ad2-5-flip-inbox-curator-stage-to-enforce |
+| AD2-6 `ship --class manual` trailer | done | cycle 2391, [`2b45c9c`](https://github.com/mickeyyaya/evolve-loop/commit/2b45c9c2b7a45f603ce79e8a7e0739a923da07e9) | none |
+| AD2-7 typed probes | done | cycle 2363, [`6f97011`](https://github.com/mickeyyaya/evolve-loop/commit/6f97011946c994366df2eaeba4487fd002ab2d67) | none |
+| AD2-8 freshness factor | done | [#1458](https://github.com/mickeyyaya/evolve-loop/pull/1458), [`9e475a9`](https://github.com/mickeyyaya/evolve-loop/commit/9e475a9e1db49f2337f8b5c81aa998db917b472d) | none |
+| AD2-9 `inbox audit` | not started | none | 2026-11-03T00-33-16Z-arch-decisions-ad2-9-graft-d-an-on-demand-llm-curator |
+| AD3-1 fingerprint normalizer | done | cycle 2425, [`7ea98e7`](https://github.com/mickeyyaya/evolve-loop/commit/7ea98e768ff75c9cf6b1e3fbb5dc12ca28005e49) | none |
+| AD3-2 directory routing rule | not started | none | 2026-11-03T00-33-18Z-arch-decisions-ad3-2-the-directory-routing-rule-a |
+| AD3-3 agreement rate in the Q8 item | not started (unverified: inbox data, no record found) | none | none (draft `arch-decisions-ad3-3-judge-agreement-note`) |
+| AD3-4 successor item for the audit verdict seat | not started (unverified: no such item found) | none | none (draft `arch-decisions-ad3-4-audit-verdict-as-an-i8-seat`) |
+| AD3-5 retire four design items | done: the four ids are in `inbox/consumed` | none | none |
+| AD4-1 H9 `output_digest` stamp | done | [#1332](https://github.com/mickeyyaya/evolve-loop/pull/1332), [`bc711a9`](https://github.com/mickeyyaya/evolve-loop/commit/bc711a9fa); `go/internal/core/handoff_reviewer.go:64` | none |
+| AD4-2 handoff doc update | done | [#1332](https://github.com/mickeyyaya/evolve-loop/pull/1332) | none |
+| AD4-3 merge #1070 and run the ratchet check | unverified: no commit for #1070 found by this review | none | none |
+| AD4-4 ratchet step merges its own PR | not started: no `ratchet_merge` key in the policy code | none | 2026-11-03T00-33-18Z-arch-decisions-ad4-4-the-ratchet-step-merges-its-own-pr |
+| AD4-5 ratchet docs and `enforce` | not started (needs AD4-4) | none | none (waits for AD4-4) |
+
+The inbox and handoff parts (D2, D3 and D4a) are mostly on main. The credential parts of D1 are mostly open: AD1-3, AD1-5 to AD1-8 and AD1-10. D2b (AD2-5, AD2-9), AD3-2 and AD4-4 are open items too. AD3-3, AD3-4 and AD4-5 have no open item, and AD3-3 and AD3-4 have drafts. AD4-3 is unverified. The item AD1-1 and AD1-9 consumes came as bookkeeping, so their code evidence is the test and the doc state.

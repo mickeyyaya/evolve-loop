@@ -1,6 +1,6 @@
 # Plan: the Signal Center measures what the pipeline delivers and detects each absent live signal
 
-- **Status:** proposed, 2026-11-13. Revised after docs review round 1 (1 HIGH, 6 MEDIUM, 2 LOW, all folded in).
+- **Status:** built, 2026-11-17. Earlier status: proposed, 2026-11-13. Revised after docs review round 1 (1 HIGH, 6 MEDIUM, 2 LOW, all folded in).
 - **Design:** [signal-center-design.md](../architecture/signal-center-design.md) (the stream) and [llm-quality-indexes.md](../architecture/llm-quality-indexes.md) (the panel). This plan adds to both. **Decision:** no ADR yet; D1 to D7 go to an ADR after the design review. **Research:** §2 below.
 - **Related plans:** [pool-resupply-2026-10.md](pool-resupply-2026-10.md), [wave-orchestrator-2026-10.md](wave-orchestrator-2026-10.md).
 
@@ -273,3 +273,18 @@ H6 updates the panel spec: the index table (PQ1 to PQ9), the code count and the 
 - **Q1.** Must a long bench (F2.7) count only as an idle cause (`bench`), or also as an availability reading for each family?
 - **Q2.** The gate share near 30% (F2.8) needs its own study. This plan only measures it.
 - **Q3.** The cause of the wave 164 fall (F2.5) stays open until H1 lands and a wave runs.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| Step 1: remove `run_max_lanes` | done | [#1433](https://github.com/mickeyyaya/evolve-loop/pull/1433) | none |
+| H1: typed idle `cause` | done | [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443), [`2bcfd82`](https://github.com/mickeyyaya/evolve-loop/commit/2bcfd8293e7959d90df4932a56f0a37385d304f0) | none |
+| H2: PQ6 to PQ9 readings | done | [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443) | none |
+| H3: PQ7 XmR chart | done | [#1450](https://github.com/mickeyyaya/evolve-loop/pull/1450), [`edd4a7d`](https://github.com/mickeyyaya/evolve-loop/commit/edd4a7dcd5faab216d6a2b1085eadbdd17b6122c) | none |
+| H4: expected-signal registry | done | [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443); fix: cycle 2443, [`b681e55`](https://github.com/mickeyyaya/evolve-loop/commit/b681e55abb42ae6940bb3dafc721149c3c1e13dd) | none |
+| H5: one reader | done | [#1452](https://github.com/mickeyyaya/evolve-loop/pull/1452), [`c9d001f`](https://github.com/mickeyyaya/evolve-loop/commit/c9d001fb0155a24ef9f5b5ebdd3c7be61d0886c5) | none |
+| H6: spec updates | done | PQ6 to PQ9 rows at `docs/architecture/llm-quality-indexes.md:59-62`; code in `docs/architecture/signal-codes.md` | none |
+| H7: frozen-check routing | done | [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443) | none |
+
+All seven components and the configuration step are on main. The registry code is in `go/internal/signalcenter/expected.go`. Open questions Q1 to Q3 stay open. Q3 needs a live wave reading of the idle causes, which this review did not verify. No unfinished component lacks an open inbox item.

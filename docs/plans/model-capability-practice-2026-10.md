@@ -1,6 +1,7 @@
 # Plan: the loop watches the practice of each CLI and trims its scaffolding by measure
 
-- **Status:** accepted, 2026-10-12. M0 merged in PR 857, and M1 merged in PR 864 on 2026-10-12. M2 to M5 are open, and each has an inbox item (section 7).
+- **Status:** partly built, 2026-11-20 (3 of 6 components on main; M2 and M3 not started).
+  - Earlier status: accepted, 2026-10-12. M0 merged in PR 857, and M1 merged in PR 864 on 2026-10-12. M2 to M5 are open, and each has an inbox item (section 7).
 - **Decision:** [ADR-0133](../architecture/adr/0133-the-loop-watches-cli-practice-and-trims-its-scaffolding.md). **Research:** [model-capability-practice-2026-10.md](../research/model-capability-practice-2026-10.md).
 
 ## Table of contents
@@ -142,3 +143,16 @@ Each criterion has a score from 1 (bad) to 5 (good).
 
 1. Must the watch also cover Codex and the Gemini CLI? This plan adds them as optional sources with no default.
 2. Which noise band must D8 use for each measure? M2 records a baseline first.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| M0 documents | done | [#857](https://github.com/mickeyyaya/evolve-loop/pull/857) | none |
+| M1 `evolve practice watch` | done | [#864](https://github.com/mickeyyaya/evolve-loop/pull/864); `go/cmd/evolve/cmd_practice.go` | none |
+| M2 `evolve prompt stats` | not started (no `prompt stats` code on main); the item is in quarantine | none | none (quarantined) |
+| M3 builder persona diet | not started; waits for M2 | none | none |
+| M4 host self-heal | done | cycle 2542, [`48a892d`](https://github.com/mickeyyaya/evolve-loop/commit/48a892d1d) (`go/internal/looppreflight/cyclestart.go`, `disk_percent.go`) | none (item consumed) |
+| M5 model notes per family | done | cycle 2245, [`ae84e4a`](https://github.com/mickeyyaya/evolve-loop/commit/ae84e4ad2) (`go/internal/policy/overlays.go`) | none (item consumed) |
+
+M2 and M3 are left. The item of M2 is in quarantine, so no lane can claim it. M3 has no inbox item in any state. Follow-up drafts exist: `model-capability-practice-m2-prompt-stats` and `model-capability-practice-m3-builder-persona-diet`. Four practice items (Claude Code and agy sources, 2026-11-21) in the open inbox show that the watch works.

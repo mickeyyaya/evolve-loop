@@ -1,6 +1,7 @@
 # Plan: cycle agent messaging, a general protocol with a policy scoped to one cycle
 
-- **Status:** in build. M0 and M1 merged in PR #845, M2 in PR #972 and M3 in PR #974. M4 merged in commit 7635ab3bb. M5 to M8 are open (section 16). The design opened on 2026-10-09 in the lane `cl-agentmsg` (branch `feat/agentmsg-skeleton`, base `origin/main` at `99b9c896d`). The operator gave decisions OD1 to OD4 on 2026-10-09, and the first lane delivered M0 (the documents) and M1 (the skeleton).
+- **Status:** partly built, 2026-11-21 (5 of 9 components on main; M5 to M8 not started).
+  - Earlier status: in build. M0 and M1 merged in PR #845, M2 in PR #972 and M3 in PR #974. M4 merged in commit 7635ab3bb. M5 to M8 are open (section 16). The design opened on 2026-10-09 in the lane `cl-agentmsg` (branch `feat/agentmsg-skeleton`, base `origin/main` at `99b9c896d`). The operator gave decisions OD1 to OD4 on 2026-10-09, and the first lane delivered M0 (the documents) and M1 (the skeleton).
 - **Spec of record:** [agent-messaging.md](../architecture/agent-messaging.md). It holds the protocol: the envelope, the addresses, the policy, the identity, the flow and the delivery. It also holds the limits, the exit codes and the threat model. This plan holds the decisions, the components and the tests.
 - **Decision record:** [ADR-0129](../architecture/adr/0129-cycle-scoped-agent-messaging.md).
 - **Research:** [agent-messaging-2026-10.md](../research/agent-messaging-2026-10.md) (findings F1.1 to F7.5, refinements R1 to R24).
@@ -367,3 +368,19 @@ The limits of record are in the spec: [agent-messaging.md](../architecture/agent
 | M6 | ☐ not started. The fix `sandbox-cross-cycle-run-dir-write` that M6 waits for is consumed. Inbox item: `agent-messaging-m6-sandbox-rules`. |
 | M7 | ☐ not started. M7 waits for M6. Inbox item: `agent-messaging-m7-cycle-wiring`. |
 | M8 | ☐ not started. M8 waits for M7. Inbox item: `agent-messaging-m8-live-wave-check`. |
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| M0 documents | done | [#845](https://github.com/mickeyyaya/evolve-loop/pull/845), [`557ba28`](https://github.com/mickeyyaya/evolve-loop/commit/557ba284b) | none |
+| M1 skeleton | done, unwired | [#845](https://github.com/mickeyyaya/evolve-loop/pull/845), [`0195d65`](https://github.com/mickeyyaya/evolve-loop/commit/0195d65a4) | none |
+| M2 channel-log store | done, unwired | [#972](https://github.com/mickeyyaya/evolve-loop/pull/972), [`09be134`](https://github.com/mickeyyaya/evolve-loop/commit/09be134cb) | none |
+| M3 outbox watcher, token mint | done, unwired | [#974](https://github.com/mickeyyaya/evolve-loop/pull/974), [`81780ee`](https://github.com/mickeyyaya/evolve-loop/commit/81780ee09) | none |
+| M4 `evolve msg` CLI | done | cycle 2058, [`7635ab3`](https://github.com/mickeyyaya/evolve-loop/commit/7635ab3bb) (`go/cmd/evolve/cmd_msg.go`) | none (item consumed) |
+| M5 deliverers | not started | none | `agent-messaging-m5-deliverers` |
+| M6 sandbox rules | not started | none | `agent-messaging-m6-sandbox-rules` |
+| M7 cycle wiring | not started | none | `agent-messaging-m7-cycle-wiring` |
+| M8 live wave check | not started | none | none |
+
+Four components are left: M5, M6, M7 and M8. M5 to M7 have open inbox items. M8 has no inbox item at all, although §16 names one. A follow-up draft exists: `agent-messaging-m8-live-wave-check`. No code of `internal/core` or the sandbox adapter references `agentmsg` yet, so nothing is wired into a cycle.

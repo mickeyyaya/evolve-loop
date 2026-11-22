@@ -1,6 +1,6 @@
 # Plan: who fixes a defect after the owner fails twice
 
-- **Status:** accepted, 2026-10-20. The operator chose design C over a direct fix by the finder.
+- **Status:** partly built, 2026-11-16 (3 of 7 components done). Earlier status: accepted, 2026-10-20. The operator chose design C over a direct fix by the finder.
 - **Research:** [finder-fix-ownership-2026-10](../research/finder-fix-ownership-2026-10.md). **Decision:** [ADR-0146](../architecture/adr/0146-a-defect-that-survives-two-builder-rounds-is-fixed-from-the-finders-spec-and-verified-by-another.md).
 - **Amends:** [ADR-0142](../architecture/adr/0142-a-capability-failure-climbs-one-bounded-retry-ladder.md) and its spec [retry-ladder](../architecture/retry-ladder.md).
 
@@ -142,3 +142,17 @@ The plan audit of 2026-10-27 filed one inbox item for each component. The inbox 
 - The scope guard of D5 can fail a fix that needs a caller or a test change outside the cited lines. The ladder then stops.
 - A fix spec can be wrong. The verify catches a wrong fix, but the ladder then stops and the operator decides.
 - The local data has 24 repair rounds. The rates of §1 are a shape, not a measure.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| F0 fix spec format | done | cycle commit [`2c5b706`](https://github.com/mickeyyaya/evolve-loop/commit/2c5b7064c85326b161b2d02e50529744dd25461b); `go/internal/retryladder/fixspec.go` | none (consumed) |
+| F1 auditor writes a fix spec | not started | `agents/evolve-auditor.md` has no fix spec text | `finder-fix-ownership-f1-auditor-writes-fix-spec` |
+| F2 rung R3 in the decider | done | cycle commit [`fa282fe`](https://github.com/mickeyyaya/evolve-loop/commit/fa282fe3c0e01b049de8074f4bd9b8765d5ca112); `go/internal/retryladder/decide.go:18` | none (consumed) |
+| F3 R3 verifier | not started | No change list found | `finder-fix-ownership-f3-r3-verifier` |
+| F4 ledger authorship | not started | No change list found | none: draft `finder-fix-ownership-f4-ledger-authorship` |
+| F5 deterministic fast path | not started | No change list found | none: draft `finder-fix-ownership-f5-deterministic-fast-path` |
+| F6 rung records in `evolve ladder report` | done | cycle commit [`88b659f`](https://github.com/mickeyyaya/evolve-loop/commit/88b659f8114a913ea13f6a1ba60dc9aa5b6ae929) | none (consumed) |
+
+The decider knows rung R3, but no auditor writes a spec and no verifier checks an R3 fix. So the rung cannot run end to end. F4 and F5 have no open item, and drafts are written. The ADR-0146 decision list is unchanged.

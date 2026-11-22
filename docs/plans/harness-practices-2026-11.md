@@ -1,6 +1,6 @@
 # Plan: the loop proves each fix with a journey test, and a refusal or a nameless red no longer costs hours
 
-- **Status:** proposed, 2026-11-04.
+- **Status:** partly built, 2026-11-20 (5 of 9 components on main, 4 not built). Earlier status: proposed, 2026-11-04.
 - **Design:** [regression-proof-and-supervision](../architecture/regression-proof-and-supervision.md). **Decision:** [ADR-0159](../architecture/adr/0159-the-loop-keeps-its-integration-train-and-takes-six-practices-from-the-2026-harness-projects.md). **Research:** [harness-practices-2026-11](../research/harness-practices-2026-11.md).
 
 ## Table of contents
@@ -185,3 +185,20 @@ Each component has 100% coverage on each changed function, a test that is red wi
 | Q3 | Do we add `testscript` for journey tests? | No for now. The `e2e_*_test.go` files work. Review after 10 journeys. |
 | Q4 | Does a mix of families in one wave raise conflicts? | Unknown. F5.7 does not show this. Record the family pair on each ejection. |
 | Q5 | Do we add branch protection on `main`? | **Decided by the operator, 2026-11-04:** yes, once the train is live. See [the steps](wave-integration-2026-10.md#branch-protection-on-main). |
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| R1 `role-guard-derives-the-active-cycle` | done | [`87e2e16`](https://github.com/mickeyyaya/evolve-loop/commit/87e2e16732d86e439c32f4238e222d72dc8a0425) | none |
+| R2 `guard-denial-ends-the-dispatch-chain` | not started | No change on main. | `guard-denial-ends-the-dispatch-chain` |
+| R3 `build-floor-keeps-audit-rules` | done | [`5e774df`](https://github.com/mickeyyaya/evolve-loop/commit/5e774dfa33619e05aa6e16551b97af5a036df02c) (`go/internal/core/build_floor_retake.go`) | none |
+| R4 `landed-identity-zero-context` | done | [`7738221`](https://github.com/mickeyyaya/evolve-loop/commit/77382212342b4f8d8225486f3b9478e271ac7356), [PR #1580](https://github.com/mickeyyaya/evolve-loop/pull/1580) (consume record only) | none |
+| R5 `journey-registry-and-trailer` | not started | No `Fix-Journey` code on main. | `journey-registry-and-trailer` |
+| R6 `regression-proof-gate` | not started | No `FIX_PROOF` code on main. | `regression-proof-gate` |
+| R7 `agent-seat-health-states` | done | [`7a57fb3`](https://github.com/mickeyyaya/evolve-loop/commit/7a57fb3e3cf44e370d226056b4f17d5486fd45fc), cycle 2186 (`cmd_wave_status_seat_test.go`) | none |
+| R8 `enforce-evidence-for-integration` | not started | No change on main. | `enforce-evidence-for-integration` |
+| R9 `harness-removal-test` | done (design only, as the plan says) | [`70e796b`](https://github.com/mickeyyaya/evolve-loop/commit/70e796b37c134e95d565d28b3fb10af276188d11), cycle 2549, [harness removal test design](harness-removal-test-2026-11.md) | none |
+
+R2, R5, R6 and R8 are not built. Each has an open inbox item, routed `console-manual`. R4 changed the identity to one line of context, as D8 states. The change is in `go/internal/integration/landed.go`. The seat states are in `go/internal/bridge/panestream/seathealth.go`. Every unfinished component has an open item.
+

@@ -2,6 +2,7 @@
 
 > **Purpose.** This plan fixes the root cause of the cycle-1838 FAIL. A claim that a dead cycle holds stays in `processing/` for ever. The planner offers an item that a claim holds. The runbook fix for a claimed tracked item (`git restore`) makes a duplicate.
 > - **Lane:** console lane `cl-inbox-claims`, branch `fix/inbox-stale-claims`.
+> - **Status:** partly built, 2026-11-21 (S1 to S8 and S10 on main; the dead-code clean-up is not built). Earlier status: none was stated.
 > - **Updates:** the status column in §7 changes when a step lands.
 
 ## 1. Incident (verified by the console, 2026-10-08 20:32)
@@ -121,3 +122,22 @@ The planner start (D6) is the one trigger. The boundary launches a fresh loop, a
 - If a cycle resumes after its claim was released, its ship retires the item from the root. Two lanes can then work the same item. The release reason in the ledger shows why.
 - `Mover.RecoverOrphans`, its facade, `WithActiveCycle` and `Options.ActiveCycleFn` have no production caller now (D9). The package rule says a golden drift is its own commit, so their removal is the follow-up inbox item `inbox-claims-review-followups`.
 - An origin copy parked in `origin-conflicts/` waits for the operator, who keeps one of the two copies.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| S1 `ClassifyHolder`, `ListClaims` | done | [#819](https://github.com/mickeyyaya/evolve-loop/pull/819), [`4bc90eb`](https://github.com/mickeyyaya/evolve-loop/commit/4bc90eb7c); `go/internal/inboxmover/holder.go:44` | none |
+| S2 `ReleaseClaim`, `ReleaseStaleClaims` | done | [#819](https://github.com/mickeyyaya/evolve-loop/pull/819); `go/internal/inboxmover/claims.go:108` | none |
+| S3 planner guard (D5) and auto-release (D6) | done | [#819](https://github.com/mickeyyaya/evolve-loop/pull/819); a later fix [#980](https://github.com/mickeyyaya/evolve-loop/pull/980) | none |
+| S4 `inbox claims`, `inbox release` | done | [#819](https://github.com/mickeyyaya/evolve-loop/pull/819) | none |
+| S5 gc of empty stale claim dirs | done | [#819](https://github.com/mickeyyaya/evolve-loop/pull/819) | none |
+| S6 `Classify.Claimed` and `AbsorbRootCopies` | done | [#819](https://github.com/mickeyyaya/evolve-loop/pull/819); `go/internal/inboxmover/claims.go:168` | none |
+| S7 docs and CHANGELOG | done | [#819](https://github.com/mickeyyaya/evolve-loop/pull/819) | none |
+| S8 and D11 `release --stale`, `--keep root\|claim` | done | [#820](https://github.com/mickeyyaya/evolve-loop/pull/820), [`53631d5`](https://github.com/mickeyyaya/evolve-loop/commit/53631d597) | none |
+| S9 boundary step | dropped (section 4.3) | none | none |
+| S10 review round 1 fixes (C1, H1, H2, D10) | done | [#819](https://github.com/mickeyyaya/evolve-loop/pull/819) | none |
+| Follow-up `inbox-claims-delta-followups` (round 2 items) | not started | none | `inbox-claims-delta-followups` |
+| Follow-up `inbox-claims-review-followups` (section 8, eight clean-ups) | not started | the item was consumed by bookkeeping in [`fd36f33`](https://github.com/mickeyyaya/evolve-loop/commit/fd36f3334) (PR 1605), with no code change; `Mover.RecoverOrphans` and `ActiveCycleFn` are still on main | none (draft `inbox-claims-review-followups-lane`) |
+
+All steps of the plan are on main. The two follow-up sets are not done. The round 2 set has an open item. The eight clean-ups of section 8 have no open item, because the bookkeeping consume of PR 1605 closed the item without a code change. A draft, `inbox-claims-review-followups-lane`, is ready for filing.

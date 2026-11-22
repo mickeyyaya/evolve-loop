@@ -1,6 +1,6 @@
 # Plan: console work — build only what a lane cannot build, and stop when the lanes starve
 
-- **Status:** proposed, 2026-11-17.
+- **Status:** partly built, 2026-11-21 (3 of 5 components on main). Earlier status: proposed, 2026-11-17.
 - **Research:** [Console work: when the console builds an item and when it routes the item to a lane](../research/console-build-or-route-2026-11.md). **Decision:** no ADR, because the plan changes no boundary of the loop. It adds rule 6 to [operating-policy.md §2](../operations/operating-policy.md), the rule of record.
 - **Related:** [the inbox classifier tiers](inbox-classifier-room-2026-11.md) stamp the author of each console route (D6 there) and decide its reroute (D7 there). This plan says which facts justify a console build, and when the console stops.
 
@@ -140,3 +140,15 @@ The lane failure rate of the moved items is the counter-measure (section 5, "wha
 
 - **Q1.** Do the `console-manual` routes that the operator filed by hand stay? This plan treats an operator route as an operator decision, so it stays. The 147 routes have no `routed_by`, so K4 lists them for the operator before the move.
 - **Q2.** Is one batch (10) the right limit for D6? The train landed 10 in one batch on 2026-11-16. Measure again after three boundaries.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| K1 rule 6 in operating-policy §2 | done, 2026-11-17 | [#1532](https://github.com/mickeyyaya/evolve-loop/pull/1532) [`a179b59`](https://github.com/mickeyyaya/evolve-loop/commit/a179b5995) (`docs/operations/operating-policy.md:172`) | none |
+| K2 supply splits `console_route_no_fact` | done, 2026-11-17 | cycle 2457 [`7f75fe9`](https://github.com/mickeyyaya/evolve-loop/commit/7f75fe933) | none |
+| K3 supply advice line | done, 2026-11-19 | cycle 2519 [`6312414`](https://github.com/mickeyyaya/evolve-loop/commit/6312414d5) (`go/acs/cycle2519/predicates_test.go:20`) | none |
+| K4 boundary reroute of console routes | unverified: this step is an inbox change, and no commit names it. The related approval is the backlog review of 2026-11-19. | none | none (draft: console-build-or-route-k4-reroute-record) |
+| K5 split of the `cmd/evolve` admission cell | partial: [admission plan](admission-cmd-evolve-cell-2026-11.md) K1 is on main and the `file_cells` step landed (see that plan) | see that plan | cmd-evolve-cell-is-too-coarse-for-8-lanes |
+
+K1 to K3 are on main. K5 depends on the admission plan and has an open item. K4 is unfinished or unrecorded and has no open inbox item. A follow-up draft asks for a measured count of console routes without a checked fact. The target of section 8 is zero.

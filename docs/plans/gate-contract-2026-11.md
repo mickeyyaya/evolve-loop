@@ -1,5 +1,7 @@
 # Plan: every gate is a typed unit with a conformance contract
 
+- **Status:** partly built, 2026-11-21 (G1, G4 and G7 on main; G5 partial; G2 built on a branch, not merged; G3 and G6 not started). Earlier status: none recorded.
+
 > Design set: [ADR-0165](../architecture/adr/0165-every-gate-is-a-typed-unit-with-a-conformance-contract.md) · research: [gate-contract-2026-11.md](../research/gate-contract-2026-11.md) · spec: [gate-contract.md](../architecture/gate-contract.md).
 
 The operator asked on 2026-11-10 for an improvement "from the fundamental unit" after the incident of 2026-11-09. This plan builds the gate contract of ADR-0165 in seven components. Each component is one pull request, and each gets an inbox item.
@@ -49,3 +51,17 @@ C wins because it is the only approach that tests the next gate as well as the k
 - The harness proves parity for the fixtures that it builds, not for every tree.
 - Base-red attribution reruns only the red tests. A red that depends on the interaction of two changes still needs the train (ADR-0147).
 - The G2 walk reaches the static call graph, so a call through reflection or a plugin is outside the measure. The sandbox (ADR-0165 R13) denies its exec or `.git` read at run time.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| G1: protected gate registry | done | [#1425](https://github.com/mickeyyaya/evolve-loop/pull/1425), [`796f9083`](https://github.com/mickeyyaya/evolve-loop/commit/796f9083e); registry in `go/internal/gateregistry/gateregistry.go`; seeds for `testdup`, `sizeratchet`, `rawgitratchet` | none |
+| G2: hermetic gate | built on a branch, not merged | branch `feat/gate-contract-g2-walker` (22 commits, worktree `dev/cl-g2walker`); no `gaterun` package on main | `gate-contract-g2-hermetic-guard` |
+| G3: parity harness | not started (unverified: the item was consumed in [`6551b70`](https://github.com/mickeyyaya/evolve-loop/commit/6551b70a3), [#1423](https://github.com/mickeyyaya/evolve-loop/pull/1423), but no harness code is on main) | none | none (draft `gate-contract-g3-three-state-parity`) |
+| G4: base-red attribution and main-red stop | done | [#1425](https://github.com/mickeyyaya/evolve-loop/pull/1425); `go/internal/baseattr`, `go/internal/mainstop`, `go/cmd/evolve/cmd_cycle_main_red_park.go` | none |
+| G5: one TDD floor | partial | helper-copy check in `go/internal/core/tdd_predicate_floor.go` ([#1425](https://github.com/mickeyyaya/evolve-loop/pull/1425), [#1467](https://github.com/mickeyyaya/evolve-loop/pull/1467), [#1601](https://github.com/mickeyyaya/evolve-loop/pull/1601)); the shared list with `phase verify tdd` is unverified | none (draft `gate-contract-g5-one-tdd-floor-rest`) |
+| G6: key baseline | not started | `go/.test-dup-baseline` still holds `count=330` and a date, not keys | none (draft `gate-contract-g6-key-baseline`) |
+| G7: manifest rows | superseded by G1 (the plan retires G7 into G1) | [#1425](https://github.com/mickeyyaya/evolve-loop/pull/1425) | none |
+
+G2 waits for the merge of its branch. G3 and G6 have no open inbox item, and the G5 remainder has none. Three follow-up drafts are ready for the console. The `gate-contract-g1-registry` and `g4` items were consumed in [#1580](https://github.com/mickeyyaya/evolve-loop/pull/1580) as bookkeeping. The code landed earlier, in #1425.

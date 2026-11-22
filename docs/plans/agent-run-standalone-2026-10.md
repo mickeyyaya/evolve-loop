@@ -1,6 +1,6 @@
 # Plan: one phase agent runs from the command line with a standard output and no cycle
 
-- **Status:** built, 2026-10-21.
+- **Status:** built, 2026-10-21. Earlier status: built, 2026-10-21.
 - **Design:** [agent-run](../architecture/agent-run.md). **Decision:** [ADR-0152](../architecture/adr/0152-one-phase-agent-runs-from-the-command-line-with-no-cycle-through-the-phase-runner.md). **Research:** [agent-run-standalone-2026-10](../research/agent-run-standalone-2026-10.md).
 - **Inbox item:** `agent-run-standalone-profile-cli` (consumed by the pull request that builds this plan).
 
@@ -120,3 +120,15 @@ Why A wins:
 
 - A source-write profile in an explicit dev worktree: a later version can allow it with `--worktree DIR` that is not the plane tree. The condition is a fence that the live loop cannot see.
 - `evolve gc` does not yet sweep `.evolve/ephemeral/agent-runs`. A sweep is needed only when `--keep` runs pile up.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| A1 `NewSpecRunner`, `DefaultBridge`, `SpecRunnable` | done | [`f392b18`](https://github.com/mickeyyaya/evolve-loop/commit/f392b18242f69a38855340efc30d1c954a5cbf97); `go/internal/cli/phasecmd/spec_phase.go:32` | none |
+| A2 `AgentInputKey` input block | done | [`f392b18`](https://github.com/mickeyyaya/evolve-loop/commit/f392b18242f69a38855340efc30d1c954a5cbf97) | none |
+| A3 `internal/cli/agentcmd` run and list | done | [`f392b18`](https://github.com/mickeyyaya/evolve-loop/commit/f392b18242f69a38855340efc30d1c954a5cbf97); `go/internal/cli/agentcmd/run.go` | none |
+| A4 `agent` registry entry | done | [`f392b18`](https://github.com/mickeyyaya/evolve-loop/commit/f392b18242f69a38855340efc30d1c954a5cbf97); `go/cmd/evolve/registry.go:45` | none |
+| A5 docs | done | [`f392b18`](https://github.com/mickeyyaya/evolve-loop/commit/f392b18242f69a38855340efc30d1c954a5cbf97) | none |
+
+The command has grown since the first build: it now has `capabilities`, `--worktree`, `--writable` and a launch record. The run record path is `.evolve/agent-runs/<run label>.json`, not the workspace path in decision D6. Open console PR [#1621](https://github.com/mickeyyaya/evolve-loop/pull/1621) adds an inbox-add executor to the same command. Section 10 has two open questions: a source-write profile in a dev worktree, and a `gc` sweep of kept runs. Neither has an open inbox item. It is unverified if `--worktree` closes the first question.

@@ -1,6 +1,6 @@
 # Plan: the integration train checks the CI of its base before it splits a red batch
 
-- **Status:** accepted, 2026-11-18. The design converged after three review rounds (§11).
+- **Status:** built, 2026-11-19 (5 of 5 components on main). Earlier status: accepted, 2026-11-18. The design converged after three review rounds (§11).
 - **Inbox items:** `integration-train-compares-a-red-batch-with-main-before-it-splits` (AC2, AC3) and `wave-integration-i7-recompose-after-console-merge` (AC3). **Decision:** no ADR. The train keeps its guarantee: a change lands only through a green batch. This plan changes only when the train splits a batch.
 - **Related:** [wave-integration-2026-10.md](wave-integration-2026-10.md) (I7, I14, D33), [pr-merge-latency-2026-10.md](pr-merge-latency-2026-10.md).
 
@@ -161,3 +161,15 @@ Round 3 (architecture-reviewer, a fresh seat, WARN) confirmed that D6 closes H1 
 | L-b: the status line names round 1 only | The status line. |
 
 **Amendment before the build.** A read of the implementers found F12: a new `Watch` signature changes two frozen ACS predicates. D6 now keeps the interfaces and adds a run log to `GhCI`. The run is still found once (round 2, H1), and the code review of the build checks the change.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| T1 `Base` port and `hold` step | done | [#1566](https://github.com/mickeyyaya/evolve-loop/pull/1566), [`13df90a`](https://github.com/mickeyyaya/evolve-loop/commit/13df90ad7); `go/internal/integration/batchpr.go:49`, `:62`; `base_hold_test.go` | none |
+| T2 wiring in `Train` to `checkMain` | done | [#1566](https://github.com/mickeyyaya/evolve-loop/pull/1566), [`13df90a`](https://github.com/mickeyyaya/evolve-loop/commit/13df90ad7); `go/internal/integration/train.go:294`; `train_base_hold_test.go` | none |
+| T3 exit code, hold line and hold signal | done | [#1566](https://github.com/mickeyyaya/evolve-loop/pull/1566), [`13df90a`](https://github.com/mickeyyaya/evolve-loop/commit/13df90ad7); `go/cmd/evolve/cmd_integration_batch.go:146`; `cmd_integration_hold_test.go` | none |
+| T4 run log of `GhCI`, `Tip` and `Base` fields | done | [#1566](https://github.com/mickeyyaya/evolve-loop/pull/1566), [`13df90a`](https://github.com/mickeyyaya/evolve-loop/commit/13df90ad7); `go/internal/integration/runlog.go` | none |
+| T5 `OnMain` in `Composition`, `Outcome`, `settle`, `EnforceActor` | done | [#1566](https://github.com/mickeyyaya/evolve-loop/pull/1566), [`13df90a`](https://github.com/mickeyyaya/evolve-loop/commit/13df90ad7); `go/internal/integration/batchpr.go:39`, `enforce_actor.go:106`; `onmain_test.go` | none |
+
+All five components landed in one pull request. The bookkeeping of item `wave-integration-i7-recompose-after-console-merge` came in with [#1605](https://github.com/mickeyyaya/evolve-loop/pull/1605), [`fd36f33`](https://github.com/mickeyyaya/evolve-loop/commit/fd36f33348a9c2098c4f280e667f5bff7594e254). The item `integration-train-compares-a-red-batch-with-main-before-it-splits` is still in the open inbox, although its work is on main. It needs a consume at the next boundary. Nothing is left to build. Verification rows G1 to G3 need a live red-base batch, so they are unverified.

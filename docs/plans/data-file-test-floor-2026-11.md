@@ -1,6 +1,6 @@
 # Plan: a lane that changes a data file runs the tests that read that file
 
-- **Status:** proposed, 2026-11-16. Revision 5. The design review of revision 4 failed with 2 CRITICAL and 7 HIGH findings. The operator then chose a layered design (§1.1). Layer 1 is built now. Layers 2 to 4 are designed here and built later in shadow.
+- **Status:** partly built, 2026-11-21 (4 of 8 components on main). Earlier status: proposed, 2026-11-16 (revision 5). The design review of revision 4 failed with 2 CRITICAL and 7 HIGH findings. The operator then chose a layered design (§1.1). Layer 1 is built now, and layers 2 to 4 are for later, in shadow.
 - **Agent rule:** [ADR-0155](../architecture/adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md): an agent proposes, and the pipeline disposes. **Shadow stages:** ADR-0167, "shadow stages prove themselves on chained evidence" (proposed, branch `design/shadow-stage-contract`).
 - **Inbox item:** `lane-floor-selects-the-tests-that-read-a-changed-data-file`.
 - **Package notes:** [internal-repocontract](../architecture/packages/internal-repocontract.md), [internal-changedpkgs](../architecture/packages/internal-changedpkgs.md) and [internal-ciparity](../architecture/packages/internal-ciparity.md).
@@ -355,3 +355,20 @@ Revision 5 design review (0 CRITICAL, 3 HIGH):
 | Arch MEDIUM 4: D28 counts noise as an escape | Agreed. D28 counts only a failure that `baseattr` charges to the lane. |
 | Docs MEDIUM: no rejected options for D25 to D30, no owner for C5 to C8 | Agreed. Both columns are added. |
 | Docs LOW: 94 rows | Corrected to 93. The build is uncommitted in `dev/cl-floorbuild`. |
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| C1 `ByNameTestsFor` | done, 2026-11-18 | [#1538](https://github.com/mickeyyaya/evolve-loop/pull/1538) [`c2a6cce`](https://github.com/mickeyyaya/evolve-loop/commit/c2a6cce2f) (`go/internal/repocontract/datafiles.go:31`) | none |
+| C2 remove detector, add the two row checks | done, 2026-11-18 | [#1538](https://github.com/mickeyyaya/evolve-loop/pull/1538) [`c2a6cce`](https://github.com/mickeyyaya/evolve-loop/commit/c2a6cce2f) (`go/internal/repocontract/datafiles_rows_test.go`) | none |
+| C3 `RepoContractPackFn` takes the changed paths | done, 2026-11-18 | [#1538](https://github.com/mickeyyaya/evolve-loop/pull/1538) [`c2a6cce`](https://github.com/mickeyyaya/evolve-loop/commit/c2a6cce2f) (`go/internal/phases/ship/repocontract_datafiles_test.go`, `go/internal/core/repo_contract_floor_test.go`) | none |
+| C4 package notes | done, 2026-11-18 | [#1538](https://github.com/mickeyyaya/evolve-loop/pull/1538) [`c2a6cce`](https://github.com/mickeyyaya/evolve-loop/commit/c2a6cce2f); the skip line at `internal-repocontract.md:40` is gone | none |
+| C5 `data-read-monitor` persona | not started | none | none (draft: data-file-floor-c5-monitor-persona) |
+| C6 acceptance check | not started | none | none (draft: data-file-floor-c6-acceptance-check) |
+| C7 shadow narrow set and escape record | not started | none | none (draft: data-file-floor-c7-narrow-shadow) |
+| C8 enforce path and flip | not started | none | none (draft: data-file-floor-c8-narrow-flip) |
+
+Layer 1 is on main in PR 1538. The inbox item `lane-floor-selects-the-tests-that-read-a-changed-data-file` is still open, although layer 1 closes it. No commit carries its `Closes-Inbox` trailer, so the item needs a consume. The related item `floor-runs-the-package-of-a-changed-testdata-file` is built in the open PR [#1626](https://github.com/mickeyyaya/evolve-loop/pull/1626).
+
+Layers 2 to 4 have no code and no inbox item. I wrote one follow-up draft for each. C7 and C8 also depend on the shadow-stage contract of ADR-0167, which is partly built.

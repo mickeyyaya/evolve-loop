@@ -1,6 +1,6 @@
 # Plan: every change class gets its review seats and checks from one table
 
-- **Status:** proposed, 2026-11-03.
+- **Status:** proposed, 2026-11-03; nothing built. Earlier status: proposed, 2026-11-03.
 - **Research:** [review-routing-2026-11](../research/review-routing-2026-11.md). **Decision set:** [architecture-decisions-2026-11](architecture-decisions-2026-11.md).
 - **Convergence rule:** [ADR-0126](../architecture/adr/0126-every-iterative-loop-converges-or-escalates.md) and [the review loop index](../architecture/review-loop-and-quality-index.md). **Commit gate:** [package note](../architecture/packages/internal-commitgate.md). **Protected surface:** [guards package note](../architecture/packages/internal-guards.md) and `go/internal/guards/integrity_surface.go`.
 - **Related ADRs:** [ADR-0124](../architecture/adr/0124-code-review-phase.md) (lane code-review phase) and [ADR-0157](../architecture/adr/0157-the-loop-works-its-own-code-a-narrow-fence-and-held-proposals.md) (held proposals).
@@ -170,3 +170,22 @@ Size is an estimate (synthesis). Stage is the value of `review_routing.stage` at
 - **Q1:** what is the line count for the size rule G1? The research gives no number. The shadow data of S4 sets it.
 - **Q2:** which second family serves the adversarial seat? The answer is routing data (S10). It depends on the families that the operator enables.
 - **Q3:** does S2 stay a lane item? It does when no verb file is in the protected manifest. S1 settles this.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| S0: console commits carry review trailers | not started | none | none |
+| S1: `reviewclass` registry | not started: no `go/internal/reviewclass` on main | none | none |
+| S2: deterministic checks | not started: no `inbox integrity` or `persona strip` verb | none | none |
+| S3: `open_blocking` in the launch record | not started: no `open_blocking` in the Go code | none | none |
+| S4: commit gate reads the requirements | not started | none | none |
+| S5: CI job `review-class` | not started | none | none |
+| S6: diff variants of the security and adversarial seats | not started: no such profile in `.evolve/profiles` | none | none |
+| S7: lane phase reads the requirements | not started | none | none |
+| S8: `review-routing.md` | not started: the file is absent | none | none |
+| S9: stage flip | not started (needs S4) | none | none |
+| S10: family routing | not started | none | none |
+| S11: diff-scoped mutation runner | not started | none | none |
+
+Nothing of this plan is on main. Only the plan itself landed, in [#1328](https://github.com/mickeyyaya/evolve-loop/pull/1328). The operator approved the registry on 2026-11-03, but no component has an open inbox item. Twelve follow-up drafts, one for each component, are ready for the console. Some other open items touch review, for example `review-verdict-counts-a-fixed-finding-as-open`. They do not build this registry.

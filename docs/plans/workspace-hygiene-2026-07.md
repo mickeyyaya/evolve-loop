@@ -1,5 +1,7 @@
 # Plan: End-of-Cycle Workspace Hygiene (clean branches/worktrees/markers, strict TDD)
 
+> **Status:** partly built, 2026-07-07 (4 of 5 slices on main, S5 partial); superseded in part by [cycle-recycle-and-gc-check-2026-11](cycle-recycle-and-gc-check-2026-11.md) and [gc-closes-the-legacy-gap-2026-11](gc-closes-the-legacy-gap-2026-11.md). Earlier status: the loop implements it through the items `workspace-hygiene-s1` to `s5`.
+
 > Supersedes the completed quota-budgeting plan previously in this file (shipped v21.8.0/v21.9.0).
 
 ## Context
@@ -62,3 +64,15 @@ S1 → S2 (consumes OwnerLive) → S3 (independent) → S4 → S5 (land S4+S5 ad
 **The evo loop implements this plan** via five weighted inbox items `workspace-hygiene-s1..s5` (one per slice). The earlier "operator implements directly" route is WITHDRAWN.
 
 **Reference implementation note:** S1 was already built and verified green (race/vet/fmt, full cmd/evolve suite) on branch `fix/workspace-hygiene` (worktree `../evolve-loop-hygiene`, based on e9afbda1) before this amendment. That branch is REFERENCE ONLY — the loop should implement S1 from this plan's spec; builders may consult the branch diff (`git diff main...fix/workspace-hygiene`) but must produce their own cycle-shipped implementation. Slice dependencies: S2 and S4 consume S1's `runlease.OwnerLive`; triage should defer them until S1 ships.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| S1 pid-aware lease staleness | done | `TestOwnerLive_DeadPidFreshHeartbeatNotLive` in `go/internal/runlease/runlease_test.go` | none |
+| S2 clean-exit marker finalize | done | `go/internal/core/cycle_finalize.go`; [`9e72ac4`](https://github.com/mickeyyaya/evolve-loop/commit/9e72ac4e4) (2026-07-06) | none |
+| S3 in-cycle branch deletion | done | `go/internal/core/worktree_branchdelete_test.go` (added in [`433ccc1`](https://github.com/mickeyyaya/evolve-loop/commit/433ccc106)) | none |
+| S4 worktree and branch backlog GC | done | `go/internal/gc/worktrees.go`; [`5ee210d`](https://github.com/mickeyyaya/evolve-loop/commit/5ee210dca), [`b17c9b9`](https://github.com/mickeyyaya/evolve-loop/commit/b17c9b9e5) (2026-07-06 and 07-07) | none |
+| S5 batch-end hook, shadow default, operator surface | partial | `TestRunGCHook_DefaultModeIsShadow` exists in `go/cmd/evolve/cmd_loop_gc_worktree_test.go`. `TestLoop_BatchEndRunsGCHook` does not exist. The checked-in `gc.mode` is `enforce` (`.evolve/policy.json:155`). | none |
+
+S1 to S4 are on main. S5 is partial: the named batch-end test does not exist. The later cycle-recycle plan owns the recycle step and the gc checks, so no new item is drafted. No inbox item is open for this plan. The two items `cycle-end-workspace-gc` and `workspace-hygiene-s1` to `s5` do not appear in the index.
