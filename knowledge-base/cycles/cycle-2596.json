@@ -1,0 +1,192 @@
+{
+  "schema_version": 2,
+  "cycle": 2596,
+  "run_id": "01M7ZSRMR9WY1XG9NV72X02AWZ",
+  "goal": "Wave 186.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 185 facts (run 20261121T081737Z): 4 of 9 cycles shipped.\n- Cycle 2582: final verdict PASS. It shipped.\n- Cycle 2583: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…cycle-N/ [inbox-mover] claimed: 2026-11-02T00-00-00Z-item-a.json → processing/cycle-N/ FAIL FAIL github.com/mickeyyaya/evolve-loop/go/cmd/evolve 696.475s FAIL. Last phase: aborted. It did not ship.\n- Cycle 2584: final verdict PASS. It shipped.\n- Cycle 2585: final verdict FAIL. Last phase: retro. It did not ship.\n- Cycle 2586: final verdict FAIL. Last phase: retro. It did not ship.\n- Cycle 2587: final verdict FAIL. Termination: cycle aborted in phase retro (abnormal-exit epilogue) cause=…ate_BaseRedWithRedMainParks2477548364/001/repo/.evolve/runs/cycle-N/ship-repocontract-scan.log [ship] repo-contract gate: GIT_FLEET_REBASE_NEEDED; full outpu…. Last phase: aborted. It did not ship.\n- Cycle 2588: final verdict PASS. It shipped.\n- Cycle 2589: final verdict FAIL. Last phase: retro. It did not ship.\n- Cycle 2590: final verdict PASS. It shipped.\n- Pull requests merged at this boundary: none.\n\nOperator notes for wave 186:\n- At this boundary PR #1656 landed: the run that holds the host verification lock gets the host CPU budget (6 CPUs at 5 lanes, not 1). PR #1655 landed: the integration tier passes go test the shared 20 minute budget under a 21 minute tier budget. Wave 185 lost 5 of 9 cycles to host contention.\n- The fleet runs 5 lanes (PR #1645) until the lock fix proves out. Each lock acquire now writes the signal HOST_VERIFY_LOCK_WAIT with its wait time.\n\nEarlier waves:\n- Wave 182 (run 20261119T213950Z): 7 of 11 cycles shipped.\n- Wave 183 (run 20261120T094708Z): 9 of 15 cycles shipped.\n- Wave 184 (run 20261120T204107Z): 5 of 8 cycles shipped.",
+  "final_verdict": "PASS",
+  "commit_sha": "268f3f430b91b473ab1670def8fb5d79fd94fef3",
+  "tree_sha": "fe79906976279c6a3371f89734002de395e2b3b1",
+  "tasks": [
+    "signal-roots-under-unregistered-roles-publish-nothing"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 38374,
+      "started_at": "2026-11-21T19:37:17Z",
+      "ended_at": "2026-11-21T19:37:57Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 10,
+        "output": 2145,
+        "cache_read": 258249,
+        "cache_write": 66643
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 42223,
+      "started_at": "2026-11-21T19:38:32Z",
+      "ended_at": "2026-11-21T19:39:17Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 14,
+        "output": 2051,
+        "cache_read": 516507,
+        "cache_write": 36941
+      }
+    },
+    {
+      "name": "fault-localization",
+      "verdict": "PASS",
+      "duration_ms": 66560,
+      "started_at": "2026-11-21T19:39:21Z",
+      "ended_at": "2026-11-21T19:40:29Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 22,
+        "output": 3738,
+        "cache_read": 229083,
+        "cache_write": 43110
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 298980,
+      "started_at": "2026-11-21T19:40:29Z",
+      "ended_at": "2026-11-21T19:45:32Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 48,
+        "output": 16047,
+        "cache_read": 2209387,
+        "cache_write": 76395
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 1404215,
+      "started_at": "2026-11-21T19:45:32Z",
+      "ended_at": "2026-11-21T20:46:07Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 190535,
+        "output": 23385,
+        "cache_read": 2497395,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 102411,
+      "started_at": "2026-11-21T20:46:39Z",
+      "ended_at": "2026-11-21T21:01:15Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 14,
+        "output": 6690,
+        "cache_read": 521184,
+        "cache_write": 43963
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 532040,
+      "started_at": "2026-11-21T21:01:43Z",
+      "ended_at": "2026-11-21T21:10:36Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "timing": {
+    "total_ms": 2484803,
+    "phase_count": 7,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 1404215,
+    "by_archetype_ms": {
+      "build": 1404215,
+      "control": 532040,
+      "evaluate": 102411,
+      "plan": 446137
+    },
+    "total_tokens": {
+      "input": 190643,
+      "output": 54056,
+      "cache_read": 6231805,
+      "cache_write": 267052
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 190535,
+        "output": 23385,
+        "cache_read": 2497395,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 14,
+        "output": 6690,
+        "cache_read": 521184,
+        "cache_write": 43963
+      },
+      "plan": {
+        "input": 94,
+        "output": 23981,
+        "cache_read": 3213226,
+        "cache_write": 223089
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9703161473631239,
+    "hot_phase_count": 6,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "fault-localization",
+      "tdd",
+      "build",
+      "audit"
+    ]
+  },
+  "recalled_lessons": [
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "cycle-93-build-report-commit-sha-fabrication",
+    "cycle-1254-driver-tests-inherit-ambient-fleet-env-gate-only-red",
+    "cycle-1496-a-retry-carries-the-items-spec-and-never-its-predecessors-lesson",
+    "cycle-1492-remedy-on-disk-in-four-places-reaches-no-agent-with-authority-to-apply-it"
+  ]
+}
