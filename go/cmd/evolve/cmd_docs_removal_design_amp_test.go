@@ -23,6 +23,33 @@ func removalAmpRelativeLinks(doc string) []string {
 	return out
 }
 
+const removalAmpDeliveryHeading = "## Delivery status"
+
+func removalAmpR9Rows(plan string) []string {
+	if i := strings.Index(plan, "\n"+removalAmpDeliveryHeading); i >= 0 {
+		plan = plan[:i]
+	}
+	var rows []string
+	for _, line := range strings.Split(plan, "\n") {
+		if strings.HasPrefix(line, "| R9 ") {
+			rows = append(rows, line)
+		}
+	}
+	return rows
+}
+
+func TestRemovalDesignAmp_TheR9CountStopsAtTheDeliveryStatusTable(t *testing.T) {
+	t.Parallel()
+	plan := "## 6. Components\n| R9 | `x` | [d](harness-removal-test-2026-11.md) |\n\n" +
+		removalAmpDeliveryHeading + " (2026-11-21)\n| R9 `x` | done | [d](harness-removal-test-2026-11.md) |\n"
+	if got := removalAmpR9Rows(plan); len(got) != 1 || !strings.HasPrefix(got[0], "| R9 | ") {
+		t.Fatalf("rows = %q", got)
+	}
+	if got := removalAmpR9Rows("| R9 | a |\n| R9 | b |\n"); len(got) != 2 {
+		t.Fatalf("a second component row must still count: %q", got)
+	}
+}
+
 func TestRemovalDesignAmp_EveryRelativeLinkResolves(t *testing.T) {
 	t.Parallel()
 	root := findRepoRoot(t)
@@ -49,18 +76,14 @@ func TestRemovalDesignAmp_TheR9RowLinksOnlyToAnExistingDesign(t *testing.T) {
 	t.Parallel()
 	root := findRepoRoot(t)
 	plan := readRepoFile(t, "docs/plans/harness-practices-2026-11.md")
-	rows := 0
-	for _, line := range strings.Split(plan, "\n") {
-		if !strings.HasPrefix(line, "| R9 ") {
-			continue
-		}
-		rows++
+	rows := removalAmpR9Rows(plan)
+	for _, line := range rows {
 		if !strings.Contains(line, "(harness-removal-test-2026-11.md)") {
 			t.Errorf("R9 row misses the design link: %s", line)
 		}
 	}
-	if rows != 1 {
-		t.Fatalf("expected exactly one R9 row, found %d", rows)
+	if len(rows) != 1 {
+		t.Fatalf("expected exactly one R9 row, found %d", len(rows))
 	}
 	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(removalDesignPath))); err != nil {
 		t.Fatal(err)
