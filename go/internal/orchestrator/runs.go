@@ -58,11 +58,6 @@ func cycleSignalSpan(dir string) (first, last time.Time, shipped, ok bool) {
 	return first, last, shipped, !first.IsZero()
 }
 
-func signalSpan(dir string) (first, last time.Time, ok bool) {
-	first, last, _, ok = cycleSignalSpan(dir)
-	return first, last, ok
-}
-
 func LaneRuns(runsDir string, last int) ([]LaneRun, error) {
 	cycles, err := cycleDirs(runsDir)
 	if err != nil {
@@ -111,15 +106,28 @@ func RunsHeartbeat(runsDir string) Heartbeat {
 
 var phaseLiveSuffixes = []string{"-pane-watch.json", "-events.ndjson", "-stdout.log"}
 
-func freshest(dir string) time.Time {
-	_, at, _ := signalSpan(dir)
+func freshest(dir string) time.Time { return CycleFreshest(dir, time.Time{}) }
+
+func CycleFreshest(dir string, until time.Time) time.Time {
+	var at time.Time
+	note := func(t time.Time) {
+		if (until.IsZero() || !t.After(until)) && t.After(at) {
+			at = t
+		}
+	}
+	if chunk, err := signalcenter.ReadStream(filepath.Join(dir, signalcenter.StreamFileName), 0); err == nil {
+		for _, e := range chunk.Events {
+			t, _ := time.Parse(time.RFC3339Nano, e.TS)
+			note(t)
+		}
+	}
 	entries, _ := os.ReadDir(dir)
 	for _, e := range entries {
 		if !slices.ContainsFunc(phaseLiveSuffixes, func(s string) bool { return strings.HasSuffix(e.Name(), s) }) {
 			continue
 		}
-		if info, err := e.Info(); err == nil && info.ModTime().After(at) {
-			at = info.ModTime()
+		if info, err := e.Info(); err == nil {
+			note(info.ModTime())
 		}
 	}
 	return at

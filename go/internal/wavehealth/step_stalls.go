@@ -15,8 +15,12 @@ func stallsStep(s Snapshot) Step {
 	if !s.Stalls.Known {
 		return notGathered("A5", threshold)
 	}
-	lines := stallsInWave(s)
-	st := Step{ID: "A5", Threshold: threshold, Result: ResultOK, Reading: fmt.Sprintf("%d LOOP_ORCH_LANE_STALLED line(s) in the wave", len(lines))}
+	inWave := stallsInWave(s)
+	lines := stillSilent(inWave)
+	st := Step{ID: "A5", Threshold: threshold, Result: ResultOK, Reading: fmt.Sprintf("%d LOOP_ORCH_LANE_STALLED line(s) in the wave", len(inWave))}
+	if recovered := len(inWave) - len(lines); recovered > 0 {
+		st.Reading += fmt.Sprintf("; %d line(s) recovered", recovered)
+	}
 	if len(lines) > 0 {
 		st.Reading += "; lanes " + strings.Join(laneNames(lines[:min(len(lines), maxStallLanesShown)]), ", ")
 	}
@@ -36,6 +40,16 @@ func stallsInWave(s Snapshot) []StallLine {
 		out = append(out, line)
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].At.Before(out[j].At) })
+	return out
+}
+
+func stillSilent(lines []StallLine) []StallLine {
+	var out []StallLine
+	for _, l := range lines {
+		if !l.Recovered() {
+			out = append(out, l)
+		}
+	}
 	return out
 }
 

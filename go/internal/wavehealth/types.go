@@ -63,9 +63,12 @@ type CycleEvent struct {
 }
 
 type StallLine struct {
-	Lane string
-	At   time.Time
+	Lane      string
+	At        time.Time
+	LastEvent time.Time
 }
+
+func (l StallLine) Recovered() bool { return l.LastEvent.After(l.At) }
 
 type CIState struct {
 	Available  bool

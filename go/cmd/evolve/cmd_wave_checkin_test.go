@@ -31,6 +31,7 @@ type checkinFixture struct {
 
 var (
 	wave185Fixture = checkinFixture{name: "wave185", pid: 13795, digestAt: map[string]string{"2583": "2026-11-21T12:25:21Z"}}
+	wave186Fixture = checkinFixture{name: "wave186", pid: 51538}
 	wave184Fixture = checkinFixture{name: "wave184", pid: 26667, digestAt: map[string]string{"2576": "2026-11-21T04:00:28Z", "2577": "2026-11-21T02:56:05Z", "2579": "2026-11-20T23:38:24Z"}}
 )
 
@@ -223,6 +224,22 @@ func TestWaveCheckin_Wave184ContinuesAtEachClockTime(t *testing.T) {
 		if s.ID == "A3" && !strings.Contains(s.Reading, "3 failed cycle(s)") {
 			t.Errorf("A3 must read the 3 failed cycles of wave 184: %q", s.Reading)
 		}
+	}
+}
+
+func TestWaveCheckin_Wave186StallsBrakeWhileTheLanesAreSilentAndContinueOnceTheyRecovered(t *testing.T) {
+	t.Parallel()
+	p := newCheckinPlane(t, wave186Fixture)
+	silent := p.run(at(t, "2026-11-21T22:40:00Z"), checkinGreenCI)
+	if got := rowResult(silent.stdout, "A5"); got != "BRAKE" {
+		t.Errorf("A5 at 22:40Z with the 3 lanes silent = %q, want BRAKE\n%s", got, silent.stdout)
+	}
+	recovered := p.run(at(t, "2026-11-21T23:39:00Z"), checkinGreenCI)
+	if got := rowResult(recovered.stdout, "A5"); got != "OK" {
+		t.Errorf("A5 at 23:39Z after the 3 lanes signalled = %q, want OK\n%s", got, recovered.stdout)
+	}
+	if reading := stepReading(t, p.run(at(t, "2026-11-21T23:39:00Z"), checkinGreenCI, "--json"), "A5"); !strings.Contains(reading, "3 line(s) recovered") {
+		t.Errorf("A5 reading must name the recovered stalls: %q", reading)
 	}
 }
 
