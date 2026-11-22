@@ -75,6 +75,7 @@ func (c *collector) collect(now time.Time) (*Snapshot, map[int]*dossier.Dossier)
 		snap.Cycles = append(snap.Cycles, cs)
 	}
 	snap.Trend.RoundHistogram = roundHistogram(snap.Cycles)
+	snap.Quality = readQuality(c.root)
 	return snap, h.Dossiers
 }
 

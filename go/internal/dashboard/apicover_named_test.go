@@ -11,6 +11,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/qualitypanel"
 )
 
 func TestAPICoverNamedExports(t *testing.T) {
@@ -26,6 +27,13 @@ func TestAPICoverNamedExports(t *testing.T) {
 	var item QueueItem = queue.Pending[0]
 	if item.ID == "" {
 		t.Fatalf("pending item has no id: %+v", item)
+	}
+	if len(snap.Quality) != len(qualitypanel.Indexes()) {
+		t.Fatalf("quality count = %d, want %d", len(snap.Quality), len(qualitypanel.Indexes()))
+	}
+	var reading QualityReading = snap.Quality[0]
+	if reading.Index == "" || reading.Stage == "" {
+		t.Fatalf("quality reading %+v lacks index/stage", reading)
 	}
 	if len(snap.Trend.Points) == 0 || len(snap.Fingerprints) == 0 {
 		t.Fatalf("seeded trend/fingerprints empty: %d %d", len(snap.Trend.Points), len(snap.Fingerprints))

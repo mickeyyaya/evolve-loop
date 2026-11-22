@@ -14,6 +14,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciwatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dashboard"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/qualitypanel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -70,12 +71,14 @@ type ghPR struct {
 }
 
 type statusReport struct {
-	ProjectRoot string                   `json:"project_root"`
-	Loop        dashboard.LoopStatus     `json:"loop"`
-	Cycles      []dashboard.CycleSummary `json:"cycles"`
-	Streak      statusStreak             `json:"streak"`
-	PRs         statusRemote             `json:"prs"`
-	CI          statusRemote             `json:"ci"`
+	ProjectRoot string                     `json:"project_root"`
+	Loop        dashboard.LoopStatus       `json:"loop"`
+	Quality     []dashboard.QualityReading `json:"quality,omitempty"`
+	QualityMode string                     `json:"-"`
+	Cycles      []dashboard.CycleSummary   `json:"cycles"`
+	Streak      statusStreak               `json:"streak"`
+	PRs         statusRemote               `json:"prs"`
+	CI          statusRemote               `json:"ci"`
 }
 
 var statusCollect = dashboard.Collect
@@ -87,15 +90,20 @@ var failingCheckStates = map[string]bool{
 func runStatus(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve status", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	var projectRoot string
+	var projectRoot, qualityMode string
 	var asJSON bool
 	fs.StringVar(&projectRoot, "project-root", "", "project root (default: $EVOLVE_PROJECT_ROOT or cwd)")
 	fs.BoolVar(&asJSON, "json", false, "emit one JSON object instead of the human report")
+	fs.StringVar(&qualityMode, "quality", "report", "quality panel stage filter: report or all")
 	if err := fs.Parse(args); err != nil {
 		return cliExitUsage
 	}
+	if qualityMode != "report" && qualityMode != "all" {
+		fmt.Fprintf(stderr, "evolve status: unknown --quality %q (want report or all)\n", qualityMode)
+		return cliExitUsage
+	}
 	if fs.NArg() > 0 {
-		fmt.Fprintf(stderr, "evolve status: unexpected argument %q (usage: evolve status [--json] [--project-root P])\n", fs.Arg(0))
+		fmt.Fprintf(stderr, "evolve status: unexpected argument %q (usage: evolve status [--json] [--quality report|all] [--project-root P])\n", fs.Arg(0))
 		return cliExitUsage
 	}
 	root, err := loopStopRoot(projectRoot, stderr)
@@ -107,6 +115,7 @@ func runStatus(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return rc
 	}
 	report := buildStatusReport(root, time.Now())
+	report.QualityMode = qualityMode
 	if asJSON {
 		enc := json.NewEncoder(stdout)
 		enc.SetIndent("", "  ")
@@ -160,6 +169,8 @@ func buildStatusReport(root string, now time.Time) statusReport {
 	return statusReport{
 		ProjectRoot: root,
 		Loop:        snap.Loop,
+		Quality:     snap.Quality,
+		QualityMode: "report",
 		Cycles:      cycles,
 		Streak: statusStreak{
 			ConsecutiveShipped: snap.Trend.ShipStreak,
@@ -232,6 +243,7 @@ func writeStatusLoopLine(w io.Writer, l dashboard.LoopStatus) {
 
 func writeStatusText(w io.Writer, r statusReport) {
 	writeStatusLoopLine(w, r.Loop)
+	writeStatusQuality(w, r.Quality, r.QualityMode)
 	fmt.Fprintf(w, "cycles:  %d rendered\n", len(r.Cycles))
 	for _, c := range r.Cycles {
 		fmt.Fprintf(w, "  cycle %d  %s\n", c.ID, c.StateName)
@@ -273,4 +285,48 @@ func writeStatusCI(w io.Writer, r statusRemote) {
 	if len(run.FailingJobs) > 0 {
 		fmt.Fprintf(w, "         failing jobs: %s\n", strings.Join(run.FailingJobs, ", "))
 	}
+}
+
+func writeStatusQuality(w io.Writer, readings []dashboard.QualityReading, mode string) {
+	if len(readings) == 0 {
+		return
+	}
+	fmt.Fprintf(w, "Quality (%s stage; [95%% interval], n, window)\n", mode)
+	for _, q := range readings {
+		if mode != "all" && q.Stage == string(qualitypanel.StageShadow) {
+			continue
+		}
+		fmt.Fprintln(w, formatQualityLine(q))
+	}
+}
+
+func formatQualityLine(q dashboard.QualityReading) string {
+	name := q.Index
+	unit := ""
+	if ix, ok := qualitypanel.Lookup(q.Index); ok {
+		name = ix.Name
+		unit = ix.Unit
+	}
+	if !q.HasReading {
+		return fmt.Sprintf("  %-4s %-34s no reading yet", q.Index, name)
+	}
+	val := formatQualityValue(q, unit)
+	mark := ""
+	if q.Status == string(qualitypanel.StatusBreach) {
+		mark = " !"
+	}
+	return fmt.Sprintf("  %-4s %-34s %-19s n=%-4d %-15s %s%s", q.Index, name, val, q.N, q.Window, q.Stage, mark)
+}
+
+func formatQualityValue(q dashboard.QualityReading, unit string) string {
+	scale := 1.0
+	suffix := ""
+	if unit == "ratio" {
+		scale = 100.0
+		suffix = "%"
+	}
+	if q.Lo != nil && q.Hi != nil {
+		return fmt.Sprintf("%.1f%s [%.1f, %.1f]", *q.Value*scale, suffix, *q.Lo*scale, *q.Hi*scale)
+	}
+	return fmt.Sprintf("%.1f%s", *q.Value*scale, suffix)
 }

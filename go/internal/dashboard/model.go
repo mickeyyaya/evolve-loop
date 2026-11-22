@@ -19,7 +19,20 @@ type Snapshot struct {
 	Cycles       []CycleSummary    `json:"cycles"`
 	Trend        Trend             `json:"trend"`
 	Fingerprints []FingerprintStat `json:"fingerprints"`
+	Quality      []QualityReading  `json:"quality"`
 	Warnings     []string          `json:"warnings,omitempty"`
+}
+
+type QualityReading struct {
+	Index      string   `json:"index"`
+	HasReading bool     `json:"has_reading"`
+	Value      *float64 `json:"value,omitempty"`
+	Lo         *float64 `json:"lo,omitempty"`
+	Hi         *float64 `json:"hi,omitempty"`
+	N          int      `json:"n,omitempty"`
+	Window     string   `json:"window,omitempty"`
+	Stage      string   `json:"stage,omitempty"`
+	Status     string   `json:"status,omitempty"`
 }
 
 type LoopStatus struct {

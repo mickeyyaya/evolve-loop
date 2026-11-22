@@ -887,9 +887,11 @@ A separate quality dashboard splits health into two homes, which the operator re
 
 ### Solution
 
-- `evolve status` gains a "Quality" block after the loop line. It shows one line per index in `report` or `gate` stage, in layer order: id, value, interval, n, window, stage and status. A breach line is marked with `!`.
-- The dashboard `Snapshot` gains `Quality []QualityReading`, from the latest `quality.reading` per index in the root stream and the cycle streams.
-- `evolve status --quality all` also shows the `shadow` indexes.
+- `evolve status` prints a `Quality` block after the loop line. It shows one line per index in `report` or `gate` stage, in layer order.
+- Each line prints id, name, value, interval, `n=<N>`, window and stage. Ratio units print as `%`; other units print raw; a census reading omits brackets.
+- A breach line ends with `!`. An absent reading prints `no reading yet`.
+- `--quality` accepts `report` (default) or `all` (includes `shadow` indexes). Any other value exits `10`.
+- The dashboard `Snapshot` carries `Quality []QualityReading` from the latest `quality.reading` per index by timestamp across `.evolve/signals.ndjson`, each `.evolve/runs/cycle-N/signals.ndjson` and the `quality.reading` event channel (`paths.EventChannelsRoot`).
 - There is no total. The panel shows separate readings, next to the loop liveness and CLI health lines, so a reader sees which layer moved (ADR-0153 decision 2).
 
 Example of the block (values from the baselines):
