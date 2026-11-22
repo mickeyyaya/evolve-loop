@@ -69,10 +69,13 @@ func scopeSet(scopeIDs []string) map[string]bool {
 	return set
 }
 
-func ResolveContinuationForScope(opts Options, cycle int, scopeIDs []string) *continuation.Continuation {
-	opts.resolveOpts()
+func ResolveContinuationForScope(opts Options, cycle int, scopeIDs []string) (*continuation.Continuation, error) {
+	opts, err := opts.resolved()
+	if err != nil {
+		return nil, err
+	}
 	if c := resolveClaim(opts, cycle, scopeSet(scopeIDs)); c != nil {
-		return c
+		return c, nil
 	}
 	for _, id := range scopeIDs {
 		if strings.TrimSpace(id) == "" {
@@ -81,7 +84,7 @@ func ResolveContinuationForScope(opts Options, cycle int, scopeIDs []string) *co
 		c, ok, err := continuation.ReadRegistryEntry(opts.ProjectRoot, id)
 		if err != nil {
 			fmt.Fprintf(opts.Stderr, "[inbox] WARN cycle %d continuation registry unreadable (%v) — no lane-scope binding resolved\n", cycle, err)
-			return nil
+			return nil, nil
 		}
 		if ok && c.SnapshotSHA != "" {
 			retiredPath, retiredIn := scopeRetiredAt(opts, id)
@@ -89,7 +92,7 @@ func ResolveContinuationForScope(opts Options, cycle int, scopeIDs []string) *co
 				if rc := retiredAtCycle(retiredPath); rc > 0 && rc < c.Cycle {
 					fmt.Fprintf(opts.Stderr, "[inbox] WARN cycle %d scope %q has a retired copy in inbox/%s/ from cycle %d, but its binding is NEWER (cycle %d) — the item was re-filed and rebound after that retirement, so the copy is stale evidence: adopting the binding, not releasing it\n", cycle, id, retiredIn, rc, c.Cycle)
 					resolved := c
-					return &resolved
+					return &resolved, nil
 				}
 				fmt.Fprintf(opts.Stderr, "[inbox] WARN cycle %d refusing continuation binding for scope %q: its item is retired in inbox/%s/ with no live pending copy (not in the inbox root, not claimed in processing/) — releasing the dead binding (snapshot %s, cycle %d)\n", cycle, id, retiredIn, c.SnapshotSHA, c.Cycle)
 				if _, _, derr := ReleaseContinuationBinding(opts, id, fmt.Sprintf("scope-read-guard-cycle-%d", cycle), "runtime (scope read guard)"); derr != nil {
@@ -98,8 +101,8 @@ func ResolveContinuationForScope(opts Options, cycle int, scopeIDs []string) *co
 				continue
 			}
 			resolved := c
-			return &resolved
+			return &resolved, nil
 		}
 	}
-	return nil
+	return nil, nil
 }

@@ -574,8 +574,10 @@ func TestWatch_AnInboxThatCannotBeReadIsAnErrorAndFilesNothing(t *testing.T) {
 
 func TestWatch_FilesIntoTheInboxDirectoryTheOptionsName(t *testing.T) {
 	root, srv := t.TempDir(), newPracticeServer(t, "a\n")
-	custom := filepath.Join(t.TempDir(), "elsewhere")
+	elsewhere := t.TempDir()
+	custom := filepath.Join(elsewhere, ".evolve", "inbox")
 	opts := optionsFor(root, fileSource("cc", srv.URL))
+	opts.Inbox.ProjectRoot = elsewhere
 	opts.Inbox.InboxDir = custom
 	Watch(context.Background(), opts)
 	srv.set("a\nb\n", "")

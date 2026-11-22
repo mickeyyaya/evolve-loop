@@ -11,7 +11,10 @@ import (
 var ErrWaitingOnDependency = errors.New("inboxmover: item waits on a dependency that has not landed — refusing claim")
 
 func ClaimPending(opts Options, cycle int, ids []string) error {
-	opts.resolveOpts()
+	opts, err := opts.resolved()
+	if err != nil {
+		return err
+	}
 	cycleStr := strconv.Itoa(cycle)
 	var errs []error
 	for _, id := range dedupeIDs(ids) {
@@ -33,7 +36,10 @@ func ClaimPending(opts Options, cycle int, ids []string) error {
 }
 
 func ClaimDispatchable(opts Options, taskID, cycle string) (ClaimResult, error) {
-	opts.resolveOpts()
+	opts, err := opts.resolved()
+	if err != nil {
+		return ClaimResult{}, err
+	}
 	if ds := ResolveDispatchState(opts, taskID); ds.State == StatePending {
 		if d := PendingDispatchability(opts, ds.Deps); !d.Dispatchable {
 			fmt.Fprintf(opts.Stderr, lifecycle.LegacyPrefix+"refusing claim of %q for cycle %s: %s — it stays pending until that dependency lands\n", taskID, cycle, d.Reason)

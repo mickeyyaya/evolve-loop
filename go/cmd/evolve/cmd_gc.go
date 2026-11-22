@@ -511,7 +511,7 @@ func gcSize(b int64) string { return fmt.Sprintf("%.2f GB", float64(b)/1e9) }
 
 func resolveGCProjectRoot(projectRoot string, dryRun bool, stderr io.Writer) (string, int, bool) {
 	if projectRoot != "" {
-		return projectRoot, 0, true
+		return paths.AbsoluteRoot("--project-root", projectRoot, rootWarner("evolve gc", stderr)), 0, true
 	}
 	if !dryRun {
 		fmt.Fprintf(stderr, "evolve gc: mutating run refused: --project-root must be explicitly set\n")

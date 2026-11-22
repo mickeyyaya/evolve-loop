@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
@@ -51,5 +52,38 @@ func TestFixtures_WriteLiveRunLeaseRecordsTheRunningProcess(t *testing.T) {
 	}
 	if lease.RunID != "01LIVE" || lease.OwnerPID != os.Getpid() {
 		t.Errorf("lease = %+v", lease)
+	}
+}
+
+func TestFixtures_WriteItemBindBoundMkdirAllAndRealDirDoWhatTheirNamesSay(t *testing.T) {
+	root := EmptyRoot(t)
+	inbox := filepath.Join(root, ".evolve", "inbox")
+	path := WriteItem(t, inbox, "alpha")
+	fields := ItemFields(t, path)
+	if fields["id"] != "alpha" || fields["kind"] != "bug" || fields["priority"] != "high" || fields["title"] != "fixture item alpha" {
+		t.Errorf("item fields = %v", fields)
+	}
+	if filepath.Base(path) != "2026-08-16T15-10-00Z-alpha.json" {
+		t.Errorf("item path = %s", path)
+	}
+	if Bound(t, root, "alpha") {
+		t.Fatal("a scope with no binding reads as bound")
+	}
+	Bind(t, root, "alpha", continuation.Continuation{Cycle: 3})
+	if !Bound(t, root, "alpha") {
+		t.Error("Bind did not bind the scope")
+	}
+	nested := filepath.Join(root, "a", "b")
+	MkdirAll(t, nested)
+	if fi, err := os.Stat(nested); err != nil || !fi.IsDir() {
+		t.Errorf("MkdirAll: %v %v", fi, err)
+	}
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(nested, link); err != nil {
+		t.Fatal(err)
+	}
+	want, _ := filepath.EvalSymlinks(nested)
+	if got := RealDir(t, link); got != want {
+		t.Errorf("RealDir = %s, want %s", got, want)
 	}
 }

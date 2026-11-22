@@ -3,12 +3,14 @@ package inboxtest
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
@@ -109,4 +111,43 @@ func WriteLiveRunLease(t testing.TB, root string) {
 	if err := runlease.Write(runDir, runlease.Lease{RunID: "01LIVE", OwnerPID: os.Getpid()}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func WriteItem(t testing.TB, dir, id string) string {
+	t.Helper()
+	path := filepath.Join(dir, "2026-08-16T15-10-00Z-"+id+".json")
+	WriteFile(t, path, fmt.Sprintf("{\n  \"id\": %q,\n  \"kind\": \"bug\",\n  \"priority\": \"high\",\n  \"title\": \"fixture item %s\"\n}\n", id, id))
+	return path
+}
+
+func Bind(t testing.TB, root, id string, c continuation.Continuation) {
+	t.Helper()
+	if err := continuation.WriteRegistryEntry(root, id, c); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func Bound(t testing.TB, root, id string) bool {
+	t.Helper()
+	_, ok, err := continuation.ReadRegistryEntry(root, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ok
+}
+
+func MkdirAll(t testing.TB, dir string) {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func RealDir(t testing.TB, dir string) string {
+	t.Helper()
+	real, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return real
 }

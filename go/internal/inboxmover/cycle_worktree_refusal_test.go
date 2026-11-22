@@ -29,16 +29,8 @@ func cycleWorktreeOf(t *testing.T, plane string) string {
 	return wt
 }
 
-func TestMutators_RefuseACycleWorktreeInboxCopyAndNameThePlane(t *testing.T) {
-	plane := makeRepo(t)
-	dropInboxFile(t, plane, "task-1.json", "task-1")
-	wt := cycleWorktreeOf(t, plane)
-	wtCopy := dropInboxFile(t, wt, "task-1.json", "task-1")
-	dropProcessingFile(t, wt, "9", "task-2.json", "task-2")
-	ledgerBefore, _ := os.ReadFile(filepath.Join(plane, ".evolve", "ledger.jsonl"))
-	opts := Options{ProjectRoot: wt}
-
-	calls := map[string]func() error{
+func facadeCalls(opts Options) map[string]func() error {
+	return map[string]func() error{
 		"Claim":             func() error { _, err := Claim(opts, "task-1", "9"); return err },
 		"ClaimDispatchable": func() error { _, err := ClaimDispatchable(opts, "task-1", "9"); return err },
 		"ClaimPending":      func() error { return ClaimPending(opts, 9, []string{"task-1"}) },
@@ -71,7 +63,52 @@ func TestMutators_RefuseACycleWorktreeInboxCopyAndNameThePlane(t *testing.T) {
 			_, _, err := ReleaseContinuationBinding(opts, "task-1", "r", "test")
 			return err
 		},
+		"ReleaseCycleProcessingWithReason": func() error {
+			_, err := ReleaseCycleProcessingWithReason(opts, 9, "r")
+			return err
+		},
+		"ReleaseClaimKeeping": func() error { _, err := ReleaseClaimKeeping(opts, "task-2", "stale", KeepRoot); return err },
+		"ReleaseStaleClaims":  func() error { _, err := ReleaseStaleClaims(opts, "stale"); return err },
+		"SurveyClaims":        func() error { _, err := SurveyClaims(opts); return err },
+		"ShedDeclinedContinuation": func() error {
+			_, err := ShedDeclinedContinuation(opts, 9, continuation.Continuation{SnapshotSHA: "snap"})
+			return err
+		},
+		"ApplyCycleOutcome": func() error {
+			_, err := ApplyCycleOutcome(opts, CycleOutcome{Cycle: 9, CommittedIDs: []string{"task-1"}})
+			return err
+		},
+		"ConsumeFixItem": func() error { return ConsumeFixItem(opts, "task-1", PromoteOpts{}) },
+		"ReleaseContinuationBindingFor": func() error {
+			_, _, err := ReleaseContinuationBindingFor(opts, ReleaseRequest{ScopeID: "task-1", Reason: "r", By: "test"})
+			return err
+		},
 		"RetireUnbacked": func() error { _, err := RetireUnbacked(opts, 9, "consumed", "r", "", []string{"task-2"}); return err },
+	}
+}
+
+func scopeCalls(opts Options) map[string]func() error {
+	return map[string]func() error{
+		"ResolveContinuationForScope": func() error {
+			_, err := ResolveContinuationForScope(opts, 9, []string{"task-1"})
+			return err
+		},
+		"ReconcileConsumedBindings": func() error { _, err := ReconcileConsumedBindings(opts); return err },
+	}
+}
+
+func TestMutators_RefuseACycleWorktreeInboxCopyAndNameThePlane(t *testing.T) {
+	plane := makeRepo(t)
+	dropInboxFile(t, plane, "task-1.json", "task-1")
+	wt := cycleWorktreeOf(t, plane)
+	wtCopy := dropInboxFile(t, wt, "task-1.json", "task-1")
+	dropProcessingFile(t, wt, "9", "task-2.json", "task-2")
+	ledgerBefore, _ := os.ReadFile(filepath.Join(plane, ".evolve", "ledger.jsonl"))
+	opts := Options{ProjectRoot: wt}
+
+	calls := facadeCalls(opts)
+	for name, call := range scopeCalls(opts) {
+		calls[name] = call
 	}
 	for name, call := range calls {
 		t.Run(name, func(t *testing.T) {
@@ -92,13 +129,18 @@ func TestMutators_RefuseACycleWorktreeInboxCopyAndNameThePlane(t *testing.T) {
 	}
 }
 
-func TestMutators_AnExplicitPlaneInboxFromACycleWorktreeIsAllowed(t *testing.T) {
+func TestMutators_ThePlaneRootWithTheCycleWorktreeAsInboxIsRefusedAsAMixedTree(t *testing.T) {
 	plane := makeRepo(t)
 	dropInboxFile(t, plane, "task-1.json", "task-1")
 	wt := cycleWorktreeOf(t, plane)
-	res, err := Claim(Options{ProjectRoot: wt, InboxDir: filepath.Join(plane, ".evolve", "inbox")}, "task-1", "9")
+	planeInbox := filepath.Join(plane, ".evolve", "inbox")
+
+	if _, err := Claim(Options{ProjectRoot: wt, InboxDir: planeInbox}, "task-1", "9"); !errors.Is(err, errRootInboxMismatch) {
+		t.Fatalf("a worktree root with the plane inbox: err = %v, want errRootInboxMismatch", err)
+	}
+	res, err := Claim(Options{ProjectRoot: plane, InboxDir: planeInbox}, "task-1", "9")
 	if err != nil {
-		t.Fatalf("a claim on the plane inbox must pass: %v", err)
+		t.Fatalf("a claim that names the plane root must pass: %v", err)
 	}
 	if !strings.HasPrefix(res.DestPath, plane) {
 		t.Errorf("DestPath = %q, want under the plane %s", res.DestPath, plane)
@@ -131,7 +173,7 @@ func TestCycleWorktreeRefusal_ARelativeStateLinkResolvesThePlane(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = cycleWorktreeRefusal(filepath.Join(wtEvolve, "inbox"))
-	if !errors.Is(err, errCycleWorktreeInbox) || !strings.Contains(err.Error(), "EVOLVE_PROJECT_ROOT="+plane) {
+	if !errors.Is(err, errCycleWorktreeInbox) || !strings.Contains(err.Error(), "--project-root "+plane) {
 		t.Fatalf("err = %v, want the refusal naming the plane %s", err, plane)
 	}
 	if err := cycleWorktreeRefusal(filepath.Join(plane, ".evolve", "inbox")); err != nil {
