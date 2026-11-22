@@ -310,6 +310,8 @@ The file is `main_red_stop.go`. The design is in [gate-contract-g4-base-red-attr
 - `stopCheck` holds the stop, the `main` commit and the stage, so each method reads them from one place.
 - `gates.main_red_stop` is the stage, and the check reads it from `policy.json`. The default is `shadow`.
 - While a stop holds, the check runs `selfheal.StopBound.Check` with `gates.main_red_stop_bound_minutes` and `Options.clock`. The default bound is 120 minutes.
+- A stop with only CI keys (`core.StopCIOnly`) holds a red CI of `origin/main`. The check runs no CI key in the lane, because a lane cannot prove a CI job green. `core.CIKeysStayRed` reports each CI key as red. At `enforce`, the check admits a lane that carries `stop.FixItem` in its committed inbox set (from `lane-scope.json` or `triage-decision.json`) with no key run.
+  - Both `consumeCommittedItems` and `PromoteLanded` keep `stop.FixItem` pending in the inbox while the CI stop holds, so a failed fix leaves the item pickable. Other lanes refuse with `MAIN_CI_RED` (precondition), also off the main tip. At `shadow`, admitted fix lanes emit no `GATE_REPO_MAIN_RED_STOP_WOULD_REFUSE`, and other lanes land while recording the failed jobs. The loop poll closes the stop and consumes `stop.FixItem` on a green main.
 - A stop past its bound escalates one time: one `main-red` incident and one `GATE_REPO_MAIN_RED_STOP_ESCALATED` signal (see [internal-selfheal.md](internal-selfheal.md)).
 - An escalation that fails is one WARN line. The stop check then goes on, so the bound never changes an admission.
 - At `enforce`, a lane that is not on the `main` tip gets `CodeGitFleetRebaseNeeded`. A lane that turns no key green gets `CodeMainRedPark`, and the orchestrator parks it.

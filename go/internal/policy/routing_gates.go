@@ -81,6 +81,8 @@ type GatesPolicy struct {
 
 	MainRedStopBoundMinutes int `json:"main_red_stop_bound_minutes,omitempty"`
 
+	MainCIPollMinutes int `json:"main_ci_poll_minutes,omitempty"`
+
 	PhaseIO string `json:"phase_io,omitempty"`
 }
 
@@ -104,6 +106,8 @@ type GatesConfig struct {
 
 	MainRedStopBound time.Duration
 
+	MainCIPoll time.Duration
+
 	PhaseIO string
 }
 
@@ -123,6 +127,7 @@ func defaultGatesConfig() GatesConfig {
 		BaseRedRerun:           defaultBaseRedRerunSeconds * time.Second,
 		MainRedStop:            "shadow",
 		MainRedStopBound:       defaultMainRedStopBoundMinutes * time.Minute,
+		MainCIPoll:             defaultMainCIPollMinutes * time.Minute,
 	}
 }
 
@@ -185,6 +190,9 @@ func (c *GatesConfig) applyMainRedStop(g *GatesPolicy) {
 	if g.MainRedStopBoundMinutes > 0 {
 		c.MainRedStopBound = time.Duration(g.MainRedStopBoundMinutes) * time.Minute
 	}
+	if g.MainCIPollMinutes > 0 {
+		c.MainCIPoll = time.Duration(g.MainCIPollMinutes) * time.Minute
+	}
 }
 
 func (c *GatesConfig) applyBaseRedRerun(g *GatesPolicy) {
@@ -198,6 +206,7 @@ const (
 	defaultScanCacheBudgetSeconds  = 60
 	defaultBaseRedRerunSeconds     = 300
 	defaultMainRedStopBoundMinutes = 120
+	defaultMainCIPollMinutes       = 10
 )
 
 type ScanCacheConfig struct {

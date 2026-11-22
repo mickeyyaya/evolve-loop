@@ -1,6 +1,7 @@
 package main
 
 var serialTests = map[string]string{
+	"main.TestLoopTick_MainCIPollWiredToOriginMainAndGH":                                                              "sets the process PATH through t.Setenv",
 	"main.TestPoolLane_LowDiskEmitsHostDiskLowOnTheCoordinatorCenter":                                                 "replaces the process-wide cycleStartDiskUsageFn seam",
 	"main.TestBuildCycleStartOptions_HookWinsOverTheSeam":                                                             "replaces the process-wide cycleStartDiskUsageFn seam",
 	"main.TestBuildCycleStartOptions_UsesTheSeamWhenNoHookIsSet":                                                      "replaces the process-wide cycleStartDiskUsageFn seam",

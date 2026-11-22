@@ -75,9 +75,9 @@ func (w stopWiring) hold() *selfheal.StopHold {
 	return &selfheal.StopHold{
 		EvolveDir: evolveDir, Enforced: gates.MainRedStopEnforced(), Warn: w.warn, Emit: w.emit,
 		Event: signalcenter.Event{Origin: batchEventOrigin},
-		Run: func(ctx context.Context, rev string, reds baseattr.Reds) ([]baseattr.Key, error) {
+		Run: selfheal.KeyRun(core.CIKeysStayRed(func(ctx context.Context, rev string, reds baseattr.Reds) ([]baseattr.Key, error) {
 			return w.env.KeyRun(w.projectRoot, w.warn)(ctx, rev, reds)
-		},
+		})),
 	}
 }
 

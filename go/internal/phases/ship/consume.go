@@ -51,7 +51,7 @@ func consumeCommittedItems(ctx context.Context, opts *Options, res *RunResult, d
 	if body == nil && note != "" {
 		res.Logs = append(res.Logs, note)
 	}
-	ids := committedInboxIDs(opts.WorkspacePath, body, true)
+	ids := withoutHeldCIFixItem(opts, opts.Stderr, committedInboxIDs(opts.WorkspacePath, body, true))
 	if len(ids) == 0 {
 		return
 	}

@@ -57,7 +57,11 @@ func silentLoop(*signalcenter.Center, io.Writer) func(*int) {
 
 func (c loopConfig) announcer() loopAnnouncer {
 	if c.announce == nil {
-		return announceLoop
+		return func(signals *signalcenter.Center, stderr io.Writer) func(*int) {
+			return announceLoopWith(signals, stderr, announceDeps{
+				procStartOf: loopProcStartFn, ticker: defaultLoopTicker, mainCI: newLoopMainCIPoll(c.ProjectRoot),
+			})
+		}
 	}
 	return c.announce
 }
@@ -96,9 +100,14 @@ func defaultLoopTicker() (<-chan time.Time, func()) {
 type announceDeps struct {
 	procStartOf func(int) (string, error)
 	ticker      func() (<-chan time.Time, func())
+	mainCI      *mainCIPoll
 }
 
 func emitLoopTicks(signals *signalcenter.Center, ticks <-chan time.Time) (stop func()) {
+	return emitLoopTicksWith(signals, ticks, nil)
+}
+
+func emitLoopTicksWith(signals *signalcenter.Center, ticks <-chan time.Time, onTick func(time.Time)) (stop func()) {
 	done := make(chan struct{})
 	exited := make(chan struct{})
 	go func() {
@@ -107,11 +116,14 @@ func emitLoopTicks(signals *signalcenter.Center, ticks <-chan time.Time) (stop f
 			select {
 			case <-done:
 				return
-			case <-ticks:
+			case now := <-ticks:
 				signals.Emit(signalcenter.Event{
 					Module: signalcenter.ModuleLoop, Origin: "emitLoopTicks", Kind: signalcenter.KindLoopTick,
 					Severity: signalcenter.SeverityInfo, Reason: "the loop is running",
 				})
+				if onTick != nil {
+					onTick(now)
+				}
 			}
 		}
 	}()
@@ -128,7 +140,11 @@ func announceLoop(signals *signalcenter.Center, stderr io.Writer) func(exit *int
 
 func announceLoopWith(signals *signalcenter.Center, stderr io.Writer, deps announceDeps) func(exit *int) {
 	ticks, stopTicker := deps.ticker()
-	stopTicks := emitLoopTicks(signals, ticks)
+	var onTick func(time.Time)
+	if deps.mainCI != nil {
+		onTick = func(now time.Time) { deps.mainCI.tick(now, signals, stderr) }
+	}
+	stopTicks := emitLoopTicksWith(signals, ticks, onTick)
 	stopAll := func() {
 		stopTicks()
 		stopTicker()

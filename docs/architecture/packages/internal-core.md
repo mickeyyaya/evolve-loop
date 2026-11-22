@@ -1570,6 +1570,7 @@ When the base and `main` are both red, the build floor opens the main-red stop. 
 - `stopOpening.through` calls the sink and emits `GATE_REPO_MAIN_RED_STOP_OPENED` when `opened` is true. The signal gives the keys, the `main` commit and the fix item.
 - The signal is a warning when the fix item is in the inbox. It is an incident with the field `fix_item_error` when the stop opened and the item was not filed.
 - A verdict with no `MainRed` key calls no sink and emits nothing. A stop that held before the call emits nothing.
+- `OpenMainCIRedStop` (file `main_ci_red.go`) opens the same stop from a red CI of `origin/main` with no lane verdict. It makes one key of the package `CIPackage` for each failed job, and files the fix item with a CI cause. A verdict with no failed job opens nothing. `StopCIKeys`, `StopLaneKeys` and `StopCIOnly` split a stop, and `CIKeysStayRed` wraps a key runner so that a CI key is never run and never green. Ship and the integration train use the wrapper. `MainCIRed.Incident` builds the `GATE_REPO_MAIN_CI_RED` incident, which the loop poll of `cmd/evolve` emits when the stop opened.
 - A sink error on the build floor is one WARN line. The floor result does not change, because the ship check owns the stop.
 - The signal of the build floor has the run, the cycle and the phase `build`.
 - Tests of the opener: the five `TestOpenMainRedStop_*` tests that call it, and the three `TestStopOpening_*` tests.

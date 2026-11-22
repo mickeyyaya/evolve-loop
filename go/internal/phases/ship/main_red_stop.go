@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/mainstop"
 	"github.com/mickeyyaya/evolve-loop/go/internal/selfheal"
@@ -38,8 +39,41 @@ func checkMainRedStop(ctx context.Context, opts *Options, warn io.Writer) ([]bas
 		fmt.Fprintf(warn, "[ship] WARN main-red stop: %v\n", err)
 	}
 	c := stopCheck{opts: opts, warn: warn, attr: attributorOf(opts, gates), stop: stop, enforced: gates.MainRedStopEnforced()}
+	if c.admitsCIFixLane() {
+		return nil, nil
+	}
 	c.main = c.resolved(ctx, c.attr.MainRef)
 	return c.admit(c.proof(ctx, tree, c.resolved(ctx, baseRef)))
+}
+
+func (c stopCheck) admitsCIFixLane() bool {
+	if !core.StopCIOnly(c.stop) || c.stop.FixItem == "" || c.opts.WorkspacePath == "" {
+		return false
+	}
+	body, _ := triageDecisionBytes(c.opts.WorkspacePath, c.opts.CycleID)
+	return slices.Contains(committedInboxIDs(c.opts.WorkspacePath, body, true), c.stop.FixItem)
+}
+
+func heldCIFixItem(opts *Options, warn io.Writer) string {
+	if opts == nil || opts.ProjectRoot == "" {
+		return ""
+	}
+	if warn == nil {
+		warn = io.Discard
+	}
+	stop, holds := selfheal.ReadStop(opts.evolveDir(), warn)
+	if !holds || !core.StopCIOnly(stop) {
+		return ""
+	}
+	return stop.FixItem
+}
+
+func withoutHeldCIFixItem(opts *Options, warn io.Writer, ids []string) []string {
+	fix := heldCIFixItem(opts, warn)
+	if fix == "" || len(ids) == 0 {
+		return ids
+	}
+	return slices.DeleteFunc(slices.Clone(ids), func(id string) bool { return id == fix })
 }
 
 func (c stopCheck) resolved(ctx context.Context, rev string) string {
@@ -55,7 +89,10 @@ func (c stopCheck) proof(ctx context.Context, tree, base string) mainstop.Proof 
 	if base == "" || base != c.main {
 		return mainstop.Proof{Base: base}
 	}
-	red, err := c.attr.RunIn(ctx, tree, mainstop.ProofReds(c.stop.Keys))
+	run := core.CIKeysStayRed(func(ctx context.Context, _ string, reds baseattr.Reds) ([]baseattr.Key, error) {
+		return c.attr.RunIn(ctx, tree, reds)
+	})
+	red, err := run(ctx, tree, mainstop.ProofReds(c.stop.Keys))
 	if err != nil {
 		fmt.Fprintf(c.warn, "[ship] WARN main-red stop: the keys of the stop could not be run in the lane (%v), so the lane is not a proven fix\n", err)
 		return mainstop.Proof{Base: base}
@@ -86,6 +123,13 @@ type stopRefusal struct {
 }
 
 func (c stopCheck) refusal(r selfheal.StopRefusal) stopRefusal {
+	if core.StopCIOnly(c.stop) {
+		return stopRefusal{
+			code: shiperr.CodeMainCIRed, class: shiperr.ShipClassPrecondition,
+			verdict: baseattr.Verdict{BaseRed: c.stop.Keys, MainRed: c.stop.Keys, Base: r.Base, Main: c.stop.MainSHA},
+			message: "the CI of origin/main is red and a stop holds, and no lane can prove a CI job green; the lane waits for a green main",
+		}
+	}
 	if r.Admission == mainstop.RefuseRebase {
 		return stopRefusal{
 			code: shiperr.CodeGitFleetRebaseNeeded, class: shiperr.ShipClassTransient,

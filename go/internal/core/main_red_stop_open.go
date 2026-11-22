@@ -61,6 +61,16 @@ func (o mainRedStopOpener) open(projectRoot string, v baseattr.Verdict) (bool, e
 
 func fixItemOf(stop mainstop.Stop) mainRedFixItem {
 	keys := baseattr.Names(stop.Keys)
+	item := laneFixItem(stop, keys)
+	if StopCIOnly(stop) {
+		item.Summary = fmt.Sprintf("The CI of origin/main is red at %s: %s. No lane found it, so each landing is refused until main is green. The keys of the stop are in .evolve/main-red-stop.json.", stop.MainSHA, keys)
+		item.Fix = fmt.Sprintf("Read the logs of each failed job (%s) on origin/main, fix each at its source, and ship the fix. The loop poll releases the stop when the CI of origin/main is green.", keys)
+		item.Files = []string{}
+	}
+	return item
+}
+
+func laneFixItem(stop mainstop.Stop, keys string) mainRedFixItem {
 	return mainRedFixItem{
 		ID:            stop.FixItem,
 		Weight:        1.0,

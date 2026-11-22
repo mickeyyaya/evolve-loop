@@ -186,7 +186,8 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 
 func PromoteLanded(opts *Options, mvOpts inboxmover.Options, res *RunResult, cycleDir string, cid int, commitShort string, body []byte) []string {
 	pinIDs := cycleoutcome.LaneScopeIDs(cycleDir)
-	committedIDs, committedRefusals := inboxmover.FilterPromotionScope(mvOpts, cid, pinIDs, committedInboxIDs(cycleDir, body, workspaceACSVerdict(cycleDir) == "PASS"))
+	rawIDs := withoutHeldCIFixItem(opts, opts.Stderr, committedInboxIDs(cycleDir, body, workspaceACSVerdict(cycleDir) == "PASS"))
+	committedIDs, committedRefusals := inboxmover.FilterPromotionScope(mvOpts, cid, pinIDs, rawIDs)
 	supersededIDs, supersededRefusals := inboxmover.FilterPromotionScope(mvOpts, cid, pinIDs, inboxmover.SupersededInboxIDs(body))
 	for _, w := range append(committedRefusals, supersededRefusals...) {
 		res.Logs = append(res.Logs, "[ship] WARN: "+w)

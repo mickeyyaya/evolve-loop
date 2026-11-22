@@ -40,6 +40,7 @@ var codeDocs = map[ShipErrorCode]string{
 	CodeGitFleetRebaseNeeded:        "atomic-ship: a peer lane moved main; rebase and re-verify the merged tree (transient, ADR-0049 S5b)",
 	CodeGitFleetRebaseConflict:      "atomic-ship: the fleet rebase hit a genuine merge conflict; routed to the debugger (integrity, ADR-0049 G13a)",
 	CodeMainRedPark:                 "atomic-ship: the lane's red tests are red on its base and on main too. Ship does not blame the lane and parks it until main is green (precondition, ADR-0165 G4)",
+	CodeMainCIRed:                   "atomic-ship: the CI of origin/main is red and the main-red stop holds a CI key. No lane can prove a CI job green, so ship refuses the landing until the loop poll sees a green main (precondition)",
 	CodeGitPushRejected:             "atomic-ship: the remote rejected the push",
 	CodeCommitPrefixGate:            "atomic-ship: the commit-message prefix gate refused the message",
 	CodeManifestGate:                "atomic-ship: a staged path was declared by no build/TDD report (cross-lane leak guard)",
