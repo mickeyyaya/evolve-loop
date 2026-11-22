@@ -1,0 +1,9 @@
+{
+  "category": "non-progress",
+  "level": "system",
+  "evidence": "three TDD/build/audit rounds ended on the same H1 with an empty diff (audit-report.md round 3, tree a8a3761c..093f46de differs only in the eval file); cycle 2494 failed on the identical cause for wave 158; console item latency-wave-breach-from-wave-158-ac-2-console unconsumed since 2026-11-18",
+  "justification": "the pipeline is at fault: it re-dispatches a protected-surface cause to a lane every wave and retries a protected-path BLOCKER, so no lane round can progress",
+  "action": "halt-and-diagnose",
+  "fix_type": "pipeline-repair",
+  "schema_version": 1
+}

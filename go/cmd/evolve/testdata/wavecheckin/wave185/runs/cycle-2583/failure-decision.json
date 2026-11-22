@@ -1,0 +1,9 @@
+{
+  "category": "code-build-fail",
+  "level": "task",
+  "evidence": "audit-fail-reason.json: build handoff floor rejected after 1 correction because TestParallelDefault_EveryTopLevelTestIsParallelOrListedSerial failed in ./cmd/evolve under both -tags integration (663.896s) and unit tests (696.475s); worktree rerun (0.22s) prints only TestRemoveUntrackedCopiesOfOrigin_KeepsATrackedFile and TestRemoveUntrackedCopiesOfOrigin_StopsWhenTheDiffFails in cmd_syncmain_untracked_test.go missing t.Parallel(); ./internal/inboxstamps and ./acs/cycle2583 PASS; usage-evidence.ndjson verdict=healthy (81% week window) rules out quota",
+  "justification": "The builder's own Correction 1 unit tests omitted t.Parallel() and failed an enforced package lint; the build handoff floor rejected legitimately, so this is a task-level build defect.",
+  "action": "retry-with-fix",
+  "fix_type": "build-repair",
+  "schema_version": 1
+}
