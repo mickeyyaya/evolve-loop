@@ -14,6 +14,7 @@ The package is a leaf. It imports the standard library only, and it must not imp
 - **Lane time:** the wall time of a cycle, from its first `phase.dispatched` to its last `phase.outcome` or `phase.aborted`.
 - **Model time:** the part of a phase span that `llm-calls.ndjson` covers with a call of the same phase.
 - **Host time:** the phase span minus the model time. The host runs the deterministic gates in it.
+- **Lock wait:** the host time that a run waited at the host verification lock. It comes from `HOST_VERIFY_LOCK_WAIT` signals in the span.
 - **Gate time:** the time from the end of a call to the next event. The next event is the start of the next call of the same span, or the end of the span.
 
 ## Design
@@ -23,7 +24,7 @@ The package is a leaf. It imports the standard library only, and it must not imp
 | Slot use | `SlotUse(samples, from, to)` | `LOOP_ORCH_*` signals with `fields.live` and `fields.target` (`ReadSamples`) | Each sample holds until the next one. The last sample holds until `to`, or it ends the window when `to` is zero. Average live lanes is the used slot-hours over the window hours. |
 | Wave samples | `WaveSamples(samples, pid, from, to)` | the samples of a wave and its time window | A wave with a pid gets the samples of that pid and a cleared `from`. A wave with no pid keeps all samples and the window. It returns the samples, `from` and `to`. `evolve wave latency` and `internal/pipelinerates` both call it. |
 | Idle slot-hours for each cause | `IdleUse(samples, from, to)` | `LOOP_ORCH_POOL_IDLE` and `LOOP_ORCH_POOL_UNDERFILLED` samples. `Sample` carries `Code` and `Cause` (`fields.cause`). | The same window and the same hold rule as `SlotUse`. A sample adds `target` − `live` free slots times its hold hours to its cause. An idle event with no cause counts as `unknown`. A zero-length or negative span adds nothing, and no span goes past `to`. |
-| Lane time by phase, model and host split, gate time | `Phases(cycles)` | `signals.ndjson` and `llm-calls.ndjson` of each run dir (`ReadCycles`) | A span opens at the first `phase.dispatched` of a phase. The next `phase.outcome` or `phase.aborted` of that phase closes it. The share is the span time over the total lane time. The gaps between spans are one row. |
+| Lane time by phase, model and host split, lock wait, gate time | `Phases(cycles)` | `signals.ndjson` and `llm-calls.ndjson` of each run dir (`ReadCycles`) | A span opens at the first `phase.dispatched` of a phase. The next `phase.outcome` or `phase.aborted` of that phase closes it. Each positive `HOST_VERIFY_LOCK_WAIT` signal adds its `wait_ms` to `lock_wait` of the first span that holds its time, clamped to `host`. The share is the span time over the total lane time. The gaps between spans are one row. |
 | Lane time to a PASS per CLI family | `LaneTimeToPass(cycles, last)` | the same run dirs | See the next section. |
 
 ## The input of W4
@@ -56,6 +57,7 @@ The consumer (W4, 2026-10-19): at each wave boundary, `runPreWaveProbes` in `cmd
 - `Slots.Utilization` is live over target in the pool. It is not the `utilization` of `wavemeasure`, which is busy lane time over the sized width.
 - The family measure covers the history that gc keeps, not the history as of the wave that `--wave` names.
 - The leaf rule is tested as stdlib only. The package therefore keeps its own copy of the signal names and the shapes of the two ndjson files.
+- A lock wait without a positive `wait_ms` or outside every span counts for nothing. Each phase clamps `lock_wait` to `host`.
 
 ## The wave check
 
@@ -67,7 +69,7 @@ The consumer (W4, 2026-10-19): at each wave boundary, `runPreWaveProbes` in `cmd
 | A quota pause. | The signal `ORCHESTRATOR_QUOTA_PAUSED` in the project stream (`ReadStream`) or in a run dir (`Cycle.Paused`). | Left out. |
 | A loop stop. | A `loop.halt` signal with a `stop_reason`. The brake carries `loop_operator_brake`. | Left out, with a reason that names the stop or the brake. |
 | Live lanes. | `SlotUse` utilization below `Bounds.MinLiveShare`. A `LOOP_ORCH_SUPPLY_SHORT` signal of the wave skips the rule. | Breach. |
-| Host gate share. | The host time over the span time of `Phases`, above `Bounds.MaxGateShare`. A share equal to the bound passes. | Breach. |
+| Host gate share. | Host time minus lock wait, over the span time of `Phases`, above `Bounds.MaxGateShare`. A share equal to the bound passes. | Breach. The verdict carries `lock_wait_share`, and the breach reason names it. |
 
 A signal belongs to a wave when its pid is the pid of the wave or its time lies in the wave window. A wave with no sample and no span is left out.
 

@@ -412,7 +412,7 @@ func TestPhaseReport_TheJSONNamesAreStableForMachines(t *testing.T) {
 			t.Errorf("report lacks the key %q", key)
 		}
 	}
-	for _, key := range []string{"phase", "spans", "time", "share", "model", "host", "gates", "gate_total", "gate_median"} {
+	for _, key := range []string{"phase", "spans", "time", "share", "model", "host", "lock_wait", "gates", "gate_total", "gate_median"} {
 		if _, ok := phases[0][key]; !ok {
 			t.Errorf("phase stat lacks the key %q", key)
 		}
@@ -508,5 +508,59 @@ func TestWaveSamples_NoPIDKeepsAllSamplesAndTheWindow(t *testing.T) {
 
 	if len(own) != 2 || !gotFrom.Equal(from) || !gotTo.Equal(to) {
 		t.Errorf("WaveSamples = %v %v %v, want every sample and the window", own, gotFrom, gotTo)
+	}
+}
+
+func TestReadCycles_ParsesPositiveLockWaitsAndIgnoresBadOnes(t *testing.T) {
+	dir := t.TempDir()
+	run := filepath.Join(dir, "runs", "cycle-9")
+	if err := os.MkdirAll(run, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	signals := `{"ts":"2026-10-19T10:00:00Z","phase":"build","kind":"phase.dispatched"}` + "\n" +
+		`{"ts":"2026-10-19T10:15:00Z","kind":"loop.warning","code":"` + CodeHostVerifyLockWait + `","fields":{"wait_ms":"600000"}}` + "\n" +
+		`{"ts":"2026-10-19T10:16:00Z","kind":"loop.warning","code":"` + CodeHostVerifyLockWait + `","fields":{"wait_ms":"bad"}}` + "\n" +
+		`{"ts":"2026-10-19T10:17:00Z","kind":"loop.warning","code":"` + CodeHostVerifyLockWait + `","fields":{"wait_ms":"-500"}}` + "\n" +
+		`{"ts":"2026-10-19T10:30:00Z","phase":"build","kind":"phase.outcome","fields":{"verdict":"PASS"}}` + "\n"
+	if err := os.WriteFile(filepath.Join(run, "signals.ndjson"), []byte(signals), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cycles, warnings, err := ReadCycles(dir, 0, 0)
+	if err != nil || len(warnings) != 0 || len(cycles) != 1 {
+		t.Fatalf("cycles = %+v warnings = %v err = %v", cycles, warnings, err)
+	}
+	want := []LockWait{{At: at("10:15"), Wait: 10 * time.Minute}}
+	if !reflect.DeepEqual(cycles[0].LockWaits, want) {
+		t.Errorf("LockWaits = %+v, want %+v", cycles[0].LockWaits, want)
+	}
+}
+
+func TestPhases_AttributesLockWaitToContainingSpanAndClampsToHost(t *testing.T) {
+	c := Cycle{
+		ID: 1,
+		Spans: []Span{
+			{Phase: "build", Start: at("10:00"), End: at("10:30")},
+			{Phase: "audit", Start: at("10:30"), End: at("10:50")},
+		},
+		Calls: []Call{
+			{Phase: "build", Start: at("10:00"), End: at("10:10")},
+			{Phase: "audit", Start: at("10:30"), End: at("10:40")},
+		},
+		LockWaits: []LockWait{
+			{At: at("09:55"), Wait: 5 * time.Minute},
+			{At: at("10:30"), Wait: 10 * time.Minute},
+			{At: at("10:45"), Wait: 30 * time.Minute},
+		},
+	}
+	r := Phases([]Cycle{c})
+	byPhase := map[string]PhaseStat{}
+	for _, p := range r.Phases {
+		byPhase[p.Phase] = p
+	}
+	if byPhase["build"].Host != 20*time.Minute || byPhase["build"].LockWait != 10*time.Minute {
+		t.Errorf("build = %+v, want 20m host and 10m lock_wait", byPhase["build"])
+	}
+	if byPhase["audit"].Host != 10*time.Minute || byPhase["audit"].LockWait != 10*time.Minute {
+		t.Errorf("audit = %+v, want 10m host and 10m clamped lock_wait", byPhase["audit"])
 	}
 }

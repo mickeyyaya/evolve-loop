@@ -156,6 +156,7 @@ func TestWaveLatency_TextNamesTheSlotUseThePhasesAndTheFamilies(t *testing.T) {
 		"wave 1: cycles 1-3, 3 cycle(s), lane time 2h45m0s\n",
 		"slots: avg live 2.00 of 4.00, 3.00 of 6.00 slot-hours used (50.0%) over 1h30m0s\n",
 		"build ",
+		"lock-wait",
 		" 66.7% ",
 		"(gap) ",
 		"lane time to a PASS, last 20 builds of each family:\n",

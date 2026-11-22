@@ -160,7 +160,7 @@ func runWaveLatencyCheck(env waveEnv, plane wavePlaneDirs, asJSON bool, stdout, 
 
 func writeWaveLatencyCheckText(w io.Writer, r waveLatencyCheck) {
 	for _, v := range r.Waves {
-		fmt.Fprintf(w, "wave %d: %s, live %.1f%%, gate share %.1f%%", v.Wave, v.Status, v.LiveShare*100, v.GateShare*100)
+		fmt.Fprintf(w, "wave %d: %s, live %.1f%%, gate share %.1f%%, lock wait %.1f%%", v.Wave, v.Status, v.LiveShare*100, v.GateShare*100, v.LockWaitShare*100)
 		if len(v.Reasons) > 0 {
 			fmt.Fprintf(w, " (%s)", strings.Join(v.Reasons, "; "))
 		}

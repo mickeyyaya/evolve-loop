@@ -35,6 +35,7 @@ type signalLine struct {
 		Target     string `json:"target"`
 		Cause      string `json:"cause"`
 		StopReason string `json:"stop_reason"`
+		WaitMS     string `json:"wait_ms"`
 	} `json:"fields"`
 }
 
@@ -66,15 +67,21 @@ func forEachLine[T any](path string, visit func(T)) (int, error) {
 }
 
 type spanBuilder struct {
-	open     map[string]time.Time
-	spans    []Span
-	unpaired int
-	paused   bool
+	open      map[string]time.Time
+	spans     []Span
+	lockWaits []LockWait
+	unpaired  int
+	paused    bool
 }
 
 func (b *spanBuilder) add(l signalLine) {
 	if l.Code == CodeQuotaPaused {
 		b.paused = true
+	}
+	if l.Code == CodeHostVerifyLockWait {
+		if ms, err := strconv.ParseInt(l.Fields.WaitMS, 10, 64); err == nil && ms > 0 {
+			b.lockWaits = append(b.lockWaits, LockWait{At: l.TS, Wait: time.Duration(ms) * time.Millisecond})
+		}
 	}
 	switch l.Kind {
 	case "phase.dispatched":
@@ -101,7 +108,7 @@ func readCycle(dir string, id int) (Cycle, int, error) {
 	if err != nil {
 		return Cycle{}, 0, err
 	}
-	cycle := Cycle{ID: id, Spans: b.spans, Unpaired: b.unpaired, Open: len(b.open), Paused: b.paused}
+	cycle := Cycle{ID: id, Spans: b.spans, LockWaits: b.lockWaits, Unpaired: b.unpaired, Open: len(b.open), Paused: b.paused}
 	bad, err := forEachLine(filepath.Join(dir, callsFile), func(l callLine) {
 		cycle.Calls = append(cycle.Calls, Call{Phase: l.Phase, CLI: l.CLI, Start: l.StartedAt, End: l.EndedAt})
 	})

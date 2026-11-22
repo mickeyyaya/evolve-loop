@@ -3,6 +3,7 @@ package lanetime
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -152,5 +153,21 @@ func TestStream_CarriesSamplesAndMarksFromOneSignalFile(t *testing.T) {
 	}
 	if stream.Samples[0].Live != 2 || stream.Samples[0].Target != 4 {
 		t.Errorf("sample = %+v, want live 2 target 4", stream.Samples[0])
+	}
+}
+
+func TestCheck_LockWaitIsExcludedFromGateShareAndNamedOnBreach(t *testing.T) {
+	queued := checkWave(4, 4, 40)
+	queued.Cycles[0].LockWaits = []LockWait{{At: at("11:00"), Wait: 45 * time.Minute}}
+	ok := Check(queued, checkBounds)
+	if ok.Status != StatusOK || ok.GateShare != 0.15 || ok.LockWaitShare != 0.45 {
+		t.Errorf("queued wave = %+v, want ok with gate_share 0.15 and lock_wait_share 0.45", ok)
+	}
+
+	heavy := checkWave(4, 4, 30)
+	heavy.Cycles[0].LockWaits = []LockWait{{At: at("11:00"), Wait: 20 * time.Minute}}
+	breach := Check(heavy, checkBounds)
+	if breach.Status != StatusBreach || breach.GateShare != 0.5 || breach.LockWaitShare != 0.2 || !strings.Contains(strings.Join(breach.Reasons, " "), "lock") {
+		t.Errorf("heavy wave = %+v, want breach at 0.5 gate_share and 0.2 lock_wait_share naming lock", breach)
 	}
 }

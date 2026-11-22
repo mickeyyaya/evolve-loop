@@ -10,11 +10,12 @@ const (
 	StatusBreach  = "breach"
 	StatusLeftOut = "left_out"
 
-	CodeQuotaPaused  = "ORCHESTRATOR_QUOTA_PAUSED"
-	CodeSupplyShort  = "LOOP_ORCH_SUPPLY_SHORT"
-	BrakeStopReason  = "loop_operator_brake"
-	kindLoopHalt     = "loop.halt"
-	BreachRunToAlarm = 2
+	CodeQuotaPaused        = "ORCHESTRATOR_QUOTA_PAUSED"
+	CodeSupplyShort        = "LOOP_ORCH_SUPPLY_SHORT"
+	CodeHostVerifyLockWait = "HOST_VERIFY_LOCK_WAIT"
+	BrakeStopReason        = "loop_operator_brake"
+	kindLoopHalt           = "loop.halt"
+	BreachRunToAlarm       = 2
 )
 
 type Mark struct {
@@ -41,11 +42,12 @@ type WaveInput struct {
 }
 
 type Verdict struct {
-	Wave      int      `json:"wave"`
-	Status    string   `json:"status"`
-	Reasons   []string `json:"reasons,omitempty"`
-	LiveShare float64  `json:"live_share"`
-	GateShare float64  `json:"gate_share"`
+	Wave          int      `json:"wave"`
+	Status        string   `json:"status"`
+	Reasons       []string `json:"reasons,omitempty"`
+	LiveShare     float64  `json:"live_share"`
+	GateShare     float64  `json:"gate_share"`
+	LockWaitShare float64  `json:"lock_wait_share"`
 }
 
 func (w WaveInput) owns(m Mark) bool {
@@ -116,10 +118,11 @@ func Check(w WaveInput, b Bounds) Verdict {
 	samples, from, to := WaveSamples(w.Samples, w.PID, w.Start, w.End)
 	slots := SlotUse(samples, from, to)
 	phases := Phases(w.Cycles)
-	var span, host time.Duration
+	var span, host, lockWait time.Duration
 	for _, p := range phases.Phases {
 		span += p.Time
 		host += p.Host
+		lockWait += p.LockWait
 	}
 	if slots.Window == 0 && span == 0 {
 		return leftOut("no orchestration sample and no phase span lie in the wave")
@@ -132,9 +135,10 @@ func Check(w WaveInput, b Bounds) Verdict {
 		}
 	}
 	if span > 0 {
-		v.GateShare = ratio(float64(host), float64(span))
+		v.LockWaitShare = ratio(float64(lockWait), float64(span))
+		v.GateShare = ratio(float64(host-lockWait), float64(span))
 		if v.GateShare > b.MaxGateShare {
-			breaches = append(breaches, fmt.Sprintf("host gate share %.1f%%, above the ceiling of %.1f%%", v.GateShare*100, b.MaxGateShare*100))
+			breaches = append(breaches, fmt.Sprintf("host gate share %.1f%% (lock wait %.1f%%), above the ceiling of %.1f%%", v.GateShare*100, v.LockWaitShare*100, b.MaxGateShare*100))
 		}
 	}
 	if len(breaches) > 0 {

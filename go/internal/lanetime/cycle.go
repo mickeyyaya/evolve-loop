@@ -19,13 +19,19 @@ type Call struct {
 	End   time.Time
 }
 
+type LockWait struct {
+	At   time.Time
+	Wait time.Duration
+}
+
 type Cycle struct {
-	ID       int
-	Spans    []Span
-	Calls    []Call
-	Unpaired int
-	Open     int
-	Paused   bool
+	ID        int
+	Spans     []Span
+	Calls     []Call
+	LockWaits []LockWait
+	Unpaired  int
+	Open      int
+	Paused    bool
 }
 
 func (c Cycle) bounds() (time.Time, time.Time) {

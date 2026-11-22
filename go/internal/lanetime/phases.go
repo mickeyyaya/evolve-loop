@@ -12,6 +12,7 @@ type PhaseStat struct {
 	Share      float64       `json:"share"`
 	Model      time.Duration `json:"model"`
 	Host       time.Duration `json:"host"`
+	LockWait   time.Duration `json:"lock_wait"`
 	Gates      int           `json:"gates"`
 	GateTotal  time.Duration `json:"gate_total"`
 	GateMedian time.Duration `json:"gate_median"`
@@ -92,6 +93,7 @@ func Phases(cycles []Cycle) PhaseReport {
 	accums := map[string]*phaseAccum{}
 	for _, c := range cycles {
 		var spanTime time.Duration
+		usedWaits := make([]bool, len(c.LockWaits))
 		for _, s := range c.Spans {
 			a, ok := accums[s.Phase]
 			if !ok {
@@ -99,6 +101,12 @@ func Phases(cycles []Cycle) PhaseReport {
 				accums[s.Phase] = a
 			}
 			a.addSpan(s, c.Calls)
+			for i, w := range c.LockWaits {
+				if !usedWaits[i] && w.Wait > 0 && !w.At.Before(s.Start) && !w.At.After(s.End) {
+					a.stat.LockWait += w.Wait
+					usedWaits[i] = true
+				}
+			}
 			spanTime += s.End.Sub(s.Start)
 		}
 		report.Lane += c.Lane()
@@ -108,6 +116,7 @@ func Phases(cycles []Cycle) PhaseReport {
 	for _, a := range accums {
 		a.stat.Model = min(a.stat.Model, a.stat.Time)
 		a.stat.Host = a.stat.Time - a.stat.Model
+		a.stat.LockWait = min(a.stat.LockWait, a.stat.Host)
 		a.stat.Share = ratio(float64(a.stat.Time), float64(report.Lane))
 		a.stat.Gates = len(a.gates)
 		a.stat.GateMedian = median(a.gates)

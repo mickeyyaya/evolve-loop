@@ -87,7 +87,7 @@ func TestWaveLatencyCheck_TwoBreachesInARowFileOneItemAndEmitOneSignalAcrossReru
 		t.Fatalf("rc = %d, want 0 for a soft gate; stderr %s", rc, h.stderr.String())
 	}
 	text := h.stdout.String()
-	for _, want := range []string{"wave 1: ok", "wave 2: breach", "gate share", "wave 3: breach", "live lanes", "LATENCY_BUDGET_EXCEEDED", "latency-wave-breach-from-wave-2", "warning: 1 malformed orchestration line(s) were skipped"} {
+	for _, want := range []string{"wave 1: ok", "wave 2: breach", "gate share", "lock wait", "wave 3: breach", "live lanes", "LATENCY_BUDGET_EXCEEDED", "latency-wave-breach-from-wave-2", "warning: 1 malformed orchestration line(s) were skipped"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("text report lacks %q:\n%s", want, text)
 		}

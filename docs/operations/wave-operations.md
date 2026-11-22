@@ -31,9 +31,10 @@ This page tells the console (an operator or an LLM) how to run each wave through
   - The loop takes the same census at the start of each plan and keeps the last 12 in `.evolve/waves/supply.json`. When the `admissible` count is below the window, the loop publishes `LOOP_ORCH_SUPPLY_SHORT`.
 - To see where the time of a wave goes, run `evolve wave latency`. It reads the run dirs and the `LOOP_ORCH_*` signals, and it changes nothing. Add `--wave N` for a recorded wave, `--cycles A-B` for a range of cycles, or `--json` for the full numbers. With no flag it reports the latest wave.
   - The report has the slot use: the average live lanes, and the slot-hours used over the capacity.
-  - It has the lane time by phase with its share, and the model and host time of each phase. It has the median gate time after a call.
+  - It has the lane time by phase with its share, and the model and host time of each phase. It also shows `lock_wait` (`lock-wait` in text) and the median gate time after a call.
   - It also has the lane time to a PASS for each CLI family. The measure covers the last 20 builds of the whole history, not only of the wave. A family with no pass shows `none`.
   - The JSON gives each duration in nanoseconds. A wave that is still live is read to its last signal.
+  - Run `evolve wave latency --check` to judge every wave against the live-lane floor and the gate-share ceiling. Each verdict reports `live_share`, `gate_share`, and `lock_wait_share`, where `gate_share` excludes lock wait from host time.
   - The definitions are in [internal-lanetime.md](../architecture/packages/internal-lanetime.md). The plan is [wave-latency-2026-10](../plans/wave-latency-2026-10.md).
 - To follow the wave, run `evolve wave watch` under a monitor. It prints one line for each phase change, seal, deadline stop, ship and quota pause. It exits when the loop exits. When a newer wave starts, it prints `wave-started` and follows the newer wave.
 

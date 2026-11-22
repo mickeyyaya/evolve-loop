@@ -191,9 +191,9 @@ func writeLatencyPhases(w io.Writer, r lanetime.PhaseReport) {
 	for _, p := range r.Phases {
 		width = max(width, len(p.Phase))
 	}
-	fmt.Fprintf(w, "%-*s %9s %7s %9s %9s %6s %9s\n", width, "phase", "time", "share", "model", "host", "gates", "gate-med")
+	fmt.Fprintf(w, "%-*s %9s %7s %9s %9s %9s %6s %9s\n", width, "phase", "time", "share", "model", "host", "lock-wait", "gates", "gate-med")
 	for _, p := range r.Phases {
-		fmt.Fprintf(w, "%-*s %9s %6.1f%% %9s %9s %6d %9s\n", width, p.Phase, roundSecond(p.Time), p.Share*100, roundSecond(p.Model), roundSecond(p.Host), p.Gates, roundSecond(p.GateMedian))
+		fmt.Fprintf(w, "%-*s %9s %6.1f%% %9s %9s %9s %6d %9s\n", width, p.Phase, roundSecond(p.Time), p.Share*100, roundSecond(p.Model), roundSecond(p.Host), roundSecond(p.LockWait), p.Gates, roundSecond(p.GateMedian))
 	}
 	fmt.Fprintf(w, "%-*s %9s %6.1f%%\n", width, "(gap)", roundSecond(r.Gap), r.GapShare*100)
 }
