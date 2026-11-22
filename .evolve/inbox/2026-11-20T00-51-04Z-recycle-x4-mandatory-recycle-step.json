@@ -6,12 +6,14 @@
     "Red first: a PASS cycle whose branch is merged only into the hub HEAD keeps its branch",
     "A second call of the step does nothing, and a crash between the record and the release leaves the release state open for K4",
     "The shadow stage deletes nothing",
-    "A test runs a fleet lane cycle to its seal and sees the sealed-cycle sweep run once for that cycle; the test is red before the fix"
+    "A test runs a fleet lane cycle to its seal and sees the sealed-cycle sweep run once for that cycle; the test is red before the fix",
+    "The recycle step calls RunCycleChecks of X4b, so the cycle-scoped gc checks (cache, temp, worktrees, processes) run at every cycle end; amended 2026-11-22 (PR #1683)."
   ],
   "created_at": "2026-11-20T00:51:04Z",
   "deps": [
     "recycle-x5-continuation-reads-the-leaf",
-    "recycle-x1a-check-registry-worktrees"
+    "recycle-x1a-check-registry-worktrees",
+    "recycle-x4b-check-scopes"
   ],
   "files": [
     "go/internal/core/cyclerun.go",

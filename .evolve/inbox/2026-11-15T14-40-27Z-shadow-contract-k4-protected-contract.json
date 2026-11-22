@@ -12,9 +12,9 @@
   ],
   "evidence": "The contract can be weakened silently today, and the keys already at enforce have no flip record.",
   "files": [
-    "go/internal/guards/protected.go",
     "go/internal/gateregistry/testdata/stage_violations.json",
-    "go/cmd/evolve/cmd_stage.go"
+    "go/cmd/evolve/cmd_stage.go",
+    "go/internal/guards/integrity_surface.go"
   ],
   "fix": "Plan §6 K4 and K4b: the registry, recorder, baseline and tests are protected surfaces with a shrink-only ratchet; evolve stage migrate writes grandfather flip records and one genesis record once; TestRegistryRatchet, TestViolationBaselineOnlyShrinks, TestHeadPolicyAccepted.",
   "id": "shadow-contract-k4-protected-contract",

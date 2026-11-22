@@ -1,0 +1,34 @@
+{
+  "acceptance": [
+    "Red first: a cycle end under cache_trim_free_gb trims the cache through the real recycle step, and an entry that a sibling lane holds open stays",
+    "Red first: a temp entry with the id of another cycle stays; one with this cycle's id and no holder goes",
+    "Red first: a host-scoped check (run dirs, branches, dev worktrees) does not run at a cycle end",
+    "Red first: the recycle record holds the run dir size and the run dir is not deleted",
+    "New code at 100% measured coverage of the changed functions; one end-to-end test through the real entry point"
+  ],
+  "created_at": "2026-11-22T10:01:48Z",
+  "deps": [
+    "recycle-x1a-check-registry-worktrees",
+    "recycle-x1c-check-registry-cache",
+    "recycle-x1d-check-registry-temp",
+    "recycle-x1e-check-registry-processes",
+    "recycle-x2-gocache-counts-executable-dirs",
+    "recycle-x7-temp-shape-registry"
+  ],
+  "files": [
+    "go/internal/gc/check.go",
+    "go/internal/gc/gocache.go",
+    "go/internal/gc/tempdir.go",
+    "go/internal/gc/processes.go",
+    "go/internal/core/cyclerun.go",
+    "go/internal/guards/integrity_surface.go"
+  ],
+  "fix": "Add a Scope (cycle or host) to the Check interface and RunCycleChecks(ctx, cc, cycleID). Cycle scope: K1 worktree, K2 branch, K3 processes and sessions (K3 is the X1e adapter), K8 and K9 temp entries that carry the cycle id in their name or owner file (shapes from X7), K7 cache only when free disk is under gc.cache_trim_free_gb, with the holder probe. Host scope: all others, including run dirs, salvage, branches, dev worktrees. The X4 step (go/internal/core, protected, console) calls RunCycleChecks; the scope table joins the integrity rows of X10 (D14). The recycle record stores the size of the run dir and deletes nothing.",
+  "id": "recycle-x4b-check-scopes",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Plan docs/plans/cycle-recycle-and-gc-check-2026-11.md section 13, component X4b (decisions D1, D7, D12, D15). The operator asked for gc 'applied at cycle level'. The registry (go/internal/gc/check.go:36-38) has no scope, so the X4 recycle step cannot run only the checks of one cycle. The Go cache key follows the worktree path, so no cache entry belongs to one cycle, and a sibling lane can hold an entry open. The run dir stays wave-scoped (D33): the closeout reads it after the seal.",
+  "title": "Each registry check has a cycle or host scope, and the cycle end runs the cycle subset",
+  "weight": 0.8
+}
