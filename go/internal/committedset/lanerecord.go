@@ -20,6 +20,7 @@ type Record struct {
 	ItemIDs   []string `json:"item_ids"`
 	GoalHash  string   `json:"goal_hash,omitempty"`
 	RoutedIDs []string `json:"routed_ids,omitempty"`
+	LaneSpec
 }
 
 type Drift struct {

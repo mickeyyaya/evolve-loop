@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inputindex"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
@@ -18,6 +19,7 @@ type indexTarget struct {
 	projectRoot, workspace, runID, goalHash string
 	cycle                                   int
 	specInputs                              []string
+	spec                                    committedset.LaneSpec
 }
 
 func writeInputIndex(at indexTarget, phase Phase, itemIDs []string, warn io.Writer) error {
@@ -61,12 +63,15 @@ func cycleRecord(at indexTarget, itemIDs []string) (inputindex.Record, error) {
 	if !filepath.IsAbs(at.projectRoot) {
 		return inputindex.Record{}, fmt.Errorf("the project root %q is not absolute", at.projectRoot)
 	}
-	record := inputindex.Record{Cycle: at.cycle, RunID: at.runID, ItemIDs: itemIDs, GoalHash: at.goalHash}
+	record := inputindex.Record{Cycle: at.cycle, RunID: at.runID, ItemIDs: itemIDs, GoalHash: at.goalHash, LaneSpec: at.spec}
 	if recorded, ok := inputindex.ReadRecord(at.projectRoot, at.cycle); ok {
 		if recorded.RunID == at.runID {
 			return recorded, nil
 		}
 		record.RoutedIDs = recorded.RoutedIDs
+		if !recorded.IsZero() {
+			record.LaneSpec = recorded.LaneSpec
+		}
 		if len(recorded.ItemIDs) > 0 {
 			record.ItemIDs = recorded.ItemIDs
 			if recorded.GoalHash != "" {

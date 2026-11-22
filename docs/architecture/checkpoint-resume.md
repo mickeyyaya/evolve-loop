@@ -93,7 +93,7 @@ The pool then puts each ready paused scope at the head of the backlog (`pausedPl
 - The lead todo is the triage todo of the scope, with its files, priority, dependencies and output contract. The pool serializes lanes on their files, so a resumed lane keeps its file claims. A scope that is not in the triage list takes the declared files of its inbox items.
 - The pool does not put a scope first when the lane cannot take it back. The pool asks the rule of `laneResume.adopt` (`scopeHold.adoptableBy`) for each paused scope. It asks also when a triage todo matches the scope. Each item of the scope must be in the inbox and not held by another cycle. One missing item skips the scope, and the pool writes a `[pool] WARN` line that names the cycle, the scope and the cause. The triage todos of a skipped scope keep their plain triage place.
 - An item that is in the inbox but has no readable file list stays in its scope. The pool then writes a `[pool] WARN` line that names the cycle and the item, and the lead todo has no file claim from that item.
-- An untriaged scope leads with only its ID and its files. Its dependencies and its output contract are not recorded yet.
+- An untriaged scope leads with its ID, its files, and the `LaneSpec` from its lineage record (`DependsOn`, `Priority`, `OutputContract`). `fleet.poolSpec` writes `LaneSpec` to `EVOLVE_FLEET_SPEC`, `core.PausedLaneScopes` reads it through `committedset.ReadRecord`, and `pausedPlan.lead` applies it when no triage todo matches.
 - The triage todos of the scope do not appear again.
 
 The lanes adopt the scopes through `laneResume.adopt`, and the cycles run at the same time. If the scan fails, the pool writes a warning and keeps the triage order.

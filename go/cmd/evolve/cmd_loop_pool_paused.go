@@ -81,6 +81,9 @@ func (pp pausedPlan) lead(p core.PausedScope, triage []fleet.Todo) (fleet.Todo, 
 			pp.warnf("[pool] WARN: paused cycle %d: scope %s keeps its place without some file claims: %v\n", p.Cycle, id, err)
 		}
 		lead.Files = files
+		lead.DependsOn = slices.Clone(p.Spec.DependsOn)
+		lead.Priority = p.Spec.Priority
+		lead.OutputContract = p.Spec.OutputContract
 	}
 	lead.Resume = mainRedParked(p) && pp.parkedResume
 	slices.Sort(lead.Files)

@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 )
@@ -323,6 +324,9 @@ func poolSpec(td Todo, width int, liveWidthFile string) CycleSpec {
 	}
 	if liveWidthFile != "" {
 		env[ipcenv.FleetLiveWidthKey] = liveWidthFile
+	}
+	if spec := (committedset.LaneSpec{DependsOn: td.DependsOn, Priority: td.Priority, OutputContract: td.OutputContract}); !spec.IsZero() {
+		env[ipcenv.FleetSpecKey] = spec.Encode()
 	}
 	return CycleSpec{
 		Scope:          []string{td.ID},

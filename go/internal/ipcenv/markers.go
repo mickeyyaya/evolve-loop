@@ -14,7 +14,7 @@ type marker struct {
 var markers = []marker{
 	{"EVOLVE_PROJECT_ROOT", true}, {"EVOLVE_PLUGIN_ROOT", false},
 	{DispatchIDKey, false}, {DispatchDepthKey, true}, {MsgTokenKey, false}, {PhaseKey, true},
-	{FleetKey, true}, {FleetScopeKey, true}, {FleetWidthKey, true}, {FleetLiveWidthKey, true}, {FleetReachHolderKey, true},
+	{FleetKey, true}, {FleetScopeKey, true}, {FleetSpecKey, false}, {FleetWidthKey, true}, {FleetLiveWidthKey, true}, {FleetReachHolderKey, true},
 	{WorktreeRootKey, true}, {CycleStateFileKey, true}, {TmuxSocketKey, true},
 	{"EVOLVE_FANOUT_WORKER_TOKEN", false}, {"EVOLVE_FANOUT_WORKER_NAME", false}, {"EVOLVE_FANOUT_CYCLE", false},
 	{"EVOLVE_FANOUT_WORKSPACE", false}, {"EVOLVE_FANOUT_PARENT_AGENT", false}, {"EVOLVE_FANOUT_WORKER_ARTIFACT", false},

@@ -19,6 +19,9 @@ func TestIpcenv_ConstValues(t *testing.T) {
 	if ipcenv.FleetScopeKey != "EVOLVE_FLEET_SCOPE" {
 		t.Errorf("FleetScopeKey = %q, want %q", ipcenv.FleetScopeKey, "EVOLVE_FLEET_SCOPE")
 	}
+	if ipcenv.FleetSpecKey != "EVOLVE_FLEET_SPEC" {
+		t.Errorf("FleetSpecKey = %q, want %q", ipcenv.FleetSpecKey, "EVOLVE_FLEET_SPEC")
+	}
 	if ipcenv.WorktreeRootKey != "EVOLVE_WORKTREE_ROOT" {
 		t.Errorf("WorktreeRootKey = %q, want %q", ipcenv.WorktreeRootKey, "EVOLVE_WORKTREE_ROOT")
 	}

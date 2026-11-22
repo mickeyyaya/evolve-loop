@@ -5,6 +5,8 @@ import (
 	"io/fs"
 	"slices"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 )
 
 type PausedScope struct {
@@ -16,6 +18,7 @@ type PausedScope struct {
 	AutoMaxAttempts int
 	QuotaResetAt    string
 	Reason          string
+	Spec            committedset.LaneSpec
 }
 
 func PausedLaneScopes(projectRoot, evolveDir string, opts ResumeOptions) ([]PausedScope, error) {
@@ -31,8 +34,9 @@ func PausedLaneScopes(projectRoot, evolveDir string, opts ResumeOptions) ([]Paus
 	var paused []PausedScope
 	for key, last := range newestPerScope(states) {
 		if rp, ok := laneResumable(last, ships, projectRoot, opts); ok {
+			rec, _ := committedset.ReadRecord(projectRoot, rp.CycleID)
 			paused = append(paused, PausedScope{Cycle: rp.CycleID, Scope: strings.Split(key, ","), Phase: rp.Phase, StatePath: rp.StatePath,
-				AutoAttempts: rp.AutoAttempts, AutoMaxAttempts: rp.AutoMaxAttempts, QuotaResetAt: rp.QuotaResetAt, Reason: rp.Reason})
+				AutoAttempts: rp.AutoAttempts, AutoMaxAttempts: rp.AutoMaxAttempts, QuotaResetAt: rp.QuotaResetAt, Reason: rp.Reason, Spec: rec.LaneSpec})
 		}
 	}
 	slices.SortFunc(paused, func(a, b PausedScope) int { return a.Cycle - b.Cycle })
