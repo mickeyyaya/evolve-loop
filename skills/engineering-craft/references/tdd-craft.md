@@ -49,6 +49,26 @@ Principle in `fable/references/verification.md` §Hermetic tests; the Go-concret
    - **Hard-coded input:** a literal equal to the value every test uses (a cooldown of one hour when every test uses one hour). Tests should use values no plausible literal equals.
    A mutant that behaves identically to the code for every valid input is equivalent: name it and set it aside.
    A kill is claimed only after the killing test ran against its mutant.
+
+## Tests the test-audit ratchet refuses
+
+The ratchet (`go/internal/testaudit`, rule ids in `rules.go`) refuses a new test that matches one of these. Rebaseline refuses new rows, so no new row is ever baselined; write the accepted form.
+
+- `no-assertion`: a test that never asserts or fails. Accepted: assert the returned value or the state change.
+- `log-only`: a test that only calls `t.Log`. Accepted: turn each logged value into an assertion.
+- `asserts-own-setup`: a test whose failing `if` checks only literals it just built. Accepted: assert on output of the code under test.
+- `both-branches-pass`: an `if/else` where both branches pass and nothing asserts. Accepted: one branch fails the test, or split into two cases.
+- `skip-hides-error`: `t.Skip` inside an `err != nil` branch (or the else of an `err == nil` check). Accepted: `t.Fatal` on the error; skip only for a named missing precondition.
+- `literal-field-count`: comparing `NumField()` to an integer literal. Accepted: assert each field by name, or a table of the fields that matter.
+- `single-file-source-pin`: reading one `.go` file and matching its text (`os.ReadFile`, `acsassert.FileContains`). Accepted: call the code and assert its behavior.
+- `single-file-ast-pin`: parsing one `.go` file with `parser.ParseFile` to pin its shape. Accepted: call the code and assert its behavior.
+- `unverified-fake`: `fakeclitest.Install` of a fake not listed in `go/internal/testaudit/fakes.json`. Accepted: a listed fake, or register the fake with its contract proof.
+- `mock-call-order`: comparing a recorded `calls`, `callOrder` or `invocations` slice. Accepted: assert the outcome, or a fake with real behavior.
+- `golden-update-flag`: writing a golden file under `testdata` outside the flag guard it reads. Accepted: write goldens only inside the `-update` flag branch and assert on the file.
+- `error-text-match`: matching `err.Error()` text (`strings.Contains`, `==`). Accepted: `errors.Is` on a sentinel error or `errors.As` on a typed error, never compare `err.Error()` text.
+- `sleep-sync`: `time.Sleep`. Accepted: synchronize with a channel, a hook or an injected clock.
+- central baseline zero-to-N: a package the central baseline lists with no rows cannot gain rows. Accepted: write the test clean.
+
 ## What NOT to write
 
 - Assertion-free tests, tests of getters/setters, tests that re-state the implementation line-by-line.
