@@ -20,7 +20,7 @@ func TestEnterShipWindow_OnlyALiveCycleShipTakesTheLease(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			opts.ProjectRoot = t.TempDir()
-			release := enterShipWindow(context.Background(), &opts, &RunResult{})
+			_, release := enterShipWindow(context.Background(), &opts, &RunResult{})
 			if _, err := os.Stat(filepath.Join(opts.ProjectRoot, ".evolve")); !os.IsNotExist(err) {
 				t.Fatalf("a %s ship touched the ship window (stat err=%v)", name, err)
 			}
@@ -45,7 +45,7 @@ func TestEnterShipWindow_AWaiterOutlastsAHealthyHolderWithoutAWarn(t *testing.T)
 		close(released)
 	}()
 	res := &RunResult{}
-	release := enterShipWindow(context.Background(), &Options{Class: ClassCycle, ProjectRoot: root}, res)
+	_, release := enterShipWindow(context.Background(), &Options{Class: ClassCycle, ProjectRoot: root}, res)
 	select {
 	case <-released:
 	default:
@@ -74,7 +74,7 @@ func TestEnterShipWindow_ACanceledWaitShipsUnleasedWithAWarn(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	res := &RunResult{}
-	release := enterShipWindow(ctx, &Options{Class: ClassCycle, ProjectRoot: root}, res)
+	_, release := enterShipWindow(ctx, &Options{Class: ClassCycle, ProjectRoot: root}, res)
 	release()
 	if !containsLog(*res, "[ship] WARN: ship-window lease not acquired (context canceled); proceeding unleased") {
 		t.Fatalf("logs=%v", res.Logs)
@@ -88,7 +88,7 @@ func TestEnterShipWindow_AReleaseFailureIsLogged(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	res := &RunResult{}
-	release := enterShipWindow(context.Background(), &Options{Class: ClassCycle, ProjectRoot: root}, res)
+	_, release := enterShipWindow(context.Background(), &Options{Class: ClassCycle, ProjectRoot: root}, res)
 	evolveDir := filepath.Join(root, ".evolve")
 	if err := os.RemoveAll(evolveDir); err != nil {
 		t.Fatal(err)
@@ -111,7 +111,7 @@ func TestEnterShipWindow_AHeldContextReentersWithoutWaitingOrReleasing(t *testin
 	ctx, cancel := context.WithTimeout(shipwindow.WithHeld(context.Background(), outer), 2*time.Second)
 	defer cancel()
 	res := &RunResult{}
-	release := enterShipWindow(ctx, &Options{Class: ClassCycle, ProjectRoot: root}, res)
+	_, release := enterShipWindow(ctx, &Options{Class: ClassCycle, ProjectRoot: root}, res)
 	release()
 	if ctx.Err() != nil || len(res.Logs) != 0 {
 		t.Fatalf("a ship inside the orchestrator's held window waited or warned: ctxErr=%v logs=%v", ctx.Err(), res.Logs)
@@ -128,7 +128,7 @@ func TestEnterShipWindow_BreakingAHungHolderWarnsAndSignals(t *testing.T) {
 		fmt.Sprintf(`{"owner_pid":%d,"heartbeat_at":"2026-10-19T01:13:10Z","token":"hung"}`+"\n", os.Getpid()))
 	center, events := recordingCenter()
 	res := &RunResult{}
-	release := enterShipWindow(context.Background(), &Options{Class: ClassCycle, ProjectRoot: root, CycleID: 7, Signals: center}, res)
+	_, release := enterShipWindow(context.Background(), &Options{Class: ClassCycle, ProjectRoot: root, CycleID: 7, Signals: center}, res)
 	defer release()
 	center.Flush()
 	want := fmt.Sprintf("[ship] WARN: ship-window lease of pid %d broken at the TTL (heartbeat 2026-10-19T01:13:10Z)", os.Getpid())
@@ -137,9 +137,9 @@ func TestEnterShipWindow_BreakingAHungHolderWarnsAndSignals(t *testing.T) {
 	}
 	found := false
 	for _, e := range *events {
-		found = found || (e.Code == codeShipWindowLeaseBroken && e.Fields["owner_pid"] == strconv.Itoa(os.Getpid()))
+		found = found || (e.Code == CodeShipWindowLeaseBroken && e.Fields["owner_pid"] == strconv.Itoa(os.Getpid()))
 	}
 	if !found {
-		t.Fatalf("signals=%+v, want %s naming the broken holder", *events, codeShipWindowLeaseBroken)
+		t.Fatalf("signals=%+v, want %s naming the broken holder", *events, CodeShipWindowLeaseBroken)
 	}
 }
