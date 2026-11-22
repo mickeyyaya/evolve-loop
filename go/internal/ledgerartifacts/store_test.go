@@ -342,3 +342,31 @@ func TestPut_FailsLoudlyWhenItCannotListItsFanOutDir(t *testing.T) {
 		t.Fatal("Put into a fan-out dir it cannot list = nil, want the failure surfaced")
 	}
 }
+
+func TestPutAt_ReturnsTheDigestAndThePathOfTheStoredObject(t *testing.T) {
+	store := Open(t.TempDir())
+	body := []byte("evidence\n")
+
+	digest, path, err := store.PutAt(body)
+
+	wantPath, pathErr := store.Path(sha256Hex(body))
+	if err != nil || pathErr != nil || digest != sha256Hex(body) || path != wantPath {
+		t.Fatalf("PutAt = %q %q err %v; want %q %q", digest, path, err, sha256Hex(body), wantPath)
+	}
+	if stored, err := os.ReadFile(path); err != nil || string(stored) != string(body) {
+		t.Fatalf("object at the returned path = %q err %v, want the body", stored, err)
+	}
+}
+
+func TestPutAt_ReportsAStoreThatCannotBeWrittenWithoutAPath(t *testing.T) {
+	evolveDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(evolveDir, DirName), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	digest, path, err := Open(evolveDir).PutAt([]byte("evidence\n"))
+
+	if err == nil || digest != "" || path != "" {
+		t.Fatalf("PutAt = %q %q err %v; want an error and no digest or path", digest, path, err)
+	}
+}

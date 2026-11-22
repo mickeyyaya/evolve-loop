@@ -45,3 +45,11 @@ func TestAPI_IdenticalRebaseCarryIsNamed(t *testing.T) {
 		t.Errorf("IdenticalRebaseMethod = %q", IdenticalRebaseMethod)
 	}
 }
+
+func TestAPICover_NamesTheStageEvidenceExports(t *testing.T) {
+	t.Parallel()
+	var _ *StageChainReader = New(t.TempDir()).StageChain()
+	if StageEvidenceSealKind == "" || StageEvidenceRole == "" {
+		t.Fatal("stage evidence kind and role must be named")
+	}
+}
