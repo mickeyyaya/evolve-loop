@@ -37,7 +37,7 @@ func TestRunGCCheck_CLIModesAndErrors(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &rep); err != nil {
 		t.Fatalf("decode report: %v\n%s", err, stdout.String())
 	}
-	if len(rep.Checks) != 1 || rep.Checks[0].Name != "worktrees" || len(rep.Checks[0].Items) != 1 {
+	if len(rep.Checks) != 2 || rep.Checks[0].Name != "worktrees" || len(rep.Checks[0].Items) != 1 || rep.Checks[1].Name != "temp" {
 		t.Fatalf("unexpected report: %+v", rep)
 	}
 

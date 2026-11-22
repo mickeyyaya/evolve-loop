@@ -34,7 +34,7 @@ type Check interface {
 }
 
 func DefaultChecks() []Check {
-	return []Check{worktreeCheck{}}
+	return []Check{worktreeCheck{}, tempCheck{}}
 }
 
 func RunChecks(ctx context.Context, cc CheckContext, checks []Check) (CheckReport, error) {
