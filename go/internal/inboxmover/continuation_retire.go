@@ -21,7 +21,7 @@ type releasedContinuation struct {
 const retireAuthority = "runtime (inbox retirement)"
 
 func releaseContinuationOnRetire(opts Options, itemPath, taskID, reason string) {
-	if taskID == "" || taskID == "unknown" || opts.ProjectRoot == "" {
+	if taskID == "" || taskID == "unknown" {
 		return
 	}
 	c, ok, err := continuation.ReadRegistryEntry(opts.ProjectRoot, taskID)

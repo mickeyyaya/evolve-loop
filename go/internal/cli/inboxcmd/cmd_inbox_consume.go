@@ -16,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
 
 func ackItemFingerprint(evolveDir, itemPath, resolvedBy string) (fingerprint string, found bool, err error) {
@@ -111,7 +112,8 @@ func consumeInboxItem(evolveDir, itemPath string, stamp inboxConsumedStamp, stdo
 		fmt.Fprintf(stderr, "inbox consume: %s consumed, but the consumed stamp write failed: %v\n", dest, err)
 		return inboxWriteResult{}, 1
 	}
-	if releaseConsumedItemBinding(filepath.Dir(evolveDir), dest, stderr) {
+	projectRoot, _ := paths.ProjectRootOf(evolveDir)
+	if releaseConsumedItemBinding(projectRoot, dest, stderr) {
 		fmt.Fprintf(stdout, "inbox consume: released continuation binding for %s (salvage pointer preserved on the item)\n", filepath.Base(itemPath))
 	}
 	fp, found, err := ackItemFingerprint(evolveDir, dest, "inbox-consume")
@@ -205,7 +207,10 @@ func releaseConsumedItemBinding(projectRoot, itemPath string, stderr io.Writer) 
 }
 
 func ReconcileConsumedBindings(projectRoot, evolveDir string, stderr io.Writer) {
-	released := inboxmover.ReconcileConsumedBindings(inboxmover.Options{ProjectRoot: projectRoot, Stderr: stderr})
+	released, err := inboxmover.ReconcileConsumedBindings(inboxmover.Options{ProjectRoot: projectRoot, Stderr: stderr})
+	if err != nil {
+		fmt.Fprintf(stderr, "[inbox] WARN: binding release: %v\n", err)
+	}
 	for _, id := range released {
 		fmt.Fprintf(stderr, "[loop] blocker-breaker: released stray continuation binding for consumed item %s\n", id)
 	}

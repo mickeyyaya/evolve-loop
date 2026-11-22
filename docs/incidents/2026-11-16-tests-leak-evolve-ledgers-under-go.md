@@ -8,7 +8,7 @@ The record of the first use of the [issue-record](../../skills/issue-record/SKIL
 - **Root cause:** `inboxmover` built its ledger path from `ProjectRoot`. Tests that named only `InboxDir` left `ProjectRoot` empty, so the ledger went to `.evolve/` under the package directory of the test.
 - **Escape:** CI runs `make test-integration`, which has no treewalk guard. Only `make test` has it, and only the lanes run `make test` on the composed tree.
 - **Fix:** PR #1490 derives `ProjectRoot` from an `InboxDir` of the form `<root>/.evolve/inbox`, and gives the three tests a root.
-- **Open:** the inbox item `ci-test-integration-treewalk-parity` adds the treewalk guard to the CI target.
+- **Open:** the inbox item `ci-test-integration-treewalk-parity` adds the treewalk guard to the CI target. The plan [every-inbox-mover-names-its-project-root](../plans/every-inbox-mover-names-its-project-root-2026-11.md) fixes the mover half, and that item keeps the CI wrap.
 
 ## Terms used throughout
 
