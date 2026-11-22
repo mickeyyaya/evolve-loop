@@ -348,6 +348,26 @@ func TestEvaluate_A5CountsAStallOnlyWhileItsLaneIsStillSilent(t *testing.T) {
 	wantStep(t, Evaluate(s), "A5", ResultBrake, "; STALL")
 }
 
+func TestStallLine_RecoveredIsTrueOnlyWhenTheLaneSpokeAfterTheStall(t *testing.T) {
+	t.Parallel()
+	stalledAt := waveStart.Add(time.Hour)
+	cases := []struct {
+		name      string
+		lastEvent time.Time
+		want      bool
+	}{
+		{"no event since the stall", time.Time{}, false},
+		{"last event at the stall", stalledAt, false},
+		{"last event before the stall", stalledAt.Add(-time.Second), false},
+		{"last event after the stall", stalledAt.Add(time.Second), true},
+	}
+	for _, c := range cases {
+		if got := (StallLine{At: stalledAt, LastEvent: c.lastEvent}).Recovered(); got != c.want {
+			t.Errorf("%s: Recovered = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
 func TestEvaluate_A5WithoutAWaveCountsEveryLineUpToNow(t *testing.T) {
 	t.Parallel()
 	s := healthy()
