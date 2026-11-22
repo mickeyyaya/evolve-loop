@@ -49,6 +49,7 @@ type Pool struct {
 	Holders       *ReachHolders
 	FamilyHolds   *FamilyHolds
 	Benched       func() bool
+	Hold          fleet.Hold
 	LiveWidthFile string
 
 	sysHalt *atomic.Bool
@@ -61,6 +62,7 @@ var transitionCodes = map[fleet.PoolTransitionKind]signalcenter.Code{
 	fleet.PoolIdle:       CodePoolIdle,
 	fleet.PoolHeld:       CodePoolHeld,
 	fleet.PoolResupplied: CodePoolResupplied,
+	fleet.PoolFloorHold:  CodePoolFloorHold,
 }
 
 var errIntakeNeedsAdmit = errors.New("orchestrator: a pool with an intake needs an admit function: the freed cells and the limit act through it")
@@ -89,7 +91,7 @@ func (p Pool) Run(ctx context.Context, backlog []fleet.Todo) []fleet.Result {
 	launch = p.watchSystemHalt(launch, live)
 	cfg := fleet.PoolConfig{Target: p.Target, Concurrency: p.Concurrency, MaxLaunches: p.MaxLanes, LiveWidthFile: p.LiveWidthFile,
 		Halted: func() bool { return p.systemHalted() || in.Stopped() || (p.Halted != nil && p.Halted()) },
-		Next:   next, Kick: in.Wake(), Window: p.admissionWindow(), Resupply: p.Resupply,
+		Next:   next, Kick: in.Wake(), Window: p.admissionWindow(), Resupply: p.Resupply, Hold: p.Hold,
 		Prepare: func(td fleet.Todo, spec fleet.CycleSpec) (fleet.CycleSpec, bool) {
 			in.Hold(td.ID)
 			prepared, ok := p.prepare(td, spec)
@@ -150,6 +152,9 @@ func (p Pool) prepare(td fleet.Todo, spec fleet.CycleSpec) (fleet.CycleSpec, boo
 
 func (p Pool) transition(t fleet.PoolTransition) {
 	fields := map[string]string{"live": strconv.Itoa(t.Live), "target": strconv.Itoa(t.Target)}
+	if t.Kind == fleet.PoolFloorHold {
+		fields["held"] = strconv.FormatBool(t.Held)
+	}
 	reason := "pool " + string(t.Kind)
 	if t.Todo != "" {
 		fields["todo"] = t.Todo
@@ -168,7 +173,7 @@ func (p Pool) transition(t fleet.PoolTransition) {
 	if t.Kind == fleet.PoolLaunched || t.Kind == fleet.PoolBackfilled {
 		p.FamilyHolds.forget(t.Todo)
 	}
-	if idleOrHeld && cause != CauseHostPressure && cause != CauseSystemHalt && p.MinLanes > 0 && t.Live < p.MinLanes && (p.Halted == nil || !p.Halted()) {
+	if idleOrHeld && cause != CauseHostPressure && cause != CauseSystemHalt && cause != CauseDiskFloor && p.MinLanes > 0 && t.Live < p.MinLanes && (p.Halted == nil || !p.Halted()) {
 		uFields := map[string]string{
 			"live":      strconv.Itoa(t.Live),
 			"target":    strconv.Itoa(t.Target),

@@ -25,7 +25,7 @@
 
 ## Stage entries (K1a)
 
-- `StageEntries` returns one `stage-feature` entry for each stage key of the typed policy schema (41 keys). Each entry has a `Shadow` descriptor and no seed `Stage`. `Entries` stays unchanged, so the real-tree gate tests never run a stage entry.
+- `StageEntries` returns one `stage-feature` entry for each stage key of the typed policy schema (43 keys). Each entry has a `Shadow` descriptor and no seed `Stage`. `Entries` stays unchanged, so the real-tree gate tests never run a stage entry.
 - A seed table `stageSeeds` holds the data: the key, the signal code, the emit site, the decision fields and the closure. The policy subtree is the key without its last segment, and a test pins it. A test pins the populated seed rows and the copy of their slices. The signal codes that exist as constants (`core.CodeLadderDecision`, `ship.CodeHoldShadow`) are referenced, not repeated. `Decide`, `Enforce` and `Score` are nil; K1b wires them.
 - An emit site is `gatecontract.EmitSite{Path, Func, Ref}`. A function value cannot name an unexported function of another package. So the test parses the file and checks four facts:
   - The function exists in a non-test file.
@@ -37,3 +37,4 @@
 - The conformance tests walk the policy struct by reflection, never the live `policy.json`. They fail for a `(key, rule)` pair that is not in `testdata/stage_violations.json`.
 - The baseline lists 88 pairs: 41 `string-typed-stage` (the stage constants are not unified in this change), and the missing signals, unregistered codes and emit sites. `TestViolationBaselineOnlyShrinks` requires the count to equal `baselineCeiling`, rejects a duplicate and rejects a pair that is no longer a violation. A fix removes its pairs and lowers the ceiling.
 - Two spec keys have no stage field in the schema and no entry: the ship scan skip and `gates.main_red_stop`.
+- The keys `gc.sentinel.hold.stage` and `gc.sentinel.release.stage` have seeds since 2026-11-21. Their signals are `HOST_WOULD_HOLD` and `HOST_WOULD_RELEASE`. Their closure is `internal/hostsentinel`. The seed test pins each row and checks that each pinned key has an entry.

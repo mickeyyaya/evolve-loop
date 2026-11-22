@@ -11,6 +11,7 @@
 - **Retention ladder.** `RunsPolicy.KeepFull` keeps the newest N run directories in full (by mtime, live or not; live runs are protected independently of the count). Beyond it, a dead run strictly older than `ArchiveAfterDays` moves under `<evolve>/archive/runs/`, and one strictly older than `DeleteAfterDays` is deleted. Delete wins over archive.
 - **Worktree grace.** `WorktreesPolicy.KeepRecent` keeps the newest N fully eligible candidates (merged, clean, dead). `MinAgeMinutes` leaves a younger candidate alone, which covers the create-to-lease-write race.
 - **Other TTLs.** `SalvageTTLDays` prunes `<evolve>/operator-salvage` (default 30), `LogsTTLDays` prunes `<evolve>/dispatch-logs/*.log` (default 30), `TrackerTTLDays` prunes the `.ephemeral` subtrees of kept runs (default 7).
+- **The sentinel block.** `Policy.Sentinel` holds the settings of the host sentinel ([internal-hostsentinel.md](internal-hostsentinel.md)). The keys are `interval_s`, `repeat_s`, `orphan_servers_max`, `orphan_processes_max`, `hold_max_s`, `release_budget_s` and `no_progress_bytes`. Each zero value takes its compiled default. The two stage keys `sentinel.hold.stage` and `sentinel.release.stage` use the typed `SentinelStage`. Only the value `enforce` enforces, and every other value is shadow.
 
 ## Invariants
 

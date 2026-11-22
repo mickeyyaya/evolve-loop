@@ -242,7 +242,19 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | Code | Meaning |
 |---|---|
 | `HOST_DISK_LOW` | free disk space on the host volume is below the pause line, so the cycle start waits before it dispatches. fields.free_pct, pause_pct and path give the reading, and fields.outcome is paused (the first wait) or gave_up (the maximum pause from preflight.disk_guard.max_pause_s passed and the cycle start stopped) |
+| `HOST_GOCACHE_OVER` | the host sentinel measured the go build cache over gc.go_cache_max_gb; WARN. Fields: fields.cache_bytes, limit_bytes |
+| `HOST_LANE_HOLD` | the host sentinel holds new lane starts because free disk is under gc.disk_floor_gb; running lanes continue; WARN. Fields: fields.free_bytes, floor_bytes |
+| `HOST_LANE_HOLD_STUCK` | the hold on new lanes lasted longer than gc.sentinel.hold_max_s and stays on; INCIDENT. Fields: fields.held_s, free_bytes |
+| `HOST_ORPHANS_HIGH` | the host sentinel counted more orphan processes of finished cycles than gc.sentinel.orphan_processes_max; WARN. Fields: fields.count, limit |
+| `HOST_ORPHAN_SERVERS_HIGH` | the host sentinel counted more owner-dead tmux servers than gc.sentinel.orphan_servers_max; WARN. Fields: fields.count, limit |
+| `HOST_RELEASED` | the mid-wave release ran the go cache trim and the pipeline temp sweep; INFO. Fields: fields.freed_bytes (free disk delta), cache_bytes (re-measured) |
+| `HOST_RELEASE_SKIPPED` | the host sentinel skipped a mid-wave release; INFO. Fields: fields.reason (gc_lease_held or the failure) |
+| `HOST_SENTINEL_BLIND` | the host sentinel could not read the host for three samples in a row; WARN. Fields: fields.reason |
+| `HOST_SENTINEL_DISK_FLOOR` | the host sentinel read free disk under gc.disk_floor_gb during a wave; WARN. Fields: fields.free_bytes, floor_bytes, warn_bytes, path |
+| `HOST_SENTINEL_DISK_WARN` | the host sentinel read free disk under gc.disk_warn_gb and over the floor during a wave; INFO. Fields: fields.free_bytes, warn_bytes, path |
 | `HOST_VERIFY_LOCK_WAIT` | a verification run asked for the host verification lock. fields.source names the caller (build-floor or acs-suite), fields.wait_ms the time that it waited, and fields.outcome is acquired or unserialized (the wait bound passed or the lock failed, so the run went on without the lock) |
+| `HOST_WOULD_HOLD` | at gc.sentinel.hold.stage shadow, the host sentinel records the hold on new lanes that enforce sets or clears; INFO. Fields: fields.would_hold (true or false), free_bytes, floor_bytes |
+| `HOST_WOULD_RELEASE` | at gc.sentinel.release.stage shadow, the host sentinel records the mid-wave release that enforce starts; INFO. Fields: fields.scopes, free_bytes, cache_bytes |
 
 ### inbox
 
@@ -360,10 +372,11 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `LOOP_ORCH_LANE_STALLED` | a lane had no live signal (cycle signals, pane-watch, events, or stdout) for fleet.orchestrator.stall_minutes (ADR-0139 O5). Published once per lane; missing cycles have unknown heartbeats and keep their slot. Fields: fields.todo, stage, last_heartbeat, stall_minutes |
 | `LOOP_ORCH_OPTIMISTIC_ADMISSION_FAILED` | an optimistically admitted lane (ADR-0143 W1b) hit a composed-tree gate failure or fleet rebase conflict. Published once at first failure; D3 counts failures only when admission of that todo is in-wave; WARN. Fields: fields.todo, held_by, gate |
 | `LOOP_ORCH_OVERSIGHT_ACTION` | the oversight loop (ADR-0139 O6) mapped a cycle, ship, errors, or loop event to a lane action. At shadow applied is false; at enforce applied is true; INFO. Fields: fields.actions, lane, cycle, event, stage, applied, verdict/target |
+| `LOOP_ORCH_POOL_FLOOR_HOLD` | the pool started or ended a hold on new lanes because free disk is under gc.disk_floor_gb. Running lanes continue and a held pool is never reported as underfilled. One event at each change; INFO. Fields: fields.held (true or false), live, target |
 | `LOOP_ORCH_POOL_HELD` | a pool fill round stopped below its width because admission refused every pending todo while a lane was in flight. Fires once per live/pending count change at wave start and round end; INFO. Fields: fields.live, target |
-| `LOOP_ORCH_POOL_IDLE` | an orchestrator pool slot stays free after a lane exit: no admissible todo, empty supply, operator stop, or run_max_lanes reached; INFO. Fields: fields.live, target, cause (family_held, run_cap, supply_empty, admission_refused, bench, operator_stop, host_pressure or system_halt) |
+| `LOOP_ORCH_POOL_IDLE` | an orchestrator pool slot stays free after a lane exit: no admissible todo, empty supply, operator stop, or run_max_lanes reached; INFO. Fields: fields.live, target, cause (family_held, run_cap, supply_empty, admission_refused, bench, operator_stop, host_pressure, system_halt or disk_floor) |
 | `LOOP_ORCH_POOL_RESUPPLIED` | an orchestrator pool slot stayed free after a lane exit, so the pool re-ran the plan source and added a ready todo. One event per added todo; INFO. Fields: fields.todo, live, target |
-| `LOOP_ORCH_POOL_UNDERFILLED` | the pool had an idle or held transition with fewer than fleet.min_lanes in flight while not stopped; WARN. family_held names family-held todos so they do not read as supply failures. Fields: fields.live, target, min_lanes, ready, cause (family_held, run_cap, supply_empty, admission_refused, bench, operator_stop, host_pressure or system_halt), family_held |
+| `LOOP_ORCH_POOL_UNDERFILLED` | the pool had an idle or held transition with fewer than fleet.min_lanes in flight while not stopped; WARN. family_held names family-held todos so they do not read as supply failures. Fields: fields.live, target, min_lanes, ready, cause (family_held, run_cap, supply_empty, admission_refused, bench, operator_stop, host_pressure, system_halt or disk_floor), family_held |
 | `LOOP_ORCH_SUPPLY` | the supply census (ADR-0139 O6, spec section 4) before a plan counts inbox items in 7 classes plus window and console items. The full record is .evolve/waves/supply.json; INFO. Fields: seven class names, window, console |
 | `LOOP_ORCH_SUPPLY_SHORT` | the supply census found fewer admissible items than the window, so the plan lanes cannot all be filled. Refusal causes sit in the supply record and evolve wave supply; INFO. Fields: seven class names, window |
 | `LOOP_ORCH_WINDOW` | the adaptive orchestrator pool window (ADR-0139 O8) changed size: +1 per clean landing, halved on conflict (min window.min), following sized count. Publishes once per change in enforce pool only; INFO. Fields: fields.old, new, sized, cause |
