@@ -899,4 +899,10 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [plans/cycle-recycle-and-gc-check-2026-11.md](plans/cycle-recycle-and-gc-check-2026-11.md) | Plan for a mandatory recycle step at the end of each cycle. The step writes a thin archive, then releases the cycle resources. It also adds a gc check registry. Each check has a rule, a justification and an action. The facts come from the disk-full event of 2026-11-20. |
 
+## 2026-11-22 — Finish the partly built features, closest to done first
+
+| Document | What it records |
+|---|---|
+| [plans/feature-finish-line-2026-11.md](plans/feature-finish-line-2026-11.md) | Plan: a queue of the 52 plans with open pieces, in the order closest to done first. It holds the five kinds of an open piece, the wave sets, the switch list and the orphan list. The operator decisions of 2026-11-22 put the shadow-contract chain K2 to K5 first and approved the 14 orphans. |
+
 <!-- GENERATED:research-index END -->
