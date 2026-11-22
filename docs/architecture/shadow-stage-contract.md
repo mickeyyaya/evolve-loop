@@ -540,15 +540,18 @@ The operator's order: keep the evidence and the contract intact, and make both v
 ### 10.2 The evidence rules
 
 **E1 Evidence is durable and tamper-evident.**
-- Each shadow decision is an evidence record. Its fields are: stage key, decision, `would_*` fields, inputs digest, cycle, decision version digest and a sequence number.
-- Each record holds the hash of the record before it. The ledger entry of the cycle commits to the hash of the last record and to the count (E2).
+- Each shadow decision is an evidence record. Its fields are: scope, scope id, session, stage key, kind, decision version digest, `would_*` fields, inputs digest, build revision and a sequence number. The kind is `open`, `decision`, `late` or `close`.
+- The chain is one chain for each scope key. A scope key is a pair of a scope kind and an id. A cycle, a pool, a fleet tick and a curator run are scopes. Records of two scopes with the same id never share a chain.
+- Each record holds the hash of the record before it. The first record of a scope has an empty `prev`. The ledger entry of the scope commits to the hash of the last record and to the count (E2).
 - An edit, a deletion or a reorder of any record fails `evolve stage verify`. The verb names the first record that fails, by cycle and sequence number.
 - Tests: `TestEvidenceEditFailsVerify`, `TestEvidenceDeleteFailsVerify`, `TestEvidenceReorderFailsVerify`. Each has a mutation in §5.
 
 **E2 Evidence is complete.**
 - The decider does not write evidence on its own. It goes through the recorder, and the recorder adds one to an in-memory decision counter of the key before it writes the record. The counter does not depend on the write.
-- The cycle seal commits the counter and the count of written records, with the digest. A counter that is higher than the count of records is a gap. A gap marks the evidence of the cycle `incomplete`. No signal file is an input.
-- A write failure of evidence emits a loud signal and marks the evidence of the cycle `incomplete` in the ledger entry. An `incomplete` cycle never counts toward readiness. The scorer lists such cycles by number.
+- A session is one process that writes evidence. A session writes an `open` marker before its first record and a `close` marker at its end. The close marker holds the counter of each key. A cycle has one working file, shared by its sessions under a file lock. The ship child process and a resumed cycle are sessions of the same cycle.
+- The seal copies the working file into the write-once store `ledgerartifacts` and appends one ledger entry. The entry has the role `stage-evidence`, the kind `stage-evidence-seal`, the scope label in `cycle_label`, and the digest of the stored copy in `artifact_path` and `artifact_sha256`. Its `message` holds the version, the count, the last hash, the counters and the cause of an incomplete scope. A second seal of a scope must contain the first as a prefix. The reader uses the last seal.
+- A counter that differs from the count of records of its session is a gap. Three more faults mark the scope `incomplete`: a session without a close marker, a torn last line and a failed write. The causes are `gap`, `open-session`, `torn-tail` and `write-failed`. No signal file is an input.
+- A write failure of evidence emits a loud signal and marks the evidence of the cycle `incomplete` in the ledger entry. An `incomplete` cycle never counts toward readiness. The scorer lists such cycles by number. The reader treats a working file as `incomplete` when no seal pins it or when it differs from its last seal.
 - **The seal point.** The seal is its own unconditional `defer`. It is registered in both `runCycle` and the resume path (`resume_execution.go`) before the `abnormalEpilogue` defer, so it runs after it. It is not inside `abnormalEpilogue` or the resume defer, because their guards skip the normal, parked and deadline exits. The seal reads the exit kind from `retErr` and the context. Every exit passes through it: normal completion, `abnormalEpilogue`, `deadlineStamp`, the parked return and a failed `finalizeCycle`.
 - **The ledger entry of the seal.** The seal appends its own typed entry through `o.ledger.Append`, the port that `cyclerun_record.go` uses. It does not depend on `emitCycleClose`, whose sink is a signal and not the ledger. The seal writes one ledger entry of kind `stage-evidence-seal` on every exit. The test asserts the ledger entry, not a signal.
 - **Why every path.** A failed cycle holds the decisions that matter most: the ladder decides on failing cycles, and an escape or a wrong raise shows only there. A seal at `evolve ship` alone drops these cycles and skews the score toward `ready`.
@@ -602,7 +605,7 @@ Stage `regression_tia.stage`, cycle 2400, two decisions.
 
 ### 10.5 Open questions
 
-- Q1: the home of the evidence record in the chain. It is a ledger entry kind, or a sidecar file with a digest in the ledger entry. The recommendation is D7. The builder must read `go/internal/core/ports.go` and the ledger adapter before it chooses the field names.
+- Q1 is closed by K2: the working file is `.evolve/stage-evidence/<scope>.ndjson`, outside `runs/`. The stored copy is in the write-once store `ledgerartifacts`, and the ledger entry pins it by digest.
 - Q5: which standard library paths belong in the escape hatch list (§7 F2).
 
 ## 11. Limits
@@ -614,6 +617,6 @@ Stage `regression_tia.stage`, cycle 2400, two decisions.
 - `evolve docs ste-lint --strict` reports 0 findings on this revision.
 - The chain proves that evidence did not change after it was written. It does not prove that the decision function was right when it wrote the record. S2 and the scorer tests cover that.
 - A party that can rewrite the whole chain and the head anchor can forge evidence. The hash chain detects an edit by a party that cannot do this. The protected paths (C1) and the ship gate limit who can.
-- The file:line cites of §10 were read at HEAD `64bcd83c4`. The evidence record, the digest and the verbs `evolve stage verify`, `evolve stage status`, `evolve stage flip` and `evolve stage migrate` do not exist yet.
+- The file:line cites of §10 were read at HEAD `64bcd83c4`. The recorder, the seal writer and the ledger reader exist as packages from K2a and K2b. The wiring of the recorder into the cycle, the default reader of `evolve stage report` and the verbs `evolve stage status`, `evolve stage flip` and `evolve stage migrate` do not exist yet.
 - A scorer proves a stage only for the cases that the data holds. A rare failure can stay unseen until the flip. The stop-and-revert path of each enforce branch is the second defense.
 - The description of the Go test cache in §7 F2 comes from the research notes of 2026-11-15 and not from a test run.

@@ -32,18 +32,18 @@ func (f fileChainReader) ReadChain(_ context.Context, key string) (Chain, error)
 		return Chain{}, err
 	}
 	filtered := Chain{preverified: true}
-	cycles := map[int]bool{}
+	scopes := map[ScopeKey]bool{}
 	for _, r := range whole.Records {
 		if r.Key == key {
 			filtered.Records = append(filtered.Records, r)
-			cycles[r.Cycle] = true
+			scopes[r.ScopeKey()] = true
 		}
 	}
 	if len(filtered.Records) == 0 {
 		return Chain{}, ErrEmptyChain
 	}
 	for _, o := range whole.Outcomes {
-		if cycles[o.Cycle] {
+		if scopes[o.ScopeKey()] {
 			filtered.Outcomes = append(filtered.Outcomes, o)
 		}
 	}

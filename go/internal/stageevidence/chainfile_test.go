@@ -33,7 +33,7 @@ func twoKeyChain() stageevidence.Chain {
 			other,
 			decision(3, 3, currentVersion, map[string]string{"would_stop": "true"}),
 		}),
-		Outcomes: []stageevidence.Outcome{{Cycle: 3, Shipped: true}},
+		Outcomes: []stageevidence.Outcome{{ID: 3, Shipped: true}},
 	}
 }
 
@@ -47,7 +47,7 @@ func TestFileChainReadsOneKeyOfAnIntactChain(t *testing.T) {
 	if len(got.Records) != 2 || got.Records[0].Seq != 1 || got.Records[1].Seq != 3 {
 		t.Errorf("records of %s = %+v, want seq 1 and 3", stageKey, got.Records)
 	}
-	if len(got.Outcomes) != 1 || got.Outcomes[0].Cycle != 3 {
+	if len(got.Outcomes) != 1 || got.Outcomes[0].ID != 3 {
 		t.Errorf("outcomes = %+v, want the one outcome of cycle 3", got.Outcomes)
 	}
 }
@@ -82,7 +82,7 @@ func TestFileChainReportsAnUnreadableFileAsNotAChainError(t *testing.T) {
 func TestErrorCodeNamesTheTypedErrors(t *testing.T) {
 	t.Parallel()
 	cases := map[string]error{
-		"broken-chain": &stageevidence.BrokenChainError{Cycle: 2, Seq: 2},
+		"broken-chain": &stageevidence.BrokenChainError{Scope: stageevidence.CycleScope(2), Seq: 2},
 		"empty-chain":  stageevidence.ErrEmptyChain,
 		"":             nil,
 	}

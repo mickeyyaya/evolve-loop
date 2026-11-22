@@ -17,17 +17,17 @@ const (
 
 func linked(records []stageevidence.Record) []stageevidence.Record {
 	out := make([]stageevidence.Record, 0, len(records))
-	prev := ""
+	prev := map[stageevidence.ScopeKey]string{}
 	for _, r := range records {
-		sealed := stageevidence.Link(prev, r)
+		sealed := stageevidence.Link(prev[r.ScopeKey()], r)
 		out = append(out, sealed)
-		prev = sealed.Hash
+		prev[r.ScopeKey()] = sealed.Hash
 	}
 	return out
 }
 
 func decision(cycle, seq int, version string, fields map[string]string) stageevidence.Record {
-	return stageevidence.Record{Key: stageKey, Version: version, Kind: stageevidence.KindDecision, Cycle: cycle, Seq: seq, Fields: fields}
+	return stageevidence.Record{Key: stageKey, Version: version, Kind: stageevidence.KindDecision, ID: cycle, Seq: seq, Fields: fields}
 }
 
 func fixtureChain() stageevidence.Chain {
@@ -40,10 +40,10 @@ func fixtureChain() stageevidence.Chain {
 			decision(4, 5, currentVersion, map[string]string{"would_skip": "true", "check": "lint"}),
 		}),
 		Outcomes: []stageevidence.Outcome{
-			{Cycle: 1, Failed: []string{"lint"}},
-			{Cycle: 2, Shipped: true},
-			{Cycle: 3, Routed: []string{"item-9"}},
-			{Cycle: 4, Shipped: true},
+			{ID: 1, Failed: []string{"lint"}},
+			{ID: 2, Shipped: true},
+			{ID: 3, Routed: []string{"item-9"}},
+			{ID: 4, Shipped: true},
 		},
 	}
 }
@@ -120,7 +120,7 @@ func TestScorerMutationChangesGolden(t *testing.T) {
 }
 
 func singleFault(fields map[string]string, outcome stageevidence.Outcome) stageevidence.Chain {
-	outcome.Cycle = 4
+	outcome.ID = 4
 	return stageevidence.Chain{
 		Records: linked([]stageevidence.Record{
 			decision(1, 1, currentVersion, map[string]string{"would_stop": "false"}),
@@ -172,7 +172,7 @@ func TestEvidenceOfOtherVersionNotCounted(t *testing.T) {
 			decision(4, 4, currentVersion, map[string]string{"would_stop": "false"}),
 			decision(5, 5, currentVersion, map[string]string{"would_stop": "false"}),
 		}),
-		Outcomes: []stageevidence.Outcome{{Cycle: 1, Shipped: true}, {Cycle: 2, Shipped: true}, {Cycle: 3, Shipped: true}},
+		Outcomes: []stageevidence.Outcome{{ID: 1, Shipped: true}, {ID: 2, Shipped: true}, {ID: 3, Shipped: true}},
 	}
 	got := stageevidence.Score(chain, currentVersion, gatecontract.Promotion{MinDecisions: 3}, stageevidence.DefaultScorer())
 	if got.Decisions != 2 {
@@ -200,7 +200,7 @@ func TestIncompleteAndLateEvidenceNeverCount(t *testing.T) {
 			late,
 			decision(4, 4, currentVersion, map[string]string{"would_stop": "false"}),
 		}),
-		Outcomes: []stageevidence.Outcome{{Cycle: 1, Shipped: true, Incomplete: true}, {Cycle: 3, Shipped: true}},
+		Outcomes: []stageevidence.Outcome{{ID: 1, Shipped: true, Incomplete: true}, {ID: 3, Shipped: true}},
 	}
 	got := stageevidence.Score(chain, currentVersion, gatecontract.Promotion{MinDecisions: 1}, stageevidence.DefaultScorer())
 	if got.Decisions != 2 {
@@ -209,7 +209,7 @@ func TestIncompleteAndLateEvidenceNeverCount(t *testing.T) {
 	if !slices.Equal(got.IncompleteCycles, []int{1}) {
 		t.Errorf("incomplete cycles = %v, want [1]", got.IncompleteCycles)
 	}
-	if len(got.Late) != 1 || got.Late[0].Cycle != 3 || got.Late[0].Seq != 3 {
+	if len(got.Late) != 1 || got.Late[0].ID != 3 || got.Late[0].Seq != 3 {
 		t.Errorf("late = %+v, want the one record of cycle 3 seq 3 listed", got.Late)
 	}
 	if got.FalseStops != 0 {
@@ -229,11 +229,11 @@ func TestBrokenChainGivesNotReadyAndTypedError(t *testing.T) {
 			r[1].Fields = map[string]string{"would_stop": "false"}
 			return r
 		}, 2, 2},
-		{"delete", func(r []stageevidence.Record) []stageevidence.Record { return slices.Delete(r, 1, 2) }, 3, 3},
+		{"delete", func(r []stageevidence.Record) []stageevidence.Record { return slices.Delete(r, 3, 4) }, 4, 5},
 		{"reorder", func(r []stageevidence.Record) []stageevidence.Record {
-			r[1], r[2] = r[2], r[1]
+			r[3], r[4] = r[4], r[3]
 			return r
-		}, 3, 3},
+		}, 4, 5},
 	}
 	for _, m := range mutations {
 		chain := fixtureChain()
@@ -244,8 +244,8 @@ func TestBrokenChainGivesNotReadyAndTypedError(t *testing.T) {
 			t.Errorf("%s: VerifyChain = %v, want a typed broken-chain error", m.name, err)
 			continue
 		}
-		if broken.Cycle != m.wantCycle || broken.Seq != m.wantSeq {
-			t.Errorf("%s: names cycle %d seq %d, want cycle %d seq %d", m.name, broken.Cycle, broken.Seq, m.wantCycle, m.wantSeq)
+		if broken.Scope != stageevidence.CycleScope(m.wantCycle) || broken.Seq != m.wantSeq {
+			t.Errorf("%s: names %v seq %d, want cycle %d seq %d", m.name, broken.Scope, broken.Seq, m.wantCycle, m.wantSeq)
 		}
 		res, verifyErr := stageevidence.Verify(context.Background(), memoryChain{chain: chain, err: err}, stageKey, currentVersion, strictPromotion, stageevidence.DefaultScorer())
 		if res.Ready || !errors.Is(verifyErr, stageevidence.ErrBrokenChain) || res.Error != "broken-chain" {

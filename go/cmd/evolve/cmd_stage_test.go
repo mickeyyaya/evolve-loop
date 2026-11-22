@@ -59,12 +59,10 @@ func stageVersion(t *testing.T, root string) string {
 func stageChainFile(t *testing.T, version string, fields ...map[string]string) string {
 	t.Helper()
 	chain := stageevidence.Chain{}
-	prev := ""
 	for i, f := range fields {
-		rec := stageevidence.Link(prev, stageevidence.Record{Key: stageVerbKey, Version: version, Kind: stageevidence.KindDecision, Cycle: i + 1, Seq: i + 1, Fields: f})
+		rec := stageevidence.Link("", stageevidence.Record{Key: stageVerbKey, Version: version, Kind: stageevidence.KindDecision, ID: i + 1, Seq: i + 1, Fields: f})
 		chain.Records = append(chain.Records, rec)
-		chain.Outcomes = append(chain.Outcomes, stageevidence.Outcome{Cycle: i + 1, Shipped: true})
-		prev = rec.Hash
+		chain.Outcomes = append(chain.Outcomes, stageevidence.Outcome{ID: i + 1, Shipped: true})
 	}
 	return writeStageChain(t, chain)
 }

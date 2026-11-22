@@ -1,4 +1,4 @@
-// Package stageevidence verifies shadow-stage evidence hash chains, computes decision version digests, and scores stage readiness.
+// Package stageevidence records and seals shadow-stage evidence hash chains, computes decision version digests, and scores stage readiness.
 package stageevidence
 
 import (
@@ -19,6 +19,8 @@ type Kind string
 const (
 	KindDecision Kind = "decision"
 	KindLate     Kind = "late"
+	KindOpen     Kind = "open"
+	KindClose    Kind = "close"
 )
 
 type Class string
@@ -35,15 +37,17 @@ var (
 	ErrEmptyChain     = errors.New("empty chain")
 	ErrTrailingData   = errors.New("trailing data in policy JSON")
 	ErrMissingPackage = errors.New("missing package in closure")
+	ErrLedgerBroken   = errors.New("ledger broken")
+	ErrCorruptStore   = errors.New("corrupt evidence store")
 )
 
 type BrokenChainError struct {
-	Cycle int
+	Scope ScopeKey
 	Seq   int
 }
 
 func (e *BrokenChainError) Error() string {
-	return fmt.Sprintf("broken chain at cycle %d seq %d", e.Cycle, e.Seq)
+	return fmt.Sprintf("broken chain at %s %d seq %d", e.Scope.Kind, e.Scope.ID, e.Seq)
 }
 
 func (e *BrokenChainError) Unwrap() error {
@@ -60,14 +64,22 @@ func ErrorCode(err error) string {
 	if errors.Is(err, ErrEmptyChain) {
 		return "empty-chain"
 	}
+	if errors.Is(err, ErrLedgerBroken) {
+		return "ledger-broken"
+	}
+	if errors.Is(err, ErrCorruptStore) {
+		return "corrupt-store"
+	}
 	return "error"
 }
 
 type Record struct {
+	Scope   ScopeKind         `json:"scope,omitempty"`
+	ID      int               `json:"id"`
+	Session string            `json:"session,omitempty"`
 	Key     string            `json:"key"`
 	Version string            `json:"version"`
 	Kind    Kind              `json:"kind"`
-	Cycle   int               `json:"cycle"`
 	Seq     int               `json:"seq"`
 	Fields  map[string]string `json:"fields,omitempty"`
 	Prev    string            `json:"prev,omitempty"`
@@ -75,17 +87,23 @@ type Record struct {
 }
 
 type Outcome struct {
-	Cycle      int      `json:"cycle"`
-	Shipped    bool     `json:"shipped,omitempty"`
-	Incomplete bool     `json:"incomplete,omitempty"`
-	Failed     []string `json:"failed,omitempty"`
-	Routed     []string `json:"routed,omitempty"`
+	Scope      ScopeKind `json:"scope,omitempty"`
+	ID         int       `json:"id"`
+	Shipped    bool      `json:"shipped,omitempty"`
+	Incomplete bool      `json:"incomplete,omitempty"`
+	Failed     []string  `json:"failed,omitempty"`
+	Routed     []string  `json:"routed,omitempty"`
 }
 
 type Chain struct {
 	Records     []Record  `json:"records,omitempty"`
 	Outcomes    []Outcome `json:"outcomes,omitempty"`
+	Digest      string    `json:"-"`
 	preverified bool
+}
+
+func PreverifiedChain(records []Record, outcomes []Outcome, digest string) Chain {
+	return Chain{Records: records, Outcomes: outcomes, Digest: digest, preverified: true}
 }
 
 type Case struct {
@@ -146,10 +164,12 @@ func ScorerFor(_ string) Scorer {
 }
 
 type hashedRecord struct {
+	Scope   ScopeKind         `json:"scope,omitempty"`
+	ID      int               `json:"id"`
+	Session string            `json:"session,omitempty"`
 	Key     string            `json:"key"`
 	Version string            `json:"version"`
 	Kind    Kind              `json:"kind"`
-	Cycle   int               `json:"cycle"`
 	Seq     int               `json:"seq"`
 	Fields  map[string]string `json:"fields,omitempty"`
 	Prev    string            `json:"prev,omitempty"`
@@ -157,10 +177,12 @@ type hashedRecord struct {
 
 func computeRecordHash(r Record) string {
 	payload, _ := json.Marshal(hashedRecord{
+		Scope:   r.Scope,
+		ID:      r.ID,
+		Session: r.Session,
 		Key:     r.Key,
 		Version: r.Version,
 		Kind:    r.Kind,
-		Cycle:   r.Cycle,
 		Seq:     r.Seq,
 		Fields:  r.Fields,
 		Prev:    r.Prev,
@@ -179,38 +201,40 @@ func VerifyChain(chain Chain) error {
 	if len(chain.Records) == 0 {
 		return ErrEmptyChain
 	}
-	prev := ""
+	prevByScope := map[ScopeKey]string{}
 	for _, r := range chain.Records {
-		if r.Prev != prev || r.Hash == "" || r.Hash != computeRecordHash(r) {
-			return &BrokenChainError{Cycle: r.Cycle, Seq: r.Seq}
+		scope := r.ScopeKey()
+		if r.Prev != prevByScope[scope] || r.Hash == "" || r.Hash != computeRecordHash(r) {
+			return &BrokenChainError{Scope: scope, Seq: r.Seq}
 		}
-		prev = r.Hash
+		prevByScope[scope] = r.Hash
 	}
 	return nil
 }
 
-func indexOutcomes(list []Outcome) (map[int]Outcome, []int) {
-	byCycle := make(map[int]Outcome, len(list))
+func indexOutcomes(list []Outcome) (map[ScopeKey]Outcome, []int) {
+	byScope := make(map[ScopeKey]Outcome, len(list))
 	var incomplete []int
-	seenIncomplete := map[int]bool{}
+	seenIncomplete := map[ScopeKey]bool{}
 	for _, o := range list {
-		byCycle[o.Cycle] = o
-		if o.Incomplete && !seenIncomplete[o.Cycle] {
-			seenIncomplete[o.Cycle] = true
-			incomplete = append(incomplete, o.Cycle)
+		scope := o.ScopeKey()
+		byScope[scope] = o
+		if o.Incomplete && !seenIncomplete[scope] {
+			seenIncomplete[scope] = true
+			incomplete = append(incomplete, o.ID)
 		}
 	}
 	sort.Ints(incomplete)
-	return byCycle, incomplete
+	return byScope, incomplete
 }
 
 func tallyRecord(res *Result, r Record, out Outcome, scorer Scorer) {
 	res.Decisions++
-	if res.FirstCycle == 0 || r.Cycle < res.FirstCycle {
-		res.FirstCycle = r.Cycle
+	if res.FirstCycle == 0 || r.ID < res.FirstCycle {
+		res.FirstCycle = r.ID
 	}
-	if r.Cycle > res.LastCycle {
-		res.LastCycle = r.Cycle
+	if r.ID > res.LastCycle {
+		res.LastCycle = r.ID
 	}
 	c := scorer.Classify(r, out)
 	switch c {
@@ -223,7 +247,7 @@ func tallyRecord(res *Result, r Record, out Outcome, scorer Scorer) {
 	default:
 		return
 	}
-	res.Cases = append(res.Cases, Case{Class: c, Cycle: r.Cycle, Seq: r.Seq})
+	res.Cases = append(res.Cases, Case{Class: c, Cycle: r.ID, Seq: r.Seq})
 }
 
 func Score(chain Chain, version string, promotion gatecontract.Promotion, scorer Scorer) Result {
@@ -238,7 +262,7 @@ func Score(chain Chain, version string, promotion gatecontract.Promotion, scorer
 	}
 	if len(chain.Records) > 0 {
 		res.Key = chain.Records[0].Key
-		res.ChainDigest = chain.Records[len(chain.Records)-1].Hash
+		res.ChainDigest = chain.chainDigest()
 	}
 	for _, r := range chain.Records {
 		if r.Kind == KindLate {
@@ -252,7 +276,7 @@ func Score(chain Chain, version string, promotion gatecontract.Promotion, scorer
 			res.OtherVersions[r.Version]++
 			continue
 		}
-		out := outcomes[r.Cycle]
+		out := outcomes[r.ScopeKey()]
 		if out.Incomplete || r.Kind != KindDecision {
 			continue
 		}
@@ -289,4 +313,11 @@ func Verify(ctx context.Context, reader ChainReader, key, version string, promot
 	res := Score(chain, version, promotion, scorer)
 	res.Key = key
 	return res, nil
+}
+
+func (c Chain) chainDigest() string {
+	if c.Digest != "" {
+		return c.Digest
+	}
+	return c.Records[len(c.Records)-1].Hash
 }

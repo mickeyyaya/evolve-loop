@@ -899,4 +899,10 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [plans/cycle-recycle-and-gc-check-2026-11.md](plans/cycle-recycle-and-gc-check-2026-11.md) | Plan for a mandatory recycle step at the end of each cycle. The step writes a thin archive, then releases the cycle resources. It also adds a gc check registry. Each check has a rule, a justification and an action. The facts come from the disk-full event of 2026-11-20. |
 
+## 2026-11-22 — Sealed shadow evidence and a protected contract (K2 and K4)
+
+| Document | What it records |
+|---|---|
+| [plans/shadow-contract-k2-k4-2026-11.md](plans/shadow-contract-k2-k4-2026-11.md) | Plan (PR #1674): the design of K2, the evidence seal, and of K4 and K4b, the protected contract and its migration. It compares three axes of candidates, sets decisions D1 to D18 and orders the chain K2, K4, K3, K5. |
+
 <!-- GENERATED:research-index END -->

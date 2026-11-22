@@ -61,6 +61,14 @@ func (s Store) Put(body []byte) (string, error) {
 	return digest, nil
 }
 
+func (s Store) PutAt(body []byte) (digest, path string, err error) {
+	digest, err = s.Put(body)
+	if err != nil {
+		return "", "", err
+	}
+	return digest, s.fannedOut(digest), nil
+}
+
 func (s Store) Get(digest string) ([]byte, error) {
 	path, err := s.Path(digest)
 	if err != nil {
