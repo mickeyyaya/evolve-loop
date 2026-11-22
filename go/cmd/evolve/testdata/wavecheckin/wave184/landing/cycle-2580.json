@@ -1,0 +1,20 @@
+{
+  "cycle": 2580,
+  "run_id": "01M7XNZGDA0RAKE3ECN5P0AHSC",
+  "audit_artifact_sha256": "2ceef9ed9e135421cb3e78531c07c88cd0f0b881f4065bd7bb6dbdfc3262d0c8",
+  "audited_tree": "5ec84ab7a08df2b801c91789aa323f769848578d",
+  "lane_tree": "bd84831fe485baa1cfdcef173ccefa1a5eb12daf",
+  "worktree_base_sha": "e776d6e4a821499d26f2eddebd99353806179656",
+  "commit_sha": "6ad27a20858e8707d3cc578a674bb11a41935621",
+  "commit_tree": "20cefc0696923b1e5d68e62378f64764fdb0822c",
+  "consumed_paths": [
+    ".evolve/inbox/2026-09-09T00-10-00Z-agy-tier-map-single-source.json",
+    ".evolve/inbox/consumed/2026-09-09T00-10-00Z-agy-tier-map-single-source.json"
+  ],
+  "explanation_view_sha256": "2e90163b4d72c4ef2574326a867aa96d30c41059c5e5f70945849a3aaec8e2d2",
+  "pre_main": "e776d6e4a821499d26f2eddebd99353806179656",
+  "branch": "main",
+  "lane_branch": "cycle-cd3ae73e-2580",
+  "status": "complete",
+  "completed_at": "2026-11-21T02:21:20Z"
+}

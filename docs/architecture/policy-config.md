@@ -370,6 +370,26 @@ The block sets how long a continuation binding lives (2026-10-27). `evolve gc` r
 
 Why: on 2026-10-27 the registry held 101 bindings, and 89 of them came from cycles before 1900 (the oldest from cycle 1127). Each kept its worktree out of `evolve worktree cleanup --stale`.
 
+## Wave health check (`wave.checkin`)
+
+`evolve wave checkin` compares the records of the running wave with these numbers. The numbers are in `policy.WaveCheckinConfig`. The loader refuses an unknown key. A key that is 0 or less keeps its default.
+
+| Key | Meaning | Default |
+|---|---|---|
+| `stall_min_age_minutes` | the wave age at which step A2 reads the ship count | 120 |
+| `stall_min_live_lanes` | the live lanes at which step A2 reads the ship count | 4 |
+| `min_ships_per_hour` | step A2 gives BRAKE (SLOW) under this ship rate, after the age and the lanes above | 0.25 |
+| `abnormal_min_events` | step A4 gives BRAKE when one kind of WARN or ERROR event has this many events in the wave… | 15 |
+| `abnormal_min_cycles` | …and this many cycles hold it | 3 |
+| `stall_lines` | step A5 gives BRAKE when this many `LOOP_ORCH_LANE_STALLED` lines fall inside the window below | 3 |
+| `stall_window_minutes` | the window of `stall_lines` | 60 |
+| `load_per_core_limit` | step A8 gives BRAKE when every host sample of the last `load_sustained_minutes` is at or over this load for each core | 3.5 |
+| `load_sustained_minutes` | the length of that window | 15 |
+
+The check reads three more numbers and keeps no copy of them. Step A3 uses the breaker ceilings of `failure_policy.thresholds` (the same rules as the loop breaker). Step A8 uses `gc.disk_floor_gb` for the free disk. Step A5 reads the stall limit from the field `stall_minutes` of each signal.
+
+Why: wave 185 shipped nothing for 5.7 hours, and the console read it as normal ([the plan](../plans/wave-checkin-verb-2026-11.md)). The defaults come from waves 184 and 185. Two waves are a small sample, so tune a number only with more waves.
+
 ## Free disk floor (`gc.disk_floor_gb`, `gc.disk_warn_gb`)
 
 `evolve gc` states the free-disk floor on each run and warns before and after the floor is crossed (2026-11-14). It reads the free space of `os.TempDir()` and of the project root. A signal never replaces the sweep: the sweep runs in each case. The loader decodes both keys strictly.

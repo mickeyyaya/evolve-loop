@@ -21,6 +21,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
+	"github.com/mickeyyaya/evolve-loop/go/internal/wavehealth"
 )
 
 const (
@@ -35,6 +36,7 @@ const (
        evolve wave watch [--json] [--project-root P]
        evolve wave note add TEXT | list [--json] | clear [--project-root P]
        evolve wave stop [--wait D] [--json] [--project-root P]
+       evolve wave checkin [--json] [--project-root P]
 one cycle in the foreground: evolve cycle run --goal-text G; resume a paused cycle: evolve cycle resume; stop at the next wave boundary: evolve wave stop --wait 10m`
 )
 
@@ -59,6 +61,7 @@ type waveEnv struct {
 	refreshBinary func(loopConfig, io.Writer) bootBinaryRefreshResult
 	openEvents    func(evolveDir string) (eventSource, error)
 	diskFree      func(path string) (uint64, error)
+	mainCI        func(root string) wavehealth.CIState
 	seatDeps      *bridgeSessionsDeps
 }
 
@@ -77,13 +80,13 @@ func defaultWaveEnv() waveEnv {
 		resolveRoot: loopStopRoot, executable: os.Executable, pidStarted: processStartTime,
 		dispatch: dispatchWaveVerb(sysexec.DefaultRunner), now: time.Now, sleep: time.Sleep,
 		pidAlive: runlease.PIDAlive, saveRecord: wave.Store.Save, mainHead: gitMainHead, mergedPRs: gitMergedPRs, openPRs: ghOpenPRCount, loadGraph: loadModuleGraph,
-		refreshBinary: bootBinaryRefresh, openEvents: openWaveEvents, diskFree: looppreflight.DiskFreeBytes,
+		refreshBinary: bootBinaryRefresh, openEvents: openWaveEvents, diskFree: looppreflight.DiskFreeBytes, mainCI: mainCIFrom(statusMainCI),
 	}
 }
 
 func runWaveWith(env waveEnv, args []string, stdout, stderr io.Writer) int {
 	handlers := map[string]func(waveEnv, []string, io.Writer, io.Writer) int{
-		"next": runWaveNext, "status": runWaveStatus, "supply": runWaveSupply, "latency": runWaveLatency, "watch": runWaveWatch, "note": runWaveNote, "stop": runWaveStop,
+		"next": runWaveNext, "status": runWaveStatus, "supply": runWaveSupply, "latency": runWaveLatency, "watch": runWaveWatch, "note": runWaveNote, "stop": runWaveStop, "checkin": runWaveCheckin,
 	}
 	if len(args) == 0 {
 		return waveUsageError(stderr, errors.New("a sub-verb is required"))

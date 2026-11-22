@@ -80,13 +80,13 @@ func TestStageVerb_CoveragePaths(t *testing.T) {
 		Key:     entry.Shadow.PolicyKey,
 		Version: realVer,
 		Kind:    stageevidence.KindDecision,
-		Cycle:   1,
+		ID:      1,
 		Seq:     1,
 		Fields:  map[string]string{"would_stop": "false"},
 	})
 	rawChain, err := json.Marshal(stageevidence.Chain{
 		Records:  []stageevidence.Record{rec},
-		Outcomes: []stageevidence.Outcome{{Cycle: 1, Shipped: true}},
+		Outcomes: []stageevidence.Outcome{{ID: 1, Shipped: true}},
 	})
 	if err != nil {
 		t.Fatal(err)

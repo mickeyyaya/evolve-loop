@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "A test fails if an emit site fills Outcome.Routed or the held-proposal item while no scorer test reaches the conflict class.",
+    "The test passes on the current tree and names the F-item that will add the source."
+  ],
+  "created_at": "2026-11-22T09:58:43Z",
+  "files": [
+    "go/internal/stageevidence/score.go",
+    "go/internal/stageevidence/score_test.go"
+  ],
+  "fix": "Add a guard test in the stageevidence scorer package: when any emitter fills Outcome.Routed or the held-proposal item, the conflict class must have a reachable path and a test case that scores it. Until then the test pins that Routed is empty at every emit site, so the first change that fills it turns the test red and must enable the class.",
+  "id": "stage-evidence-scorer-conflict-class-guard",
+  "kind": "test",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "The K2c-K2e change (PR #1682, design PR #1674 K2c item 3) leaves Outcome.Routed empty and the held-proposal record without an item, so the scorer's conflict class cannot fire today. The design accepts this until the F-items add a routed source, and the code reviewer accepted it; the architecture review of #1682 rated it CRITICAL. Nothing would tell a later change that adds the source but forgets to enable the class.",
+  "title": "A test fails when stage evidence gains a routed-item source but the scorer's conflict class stays unreachable",
+  "weight": 0.6
+}

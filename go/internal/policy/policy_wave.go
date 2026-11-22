@@ -8,11 +8,12 @@ const (
 )
 
 type WavePolicy struct {
-	MaxCycles      int      `json:"max_cycles,omitempty"`
-	HistoryK       int      `json:"history_k,omitempty"`
-	StandingGoal   string   `json:"standing_goal,omitempty"`
-	HealthDrivers  []string `json:"health_drivers,omitempty"`
-	FactsMaxCycles int      `json:"facts_max_cycles,omitempty"`
+	MaxCycles      int                `json:"max_cycles,omitempty"`
+	HistoryK       int                `json:"history_k,omitempty"`
+	StandingGoal   string             `json:"standing_goal,omitempty"`
+	HealthDrivers  []string           `json:"health_drivers,omitempty"`
+	FactsMaxCycles int                `json:"facts_max_cycles,omitempty"`
+	Checkin        *WaveCheckinPolicy `json:"checkin,omitempty"`
 }
 
 type WaveConfig struct {

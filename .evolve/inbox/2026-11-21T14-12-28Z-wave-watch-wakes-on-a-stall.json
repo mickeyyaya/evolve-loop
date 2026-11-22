@@ -5,7 +5,16 @@
     "The wake signal names the trigger, the lanes and the evidence paths.",
     "wave-operations.md names the zero-ship first look."
   ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2599",
+    "branch": "cycle-cd3ae73e-2599",
+    "snapshot_sha": "6ebc16a2508d34f7e24aa6e671f2bb1578566f82",
+    "base_sha": "74a0684210e1ee413c4a852820c06b8f87581270",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2599/audit-fail-reason.json",
+    "cycle": 2599
+  },
   "created_at": "2026-11-21T14:12:28Z",
+  "failure_count": 1,
   "files": [
     "go/cmd/evolve/cmd_wave_watch_events.go",
     "go/internal/orchestrator/orchestrator.go",
@@ -15,8 +24,15 @@
   "fix": "Design review first. Add a stall trigger to evolve wave watch: it emits one signal when the wave is older than a bound with live lanes and no ship, or when one abnormal event kind passes a rate in a window across lanes. The signal is a lossless channel event that the console listener takes like ORCHESTRATOR_BLOCKER_ROUTED. Bounds live in policy. Start with stage shadow. Add the zero-ship first look to docs/operations/wave-operations.md: read lane stall signals and abnormal events before you wait.",
   "id": "wave-watch-wakes-on-a-stall",
   "kind": "feature",
+  "last_failure_class": "capability",
+  "last_failure_cycle": 2599,
+  "last_failure_findings": "review gate: phase \"build\" deliverable rejected after 1 correction(s): build handoff floor: 1 deterministic check failure(s) — fix these exactly before handoff:\n  test-audit ratchet: testaudit: acs/cycle2599 TestC2599_009_TheAbnormalEventLogParsesByKindAndTime error-text-match has no baseline row — remove the weak pattern (for error text: a sentinel error and errors.Is); Rebaseline refuses new rows",
+  "last_failure_fingerprint": "text:6ac0986bdeac",
+  "last_failure_reason": "cycle-failure-release",
+  "last_failure_rung": "R2",
   "origin": "console",
   "priority_class": "stability",
+  "retry_plan": "fresh-deep-plan",
   "summary": "Wave 185 ran 5.7 hours with 8 live lanes and 0 of 9 cycles shipped. The console watches woke only on failure codes. LOOP_ORCH_LANE_STALLED fired 9 times and abnormal events verify-single-flight-unavailable fired 75 times, and nothing woke on them. The console read zero ships at about 10:00Z and waited until 13:50Z.",
   "title": "The wave watch and the console wake on a stall: no ship against wave age, and a repeated abnormal event kind",
   "weight": 0.8

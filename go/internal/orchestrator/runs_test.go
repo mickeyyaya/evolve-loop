@@ -352,3 +352,40 @@ func TestRunsLocator_ASealAndTheOversightMayLocateAtOnce(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestCycleFreshest_IsBoundedByUntilAndUnboundedWhenZero(t *testing.T) {
+	runs := t.TempDir()
+	dir := writeCycle(t, runs, 70, []string{"A"}, epoch, epoch.Add(10*time.Minute))
+	touch(t, filepath.Join(dir, "build-stdout.log"), epoch.Add(30*time.Minute))
+	cases := []struct {
+		name  string
+		until time.Time
+		want  time.Time
+	}{
+		{"zero is no bound", time.Time{}, epoch.Add(30 * time.Minute)},
+		{"a bound after the file keeps it", epoch.Add(31 * time.Minute), epoch.Add(30 * time.Minute)},
+		{"a bound equal to the file time keeps it", epoch.Add(30 * time.Minute), epoch.Add(30 * time.Minute)},
+		{"a bound before the file takes the latest signal", epoch.Add(20 * time.Minute), epoch.Add(10 * time.Minute)},
+		{"a bound before the last signal takes the earlier one", epoch.Add(5 * time.Minute), epoch},
+		{"a bound before every signal gives no time", epoch.Add(-time.Minute), time.Time{}},
+	}
+	for _, tc := range cases {
+		if got := CycleFreshest(dir, tc.until); !got.Equal(tc.want) {
+			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
+		}
+	}
+	if got := freshest(dir); !got.Equal(epoch.Add(30 * time.Minute)) {
+		t.Errorf("freshest = %v, want the unbounded value", got)
+	}
+}
+
+func TestIsLaneLifecycle_OnlyTheLaneOwnTransitionsAreActivity(t *testing.T) {
+	for code, want := range map[signalcenter.Code]bool{
+		CodeLaneLaunched: true, CodeLaneExited: true, CodeLaneBackfilled: true, CodeLaneLateExit: true,
+		CodeLaneStalled: false, CodeLaneDeadline: false, CodeLaneRecoveryFailed: false, CodeOversightAction: false, CodePoolIdle: false,
+	} {
+		if got := IsLaneLifecycle(code); got != want {
+			t.Errorf("IsLaneLifecycle(%s) = %v, want %v", code, got, want)
+		}
+	}
+}

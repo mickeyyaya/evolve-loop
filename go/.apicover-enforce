@@ -78,6 +78,7 @@
 ./internal/sessionrecord
 ./internal/setup
 ./internal/shipwindow
+./internal/shipwindowtest
 ./internal/sysexec
 ./internal/systemprompt
 ./internal/textutil
@@ -895,3 +896,4 @@
 ./internal/cli/landcmd
 ./internal/hostpressure
 ./internal/logread
+./internal/wavehealth

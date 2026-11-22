@@ -116,12 +116,10 @@ func currentVersion(t *testing.T, root string) string {
 func writeChain(t *testing.T, version string, fieldsPerCycle ...map[string]string) (string, stageevidence.Chain) {
 	t.Helper()
 	chain := stageevidence.Chain{}
-	prev := ""
 	for i, fields := range fieldsPerCycle {
-		rec := stageevidence.Link(prev, stageevidence.Record{Key: stageKey, Version: version, Kind: stageevidence.KindDecision, Cycle: i + 1, Seq: i + 1, Fields: fields})
+		rec := stageevidence.Link("", stageevidence.Record{Key: stageKey, Version: version, Kind: stageevidence.KindDecision, ID: i + 1, Seq: i + 1, Fields: fields})
 		chain.Records = append(chain.Records, rec)
-		chain.Outcomes = append(chain.Outcomes, stageevidence.Outcome{Cycle: i + 1, Shipped: true})
-		prev = rec.Hash
+		chain.Outcomes = append(chain.Outcomes, stageevidence.Outcome{ID: i + 1, Shipped: true})
 	}
 	return saveChain(t, chain), chain
 }
@@ -173,7 +171,13 @@ func TestC2554_002_AVerdictIsRecomputedFromAChainFileThroughTheRealVerb(t *testi
 func TestC2554_003_ABrokenChainIsNotReadyWithATypedErrorAndNoPartialVerdict(t *testing.T) {
 	root := projectRoot(t, stagePolicy)
 	version := currentVersion(t, root)
-	_, chain := writeChain(t, version, map[string]string{"would_stop": "false"}, map[string]string{"would_stop": "false"}, map[string]string{"would_stop": "false"})
+	chain := stageevidence.Chain{Outcomes: []stageevidence.Outcome{{ID: 1, Shipped: true}}}
+	prev := ""
+	for seq := 1; seq <= 3; seq++ {
+		rec := stageevidence.Link(prev, stageevidence.Record{Key: stageKey, Version: version, Kind: stageevidence.KindDecision, ID: 1, Seq: seq, Fields: map[string]string{"would_stop": "false"}})
+		chain.Records = append(chain.Records, rec)
+		prev = rec.Hash
+	}
 	editedMiddle := slices.Clone(chain.Records)
 	editedMiddle[1].Fields = map[string]string{"would_stop": "true"}
 	deletedMiddle := slices.Delete(slices.Clone(chain.Records), 1, 2)

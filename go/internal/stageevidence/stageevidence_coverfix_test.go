@@ -30,8 +30,8 @@ func TestStageEvidence_ErrorAndFallbackBranches(t *testing.T) {
 		t.Fatal("FileChain on malformed JSON returned nil")
 	}
 
-	r1 := Link("", Record{Key: "k", Version: "v1", Kind: KindDecision, Cycle: 1, Seq: 1, Fields: map[string]string{"would_stop": "false"}})
-	chain := Chain{Records: []Record{r1}, Outcomes: []Outcome{{Cycle: 1, Shipped: true}}}
+	r1 := Link("", Record{Key: "k", Version: "v1", Kind: KindDecision, ID: 1, Seq: 1, Fields: map[string]string{"would_stop": "false"}})
+	chain := Chain{Records: []Record{r1}, Outcomes: []Outcome{{ID: 1, Shipped: true}}}
 	scored := Score(chain, "v1", gatecontract.Promotion{MinDecisions: 1}, nil)
 	if !scored.Ready || scored.Scorer != "default" {
 		t.Fatalf("Score with nil scorer = %+v", scored)
@@ -41,7 +41,7 @@ func TestStageEvidence_ErrorAndFallbackBranches(t *testing.T) {
 		t.Fatalf("Verify with nil reader = (%+v, %v)", res, err)
 	}
 
-	tampered := Chain{Records: []Record{{Key: "k", Version: "v1", Kind: KindDecision, Cycle: 2, Seq: 2, Hash: "bad"}}}
+	tampered := Chain{Records: []Record{{Key: "k", Version: "v1", Kind: KindDecision, ID: 2, Seq: 2, Hash: "bad"}}}
 	if res, err := Verify(context.Background(), unverifiedReader{chain: tampered}, "k", "v1", gatecontract.Promotion{}, nil); !errors.Is(err, ErrBrokenChain) || res.Error != "broken-chain" {
 		t.Fatalf("Verify with unverified tampered chain = (%+v, %v)", res, err)
 	}
