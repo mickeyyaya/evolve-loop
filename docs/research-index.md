@@ -905,6 +905,12 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [plans/wave-checkin-verb-2026-11.md](plans/wave-checkin-verb-2026-11.md) | Plan for `evolve wave checkin`. A pure evaluator reads a snapshot of the wave records and gives CONTINUE, BRAKE or FIX-LOCAL. The plan scores three designs and closes the gaps A3, A4 and the ship rate of the check-in SOP. It shows that three SOP thresholds give BRAKE on the healthy wave 184. |
 
+## 2026-11-22 — Finish the partly built features, closest to done first
+
+| Document | What it records |
+|---|---|
+| [plans/feature-finish-line-2026-11.md](plans/feature-finish-line-2026-11.md) | Plan: a queue of the 52 plans with open pieces, in the order closest to done first. It holds the five kinds of an open piece, the wave sets, the switch list and the orphan list. The operator decisions of 2026-11-22 put the shadow-contract chain K2 to K5 first and approved the 14 orphans. |
+
 ## 2026-11-22 — Sealed shadow evidence and a protected contract (K2 and K4)
 
 | Document | What it records |
