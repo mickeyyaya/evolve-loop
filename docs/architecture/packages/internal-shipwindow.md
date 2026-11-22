@@ -30,6 +30,8 @@ The slow ship checks run before the lease: the repo-contract scanner pack, the e
 | D2 (changed by D4) | `DefaultTTL` stays 15 minutes. It is now the limit for a holder that stops beating, not the limit for a section. | D1: a recovery holds the lease over the composed-tree gates (compile, test, acs and apicover), which take minutes. | 5 minutes: a waiter breaks a healthy recovery during its gates, and two lanes then overlap in the window. |
 | D3 | A waiter has no wait limit of its own. Only the context of the ship ends the wait. A waiter that breaks a live holder at the TTL reports it (`OnStaleBreak`), and the callers emit `SHIP_WINDOW_LEASE_BROKEN` or `ORCHESTRATOR_SHIP_WINDOW_LEASE_BROKEN`. | F1, the stale break | A wait limit equal to the TTL: a lane behind three healthy holders can wait longer than one TTL. It then ships unleased. |
 
+| D4 | The ship that fails with a moved main fast-forwards the local main of the plane to origin before it ends its lease. It does so only while it holds the lease. | A mid-wave integration batch moves origin only. The loop syncs the local main at the wave boundary. Each lane then rebases onto a stale main, and the push fails again (cycle 2565). | A fast-forward in the batch fixes one writer, and writes the main tree outside a boundary. A reroute of the push rejection alone leaves the rebind on the stale main. |
+
 *Consequence:* a sibling can now land between the audit binding and the ship of a lane. The ship then takes the identity carry, and a carry that does not prove goes back to audit. Operator choice (a) of 2026-10-19 accepts this cost. A carry that is not provable is the condition that changes this decision.
 
 ### Heartbeat while held (2026-11-21)
