@@ -11,6 +11,7 @@ This page tells the console (an operator or an LLM) how to run each wave through
 
 ## 2. During a wave
 
+- At each check-in, follow [console-checkin-sop.md](console-checkin-sop.md) Part A step by step.
 - To queue a fact for the next goal, run `evolve wave note add "<text>"`. Use one note for each fact. Write it in ASD-STE100. `evolve wave note list --json` shows the queue.
 - To see the state, run `evolve wave status --json`. It reads cycle state, signals and landing intents. It does not change anything.
   - The text output has one measures line, for example `measures: width 2/3 · utilization 0.71 · conflicts 0/2`. It gives the realized width over the sized width and the utilization. Then it gives the landed lanes with a rebase or a re-audit over all landed lanes.
@@ -197,6 +198,8 @@ early boundary: #1012 waited 1h35m0s (bound 1h0m0s); pool 2/4 lanes: run evolve 
 ## The console PR train
 
 The design is in [§10 of the integration plan](../plans/wave-integration-2026-10.md#10-amendment-of-2026-11-04-console-prs-enter-the-train).
+
+To land a console change, follow [console-checkin-sop.md](console-checkin-sop.md) Part B step by step.
 
 The console opens many PRs by hand. Each PR waits for a merge. The train puts the ready PRs into one batch and lands the batch with the engine of this plan.
 
