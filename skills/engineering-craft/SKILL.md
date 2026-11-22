@@ -45,6 +45,7 @@ description: Use when writing or changing any production code or tests — new f
 - Any comment in new code that is not machine-read (directive, marker, generated header): a name, a type, an extraction or a test says it instead ([code-comments](../../docs/conventions/code-comments.md)).
 - Two blocks that differ by a variable name (extract, or if <3 occurrences, deliberately leave and note — rule-of-three).
 - An exported symbol nothing outside the package calls.
+- A test that matches a pattern the test-audit ratchet refuses (`err.Error()` text, `time.Sleep`, a source-text pin and the rest). Read [Tests the test-audit ratchet refuses](references/tdd-craft.md#tests-the-test-audit-ratchet-refuses) and use the accepted form. Rebaseline refuses new rows: a refused pattern is never baselined.
 
 ## References (progressive disclosure — load what the task needs)
 
