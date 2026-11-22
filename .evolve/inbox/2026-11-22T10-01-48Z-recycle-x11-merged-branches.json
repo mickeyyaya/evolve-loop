@@ -1,0 +1,36 @@
+{
+  "acceptance": [
+    "Red first: a fixture hub with a merged, a closed, an open, a checked-out, an unowned, a cycle-* and an empty new branch: `evolve gc check --only branches` plans a delete for the merged branch and the closed branch past grace with the same tip, and keeps every other branch",
+    "Red first: a closed PR whose branch moved past its headRefOid is kept; a branch whose tip moves after the plan stays after `evolve gc`",
+    "Red first: with origin/HEAD naming a branch other than main, that branch stays",
+    "Red first: a PR lookup that returns exactly its limit falls back to one lookup per candidate branch",
+    "Red first: the printed restore command rebuilds a deleted local and a deleted remote branch from the record; B3 leaves refs/archive/branches/<stamp>/<branch>",
+    "Red first: shadow stage prints WOULD-DELETE and deletes nothing; a failed remote delete is a WARN and the gc exit code stays",
+    "A cycle-* branch is never planned by this check",
+    "New code at 100% measured coverage of the changed functions; one end-to-end test through the real verb",
+    "Red first: a closed-PR branch younger than 3 days is kept and one older than 3 days with the same tip is planned for delete"
+  ],
+  "created_at": "2026-11-22T10:01:48Z",
+  "deps": [
+    "recycle-x1a-check-registry-worktrees"
+  ],
+  "files": [
+    "go/internal/gc/remotesweep.go",
+    "go/internal/gc/remotegh.go",
+    "go/internal/gc/branchsweep.go",
+    "go/internal/gc/check.go",
+    "go/internal/gcpolicy/gcpolicy.go",
+    "go/cmd/evolve/cmd_gc_check.go",
+    "go/cmd/evolve/cmd_gc_remote.go",
+    "go/cmd/evolve/cmd_gc.go",
+    "docs/architecture/packages/internal-gc.md"
+  ],
+  "fix": "Make the branches sweep one registry check `branches` (decision D18): it replaces otherBranchItems (branchsweep.go:25-50) and extends PlanRemoteSweep/ApplyRemoteSweep; `evolve gc check --only branches` prints the allow-list (side, branch, tip, pr, class, evidence). Owned prefixes come from gc.branches.owned_prefixes (console/, policy/, docs/, inbox/, integration/, fix/, chore/; NOT cycle-, which K2 owns, D17); the default branch is read from refs/remotes/origin/HEAD. Classes: B1 merged PR at this tip; B2 tip in origin/main with own work (hasOwnWork); B3 closed unmerged PR whose headRefOid equals the tip, no open PR, closedAt older than gc.branches.closed_grace_days (start value 3 days) (add closedAt to the PR lookup). Keep default, open-PR, checked-out, sealHold-held, ruleset-protected, unowned and moved-tip branches. Open PRs come from a separate --state open call; a lookup that returns exactly its limit falls back to `gh pr list --head <branch> --state all` per candidate. The apply plans again and deletes only an item with the same tip, after the record of D21: B1/B2 one tsv row in <salvage home>/branch-gc/<stamp>.tsv (side, branch, tip, pr, class) plus a thin bundle when commits are ahead of origin/main; B3 the ref refs/archive/branches/<stamp>/<branch>. K5 gets a retention row for that ref namespace and the tsv dir. Remote delete uses GhRemoteAPI.DeleteBranch at gc.remote_sweep.stage (shadow first); a failed remote delete is a WARN and keeps the gc exit code. The 13 gc-flag-unmerged cycle branches are decided by K2 (D23), not by X11. `evolve gc check --only <check>` takes the names from DefaultChecks(); `evolve gc --only` keeps its sweep scopes. B2 own-work proof for a branch: the oldest entry of `git reflog show --format=%H refs/heads/<b>` differs from the tip; B2 does not apply to a remote-only branch. B3 refs and B1/B2 bundles live under branch-gc/<stamp>/ so K5 can age them by the stamp.",
+  "id": "recycle-x11-merged-branches",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Plan docs/plans/cycle-recycle-and-gc-check-2026-11.md section 13, decisions D17 to D23, component X11. On 2026-11-22 the hub has 130 local branches outside origin/main and 24 inside, and 13 gc-flag-unmerged-cycle-* items stay open. The remote sweep never deletes: gc.remote_sweep.stage is absent so RemoteStage is shadow (gcpolicy.go:171-176), it keeps a CLOSED pull request, it hard-codes main and master (branchsweep.go:23), and its pull request lookup returned exactly its 1000 limit (636 MERGED, 326 CLOSED, 38 OPEN). No verb prints the allow-list.",
+  "title": "gc deletes landed and closed branches of the pipeline and the console from an allow-list that a verb prints",
+  "weight": 0.8
+}

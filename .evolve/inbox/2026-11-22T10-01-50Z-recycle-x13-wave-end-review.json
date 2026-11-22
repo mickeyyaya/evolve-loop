@@ -1,0 +1,41 @@
+{
+  "acceptance": [
+    "Red first: a fixture cache with 44 GB allocated and 20.9 GB counted fails the cache row through the real `evolve gc review`; a fixture of many files under 4 KiB passes it",
+    "Red first: free disk under gc.disk_warn_gb fails the disk row; no FAIL row has action none",
+    "Red first: a FAIL row runs its apply once more and the record holds both readings",
+    "Red first: the run writes wave-<N>.json and one GC_REVIEW_* signal; the boundary chain runs the step once, after gc and before the launch",
+    "Red first: a FAIL verdict and an unreadable disk both reach the launch step with rc 0",
+    "Red first: a shadow-stage check with planned items gets SHADOW and does not fail the wave; a check without retry: true gets console-route; the wave number at boundary time is the wave that ends",
+    "Red first: a registered check with no review row fails the guard test",
+    "New code at 100% measured coverage of the changed functions; one end-to-end test through the real verb"
+  ],
+  "created_at": "2026-11-22T10:01:50Z",
+  "deps": [
+    "recycle-x1a-check-registry-worktrees",
+    "recycle-x1b-check-registry-run-dirs",
+    "recycle-x1c-check-registry-cache",
+    "recycle-x1d-check-registry-temp",
+    "recycle-x1e-check-registry-processes",
+    "recycle-x2-gocache-counts-executable-dirs",
+    "recycle-x11-merged-branches",
+    "recycle-x12-console-dev-worktrees"
+  ],
+  "files": [
+    "go/internal/gc/check.go",
+    "go/internal/gc/review.go",
+    "go/internal/gc/gocache.go",
+    "go/internal/gcpolicy/gcpolicy.go",
+    "go/cmd/evolve/cmd_gc_review.go",
+    "go/cmd/evolve/cmd_gc_disk.go",
+    "go/cmd/evolve/cmd_boundary.go",
+    "docs/operations/wave-operations.md"
+  ],
+  "fix": "Add `evolve gc review [--wave N] [--json]`: scan each registered check with no apply; per check print reading, threshold of the check itself (its cap, TTL or disk level; gc.review.checks.<check> holds only the action, retry permission and tolerance), PASS, FAIL or SHADOW (a shadow-stage check reports its planned count and never fails the wave) and one action (none for PASS and SHADOW; retry-apply, file-item or console-route for FAIL). retry-apply is allowed only for a check with retry: true (cache, temp, processes) and runs the same stage-aware apply as `evolve gc` once more, reads the row again and records both readings (D28). Rows: the disk (free bytes of the .evolve volume and the temp dir, through a classifier extracted from diskSignal) and the cache size through one sizer allocatedBytes (st_blocks, hard link once, <hash>-d dirs included) that the trim counter also calls, with a second row comparing the sum over the entries the trim walks with allocatedBytes of the cache root, within gc.review.cache_counter_tolerance_pct. Record .evolve/gc-reviews/wave-<N>.json and append GC_REVIEW_PASS or GC_REVIEW_FAIL. Boundary step after gc and before the launch, advisory: true, exit 0 on any verdict and read error; wave number from the wave history (cmd_wave_compose.go:105), --wave overrides. A FAIL files at most one inbox item per check and wave. A registry guard test fails a check with no review row. `evolve wave checkin` and the console check-in SOP read the record. X13 writes the review rows of every check registered when it builds (X1a to X1e, the cache check, X11 and X12).",
+  "id": "recycle-x13-wave-end-review",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Plan docs/plans/cycle-recycle-and-gc-check-2026-11.md section 13, decisions D27 to D30, component X13. In wave 186 free disk fell to 5 GiB (operator) and the disk guard paused cycle starts 20 times (grep -c HOST_DISK_LOW .evolve/signals.ndjson = 20). The Go build cache was 44 GB by du while evolve gc --only cache counted 20.9 GB against a 20 GB cap (operator). Today `evolve gc check` prints items with no reading, threshold or verdict, and `evolve wave checkin` does not exist (item wave-checkin-verb-runs-the-static-sop).",
+  "title": "evolve gc review scans every check again at wave end and prints one recorded static verdict",
+  "weight": 0.8
+}

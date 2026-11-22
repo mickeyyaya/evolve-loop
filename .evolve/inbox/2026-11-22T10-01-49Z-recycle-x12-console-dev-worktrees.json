@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "Red first: a clean tree with a merged branch and a clean tree with a closed unmerged branch are removed through `evolve gc`, and each branch stays",
+    "Red first: a dirty tree is kept and the report lists its changed paths",
+    "Red first: a tree that matches gc.dev_worktrees.protected stays and the reason names the glob; no code list holds code-index",
+    "Red first: a tree with a process inside or an open pull request stays",
+    "The dry run on the 2026-11-22 fixture shape (98 trees, 35 clean landed) lists the keep reason of each tree",
+    "New code at 100% measured coverage of the changed functions; one end-to-end test through the real verb"
+  ],
+  "created_at": "2026-11-22T10:01:49Z",
+  "deps": [
+    "recycle-x1a-check-registry-worktrees"
+  ],
+  "files": [
+    "go/internal/gc/devworktrees.go",
+    "go/internal/gc/devlanded.go",
+    "go/internal/gcpolicy/gcpolicy.go",
+    "go/cmd/evolve/cmd_gc_devwt.go",
+    "docs/architecture/packages/internal-gc.md"
+  ],
+  "fix": "In the dev sweep add the closed state to landedEarly: a clean tree with no process inside and a branch that is merged, closed or in origin/main is removed after the existing checkpoint save, and the branch stays. Report a dirty tree with its changed paths and never remove it in this rule. Add gc.dev_worktrees.protected, a list of globs relative to the dev dir (start value code-index), kept with the reason 'protected by policy: <glob>'. Build step 1 prints the keep reason of each tree of the live hub in dry run, to find which gate kept the 35.",
+  "id": "recycle-x12-console-dev-worktrees",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "Plan docs/plans/cycle-recycle-and-gc-check-2026-11.md section 13, decisions D24 to D26, component X12. The console dev dirs held 22 GB in 119 directories on 2026-11-22 (operator). The sweep only listed them: '0 of 98 idle past the archive limit'. The console removed 35 clean trees with a merged or closed pull request by hand (6 GB); 39 dirty trees hold uncommitted source. The dev sweep removes a tree only when idle 14 days or landed early (devlanded.go:14-36); a CLOSED pull request is not a case, a dirty tree has no path list, and only the project root and plane worktrees are protected, by code (devworktrees.go:219-227).",
+  "title": "gc removes a clean landed or closed console dev worktree, reports a dirty one with its paths, and protects named trees by policy data",
+  "weight": 0.8
+}

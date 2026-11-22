@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Red first: with only the new key set, diskSignal, the preflight check and the percent guard all read the same floor, through the real `evolve gc` and `evolve loop` entry points",
+    "Red first: an old key still works for one release and prints a WARN naming the new key",
+    "Red first: setting two different values for the old and new keys is refused with an error that names both",
+    "A guard test fails when a second reader of a disk floor appears outside the resolver"
+  ],
+  "created_at": "2026-11-22T10:01:50Z",
+  "deps": [],
+  "files": [
+    "go/internal/gcpolicy/gcpolicy.go",
+    "go/internal/policy/preflight_config.go",
+    "go/internal/looppreflight/diskspace.go",
+    "go/internal/looppreflight/disk_percent.go",
+    "go/cmd/evolve/cmd_gc_disk.go",
+    "docs/operations/runtime-reference.md"
+  ],
+  "fix": "Choose one policy key block for the disk floor (a warn level, a launch floor and a percent floor) with one resolver in a leaf package. gcpolicy, looppreflight and the review verb of X13 call that resolver. Keep the old keys as read-only aliases for one release with a WARN, then remove them. Update the policy docs.",
+  "id": "disk-floor-one-home",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "summary": "Operator decision 2026-11-22 (plan section 13, D35). Three places hold a free-disk floor: gc.disk_floor_gb and gc.disk_warn_gb (go/internal/gcpolicy/gcpolicy.go:18-19, defaults 10 and 20 GB, read by diskSignal in go/cmd/evolve/cmd_gc_disk.go:23), preflight.min_free_gib (go/internal/policy/preflight_config.go:16, default 1 GiB, read at go/internal/looppreflight/diskspace.go:19), and the 5% guard (go/internal/looppreflight/disk_percent.go:10). Wave 186 paused cycle starts 20 times (HOST_DISK_LOW) while another floor showed no warning. The floors differ in units and levels. This item is not part of the gc flow build.",
+  "title": "One policy home for the disk floor",
+  "weight": 0.5
+}
