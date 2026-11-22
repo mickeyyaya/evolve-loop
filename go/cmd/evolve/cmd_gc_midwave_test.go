@@ -321,3 +321,32 @@ func appendOnce(list []string, name string) []string {
 	}
 	return append(list, name)
 }
+
+func TestFailureText_KeepsTheTailAndNamesAStoppedRun(t *testing.T) {
+	t.Parallel()
+	long := strings.Repeat("a", midWaveErrorTail) + "TAIL-MARKER"
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	cases := []struct {
+		name    string
+		ctx     context.Context
+		stderr  string
+		want    string
+		notWant string
+	}{
+		{"short text passes through trimmed", context.Background(), "  read-only cache\n", "the cache scope failed: read-only cache", "stopped"},
+		{"long text keeps only the tail", context.Background(), long, "TAIL-MARKER", strings.Repeat("a", midWaveErrorTail)},
+		{"a stopped run names the context error", cancelled, "partial", "the run stopped (context canceled): partial", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := failureText(c.ctx, bytes.NewBufferString(c.stderr))
+			if !strings.Contains(got, c.want) {
+				t.Fatalf("failureText = %q, want it to contain %q", got, c.want)
+			}
+			if c.notWant != "" && strings.Contains(got, c.notWant) {
+				t.Fatalf("failureText = %q, must not contain %q", got, c.notWant)
+			}
+		})
+	}
+}
