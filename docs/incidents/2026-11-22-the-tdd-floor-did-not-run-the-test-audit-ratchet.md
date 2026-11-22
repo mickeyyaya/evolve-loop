@@ -54,7 +54,7 @@ PR #1580 and PR #1605 gave the Build floor its test-audit check (item `build-flo
 
 ## What changed
 
-- `core.PackageAuditFailures(moduleDir, pkgs)` holds the rules and the configuration. The Build floor scopes it to the packages of the changed paths. `core.TddTestAuditFailures` uses the same scope code, and adds `acs/cycle<N>`. `tddPredicateFloor` and `evolve phase verify tdd` both call it, so each audits every package that TDD changed. There is no second rule list and no second scope.
+- `packageAuditFailures(moduleDir, pkgs)` in `core` holds the rules and the configuration. The Build floor scopes it to the packages of the changed paths. `core.TddTestAuditFailures` uses the same scope code, and adds `acs/cycle<N>`. `tddPredicateFloor` and `evolve phase verify tdd` both call it, so each audits every package that TDD changed. There is no second rule list and no second scope.
 - A refusal names the rule and the test. The TDD floor returns it with `Retry`, so the correction goes to TDD.
 - The code `tdd_test_audit_floor` is the violation code of `evolve phase verify tdd`.
 - Regression tests:

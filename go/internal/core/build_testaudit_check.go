@@ -44,10 +44,10 @@ func auditChangedPaths(ctx context.Context, worktree string, paths, also []strin
 	if scope.Whole {
 		return wholeTestAuditFailures(ctx, moduleDir)
 	}
-	return PackageAuditFailures(moduleDir, append(scope.Packages, also...))
+	return packageAuditFailures(moduleDir, append(scope.Packages, also...))
 }
 
-func PackageAuditFailures(moduleDir string, pkgs []string) []string {
+func packageAuditFailures(moduleDir string, pkgs []string) []string {
 	if len(pkgs) == 0 {
 		return nil
 	}
