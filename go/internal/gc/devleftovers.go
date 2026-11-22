@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const leftoverNamesShown = 3
@@ -38,7 +39,11 @@ func rebuildableIgnored(entry string) bool {
 }
 
 func (s *devSweep) gateLeftovers(ctx context.Context, it *DevItem) (string, error) {
-	tree := gitexec.Git{Dir: it.Path, Exec: s.o.Exec}
+	return gateLeftovers(ctx, s.o.Exec, it.Path)
+}
+
+func gateLeftovers(ctx context.Context, exec sysexec.RunFunc, dir string) (string, error) {
+	tree := gitexec.Git{Dir: dir, Exec: exec}
 	held, err := heldIgnored(ctx, tree)
 	if err != nil {
 		return "", err
@@ -52,7 +57,7 @@ func (s *devSweep) gateLeftovers(ctx context.Context, it *DevItem) (string, erro
 	}
 	for _, entry := range splitNul(untracked) {
 		if strings.HasSuffix(entry, "/") {
-			nested, err := nestedRepo(filepath.Join(it.Path, entry))
+			nested, err := nestedRepo(filepath.Join(dir, entry))
 			if err != nil {
 				return "", err
 			}

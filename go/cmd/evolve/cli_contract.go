@@ -11,6 +11,9 @@ import (
 )
 
 func coreVerbOf(name string, rest []string) (coreVerb, bool) {
+	if name == "gc" && len(rest) > 0 && rest[0] == "check" {
+		return coreVerb{}, false
+	}
 	if name == "loop" {
 		if _, status := loopStatusArgs(rest); status {
 			return lookupCoreVerb("loop status")

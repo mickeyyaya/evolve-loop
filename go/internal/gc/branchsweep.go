@@ -61,7 +61,7 @@ func (o WorktreeOptions) otherBranchItem(merged *mergedSet, branch string) (Work
 	}
 	it := WorktreeItem{Branch: branch, Head: strings.TrimSpace(head), Action: WorktreeActionDeleteBranch, Bundle: true}
 	if l != landingNone {
-		it.Reason = "landed branch (" + removalReason(l) + "), saved to a verified bundle first"
+		it.Reason = "landed branch (" + removalReasonFor(l, o.Landing.display()) + "), saved to a verified bundle first"
 		return it, true, nil
 	}
 	idle, err := o.branchIdle(branch)

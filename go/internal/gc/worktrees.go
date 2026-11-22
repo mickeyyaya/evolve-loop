@@ -47,6 +47,45 @@ type WorktreeManifest struct {
 	Items []WorktreeItem `json:"items"`
 }
 
+var (
+	errInvalidLandingTarget = errors.New("gc: LandingTarget requires both Remote and Branch")
+	errBranchHeadUnreadable = errors.New("branch head unreadable")
+	errBranchTipMoved       = errors.New("tip moved since plan")
+	errBranchCheckedOut     = errors.New("has it checked out")
+	errBranchNotLanded      = errors.New("not landed")
+	errMergeBaseFailed      = errors.New("git merge-base failed")
+)
+
+type LandingTarget struct {
+	Remote string
+	Branch string
+}
+
+func (l LandingTarget) isSet() bool {
+	return l.Remote != "" && l.Branch != ""
+}
+
+func (l LandingTarget) validate() error {
+	if (l.Remote == "") != (l.Branch == "") {
+		return errInvalidLandingTarget
+	}
+	return nil
+}
+
+func (l LandingTarget) ref() string {
+	if !l.isSet() {
+		return "HEAD"
+	}
+	return "refs/remotes/" + l.Remote + "/" + l.Branch
+}
+
+func (l LandingTarget) display() string {
+	if !l.isSet() {
+		return "HEAD"
+	}
+	return l.Remote + "/" + l.Branch
+}
+
 type WorktreeOptions struct {
 	ProjectRoot  string
 	WorktreeBase string
@@ -54,6 +93,7 @@ type WorktreeOptions struct {
 	Policy       WorktreesPolicy
 	BranchScope  BranchScope
 	EndedAfter   time.Duration
+	Landing      LandingTarget
 	Now          func() time.Time
 	Exec         sysexec.RunFunc
 	PidAlive     func(int) bool
@@ -212,6 +252,9 @@ func PlanWorktrees(o WorktreeOptions) (WorktreeManifest, error) {
 	if o.Exec == nil {
 		return WorktreeManifest{}, errors.New("gc: PlanWorktrees requires Exec")
 	}
+	if err := o.Landing.validate(); err != nil {
+		return WorktreeManifest{}, err
+	}
 	porcelain, err := o.git(o.ProjectRoot, "worktree", "list", "--porcelain")
 	if err != nil {
 		return WorktreeManifest{}, err
@@ -229,7 +272,7 @@ func PlanWorktrees(o WorktreeOptions) (WorktreeManifest, error) {
 		return WorktreeManifest{}, err
 	}
 
-	items = append(items, removalItems(pool, o.Policy.KeepRecent)...)
+	items = append(items, removalItems(pool, o.Policy.KeepRecent, o.Landing.display())...)
 
 	orphans, err := o.orphanBranchItems(merged, seenBranch)
 	if err != nil {
@@ -261,14 +304,27 @@ type mergedSet struct {
 	ancestors map[string]bool
 	memo      map[string]landing
 	noNet     map[string]bool
+	fetchErr  error
+}
+
+func (o WorktreeOptions) fetchLanding() error {
+	refspec := "+refs/heads/" + o.Landing.Branch + ":" + o.Landing.ref()
+	_, err := o.git(o.ProjectRoot, "fetch", "--quiet", o.Landing.Remote, refspec)
+	return err
 }
 
 func (o WorktreeOptions) mergedBranches() (*mergedSet, error) {
-	mergedOut, err := o.git(o.ProjectRoot, "branch", "--merged", "HEAD")
+	set := &mergedSet{o: o, ancestors: map[string]bool{}, memo: map[string]landing{}, noNet: map[string]bool{}}
+	if o.Landing.isSet() {
+		if err := o.fetchLanding(); err != nil {
+			set.fetchErr = err
+			return set, nil
+		}
+	}
+	mergedOut, err := o.git(o.ProjectRoot, "branch", "--merged", o.Landing.ref())
 	if err != nil {
 		return nil, err
 	}
-	set := &mergedSet{o: o, ancestors: map[string]bool{}, memo: map[string]landing{}, noNet: map[string]bool{}}
 	for _, b := range parseBranchList(mergedOut) {
 		set.ancestors[b] = true
 	}
@@ -276,13 +332,16 @@ func (o WorktreeOptions) mergedBranches() (*mergedSet, error) {
 }
 
 func (m *mergedSet) landing(branch string) (landing, error) {
+	if m.fetchErr != nil {
+		return landingNone, nil
+	}
 	if m.ancestors[branch] {
 		return landingAncestor, nil
 	}
 	if l, seen := m.memo[branch]; seen {
 		return l, nil
 	}
-	res, err := branchLandedBySquash(context.Background(), gitexec.Git{Dir: m.o.ProjectRoot, Exec: m.o.Exec}, "HEAD", branch)
+	res, err := branchLandedBySquash(context.Background(), gitexec.Git{Dir: m.o.ProjectRoot, Exec: m.o.Exec}, m.o.Landing.ref(), branch)
 	if err != nil {
 		return landingNone, err
 	}
@@ -299,7 +358,10 @@ func (m *mergedSet) isNoNet(branch string) bool {
 }
 
 func (m *mergedSet) squashHead(branch string, l landing) (string, error) {
-	if l != landingSquash && l != landingNoNet {
+	if l == landingNone {
+		return "", nil
+	}
+	if l != landingSquash && l != landingNoNet && !m.o.Landing.isSet() {
 		return "", nil
 	}
 	out, err := m.o.git(m.o.ProjectRoot, "rev-parse", "refs/heads/"+branch)
@@ -346,7 +408,7 @@ func (o WorktreeOptions) scanWorktrees(porcelain string, merged *mergedSet, held
 			if !dirty && merged.isNoNet(e.branch) {
 				continue
 			}
-			items = append(items, o.keptOrSalvaged(path, e.branch, dirty, held))
+			items = append(items, o.keptOrSalvaged(path, e.branch, dirty, held, merged.fetchErr))
 			continue
 		}
 		if c, ok := eligibleAfterGrace(path, e.branch, now, minAge); ok {
@@ -360,14 +422,22 @@ func (o WorktreeOptions) scanWorktrees(porcelain string, merged *mergedSet, held
 	return items, pool, seenBranch, nil
 }
 
-func (o WorktreeOptions) keptOrSalvaged(path, branch string, dirty bool, held laneHolds) WorktreeItem {
+func (o WorktreeOptions) keptOrSalvaged(path, branch string, dirty bool, held laneHolds, fetchErr error) WorktreeItem {
+	if !dirty && fetchErr != nil {
+		return WorktreeItem{
+			Path:   path,
+			Branch: branch,
+			Action: WorktreeActionFlagUnmerged,
+			Reason: fmt.Sprintf("fetch of %s failed — branch treated as not landed (%v)", o.Landing.display(), fetchErr),
+		}
+	}
 	if reason, ok := o.salvageReason(path, branch, held); ok {
 		return WorktreeItem{Path: path, Branch: branch, Action: WorktreeActionSalvageRemove, Reason: reason}
 	}
 	if dirty {
 		return WorktreeItem{Path: path, Branch: branch, Action: WorktreeActionFlagDirty, Reason: "dirty worktree — preserved for manual review"}
 	}
-	return WorktreeItem{Path: path, Branch: branch, Action: WorktreeActionFlagUnmerged, Reason: "branch not merged into HEAD"}
+	return WorktreeItem{Path: path, Branch: branch, Action: WorktreeActionFlagUnmerged, Reason: "branch not merged into " + o.Landing.display()}
 }
 
 type laneHolds struct {
@@ -446,14 +516,14 @@ func eligibleAfterGrace(path, branch string, now time.Time, minAge time.Duration
 	return eligible{path: path, branch: branch, mtime: info.ModTime()}, true
 }
 
-func removalItems(pool []eligible, keepRecent int) []WorktreeItem {
+func removalItems(pool []eligible, keepRecent int, targetDisplay string) []WorktreeItem {
 	sort.Slice(pool, func(i, j int) bool { return pool[i].mtime.After(pool[j].mtime) })
 	var items []WorktreeItem
 	for i, c := range pool {
 		if i < keepRecent {
 			continue
 		}
-		reason := removalReason(c.landing)
+		reason := removalReasonFor(c.landing, targetDisplay)
 		items = append(items,
 			WorktreeItem{Path: c.path, Branch: c.branch, Action: WorktreeActionRemove, Reason: reason},
 			WorktreeItem{Path: c.path, Branch: c.branch, Head: c.squashHead, Action: WorktreeActionDeleteBranch, Reason: reason},
@@ -463,11 +533,15 @@ func removalItems(pool []eligible, keepRecent int) []WorktreeItem {
 }
 
 func removalReason(l landing) string {
+	return removalReasonFor(l, "HEAD")
+}
+
+func removalReasonFor(l landing, targetDisplay string) string {
 	switch l {
 	case landingSquash:
 		return "squash-merged, clean, dead"
 	case landingNoNet:
-		return "no net changes against HEAD and no commits ahead, clean, dead"
+		return "no net changes against " + targetDisplay + " and no commits ahead, clean, dead"
 	}
 	return "merged, clean, dead"
 }
@@ -492,14 +566,20 @@ func (o WorktreeOptions) orphanBranchItems(merged *mergedSet, seenBranch map[str
 		}
 		switch l {
 		case landingAncestor:
-			items = append(items, WorktreeItem{Branch: b, Action: WorktreeActionDeleteBranch, Reason: "merged orphan branch (no worktree)"})
+			items = append(items, WorktreeItem{Branch: b, Head: head, Action: WorktreeActionDeleteBranch, Reason: "merged orphan branch (no worktree)"})
 		case landingSquash:
 			items = append(items, WorktreeItem{Branch: b, Head: head, Action: WorktreeActionDeleteBranch, Reason: "squash-merged orphan branch (no worktree)"})
 		case landingNoNet:
 			items = append(items, WorktreeItem{Branch: b, Head: head, Action: WorktreeActionDeleteBranch, Reason: "orphan branch with no net changes and no commits ahead (no worktree)"})
 		default:
 			if !merged.isNoNet(b) {
-				items = append(items, WorktreeItem{Branch: b, Action: WorktreeActionFlagUnmerged, Reason: "unmerged orphan branch (no worktree)"})
+				reason := "unmerged orphan branch (no worktree)"
+				if merged.fetchErr != nil {
+					reason = fmt.Sprintf("unmerged orphan branch (no worktree): fetch of %s failed (%v)", o.Landing.display(), merged.fetchErr)
+				} else if o.Landing.isSet() {
+					reason = "orphan branch not merged into " + o.Landing.display() + " (no worktree)"
+				}
+				items = append(items, WorktreeItem{Branch: b, Action: WorktreeActionFlagUnmerged, Reason: reason})
 			}
 		}
 	}
@@ -521,6 +601,9 @@ func sortWorktreeItems(items []WorktreeItem) {
 func ApplyWorktrees(o WorktreeOptions, m WorktreeManifest) error {
 	if o.Exec == nil {
 		return errors.New("gc: ApplyWorktrees requires Exec")
+	}
+	if err := o.Landing.validate(); err != nil {
+		return err
 	}
 	release, err := flock.Lock(flock.ShipLockPath(o.ProjectRoot))
 	if err != nil {
@@ -593,6 +676,18 @@ func (o WorktreeOptions) removeWorktrees(items []WorktreeItem, refused map[strin
 }
 
 func (o WorktreeOptions) deleteBranches(items []WorktreeItem, refused map[string]bool) []error {
+	hasDeletes := false
+	for _, it := range items {
+		if it.Action == WorktreeActionDeleteBranch && (it.Path == "" || !refused[it.Path]) {
+			hasDeletes = true
+			break
+		}
+	}
+	if hasDeletes && o.Landing.isSet() {
+		if err := o.fetchLanding(); err != nil {
+			return []error{fmt.Errorf("gc: fetch %s before branch delete: %w", o.Landing.display(), err)}
+		}
+	}
 	var errs []error
 	for _, it := range items {
 		if it.Action != WorktreeActionDeleteBranch {
@@ -611,6 +706,9 @@ func (o WorktreeOptions) deleteBranches(items []WorktreeItem, refused map[string
 const branchNotFullyMerged = "not fully merged"
 
 func (o WorktreeOptions) deleteBranch(it WorktreeItem) error {
+	if o.Landing.isSet() {
+		return o.deleteAgainstLanding(it)
+	}
 	head := o.branchHead(it.Branch)
 	_, stderr, code, err := o.gitCapture(o.ProjectRoot, cLocaleEnv(), "branch", "-d", it.Branch)
 	switch {
@@ -625,11 +723,56 @@ func (o WorktreeOptions) deleteBranch(it WorktreeItem) error {
 	return o.deleteSquashed(it)
 }
 
+func (o WorktreeOptions) deleteAgainstLanding(it WorktreeItem) error {
+	if err := o.refuseCheckedOut(it.Branch); err != nil {
+		return err
+	}
+	head := o.branchHead(it.Branch)
+	if head == "" {
+		return fmt.Errorf("gc: refuse to delete %s: %w", it.Branch, errBranchHeadUnreadable)
+	}
+	if it.Head != "" && head != it.Head {
+		return fmt.Errorf("gc: refuse to delete %s: %w (tip is %q, the plan saw %q)", it.Branch, errBranchTipMoved, head, it.Head)
+	}
+	expected := it.Head
+	if expected == "" {
+		expected = head
+	}
+	landed, err := o.branchLandedOnTarget(it.Branch)
+	if err != nil {
+		return err
+	}
+	if !landed {
+		return fmt.Errorf("gc: refuse to delete %s: %w on %s", it.Branch, errBranchNotLanded, o.Landing.display())
+	}
+	if _, err := o.git(o.ProjectRoot, "update-ref", "-d", "refs/heads/"+it.Branch, expected); err != nil {
+		return err
+	}
+	o.logDeleted(it.Branch, expected)
+	return nil
+}
+
+func (o WorktreeOptions) branchLandedOnTarget(branch string) (bool, error) {
+	ref := "refs/heads/" + branch
+	_, stderr, code, err := o.gitCapture(o.ProjectRoot, nil, "merge-base", "--is-ancestor", ref, o.Landing.ref())
+	switch {
+	case err != nil || code > 1:
+		return false, fmt.Errorf("gc: %w --is-ancestor %s %s: exit %d err=%v: %s", errMergeBaseFailed, ref, o.Landing.ref(), code, err, strings.TrimSpace(stderr))
+	case code == 0:
+		return true, nil
+	}
+	res, err := branchLandedBySquash(context.Background(), gitexec.Git{Dir: o.ProjectRoot, Exec: o.Exec}, o.Landing.ref(), branch)
+	if err != nil {
+		return false, fmt.Errorf("%w: %w", errMergeBaseFailed, err)
+	}
+	return res.deletable(), nil
+}
+
 func (o WorktreeOptions) deleteSquashed(it WorktreeItem) error {
 	if err := o.refuseCheckedOut(it.Branch); err != nil {
 		return err
 	}
-	res, err := branchLandedBySquash(context.Background(), gitexec.Git{Dir: o.ProjectRoot, Exec: o.Exec}, "HEAD", it.Branch)
+	res, err := branchLandedBySquash(context.Background(), gitexec.Git{Dir: o.ProjectRoot, Exec: o.Exec}, o.Landing.ref(), it.Branch)
 	if err != nil {
 		return err
 	}
@@ -680,7 +823,7 @@ func (o WorktreeOptions) refuseCheckedOut(branch string) error {
 	}
 	for _, e := range parseWorktreePorcelain(porcelain) {
 		if e.branch == branch {
-			return fmt.Errorf("gc: refuse to delete %s: worktree %s has it checked out", branch, e.path)
+			return fmt.Errorf("gc: refuse to delete %s: worktree %s %w", branch, e.path, errBranchCheckedOut)
 		}
 	}
 	return nil

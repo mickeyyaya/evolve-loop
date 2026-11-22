@@ -25,6 +25,9 @@ import (
 )
 
 func runGC(args []string, _ io.Reader, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "check" {
+		return runGCCheck(args[1:], stdout, stderr)
+	}
 	fs := flag.NewFlagSet("evolve gc", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	dryRun := fs.Bool("dry-run", false, "preview only: list what WOULD be released (orphan tmux sessions and sockets, finished-cycle orphan processes, stale dispatch processes and orphan log tails, worktrees and branches, run dirs, logs of the log catalog, go build cache entries, empty claim dirs of stale cycles), mutating nothing")
