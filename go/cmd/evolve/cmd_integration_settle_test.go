@@ -50,7 +50,13 @@ func (s *settleJourney) host(n int, state, head string) {
 
 func (s *settleJourney) entry(n int) map[string]any {
 	p := s.prs[n]
-	return map[string]any{"number": n, "state": p.State, "closed": p.State != hostOpen, "headRefName": p.Head, "mergedAt": nil}
+	m := map[string]any{"number": n, "state": p.State, "closed": p.State != hostOpen, "headRefName": p.Head, "mergedAt": nil}
+	if s.gh.pullHead != nil {
+		if oid := s.gh.pullHead(strconv.Itoa(n)); oid != "" {
+			m["headRefOid"] = oid
+		}
+	}
+	return m
 }
 
 func (s *settleJourney) openList() string {

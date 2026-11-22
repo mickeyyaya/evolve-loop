@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 func classBinder(class string) Binder {
@@ -201,5 +202,74 @@ func TestTrainRecordRefusesAPRWithNoNetChange(t *testing.T) {
 	want := "integration: PR #14 cannot record a review binding: its commits have no net change. Next: close the PR."
 	if got := recordRefusal(t, r, 14); got != want {
 		t.Errorf("refusal =\n%s\nwant\n%s", got, want)
+	}
+}
+
+func TestGhHostHeadOID_RefusesEmptyOrFailedView(t *testing.T) {
+	t.Parallel()
+	empty := GhHost{CI: GhCI{Gh: func(context.Context, string, ...string) (string, int, error) {
+		return `{"state":"OPEN"}` + "\n", 0, nil
+	}}}
+	if _, err := empty.HeadOID(context.Background(), 5); !errors.Is(err, errMissingHeadOID) {
+		t.Errorf("empty headRefOid = %v, want %v", err, errMissingHeadOID)
+	}
+	failed := GhHost{CI: GhCI{Gh: func(context.Context, string, ...string) (string, int, error) { return "", 1, nil }}}
+	if _, err := failed.HeadOID(context.Background(), 5); err == nil {
+		t.Error("failed gh pr view returned nil error")
+	}
+}
+
+func TestTrainRecordPropagatesHeadOIDErrorsAndWaitInterrupts(t *testing.T) {
+	t.Parallel()
+	r := newTrainRig(t)
+	r.f.console(t, 6, "feat: a", map[string]string{"a.txt": "a\n"})
+	r.f.g.Git("push", "-q", "origin", "pr-6:refs/pull/6/head")
+
+	ghBoom := errors.New("gh down")
+	r.host.headOIDErrs = map[int]error{6: ghBoom}
+	if _, err := r.train.Record(context.Background(), 6, classBinder("docs-review")); !errors.Is(err, ghBoom) {
+		t.Errorf("HeadOID error = %v, want %v", err, ghBoom)
+	}
+
+	r.host.headOIDErrs = nil
+	r.host.headOIDs = map[int]string{6: strings.Repeat("f", 40)}
+	r.train.PullRefWait = time.Second
+	real := r.train.Composer.Repo.Git
+	ctx, cancel := context.WithCancel(context.Background())
+	r.train.Composer.Repo.Git = func(c context.Context, dir, in string, args ...string) (string, error) {
+		out, err := real(c, dir, in, args...)
+		if len(args) > 0 && args[0] == "rev-parse" && strings.Contains(strings.Join(args, " "), "refs/evolve/pr/6") {
+			cancel()
+		}
+		return out, err
+	}
+	if _, err := r.train.Record(ctx, 6, classBinder("docs-review")); !errors.Is(err, context.Canceled) {
+		t.Errorf("canceled wait = %v, want context.Canceled", err)
+	}
+
+	refetchBoom := errors.New("refetch failed")
+	fetches := 0
+	r.train.Composer.Repo.Git = func(ctx context.Context, dir, in string, args ...string) (string, error) {
+		if len(args) > 0 && args[0] == "fetch" && strings.Contains(strings.Join(args, " "), "refs/pull/6/head") {
+			fetches++
+			if fetches == 2 {
+				return "", refetchBoom
+			}
+		}
+		return real(ctx, dir, in, args...)
+	}
+	if _, err := r.train.Record(context.Background(), 6, classBinder("docs-review")); !errors.Is(err, refetchBoom) {
+		t.Errorf("refetch error = %v, want %v", err, refetchBoom)
+	}
+
+	prHeadBoom := errors.New("prHead failed")
+	r.train.Composer.Repo.Git = func(ctx context.Context, dir, in string, args ...string) (string, error) {
+		if len(args) > 0 && args[0] == "rev-parse" && strings.Contains(strings.Join(args, " "), "refs/evolve/pr/6") {
+			return "", prHeadBoom
+		}
+		return real(ctx, dir, in, args...)
+	}
+	if _, err := r.train.Record(context.Background(), 6, classBinder("docs-review")); !errors.Is(err, prHeadBoom) {
+		t.Errorf("prHead error = %v, want %v", err, prHeadBoom)
 	}
 }

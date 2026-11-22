@@ -2,9 +2,11 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acsrunner"
 )
@@ -82,9 +84,25 @@ func TestConsoleTrainExportsAreNamedByAnExecutedAssertion(t *testing.T) {
 	if len(out.Landed) != 1 || out.Ejected[0] != 2 {
 		t.Errorf("Outcome fields inconsistent: %+v", out)
 	}
-	var host PRHost = &fakeHost{ready: []int{9}}
+	var host PRHost = &fakeHost{ready: []int{9}, headOIDs: map[int]string{9: "abc1234"}}
 	if ready, err := host.Ready(context.Background()); err != nil || len(ready) != 1 || ready[0] != 9 {
 		t.Errorf("PRHost.Ready = %v, %v", ready, err)
+	}
+	if oid, err := host.HeadOID(context.Background(), 9); err != nil || oid != "abc1234" {
+		t.Errorf("PRHost.HeadOID = %q, %v", oid, err)
+	}
+	gitBoom := errors.New("git down")
+	tr := Train{PullRefWait: 5 * time.Millisecond, Composer: Composer{Repo: Repo{Git: func(context.Context, string, string, ...string) (string, error) {
+		return "", gitBoom
+	}}}}
+	if _, err := tr.Record(context.Background(), 9, nil); !errors.Is(err, gitBoom) {
+		t.Errorf("Train.Record = %v, want %v", err, gitBoom)
+	}
+	ghHost := GhHost{CI: GhCI{Gh: func(context.Context, string, ...string) (string, int, error) {
+		return `{"headRefOid":"def5678"}` + "\n", 0, nil
+	}}}
+	if oid, err := ghHost.HeadOID(context.Background(), 9); err != nil || oid != "def5678" {
+		t.Errorf("GhHost.HeadOID = %q, %v", oid, err)
 	}
 	if ErrRunTimeout == nil || !strings.Contains(ErrRunTimeout.Error(), "timed out") {
 		t.Errorf("ErrRunTimeout = %v, want timed out", ErrRunTimeout)

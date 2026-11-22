@@ -14,17 +14,19 @@ import (
 )
 
 type fakeHost struct {
-	mu         sync.Mutex
-	ready      []int
-	readyErr   error
-	commentErr error
-	closeErr   error
-	comments   map[int][]string
-	closed     map[int]string
-	states     map[int]PRState
-	stateErrs  map[int]error
-	batches    []int
-	batchesErr error
+	mu          sync.Mutex
+	ready       []int
+	readyErr    error
+	commentErr  error
+	closeErr    error
+	comments    map[int][]string
+	closed      map[int]string
+	states      map[int]PRState
+	stateErrs   map[int]error
+	batches     []int
+	batchesErr  error
+	headOIDs    map[int]string
+	headOIDErrs map[int]error
 }
 
 func (h *fakeHost) Ready(context.Context) ([]int, error) { return h.ready, h.readyErr }
@@ -40,6 +42,13 @@ func (h *fakeHost) State(_ context.Context, pr int) (PRState, error) {
 }
 
 func (h *fakeHost) OpenBatches(context.Context) ([]int, error) { return h.batches, h.batchesErr }
+
+func (h *fakeHost) HeadOID(_ context.Context, pr int) (string, error) {
+	if err := h.headOIDErrs[pr]; err != nil {
+		return "", err
+	}
+	return h.headOIDs[pr], nil
+}
 
 func (h *fakeHost) Comment(_ context.Context, pr int, body string) error {
 	h.mu.Lock()

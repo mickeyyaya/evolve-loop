@@ -28,6 +28,7 @@ type trainGh struct {
 	conclusions []string
 	main        mainRun
 	pullHeads   func() []string
+	pullHead    func(string) string
 	headRuns    map[string]string
 }
 
@@ -102,6 +103,13 @@ func (g *trainGh) run(_ context.Context, _ string, args ...string) (string, int,
 	case strings.HasPrefix(joined, "pr list --head"):
 		return "[]\n", 0, nil
 	case strings.HasPrefix(joined, "pr view"):
+		oid := ""
+		if g.pullHead != nil && len(args) > 2 {
+			oid = g.pullHead(args[2])
+		}
+		if oid != "" {
+			return `{"state":"OPEN","headRefOid":"` + oid + `"}` + "\n", 0, nil
+		}
 		return `{"state":"OPEN"}` + "\n", 0, nil
 	case strings.HasPrefix(joined, "pr list --state open --base"):
 		if g.ready == "" {
@@ -167,6 +175,9 @@ func newTrainJourney(t *testing.T) *trainJourney {
 	gh.headRuns = map[string]string{}
 	gh.pullHeads = func() []string {
 		return strings.Fields(origin.Git("for-each-ref", "--format=%(objectname)", "refs/pull/"))
+	}
+	gh.pullHead = func(n string) string {
+		return strings.TrimSpace(origin.Git("for-each-ref", "--format=%(objectname)", "refs/pull/"+n+"/head"))
 	}
 	return j
 }

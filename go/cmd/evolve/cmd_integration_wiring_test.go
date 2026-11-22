@@ -26,7 +26,7 @@ func TestIntegrationProductionEnvSetsEveryPort(t *testing.T) {
 		t.Errorf("env = %+v, want the signal emitter, the key run and the clock of the main-red stop", env)
 	}
 	train, _ := env.train("/repo", io.Discard)
-	if train.CI == nil || train.Main == nil || train.Host == nil || train.Inbox == nil || train.Root != "/repo" || train.Wave != env.Wave || train.Composer.Stage != policy.FleetIntegrationShadow {
+	if train.CI == nil || train.Main == nil || train.Host == nil || train.Inbox == nil || train.Root != "/repo" || train.Wave != env.Wave || train.Composer.Stage != policy.FleetIntegrationShadow || train.PullRefWait != policy.DefaultPullRefWaitS*time.Second {
 		t.Errorf("train = %+v, want every port set from the env", train)
 	}
 	if ci := env.ports().CI; ci.Gh == nil || ci.Settle == nil || ci.Repo.Dir != "/repo" {
@@ -114,5 +114,31 @@ func TestIntegrationRootComesFromTheWorkingDirectoryAndItsFailureStops(t *testin
 	dir := func() (string, error) { return t.TempDir(), nil }
 	if rc := runIntegrationAt(dir, []string{"watch", "--help"}, &out, &errb); rc != 0 || !strings.Contains(out.String(), "usage: evolve integration watch") {
 		t.Errorf("rc=%d out=%q err=%q", rc, out.String(), errb.String())
+	}
+}
+
+func TestIntegrationTrainPullRefWaitReadsPolicyAndFallsBackOnInvalid(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	evolveDir := filepath.Join(root, ".evolve")
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(`{"fleet":{"integration":{"pull_ref_wait_s":9}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var warn bytes.Buffer
+	train, _ := (integrationEnv{Root: root}).train(root, &warn)
+	if train.PullRefWait != 9*time.Second || warn.Len() != 0 {
+		t.Fatalf("train.PullRefWait = %v, warn=%q, want 9s and no warning", train.PullRefWait, warn.String())
+	}
+
+	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(`{"fleet":{"integration":{"pull_ref_wait_s":-2}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	warn.Reset()
+	train, _ = (integrationEnv{Root: root}).train(root, &warn)
+	if train.PullRefWait != policy.DefaultPullRefWaitS*time.Second || !strings.Contains(warn.String(), "pull_ref_wait_s") {
+		t.Fatalf("invalid policy: PullRefWait=%v warn=%q, want default and warning", train.PullRefWait, warn.String())
 	}
 }

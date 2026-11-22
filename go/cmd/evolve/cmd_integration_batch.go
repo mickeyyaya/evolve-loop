@@ -14,11 +14,13 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/commitgate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/selfheal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -54,17 +56,27 @@ func (e integrationEnv) train(projectRoot string, warn io.Writer) (integration.T
 	p := e.ports()
 	gate := e.stopGate(projectRoot, warn)
 	return integration.Train{
-		Composer: integration.Composer{Repo: p.Repo, Stage: policy.FleetIntegrationShadow, Regen: e.regenPort(p.Repo, projectRoot, warn)},
-		L2:       e.batchTest(p.Repo, projectRoot, warn),
-		CI:       gate.CI(p.CI),
-		Main:     gate.Main(p.Main),
-		Host:     integration.GhHost{CI: p.CI},
-		Inbox:    inboxCloser(e.Root),
-		Root:     e.Root,
-		Wave:     e.Wave,
-		HeadCI:   integration.PeekCI{CI: p.CI},
-		MainCI:   p.CI,
+		Composer:    integration.Composer{Repo: p.Repo, Stage: policy.FleetIntegrationShadow, Regen: e.regenPort(p.Repo, projectRoot, warn)},
+		L2:          e.batchTest(p.Repo, projectRoot, warn),
+		CI:          gate.CI(p.CI),
+		Main:        gate.Main(p.Main),
+		Host:        integration.GhHost{CI: p.CI},
+		Inbox:       inboxCloser(e.Root),
+		Root:        e.Root,
+		Wave:        e.Wave,
+		HeadCI:      integration.PeekCI{CI: p.CI},
+		MainCI:      p.CI,
+		PullRefWait: pullRefWait(projectRoot, warn),
 	}, p.Runs
+}
+
+func pullRefWait(projectRoot string, warn io.Writer) time.Duration {
+	wait, err := policy.LoadOrDefaults(filepath.Join(paths.EvolveDirOf(projectRoot), "policy.json"), warn).PullRefWait()
+	if err != nil {
+		fmt.Fprintf(warn, "%sthe pull-ref wait is invalid, so it uses the default: %v\n", integrationPrefix, err)
+		return policy.DefaultPullRefWaitS * time.Second
+	}
+	return wait
 }
 
 func inboxCloser(root string) integration.InboxFunc {

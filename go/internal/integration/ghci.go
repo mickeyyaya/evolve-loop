@@ -32,10 +32,11 @@ const (
 )
 
 var (
-	ErrRunTimeout = errors.New("integration: CI run timed out")
-	ErrRunPending = errors.New("integration: the CI run is not complete")
-	ErrNoRun      = errors.New("integration: no CI run")
-	prURL         = regexp.MustCompile(`/pull/([0-9]+)\s*$`)
+	ErrRunTimeout     = errors.New("integration: CI run timed out")
+	ErrRunPending     = errors.New("integration: the CI run is not complete")
+	ErrNoRun          = errors.New("integration: no CI run")
+	errMissingHeadOID = errors.New("integration: gh pr view returned no headRefOid")
+	prURL             = regexp.MustCompile(`/pull/([0-9]+)\s*$`)
 )
 
 func SysGh() GhFunc {
@@ -318,4 +319,17 @@ func (h GhHost) OpenBatches(ctx context.Context) ([]int, error) {
 		}
 	}
 	return prs, nil
+}
+
+func (h GhHost) HeadOID(ctx context.Context, pr int) (string, error) {
+	var view struct {
+		HeadRefOid string `json:"headRefOid"`
+	}
+	if err := h.CI.decode(ctx, &view, "pr", "view", strconv.Itoa(pr), "--json", "headRefOid"); err != nil {
+		return "", err
+	}
+	if view.HeadRefOid == "" {
+		return "", fmt.Errorf("%w: PR #%d", errMissingHeadOID, pr)
+	}
+	return view.HeadRefOid, nil
 }

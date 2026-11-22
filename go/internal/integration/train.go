@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
@@ -25,6 +26,7 @@ type PRHost interface {
 	Close(ctx context.Context, pr int, body string) error
 	State(ctx context.Context, pr int) (PRState, error)
 	OpenBatches(ctx context.Context) ([]int, error)
+	HeadOID(ctx context.Context, pr int) (string, error)
 }
 
 type InboxFunc func(ctx context.Context, ids []string) ([]string, error)
@@ -39,10 +41,11 @@ type Train struct {
 	Root     string
 	Wave     string
 
-	HeadCI     headWatcher
-	MainCI     MainCI
-	MainRedFix bool
-	Progress   func(Step)
+	HeadCI      headWatcher
+	MainCI      MainCI
+	MainRedFix  bool
+	Progress    func(Step)
+	PullRefWait time.Duration
 }
 
 type headWatcher interface {
@@ -241,10 +244,18 @@ func (t Train) sync(ctx context.Context, prs []int) error {
 		return fmt.Errorf("integration: fetch origin main: %w", err)
 	}
 	for _, n := range prs {
-		num := strconv.Itoa(n)
-		if _, err := git.Git(ctx, git.Dir, "", "fetch", "-q", "origin", "+refs/pull/"+num+"/head:refs/evolve/pr/"+num); err != nil {
-			return fmt.Errorf("integration: fetch the head of PR #%d: %w", n, err)
+		if err := t.fetchPRHead(ctx, n); err != nil {
+			return err
 		}
+	}
+	return nil
+}
+
+func (t Train) fetchPRHead(ctx context.Context, pr int) error {
+	git := t.Composer.Repo
+	num := strconv.Itoa(pr)
+	if _, err := git.Git(ctx, git.Dir, "", "fetch", "-q", "origin", "+refs/pull/"+num+"/head:refs/evolve/pr/"+num); err != nil {
+		return fmt.Errorf("integration: fetch the head of PR #%d: %w", pr, err)
 	}
 	return nil
 }
@@ -486,9 +497,22 @@ func Brief(e *Ejection) string {
 	return b.String()
 }
 
+const pullRefPollInterval = 200 * time.Millisecond
+
 func (t Train) Record(ctx context.Context, pr int, bind Binder) (string, error) {
 	if err := t.sync(ctx, []int{pr}); err != nil {
 		return "", err
+	}
+	if t.Host != nil {
+		headOID, err := t.Host.HeadOID(ctx, pr)
+		if err != nil {
+			return "", err
+		}
+		if headOID != "" {
+			if err := t.waitPullRef(ctx, pr, headOID); err != nil {
+				return "", err
+			}
+		}
 	}
 	commits, err := t.prCommits(ctx, pr)
 	if err != nil {
@@ -507,6 +531,40 @@ func (t Train) Record(ctx context.Context, pr int, bind Binder) (string, error) 
 	}
 	rec := DeliverableRecord{Source: SourceConsolePR, Wave: ConsoleWave, PR: pr, Commits: commits, Audit: binding}
 	return WriteRecord(WaveDir(t.Root, ConsoleWave), rec)
+}
+
+func (t Train) waitPullRef(ctx context.Context, pr int, headOID string) error {
+	deadline := time.Now().Add(t.PullRefWait)
+	for {
+		tip, err := t.prHead(ctx, pr)
+		if err != nil {
+			return err
+		}
+		if tip == headOID {
+			return nil
+		}
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return &Refusal{PR: pr, Reason: fmt.Sprintf("pull ref is at %s, behind head branch %s. Next: wait for GitHub to update the pull ref, then run record-pr again.", ShortSHA(tip), ShortSHA(headOID))}
+		}
+		if err := sleepContext(ctx, min(remaining, pullRefPollInterval)); err != nil {
+			return err
+		}
+		if err := t.fetchPRHead(ctx, pr); err != nil {
+			return err
+		}
+	}
+}
+
+func sleepContext(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func (t Train) evidence(ctx context.Context, commits []CommitIdentity) (Evidence, error) {
