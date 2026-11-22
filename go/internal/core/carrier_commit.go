@@ -19,7 +19,7 @@ func commitCarrier(ctx context.Context, git gitFn, worktree string, change Audit
 		"-m", subject, "-m", carrierTrailerKey+": "+change.Label)
 }
 
-func namesMovedMain(code ShipErrorCode) bool {
+func NamesMovedMain(code ShipErrorCode) bool {
 	return code == CodeAuditBindingHeadMoved || code == CodeGitFleetRebaseNeeded
 }
 

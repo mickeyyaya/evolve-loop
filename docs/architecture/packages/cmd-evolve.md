@@ -861,6 +861,7 @@ Files: `cmd_loop_wave.go`, `cmd_loop_pool.go`, `cmd_loop_wavesync.go`.
 - `dispatchIteration`, `minWidthRepair`, `productionWaveLauncher` and `reloadFleetConfigAtWaveBoundary` are by-name facades over the engine. Their production callers are `cmd_loop_batch.go`, `cmd_loop_window.go`, `cmd_loop_pool.go` and `cli_wave_budget.go`.
 - The wave-boundary sync of `main` halts on a DIVERGED relation. It does not skip. `gitexec.RelationToRemote` is the one main-relation resolver, and `laneStartRef` also reads it. If the sync continued, the two consumers can disagree about the safety of main to lane from.
 - `--ff-only` can refuse when local tracked changes are overwritten. That is a normal runtime state (rebuilt-binary churn). Name it as such. Never call it divergence, because the "next ship reconciles" remedy belongs to the stowaway class.
+- The wave-boundary sync calls `mainsync.Run` ([internal-mainsync.md](internal-mainsync.md)) with a CI `Gate` and an `Around` that prepares and replays the inbox stamps. The fetch step is not in this file, so it uses the explicit refspec of that package (TestSyncMainAtWaveBoundary_AFetchConfigThatOmitsMainStillRefreshesOriginMain).
 - `waveSyncTimeout` bounds the fetch. A wedged network delays one wave and never hangs the boundary.
 - `mainCIRedForSHA` returns an unavailable API as an error, for the caller's loud fail-open path. Only a completed failing conclusion is evidence of RED.
 
