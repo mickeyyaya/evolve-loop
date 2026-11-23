@@ -22,6 +22,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner"
+	"github.com/mickeyyaya/evolve-loop/go/internal/promptboundary"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -226,7 +227,7 @@ func compactError(err error) string {
 func composePrompt(body string, req core.PhaseRequest, prev string) string {
 	var b strings.Builder
 	b.WriteString(body)
-	b.WriteString("\n\n## Cycle Context\n")
+	b.WriteString(promptboundary.Boundary)
 	fmt.Fprintf(&b, "- cycle: %d\n", req.Cycle)
 	fmt.Fprintf(&b, "- previous_verdict: %s\n", prev)
 	fmt.Fprintf(&b, "- project_root: %s\n", req.ProjectRoot)

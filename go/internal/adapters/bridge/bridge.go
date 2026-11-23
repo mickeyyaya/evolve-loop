@@ -18,6 +18,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/log"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/promptboundary"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/skilloverlay"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
@@ -180,12 +181,11 @@ func (a *Adapter) ComposePrompt(req core.BridgeRequest) (core.BridgeRequest, err
 			return core.BridgeRequest{}, fmt.Errorf("bridge: deliverable contract %q not registered", contractID)
 		}
 	}
-	body := a.injectContract(req.Prompt, contractID, req.ArtifactPath, req.Workspace)
+	body := a.injectContract(injectCorrection(req.Prompt, req.CorrectionDirective), contractID, req.ArtifactPath, req.Workspace)
 	withPolicy := injectPolicyPrefix(body, resolvePolicy(req.ProjectRoot, req.Agent, req.InteractivePolicy))
 	withRules := injectRulesPrefix(withPolicy, req.SystemPrompt)
 	withSkills := injectSkillOverlays(withRules, req)
-	withDirectives := injectOperatorDirectives(withSkills, req.OperatorDirectives)
-	inproc.Prompt = injectCorrectionPrefix(withDirectives, req.CorrectionDirective)
+	inproc.Prompt = injectOperatorDirectives(withSkills, req.OperatorDirectives)
 	return inproc, nil
 }
 
@@ -278,11 +278,11 @@ func injectSkillOverlays(prompt string, req core.BridgeRequest) string {
 	return overlay + "---\n\n" + prompt
 }
 
-func injectCorrectionPrefix(prompt, directive string) string {
+func injectCorrection(prompt, directive string) string {
 	if directive == "" {
 		return prompt
 	}
-	return "## Correction\n\n" + directive + "\n\n---\n\n" + prompt
+	return promptboundary.Place(prompt, "### Correction\n\n"+directive+"\n\n### Cycle facts\n")
 }
 
 func injectOperatorDirectives(prompt, directives string) string {

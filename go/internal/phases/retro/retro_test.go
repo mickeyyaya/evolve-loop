@@ -17,6 +17,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner/runnertest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/promptboundary"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
@@ -1007,5 +1008,12 @@ func TestValidateExplanationReview_HostDefectKeepsTheFindingsMadeBeforeIt(t *tes
 	advisories, err := validateExplanationReview(report, weird)
 	if err == nil || !strings.Contains(err.Error(), "unknown status") || !strings.Contains(strings.Join(advisories, "\n"), "must be VERIFIED") {
 		t.Fatalf("a host-side defect fails loudly and keeps the findings made before it: advisories=%v err=%v", advisories, err)
+	}
+}
+
+func TestComposePrompt_StaticPrefixEqualsBody(t *testing.T) {
+	got := composePrompt("RETRO BODY", core.PhaseRequest{Cycle: 7, Workspace: "/w", ProjectRoot: "/p"}, "FAIL")
+	if prefix := promptboundary.StaticPrefix(got); prefix != "RETRO BODY" {
+		t.Errorf("static prefix=%q want the body only", prefix)
 	}
 }

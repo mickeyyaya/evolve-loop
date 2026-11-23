@@ -15,13 +15,14 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/promptboundary"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 const (
 	fixtureDir        = "../../attemptpostmortem/testdata/"
 	session1853First  = "c61dea20-648d-4002-a794-85f794e80ba0"
-	cycle1853Composed = "BODY OF THE BUILDER" + cycleContextBoundary + "- cycle: 1853\n"
+	cycle1853Composed = "BODY OF THE BUILDER" + promptboundary.Boundary + "- cycle: 1853\n"
 )
 
 type launchStep struct {
@@ -215,10 +216,10 @@ func TestDispatch_APaneLostAttemptGivesTheRetryThePostmortemOfCycle1853(t *testi
 			t.Errorf("the retry prompt lacks %q:\n%s", want, second)
 		}
 	}
-	if !strings.HasPrefix(second, strings.TrimRight(first, "\n")) || StaticPrefix(second) != StaticPrefix(first) {
+	if !strings.HasPrefix(second, strings.TrimRight(first, "\n")) || promptboundary.StaticPrefix(second) != promptboundary.StaticPrefix(first) {
 		t.Fatal("the section must follow the cycle context and keep the cache-stable prefix")
 	}
-	if strings.Index(second, attemptpostmortem.SectionHeading) < strings.Index(second, cycleContextBoundary) {
+	if strings.Index(second, attemptpostmortem.SectionHeading) < strings.Index(second, promptboundary.Boundary) {
 		t.Fatal("the section precedes the cycle context boundary")
 	}
 	if len(run.events) != 2 || run.events[1] != second {
