@@ -111,3 +111,21 @@ func TestLoadIncidents_TwoRecordsOfOneFingerprintFailLoudly(t *testing.T) {
 		t.Fatalf("err = %v, want the duplicate fingerprint named", err)
 	}
 }
+
+func TestIncident_RecordDocRoundTripsThroughTheStore(t *testing.T) {
+	t.Parallel()
+	dir := filepath.Join(t.TempDir(), ".evolve", "incidents")
+	inc := Incident{Schema: RecordSchema, ID: "inc-2026-10-27-aaaaaaaa", Fingerprint: "main-red:main", State: StateOpen, OpenedAt: t0, Sources: []string{}, RecordDoc: "docs/incidents/2026-10-27-x.md"}
+	if err := WriteIncident(dir, inc); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(filepath.Join(dir, inc.ID+".json"))
+	got, err := LoadIncidents(dir)
+	if err != nil || len(got) != 1 || got[0].RecordDoc != inc.RecordDoc || !strings.Contains(string(raw), `"record_doc": "docs/incidents/2026-10-27-x.md"`) {
+		t.Fatalf("the record doc must persist as record_doc: %v %+v\n%s", err, got, raw)
+	}
+	legacy, err := LoadIncidents(filepath.Join("testdata", "incidents-2026-10-27"))
+	if err != nil || len(legacy) == 0 || legacy[0].RecordDoc != "" {
+		t.Fatalf("a record written before the field loads with an empty record doc: %v %+v", err, legacy)
+	}
+}

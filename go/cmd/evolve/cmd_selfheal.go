@@ -7,12 +7,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
+	"github.com/mickeyyaya/evolve-loop/go/internal/incidentkb"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/selfheal"
@@ -22,7 +25,7 @@ import (
 )
 
 const (
-	selfhealUsage    = "usage: evolve selfheal incidents|propose [--json] [--project-root P]"
+	selfhealUsage    = "usage: evolve selfheal incidents|propose|record-doc <incident-id> <path> [--json] [--project-root P]"
 	selfhealExitIn   = 11
 	selfhealCIFields = "databaseId,headBranch,status,conclusion,attempt,createdAt,updatedAt"
 	selfhealCILimit  = "200"
@@ -32,9 +35,10 @@ const (
 const (
 	selfhealVerbIncidents = "incidents"
 	selfhealVerbPropose   = "propose"
+	selfhealVerbRecordDoc = "record-doc"
 )
 
-var selfhealSchemas = map[string]string{selfhealVerbIncidents: "evolve.selfheal.incidents/1", selfhealVerbPropose: "evolve.selfheal.propose/1"}
+var selfhealSchemas = map[string]string{selfhealVerbIncidents: "evolve.selfheal.incidents/1", selfhealVerbPropose: "evolve.selfheal.propose/1", selfhealVerbRecordDoc: "evolve.selfheal.record-doc/1"}
 
 var selfhealChannels = []string{"errors", "loop"}
 
@@ -68,6 +72,7 @@ func newSelfhealCenter(root, evolveDir string, console io.Writer) (*signalcenter
 
 type selfhealArgs struct {
 	verb, root string
+	operands   []string
 	json       bool
 }
 
@@ -76,6 +81,9 @@ func runSelfhealWith(env selfhealEnv, args []string, stdout, stderr io.Writer) i
 	w := codeEnvelopeWriter{schema: selfhealSchemas[cmp.Or(a.verb, selfhealVerbIncidents)], json: a.json, stdout: stdout, stderr: stderr}
 	if err != nil {
 		return w.fail(exitUsage, "usage", "evolve selfheal: "+err.Error()+"\n"+selfhealUsage)
+	}
+	if a.verb == selfhealVerbRecordDoc {
+		return runSelfhealRecordDoc(w, a.root, a.operands)
 	}
 	evolveDir := paths.EvolveDirOf(a.root)
 	pol, err := policy.Load(filepath.Join(evolveDir, paths.PolicyFile))
@@ -104,16 +112,23 @@ func runSelfhealWith(env selfhealEnv, args []string, stdout, stderr io.Writer) i
 func parseSelfhealArgs(args []string) (selfhealArgs, error) {
 	a := selfhealArgs{json: slices.Contains(args, "--json")}
 	if len(args) == 0 || selfhealSchemas[args[0]] == "" {
-		return a, errors.New("want the incidents or the propose verb")
+		return a, errors.New("want the incidents, propose or record-doc verb")
 	}
 	a.verb = args[0]
 	operands, err := (cliFlags{bools: map[string]*bool{"--json": &a.json}, values: map[string]*string{"--project-root": &a.root}}).parse(args[1:])
+	wantOperands := 0
+	if a.verb == selfhealVerbRecordDoc {
+		wantOperands = 2
+	}
 	switch {
 	case err != nil:
 		return a, err
-	case len(operands) > 0:
-		return a, fmt.Errorf("unexpected argument %q", operands[0])
+	case len(operands) > wantOperands:
+		return a, fmt.Errorf("unexpected argument %q", operands[wantOperands])
+	case len(operands) < wantOperands:
+		return a, fmt.Errorf("the %s verb wants %d operands: <incident-id> <path>", a.verb, wantOperands)
 	}
+	a.operands = operands
 	a.root = paths.AbsoluteRoot("--project-root", a.root, nil)
 	return a, nil
 }
@@ -239,4 +254,45 @@ func printSelfheal(stdout io.Writer, asJSON bool, r selfhealReport) {
 	for _, inc := range r.Incidents {
 		fmt.Fprintf(stdout, "%s %s %s %s %s recurrence=%d: %s\n", inc.ID, inc.State, inc.Severity, inc.Tier, inc.Fingerprint, inc.Recurrence, inc.Summary)
 	}
+}
+
+var errUnknownIncident = errors.New("no incident has that id")
+
+type selfhealRecordDocReport struct {
+	Incident  string `json:"incident"`
+	RecordDoc string `json:"record_doc"`
+}
+
+func runSelfhealRecordDoc(w codeEnvelopeWriter, root string, operands []string) int {
+	id, doc := operands[0], operands[1]
+	if err := checkRecordDocShape(doc); err != nil {
+		return w.fail(selfhealExitIn, "input", "evolve selfheal: "+err.Error())
+	}
+	err := selfheal.UpdateIncidents(selfheal.Dir(paths.EvolveDirOf(root)), func(current []selfheal.Incident) ([]selfheal.Incident, error) {
+		at := slices.IndexFunc(current, func(inc selfheal.Incident) bool { return inc.ID == id })
+		if at < 0 {
+			return nil, fmt.Errorf("%w: %s", errUnknownIncident, id)
+		}
+		next := slices.Clone(current)
+		next[at].RecordDoc = doc
+		return next, nil
+	})
+	switch {
+	case errors.Is(err, errUnknownIncident):
+		return w.fail(selfhealExitIn, "input", "evolve selfheal: "+err.Error())
+	case err != nil:
+		return w.fail(exitIO, "io", "evolve selfheal: "+err.Error())
+	}
+	if !w.json {
+		fmt.Fprintf(w.stdout, "selfheal record-doc: %s -> %s\n", id, doc)
+	}
+	return w.ok(selfhealRecordDocReport{Incident: id, RecordDoc: doc})
+}
+
+func checkRecordDocShape(doc string) error {
+	dir, file := path.Split(doc)
+	if strings.TrimSuffix(dir, "/") != incidentkb.RelDir || !incidentkb.IsRecordFile(file) || !incidentkb.ValidID(strings.TrimSuffix(file, ".md")) {
+		return fmt.Errorf("the record document must be %s/<record-id>.md, got %q", incidentkb.RelDir, doc)
+	}
+	return nil
 }

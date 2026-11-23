@@ -28,6 +28,7 @@ type Verifier interface {
 	ReproGreen(Incident) bool
 	WaveEndedAfter(time.Time) bool
 	RetrospectiveExists(id string) bool
+	RecordDocExists(Incident) bool
 }
 
 func Detect(existing []Incident, obs []Observation, v Verifier, now time.Time) ([]Incident, []Transition) {
@@ -126,6 +127,7 @@ func conditionsOf(inc Incident, obs []Observation, v Verifier) Conditions {
 		SignalClear:   v.WaveEndedAfter(inc.LastSeenAt),
 		QualityHeld:   !qualityRegressedAfter(obs, inc),
 		Retrospective: v.RetrospectiveExists(inc.ID),
+		RecordDoc:     v.RecordDocExists(inc),
 	}
 }
 

@@ -6,19 +6,20 @@ import (
 	"time"
 )
 
-func TestIncident_ClosesOnlyWithTheFourConditions(t *testing.T) {
+func TestIncident_ClosesOnlyWhenEachConditionHolds(t *testing.T) {
 	t.Parallel()
 	open := Incident{ID: "inc-2026-10-27-0a1b2c3d", State: StateOpen, OpenedAt: t0}
-	all := Conditions{ReproGreen: true, SignalClear: true, QualityHeld: true, Retrospective: true}
+	all := Conditions{ReproGreen: true, SignalClear: true, QualityHeld: true, Retrospective: true, RecordDoc: true}
 	cases := []struct {
 		name    string
 		cond    Conditions
 		missing string
 	}{
-		{"no green reproduction", Conditions{SignalClear: true, QualityHeld: true, Retrospective: true}, CondReproGreen},
-		{"the signal fired in the last wave", Conditions{ReproGreen: true, QualityHeld: true, Retrospective: true}, CondSignalClear},
-		{"a quality index regressed", Conditions{ReproGreen: true, SignalClear: true, Retrospective: true}, CondQualityHeld},
-		{"no recovery retrospective", Conditions{ReproGreen: true, SignalClear: true, QualityHeld: true}, CondRetrospective},
+		{"no green reproduction", Conditions{SignalClear: true, QualityHeld: true, Retrospective: true, RecordDoc: true}, CondReproGreen},
+		{"the signal fired in the last wave", Conditions{ReproGreen: true, QualityHeld: true, Retrospective: true, RecordDoc: true}, CondSignalClear},
+		{"a quality index regressed", Conditions{ReproGreen: true, SignalClear: true, Retrospective: true, RecordDoc: true}, CondQualityHeld},
+		{"no recovery retrospective", Conditions{ReproGreen: true, SignalClear: true, QualityHeld: true, RecordDoc: true}, CondRetrospective},
+		{"no record document", Conditions{ReproGreen: true, SignalClear: true, QualityHeld: true, Retrospective: true}, CondRecordDoc},
 	}
 	for _, c := range cases {
 		got, missing := open.Close(c.cond, t0.Add(time.Hour))
@@ -28,7 +29,7 @@ func TestIncident_ClosesOnlyWithTheFourConditions(t *testing.T) {
 	}
 	got, missing := open.Close(all, t0.Add(time.Hour))
 	if got.State != StateClosed || got.ClosedAt == nil || !got.ClosedAt.Equal(t0.Add(time.Hour)) || len(missing) != 0 {
-		t.Fatalf("with all four conditions the incident closes at the pass time: %+v %v", got, missing)
+		t.Fatalf("with all five conditions the incident closes at the pass time: %+v %v", got, missing)
 	}
 	if open.State != StateOpen || open.ClosedAt != nil {
 		t.Fatal("Close returns a new record and leaves the receiver as it was")
@@ -38,7 +39,7 @@ func TestIncident_ClosesOnlyWithTheFourConditions(t *testing.T) {
 func TestIncident_CloseNamesEachMissingConditionInOrder(t *testing.T) {
 	t.Parallel()
 	_, missing := Incident{State: StateOpen}.Close(Conditions{}, t0)
-	if !slices.Equal(missing, []string{CondReproGreen, CondSignalClear, CondQualityHeld, CondRetrospective}) {
+	if !slices.Equal(missing, []string{CondReproGreen, CondSignalClear, CondQualityHeld, CondRetrospective, CondRecordDoc}) {
 		t.Fatalf("missing = %v", missing)
 	}
 }
@@ -66,5 +67,14 @@ func TestIncidentID_IsStableForOneFingerprintAndDay(t *testing.T) {
 	}
 	if incidentID("main-red:main", t0) == a {
 		t.Fatal("two fingerprints get two ids")
+	}
+}
+
+func TestIncidentClose_RefusesWithoutARecordDoc(t *testing.T) {
+	t.Parallel()
+	open := Incident{ID: "inc-2026-10-27-0a1b2c3d", State: StateOpen, OpenedAt: t0, RecordDoc: "docs/incidents/2026-10-27-x.md"}
+	got, missing := open.Close(Conditions{ReproGreen: true, SignalClear: true, QualityHeld: true, Retrospective: true}, t0.Add(time.Hour))
+	if got.State != StateOpen || got.ClosedAt != nil || !slices.Equal(missing, []string{CondRecordDoc}) {
+		t.Fatalf("four held conditions without the record document must leave the incident open and name record-doc: %+v %v", got, missing)
 	}
 }

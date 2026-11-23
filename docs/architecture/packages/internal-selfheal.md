@@ -1,6 +1,6 @@
 # internal/selfheal
 
-> Decision: [ADR-0155](../adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md). Spec of record: [llm-isolation.md](../llm-isolation.md) §18, §22 and §24. Plan: [llm-isolation-2026-10](../../plans/llm-isolation-2026-10.md) components X12, X13 and X14. The verbs are `evolve selfheal incidents` (`go/cmd/evolve/cmd_selfheal.go`) and `evolve selfheal propose` (`go/cmd/evolve/cmd_selfheal_propose.go`).
+> Decision: [ADR-0155](../adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md). Spec of record: [llm-isolation.md](../llm-isolation.md) §18, §22 and §24. Plan: [llm-isolation-2026-10](../../plans/llm-isolation-2026-10.md) components X12, X13 and X14. The verbs are `evolve selfheal incidents` (`go/cmd/evolve/cmd_selfheal.go`) `evolve selfheal propose` (`go/cmd/evolve/cmd_selfheal_propose.go`) and `evolve selfheal record-doc <incident-id> <path>` (`go/cmd/evolve/cmd_selfheal.go`).
 
 ## Purpose
 
@@ -40,7 +40,7 @@ A second pass over the same files opens nothing and publishes nothing.
   - Presence, not the evidence time, decides. A stale usage reading or a hung run keeps one evidence time, but the condition stays in the window, so its record cannot close.
   - The severity is the highest severity of the evidence. It rises to INCIDENT at `EscalateAt` (3) occurrences, or when the evidence names a protected surface.
   - The tier is T0 when the evidence names a protected surface (`guards.ProtectedPathsIn`, or a finding that says "protected"). Else it is the tier of the class: T2 for `flaky-test` and `claim-churn`, T1 for the others.
-- **The close (I-14).** `Incident.Close` closes a record only when all four `Conditions` hold. It returns the missing conditions in order.
+- **The close (I-14).** `Incident.Close` closes a record only when all five `Conditions` hold. It returns the missing conditions in order.
 
   | Condition | `TreeVerifier` reads |
   |---|---|
@@ -48,9 +48,13 @@ A second pass over the same files opens nothing and publishes nothing.
   | `signal-clear` | the pass observes no evidence of the fingerprint, and a wave started after `last_seen_at` and ended |
   | `quality-held` | no quality breach of another fingerprint after `opened_at` |
   | `retrospective` | a file under `docs/retrospectives/` names the incident id |
+  | `record-doc` | `record_doc` is a local path (`filepath.IsLocal`) and a regular file exists there under the root |
 
   X12 has no repair path, so no record has a `repro_test` yet. So a record stays open until X16 runs a repair. This is the rule of I-14, not a gap.
-- **The record.** `WriteIncident` writes `.evolve/incidents/<id>.json` with `atomicwrite.JSON`. It has the fields of spec §18.2: `id`, `class`, `sources`, `tier`, `state`, `attempts`, `repro_test`, `opened_at` and `closed_at`. It also has `fingerprint`, `subject`, `severity`, `recurrence`, `reopened`, `summary` and `last_seen_at`. `LoadIncidents` fails on a corrupt record and names its path.
+
+  The record document is a second document that gates a close, next to the retrospective. A reopened incident keeps its `record_doc`, as D14 of the plan expects. An incident that waits only for its document stays open. So it counts as open for `Pending` and for the main-red precondition of the validator. Rebuild each binary of the loop at the merge boundary before the first `record_doc` is set. An older binary does not know the field, and it drops the field when it rewrites a record.
+- **The record.** `WriteIncident` writes `.evolve/incidents/<id>.json` with `atomicwrite.JSON`. It has the fields of spec §18.2: `id`, `class`, `sources`, `tier`, `state`, `attempts`, `repro_test`, `record_doc`, `opened_at` and `closed_at`. It also has `fingerprint`, `subject`, `severity`, `recurrence`, `reopened`, `summary` and `last_seen_at`. `LoadIncidents` fails on a corrupt record and names its path.
+- **The record-doc verb.** `evolve selfheal record-doc <incident-id> <path>` stores the path through `UpdateIncidents`. It checks only the shape of the path: `docs/incidents/<record-id>.md`, local, with a name that `incidentkb.IsRecordFile` and `incidentkb.ValidID` accept. The close condition checks that the file exists, so the verb does not. `selfheal` keeps no import of `incidentkb`, so the detector does not depend on the docs schema; only the command does. The exit codes are 0 ok, 2 io, 10 usage and 11 input (a bad path or an unknown incident id).
 - **The store lock.** `UpdateIncidents` is the one read, change and write of the store. It holds the lock `.evolve/incidents.lock`, loads the records, applies the update and writes only the changed records. The boundary pass and the live reaction both use it, so neither writer loses an update of the other.
 - **The events.** `Transition.Event` gives one event for each open, reopen and close: module `healing`, kind `selfheal.incident`. An open has the code `HEALING_INCIDENT_OPENED`, a reopen has `HEALING_INCIDENT_REOPENED`, and a close is INFO with no code. The lossless channel `selfheal.incident` keeps them ([event-channels.md](../event-channels.md)).
 - **At most once.** The verb writes the records first and publishes the events after. A crash between the two loses the events of that pass. The records are the source of truth.
@@ -218,7 +222,7 @@ The file is `main_red_hold.go`. The design is in the same section 13.
 - The package never acts, with two exceptions. It writes only its own records, the decision ledger and the evidence workspaces. It changes no inbox item, no policy and no git ref.
 - The first exception is `StopBound.Check`. It sets the `escalated_at` field of `main-red-stop.json` through `mainstop.Update`, and it changes no other field of that record.
 - The second exception is `StopRelease.Keys`. It drops the green keys of `main-red-stop.json` through `Stop.Released`, in one `mainstop.Update`.
-- The incident records, the package, the verb file `cmd_selfheal.go` and the stage key are protected surfaces (`guards.ProtectedSurfaceManifest`). The verb file is protected because it chooses the evidence and builds the verifier. `cmd_selfheal_live.go` is protected too, because it opens incidents and engages the loop brake. `cmd_selfheal_propose.go` is protected for the same reason, and the proposal records are under the protected directory. `TestNoAgentProfileCanWriteTheIncidentRecords` checks that no agent profile has a write grant over `.evolve/incidents/`.
+- The incident records, the package, the verb file `cmd_selfheal.go` and the stage key are protected surfaces (`guards.ProtectedSurfaceManifest`). The verb file is protected because it chooses the evidence, builds the verifier and stores the `record_doc` path. `cmd_selfheal_live.go` is protected too, because it opens incidents and engages the loop brake. `cmd_selfheal_propose.go` is protected for the same reason, and the proposal records are under the protected directory. `TestNoAgentProfileCanWriteTheIncidentRecords` checks that no agent profile has a write grant over `.evolve/incidents/`.
 - Each rule is a pure function. Only the loaders read files, and only the verb starts `gh`.
 - The loader of the ship journal (`sources.go`) calls `shipjournal.Read`. The package has no second parser of `ship-journal.jsonl`. `readJSONL` stays for the decision ledger only.
 
