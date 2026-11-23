@@ -7,13 +7,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxtest"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 const scopeID = "context-fill-telemetry-and-cap"
@@ -40,10 +41,8 @@ func TestMain(m *testing.M) {
 		return
 	}
 	bin := filepath.Join(dir, "evolve-under-test")
-	cmd := exec.Command("go", "build", "-o", bin, "./cmd/evolve")
-	cmd.Dir = goMod
-	if out, berr := cmd.CombinedOutput(); berr != nil {
-		buildErr = fmt.Sprintf("go build ./cmd/evolve (dir=%s): %v\n%s", goMod, berr, out)
+	if stdout, stderr, _, berr := acsassert.SubprocessOutput("go", "-C", goMod, "build", "-o", bin, "./cmd/evolve"); berr != nil {
+		buildErr = fmt.Sprintf("go build ./cmd/evolve (dir=%s): %v\n%s%s", goMod, berr, stdout, stderr)
 	} else {
 		evolveBin = bin
 	}
@@ -82,19 +81,11 @@ func requireBinary(t *testing.T) string {
 
 func runCLI(t *testing.T, projectRoot string, args ...string) (string, string, int) {
 	t.Helper()
-	cmd := exec.Command(requireBinary(t), args...)
-	cmd.Dir = projectRoot
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	code := 0
-	if ee, ok := err.(*exec.ExitError); ok {
-		code = ee.ExitCode()
-	} else if err != nil {
+	stdout, stderr, code, err := acsassert.SubprocessOutputIn(projectRoot, requireBinary(t), args...)
+	if code == -1 {
 		t.Fatalf("running %v in %s: %v", args, projectRoot, err)
 	}
-	return stdout.String(), stderr.String(), code
+	return stdout, stderr, code
 }
 
 func binding(cycle int) continuation.Continuation {
@@ -149,15 +140,6 @@ func bind(t *testing.T, root, id string, c continuation.Continuation) {
 	}
 }
 
-func bound(t *testing.T, root, id string) bool {
-	t.Helper()
-	_, ok, err := continuation.ReadRegistryEntry(root, id)
-	if err != nil {
-		t.Fatalf("read registry %s: %v", id, err)
-	}
-	return ok
-}
-
 func preservedPointers(t *testing.T, path string) string {
 	t.Helper()
 	raw, err := os.ReadFile(path)
@@ -206,10 +188,10 @@ func TestC1515_001_ParkReleasesBindingAndPreservesPointer(t *testing.T) {
 		t.Fatalf("Promote(quarantine) was a no-op: %+v (stderr: %s)", res, errBuf.String())
 	}
 
-	if bound(t, root, scopeID) {
+	if inboxtest.Bound(t, root, scopeID) {
 		t.Errorf("RED: parking %q left its continuation-registry binding intact — the parked scope is re-dispatched as an adopted continuation forever (cycle-1487 burn)", scopeID)
 	}
-	if !bound(t, root, liveSibling) {
+	if !inboxtest.Bound(t, root, liveSibling) {
 		t.Errorf("RED: parking %q also released the UNRELATED live scope %q — release must be scoped to the retired item", scopeID, liveSibling)
 	}
 	joined := preservedPointers(t, res.DestPath)
@@ -260,7 +242,7 @@ func TestC1515_003_ScopeResolveRefusesRetiredBinding(t *testing.T) {
 	if !strings.Contains(errBuf.String(), scopeID) {
 		t.Errorf("RED: refusing the dead binding for %q was SILENT — the operator gets a vanished lane with no explanation. stderr: %q", scopeID, errBuf.String())
 	}
-	if bound(t, root, scopeID) {
+	if inboxtest.Bound(t, root, scopeID) {
 		t.Errorf("RED: the ghost binding for %q survived the refusal — it re-arms on the very next wave", scopeID)
 	}
 
@@ -318,10 +300,10 @@ func TestC1515_006_ContinuationReleaseReleasesAndAnnotates(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("RED: `evolve continuation release -operator %s` exited %d — authority was granted, so the release path itself is broken.\nstdout: %s\nstderr: %s", scopeID, code, stdout, stderr)
 	}
-	if bound(t, root, scopeID) {
+	if inboxtest.Bound(t, root, scopeID) {
 		t.Errorf("RED: `evolve continuation release %s` reported success but the binding is still in the registry", scopeID)
 	}
-	if !bound(t, root, liveSibling) {
+	if !inboxtest.Bound(t, root, liveSibling) {
 		t.Errorf("RED: releasing %q also dropped the UNRELATED binding for %q — release must name exactly one scope", scopeID, liveSibling)
 	}
 	joined := preservedPointers(t, itemPath)
@@ -343,7 +325,7 @@ func TestC1515_007_ContinuationReleaseRejectsUnknownScope(t *testing.T) {
 	if !strings.Contains(stdout+stderr, "no-such-scope-id") {
 		t.Errorf("RED: the unknown-scope failure never named the scope, so the operator cannot see what was rejected.\nstdout: %s\nstderr: %s", stdout, stderr)
 	}
-	if !bound(t, root, liveSibling) {
+	if !inboxtest.Bound(t, root, liveSibling) {
 		t.Errorf("RED: a failed release of an unknown scope collaterally dropped %q's binding", liveSibling)
 	}
 }
@@ -367,7 +349,7 @@ func TestC1515_008_ContinuationRejectsMalformedInvocations(t *testing.T) {
 			t.Errorf("RED: `evolve %s` exited 0 — a malformed invocation must fail loudly.\nstdout: %s\nstderr: %s", strings.Join(args, " "), stdout, stderr)
 		}
 	}
-	if !bound(t, root, scopeID) {
+	if !inboxtest.Bound(t, root, scopeID) {
 		t.Errorf("RED: a malformed invocation mutated the registry — %q's binding was dropped without an explicit scope argument", scopeID)
 	}
 }

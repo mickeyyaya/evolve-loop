@@ -2,7 +2,6 @@
 package acsassert
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,6 +17,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -144,10 +144,20 @@ func navigateDotPath(doc any, dotPath string) (any, bool) {
 }
 
 func SubprocessOutput(name string, args ...string) (stdout, stderr string, code int, err error) {
+	return SubprocessOutputIn("", name, args...)
+}
+
+func SubprocessOutputIn(dir, name string, args ...string) (stdout, stderr string, code int, err error) {
 	if _, lookErr := exec.LookPath(name); lookErr != nil {
 		return "", "", -1, fmt.Errorf("%w: %s: %v", ErrSubprocessNotFound, name, lookErr)
 	}
-	cmd := sysexec.Command(context.Background(), name, args...)
+	ctx, cancel := boundContext()
+	defer cancel()
+	if name == "go" {
+		args = lanebudget.WithTimeout(args, innerTimeout(ctx))
+	}
+	cmd := sysexec.Command(ctx, name, args...)
+	cmd.Dir = dir
 	var sout, serr strings.Builder
 	cmd.Stdout = &sout
 	cmd.Stderr = &serr
@@ -157,11 +167,19 @@ func SubprocessOutput(name string, args ...string) (stdout, stderr string, code 
 	if runErr == nil {
 		return stdout, stderr, 0, nil
 	}
+	code = -1
 	var exitErr *exec.ExitError
-	if errors.As(runErr, &exitErr) {
-		return stdout, stderr, exitErr.ExitCode(), fmt.Errorf("subprocess %s exited %d", name, exitErr.ExitCode())
+	isExit := errors.As(runErr, &exitErr)
+	if isExit {
+		code = exitErr.ExitCode()
 	}
-	return stdout, stderr, -1, fmt.Errorf("subprocess %s: %w", name, runErr)
+	switch {
+	case boundHit(ctx, name, stdout+stderr):
+		return stdout, stderr + boundLine(name), code, fmt.Errorf("%w: %s", ErrSubprocessBound, name)
+	case isExit:
+		return stdout, stderr, code, fmt.Errorf("subprocess %s exited %d", name, code)
+	}
+	return stdout, stderr, code, fmt.Errorf("subprocess %s: %w", name, runErr)
 }
 
 func AllOf(tb TB, predicates ...func(TB) bool) bool {

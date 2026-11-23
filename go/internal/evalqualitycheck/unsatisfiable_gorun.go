@@ -48,7 +48,7 @@ func goRunExitCodeOf(scopes scopeStack, expr ast.Expr) (binding, bool) {
 
 func goRunCommand(expr ast.Expr) (binding, bool) {
 	call, ok := expr.(*ast.CallExpr)
-	if !ok || isPkgCall(call, "acsassert", "SubprocessOutput") {
+	if !ok || isBoundedSubprocessCall(call) {
 		return binding{}, false
 	}
 	return goRunBinding(call, kindGoRunCommand)
@@ -56,7 +56,7 @@ func goRunCommand(expr ast.Expr) (binding, bool) {
 
 func goRunSubprocessExitCode(expr ast.Expr) (binding, bool) {
 	call, ok := expr.(*ast.CallExpr)
-	if !ok || !isPkgCall(call, "acsassert", "SubprocessOutput") {
+	if !ok || !isBoundedSubprocessCall(call) {
 		return binding{}, false
 	}
 	return goRunBinding(call, kindGoRunExitCode)

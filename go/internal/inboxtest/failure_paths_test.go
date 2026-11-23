@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 )
 
 type fatalSentinel struct{}
@@ -51,6 +53,13 @@ func TestFixtures_EachHelperFailsTheTestWhenItsFilesystemStepFails(t *testing.T)
 		t.Fatal(err)
 	}
 	missing := filepath.Join(t.TempDir(), "absent.json")
+	brokenRegistry := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(brokenRegistry, ".evolve"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(continuation.RegistryPath(brokenRegistry), []byte(`{not json`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	cases := map[string]func(tb testing.TB){
 		"EmptyRoot under a file":         func(tb testing.TB) { EmptyRoot(tb) },
 		"WriteFile parent is a file":     func(tb testing.TB) { WriteFile(tb, filepath.Join(blocker, "x", "f"), "b") },
@@ -61,6 +70,7 @@ func TestFixtures_EachHelperFailsTheTestWhenItsFilesystemStepFails(t *testing.T)
 		"ReadRouted invalid json":        func(tb testing.TB) { ReadRouted(tb, good) },
 		"TreeBytes missing root":         func(tb testing.TB) { TreeBytes(tb, missing) },
 		"WriteLiveRunLease under a file": func(tb testing.TB) { WriteLiveRunLease(tb, blocker) },
+		"Bound registry is invalid json": func(tb testing.TB) { Bound(tb, brokenRegistry, "x") },
 	}
 	for name, fn := range cases {
 		dir := t.TempDir()

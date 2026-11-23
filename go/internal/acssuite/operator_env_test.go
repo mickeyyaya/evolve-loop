@@ -43,7 +43,7 @@ func TestRun_PredicatesSeeTheOperatorKeysThePolicyNamesAndNoOther(t *testing.T) 
 	if _, err := Run(Options{Root: t.TempDir(), ProjectRoot: plane, Cycle: 9, GoExec: captureScopeEnvs(&envs)}); err != nil {
 		t.Fatal(err)
 	}
-	want := []string{flagCampaignKey, "EVOLVE_PROJECT_ROOT", ipcenv.WorktreeRootKey}
+	want := []string{flagCampaignKey, "EVOLVE_PROJECT_ROOT", ipcenv.WorktreeRootKey, ipcenv.ACSLaneEndKey}
 	sort.Strings(want)
 	for _, raw := range envs {
 		env := effectiveEnv(raw)

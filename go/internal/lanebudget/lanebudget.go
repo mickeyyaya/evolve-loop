@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
@@ -85,17 +86,28 @@ func ShareFor(held bool) int {
 func Args(args []string) []string { return ArgsFor(Current(), args) }
 
 func ArgsFor(procs int, args []string) []string {
-	if procs == 0 || !isGoTest(args) {
+	at := insertIndex(args)
+	if procs == 0 || at < 0 {
 		return args
 	}
 	value := strconv.Itoa(procs)
-	out := []string{args[0]}
+	out := slices.Clone(args[:at+1])
 	for _, flag := range []string{"-p", "-parallel"} {
-		if !hasFlag(args[1:], flag) {
+		if !hasFlag(args[at+1:], flag) {
 			out = append(out, flag, value)
 		}
 	}
-	return append(out, args[1:]...)
+	return append(out, args[at+1:]...)
+}
+
+func WithTimeout(args []string, timeout time.Duration) []string {
+	at := insertIndex(args)
+	timeout = timeout.Truncate(time.Millisecond)
+	if at < 0 || timeout <= 0 || hasFlag(args[at+1:], "-timeout") {
+		return args
+	}
+	out := append(slices.Clone(args[:at+1]), "-timeout", timeout.String())
+	return append(out, args[at+1:]...)
 }
 
 func Env(env []string) []string { return EnvFor(Current(), env) }
@@ -120,7 +132,35 @@ func Runner(run sysexec.RunFunc) sysexec.RunFunc {
 }
 
 func isGoTest(args []string) bool {
-	return len(args) > 0 && args[0] == "test"
+	return goTestIndex(args) >= 0
+}
+
+func insertIndex(args []string) int {
+	at := goTestIndex(args)
+	if at < 0 || at+1 >= len(args) {
+		return at
+	}
+	switch {
+	case args[at+1] == "-C" && at+2 < len(args):
+		return at + 2
+	case strings.HasPrefix(args[at+1], "-C="):
+		return at + 1
+	}
+	return at
+}
+
+func goTestIndex(args []string) int {
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "test":
+			return i
+		case "-C":
+			i++
+		default:
+			return -1
+		}
+	}
+	return -1
 }
 
 func hasFlag(args []string, flag string) bool {

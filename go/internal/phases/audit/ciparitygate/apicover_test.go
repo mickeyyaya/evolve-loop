@@ -132,6 +132,9 @@ func TestEnforceVerdict_PureTableAndMeasureInterruption(t *testing.T) {
 	if off, err := enforceVerdict(1, nil, "x.go:1: UNCOVERED (no test names it): Exported\nsummary\n"); err != nil || len(off) != 1 || !strings.Contains(off[0], "UNCOVERED") {
 		t.Errorf("offenders: (%v, %v)", off, err)
 	}
+	if off, err := enforceVerdict(1, nil, ""); err != nil || len(off) == 0 {
+		t.Errorf("a failing run with no report must still block: (%v, %v)", off, err)
+	}
 	off, err := enforceVerdict(2, errors.New("parse boom"), "partial")
 	if err != nil || off[len(off)-1] != "apicover -enforce measurement error: parse boom" {
 		t.Errorf("measurement error: (%v, %v)", off, err)

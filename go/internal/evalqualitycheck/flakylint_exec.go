@@ -116,36 +116,53 @@ func argvHasRunFilter(argv []string) bool {
 	return false
 }
 
-type execConstructor struct{ skipCtxArg, ctxBound bool }
-
-var execConstructors = map[string]execConstructor{
-	"exec.Command":               {},
-	"exec.CommandContext":        {skipCtxArg: true, ctxBound: true},
-	"acsassert.SubprocessOutput": {},
+type execConstructor struct {
+	leadArgs int
+	ctxBound bool
+	bounded  bool
+	dirArg   bool
 }
 
-func execArgv(call *ast.CallExpr, consts map[string]string) (argv []string, hasCtx, ok bool) {
+var execConstructors = map[string]execConstructor{
+	"exec.Command":                 {},
+	"exec.CommandContext":          {leadArgs: 1, ctxBound: true},
+	"acsassert.SubprocessOutput":   {ctxBound: true, bounded: true},
+	"acsassert.SubprocessOutputIn": {leadArgs: 1, ctxBound: true, bounded: true, dirArg: true},
+}
+
+func execConstructorOf(call *ast.CallExpr) (execConstructor, bool) {
 	sel, isSel := call.Fun.(*ast.SelectorExpr)
 	if !isSel {
-		return nil, false, false
+		return execConstructor{}, false
 	}
 	x, isIdent := sel.X.(*ast.Ident)
 	if !isIdent {
-		return nil, false, false
+		return execConstructor{}, false
 	}
 	ctor, known := execConstructors[x.Name+"."+sel.Sel.Name]
+	return ctor, known
+}
+
+func anchorsDirectory(call *ast.CallExpr) bool {
+	ctor, known := execConstructorOf(call)
+	return known && ctor.dirArg
+}
+
+func isBoundedSubprocessCall(call *ast.CallExpr) bool {
+	ctor, known := execConstructorOf(call)
+	return known && ctor.bounded
+}
+
+func execArgv(call *ast.CallExpr, consts map[string]string) (argv []string, hasCtx, ok bool) {
+	ctor, known := execConstructorOf(call)
 	if !known {
 		return nil, false, false
 	}
-	hasCtx = ctor.ctxBound
-	args := call.Args
-	if ctor.skipCtxArg && len(args) > 0 {
-		args = args[1:]
-	}
+	args := call.Args[min(ctor.leadArgs, len(call.Args)):]
 	for _, a := range args {
 		argv = append(argv, resolveStringExpr(a, consts))
 	}
-	return argv, hasCtx, true
+	return argv, ctor.ctxBound, true
 }
 
 func resolveStringExpr(e ast.Expr, consts map[string]string) string {

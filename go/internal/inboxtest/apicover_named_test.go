@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
@@ -51,5 +52,18 @@ func TestFixtures_WriteLiveRunLeaseRecordsTheRunningProcess(t *testing.T) {
 	}
 	if lease.RunID != "01LIVE" || lease.OwnerPID != os.Getpid() {
 		t.Errorf("lease = %+v", lease)
+	}
+}
+
+func TestFixtures_BoundReadsTheContinuationRegistry(t *testing.T) {
+	root := EmptyRoot(t)
+	if Bound(t, root, "alpha") {
+		t.Fatal("a scope with no binding reads as bound")
+	}
+	if err := continuation.WriteRegistryEntry(root, "alpha", continuation.Continuation{Cycle: 3}); err != nil {
+		t.Fatal(err)
+	}
+	if !Bound(t, root, "alpha") {
+		t.Error("a bound scope reads as unbound")
 	}
 }

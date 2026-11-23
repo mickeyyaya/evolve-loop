@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
@@ -109,4 +110,13 @@ func WriteLiveRunLease(t testing.TB, root string) {
 	if err := runlease.Write(runDir, runlease.Lease{RunID: "01LIVE", OwnerPID: os.Getpid()}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func Bound(t testing.TB, root, id string) bool {
+	t.Helper()
+	_, ok, err := continuation.ReadRegistryEntry(root, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ok
 }

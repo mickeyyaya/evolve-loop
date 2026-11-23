@@ -54,13 +54,13 @@ const cleanPredicateSrc = `//go:build acs
 package cycle4242
 
 import (
-	"context"
-	"os/exec"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 func TestC4242_ScopedGreen(t *testing.T) {
-	if err := exec.CommandContext(context.Background(), "go", "test", "-count=1", "./internal/evalgate").Run(); err != nil {
+	if _, _, code, err := acsassert.SubprocessOutput("go", "test", "-count=1", "./internal/evalgate"); code != 0 {
 		t.Fatal(err)
 	}
 }
@@ -219,7 +219,7 @@ func TestFlakyShapeGate_ReasonTruncatesWithVisibleCount(t *testing.T) {
 	reason, _ := flakyShapeGate().check(core.ReviewInput{
 		Phase: "tdd", Workspace: cycleWorkspace(t, 4242), Worktree: wt,
 	})
-	if !strings.Contains(reason, "+3 more") {
+	if want := "+" + strconv.Itoa(2*(predicateLintMaxReported+3)-predicateLintMaxReported) + " more"; !strings.Contains(reason, want) {
 		t.Errorf("reason must state how many findings it elided; got %q", reason)
 	}
 }
