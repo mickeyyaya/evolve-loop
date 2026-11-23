@@ -9,8 +9,18 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/commitgate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
+
+var repoContractPack core.RepoContractPackFn = ship.RunRepoContractPack
+
+func repoContractStep(stderr io.Writer) commitgate.RepoContractStep {
+	return func(ctx context.Context, root string) ([]string, error) {
+		return core.RepoContractJudge(core.CommitGateStage(), repoContractPack)(ctx, core.ReviewInput{ProjectRoot: root, Worktree: root, Stderr: stderr})
+	}
+}
 
 func RunCommitGate(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
@@ -44,6 +54,8 @@ func RunCommitGate(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		Env:       os.Environ(),
 		Runner:    sysexec.DefaultRunner,
 		Now:       time.Now,
+
+		RepoContract: repoContractStep(stderr),
 	}, stderr)
 	if !ok {
 		return commitgate.ExitGitFatal

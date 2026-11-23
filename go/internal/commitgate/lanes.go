@@ -151,6 +151,24 @@ func (o Options) laneGo(ctx context.Context, files []string, res *Result) int {
 		res.pass("go:golangci-lint")
 	}
 	res.pass("go:test")
+	return o.runRepoContract(ctx, res)
+}
+
+func (o Options) runRepoContract(ctx context.Context, res *Result) int {
+	if o.RepoContract == nil {
+		return ExitPass
+	}
+	refusals, err := o.RepoContract(ctx, o.RepoRoot)
+	for _, refusal := range refusals {
+		res.log("go: %s", refusal)
+	}
+	if err != nil {
+		res.log("go: repo-contract pack: %v", err)
+	}
+	if len(refusals) > 0 || err != nil {
+		return ExitFail
+	}
+	res.pass("go:repo-contract")
 	return ExitPass
 }
 

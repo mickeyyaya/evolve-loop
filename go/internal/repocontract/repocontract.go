@@ -236,6 +236,9 @@ var treeReadingSelections = []TestSelection{
 		"TestOnlyTheBridgeStartsAnLLMBinary",
 		"TestPipelineCode_StartsEveryProcessThroughCommand",
 	}},
+	{Package: "./internal/testaudit", Tests: []string{
+		"TestTreeRatchet",
+	}},
 	{Package: "./internal/tmuxtest", Tests: []string{
 		"TestEveryTmuxTestPackageUsesTheOrphanGuard",
 	}},
