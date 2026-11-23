@@ -327,6 +327,26 @@
     {
       "key": "healing.live_reaction.stage",
       "rule": "no-signal"
+    },
+    {
+      "key": "handoff.build-audit.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "handoff.intent-scout.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "handoff.scout-triage.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "handoff.tdd-build.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "handoff.triage-tdd.stage",
+      "rule": "no-signal"
     }
   ]
 }
