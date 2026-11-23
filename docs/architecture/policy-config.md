@@ -412,6 +412,25 @@ The loop warns when a stage emits its start signal and its end signal does not f
 
 A key that is 0 or absent keeps its default. The block refuses each other key.
 
+## Token weights (`telemetry.token_weights`)
+
+The token report adds the four token counts of a call with one weight for each count. The sum is the cache-weighted unit (CWU). The plan is [token-telemetry-2026-10.md](../plans/token-telemetry-2026-10.md), component T8.
+
+A family is a subscription. It is the manifest `binary` of the driver of a row. The row `agy-claude-tmux` has the base driver `agy-tmux`, whose binary is `agy`, so it counts as `agy`. The report maps a row to its family through the bridge manifest. The policy does not map rows.
+
+Two families exist: `claude` and `agy`. The families `codex` and `ollama` have no collector today, so they have no rows. A report that asks for a family without weights gets an error.
+
+| Key | Meaning | Default | Refused |
+|---|---|---|---|
+| `telemetry.token_weights.<family>.input` | the weight of an input token | 1 | below 0, or not a number |
+| `telemetry.token_weights.<family>.output` | the weight of an output token | 5 | below 0, or not a number |
+| `telemetry.token_weights.<family>.cache_read` | the weight of a cache read token | 0.1 | below 0, or not a number |
+| `telemetry.token_weights.<family>.cache_write` | the weight of a cache write token | 1.25 | below 0, or not a number |
+
+A key that is absent keeps its default. A weight of 0 is valid. The block refuses each other family and each other weight name with the error `unknown policy key`. The error of a negative weight names the full key, for example `telemetry.token_weights.claude.cache_read`. With two bad families, the error names the first in sorted order.
+
+Why: the default weights are the plan figures (P3.22). A per-family quota fit can change them without a code change ([internal-policy.md](packages/internal-policy.md)).
+
 ## Disk pause limit (`preflight.disk_guard`)
 
 The cycle start waits when free disk space is below 5%. This block sets how long it waits before it gives up.
