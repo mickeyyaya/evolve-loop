@@ -167,7 +167,7 @@ func TestResolveContinuationForScopeRecency(t *testing.T) {
 			releaseFixtureBind(t, root, "ghost-scope", c)
 
 			var errBuf bytes.Buffer
-			got := ResolveContinuationForScope(Options{ProjectRoot: root, Stderr: &errBuf}, 1515, []string{"ghost-scope"})
+			got := mustResolveScope(t, Options{ProjectRoot: root, Stderr: &errBuf}, 1515, []string{"ghost-scope"})
 
 			if tc.wantResolved {
 				if got == nil {

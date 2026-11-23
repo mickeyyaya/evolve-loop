@@ -133,7 +133,7 @@ func TestResolveContinuationForScope_GhostScopeRefusedAndReleased(t *testing.T) 
 	seedRegistryOnly(t, root, ghost, 1484)
 
 	var errBuf bytes.Buffer
-	if got := ResolveContinuationForScope(Options{ProjectRoot: root, Stderr: &errBuf}, 1507, []string{ghost}); got != nil {
+	if got := mustResolveScope(t, Options{ProjectRoot: root, Stderr: &errBuf}, 1507, []string{ghost}); got != nil {
 		t.Errorf("a ghost scope resolved for dispatch: %+v", got)
 	}
 	if stillBound(t, root, ghost) {
@@ -152,7 +152,7 @@ func TestResolveContinuationForScope_RetiredDirsAreNotLive(t *testing.T) {
 			seedItemIn(t, filepath.Join(root, ".evolve", "inbox", dir, "cycle-1506"), id)
 			seedRegistryOnly(t, root, id, 1484)
 
-			if got := ResolveContinuationForScope(Options{ProjectRoot: root, Stderr: &bytes.Buffer{}}, 1507, []string{id}); got != nil {
+			if got := mustResolveScope(t, Options{ProjectRoot: root, Stderr: &bytes.Buffer{}}, 1507, []string{id}); got != nil {
 				t.Errorf("an item in %s/ is retired, not live — its binding must not dispatch: %+v", dir, got)
 			}
 		})
@@ -164,7 +164,7 @@ func TestResolveContinuationForScope_NoItemAnywhereStillAdopts(t *testing.T) {
 	const laneOnly = "carryover-only-scope"
 	want := seedRegistryOnly(t, root, laneOnly, 1484)
 
-	got := ResolveContinuationForScope(Options{ProjectRoot: root, Stderr: &bytes.Buffer{}}, 1507, []string{laneOnly})
+	got := mustResolveScope(t, Options{ProjectRoot: root, Stderr: &bytes.Buffer{}}, 1507, []string{laneOnly})
 	if got == nil || got.SnapshotSHA != want.SnapshotSHA {
 		t.Fatalf("a lane-scope-only binding with no inbox item must still resolve (cycle-1078 orphan class): got %+v", got)
 	}
@@ -179,7 +179,7 @@ func TestResolveContinuationForScope_ClaimedItemIsLive(t *testing.T) {
 	seedClaim(t, root, 1506, id, "")
 	want := seedRegistryOnly(t, root, id, 1484)
 
-	got := ResolveContinuationForScope(Options{ProjectRoot: root, Stderr: &bytes.Buffer{}}, 1507, []string{id})
+	got := mustResolveScope(t, Options{ProjectRoot: root, Stderr: &bytes.Buffer{}}, 1507, []string{id})
 	if got == nil || got.SnapshotSHA != want.SnapshotSHA {
 		t.Fatalf("a claimed (in-flight) scope lost its binding: got %+v", got)
 	}

@@ -47,7 +47,7 @@ func TestResolveContinuationForScope_DoesNotAdoptAPeerLanesClaim(t *testing.T) {
 	writeClaim(t, root, 1536, "pipeline-defect-infra-systemic", false, 0)
 	writeClaim(t, root, 1536, "pipeline-replay-contract-boundary", true, 1532)
 
-	got := ResolveContinuationForScope(Options{ProjectRoot: root}, 1536, []string{"pipeline-defect-infra-systemic"})
+	got := mustResolveScope(t, Options{ProjectRoot: root}, 1536, []string{"pipeline-defect-infra-systemic"})
 
 	if got != nil {
 		t.Fatalf("lane scoped to %q must not adopt the peer scope's continuation (cycle %d) — that is how cycle-1536 shipped cycle-1535's eval file and destroyed its landing; got %+v",
@@ -60,7 +60,7 @@ func TestResolveContinuationForScope_AdoptsItsOwnClaim(t *testing.T) {
 	writeClaim(t, root, 1536, "pipeline-defect-infra-systemic", true, 1500)
 	writeClaim(t, root, 1536, "pipeline-replay-contract-boundary", true, 1532)
 
-	got := ResolveContinuationForScope(Options{ProjectRoot: root}, 1536, []string{"pipeline-defect-infra-systemic"})
+	got := mustResolveScope(t, Options{ProjectRoot: root}, 1536, []string{"pipeline-defect-infra-systemic"})
 
 	if got == nil {
 		t.Fatalf("a lane's OWN stamped claim must still be adopted")
@@ -75,7 +75,7 @@ func TestResolveContinuationForScope_UnscopedCycleIsUnchanged(t *testing.T) {
 	writeClaim(t, root, 1536, "some-other-task", true, 1532)
 
 	for _, scopes := range [][]string{nil, {}, {"   "}} {
-		got := ResolveContinuationForScope(Options{ProjectRoot: root}, 1536, scopes)
+		got := mustResolveScope(t, Options{ProjectRoot: root}, 1536, scopes)
 		if got == nil || got.Cycle != 1532 {
 			t.Fatalf("an unscoped cycle must keep legacy claim-first behavior (scopes=%v); got %+v", scopes, got)
 		}
@@ -86,7 +86,7 @@ func TestResolveContinuationForScope_MatchesAnyDeclaredScopeID(t *testing.T) {
 	root := t.TempDir()
 	writeClaim(t, root, 1544, "zzz-last-alphabetically", true, 1400)
 
-	got := ResolveContinuationForScope(Options{ProjectRoot: root},
+	got := mustResolveScope(t, Options{ProjectRoot: root},
 		1544, []string{"lost-ship-closeout-failure", "zzz-last-alphabetically"})
 
 	if got == nil || got.Cycle != 1400 {
@@ -99,7 +99,7 @@ func TestResolveContinuationForScope_ContinuesPastAPeerClaimToItsOwn(t *testing.
 	writeClaim(t, root, 1600, "aaa-peer-lane-task", true, 1500)
 	writeClaim(t, root, 1600, "zzz-this-lane-task", true, 1590)
 
-	got := ResolveContinuationForScope(Options{ProjectRoot: root}, 1600, []string{"zzz-this-lane-task"})
+	got := mustResolveScope(t, Options{ProjectRoot: root}, 1600, []string{"zzz-this-lane-task"})
 
 	if got == nil {
 		t.Fatalf("an out-of-scope claim met first must be SKIPPED, not abandon the lane's own binding")
@@ -120,7 +120,7 @@ func TestResolveContinuationForScope_ClaimWithEmptySnapshotIsNotABinding(t *test
 		t.Fatalf("write: %v", err)
 	}
 
-	if got := ResolveContinuationForScope(Options{ProjectRoot: root}, 1601, []string{"this-lane-task"}); got != nil {
+	if got := mustResolveScope(t, Options{ProjectRoot: root}, 1601, []string{"this-lane-task"}); got != nil {
 		t.Fatalf("a claim with no snapshot ref is not resumable work and must not bind; got %+v", got)
 	}
 }

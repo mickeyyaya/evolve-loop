@@ -137,3 +137,8 @@ func WalkModule(root string, keep func(rel string) bool) ([]string, error) {
 	}
 	return files, nil
 }
+
+func PathExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}

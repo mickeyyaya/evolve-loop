@@ -150,7 +150,7 @@ func TestReleaseContinuationBinding_ClearsTheMatchingPointerOnTheItem(t *testing
 	if _, kept := fields["continuation"]; kept {
 		t.Errorf("a released binding must not stay adoptable through the item: %s", fields["continuation"])
 	}
-	if got := ResolveContinuationForScope(opts, 3000, []string{"old-item"}); got != nil {
+	if got := mustResolveScope(t, opts, 3000, []string{"old-item"}); got != nil {
 		t.Errorf("the next claim resolves %+v; a released binding must not resume", got)
 	}
 }

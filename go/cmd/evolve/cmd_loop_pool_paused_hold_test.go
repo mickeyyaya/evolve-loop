@@ -34,7 +34,7 @@ func claimFor(t *testing.T, evolveDir string, cycle int, ids ...string) {
 
 func TestPausedPlan_AScopeThatAnotherCycleHoldsIsNotPutFirstAndWarns(t *testing.T) {
 	t.Parallel()
-	evolveDir := t.TempDir()
+	evolveDir := filepath.Join(t.TempDir(), ".evolve")
 	seedHoldInbox(t, evolveDir, "x")
 	claimFor(t, evolveDir, 8, "x")
 	var warn bytes.Buffer
@@ -48,7 +48,7 @@ func TestPausedPlan_AScopeThatAnotherCycleHoldsIsNotPutFirstAndWarns(t *testing.
 
 func TestPausedPlan_AScopeThePausedCycleHoldsItselfIsPutFirst(t *testing.T) {
 	t.Parallel()
-	evolveDir := t.TempDir()
+	evolveDir := filepath.Join(t.TempDir(), ".evolve")
 	seedHoldInbox(t, evolveDir, "x")
 	claimFor(t, evolveDir, 9, "x")
 
@@ -110,7 +110,7 @@ func TestInboxAdoptable_RefusesAnEmptyScope(t *testing.T) {
 
 func TestScopeHold_AdoptableByTakesAPendingItemAndHeldByDoesNot(t *testing.T) {
 	t.Parallel()
-	evolveDir := t.TempDir()
+	evolveDir := filepath.Join(t.TempDir(), ".evolve")
 	seedHoldInbox(t, evolveDir, "p", "m")
 	claimFor(t, evolveDir, 4, "m")
 	inbox := filepath.Join(evolveDir, "inbox")

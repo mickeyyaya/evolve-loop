@@ -47,7 +47,7 @@ func TestResolveContinuationForScope_FallsBackToLaneScopeRegistry(t *testing.T) 
 	root := t.TempDir()
 	want := seedRegistry(t, root, "chain-boundary-loop", "5555555555555555555555555555555555555555", 1078)
 
-	got := ResolveContinuationForScope(Options{ProjectRoot: root}, 1102, []string{"chain-boundary-loop"})
+	got := mustResolveScope(t, Options{ProjectRoot: root}, 1102, []string{"chain-boundary-loop"})
 	if got == nil {
 		t.Fatal("a lane-scope-only scope with a registered binding must resolve (cycle-1078 orphan class)")
 	}
@@ -64,7 +64,7 @@ func TestResolveContinuationForScope_ClaimWinsOverRegistry(t *testing.T) {
 	seedRegistry(t, root, "scope-a", "6666666666666666666666666666666666666666", 1078)
 	seedClaim(t, root, 1102, "scope-a", "7777777777777777777777777777777777777777")
 
-	got := ResolveContinuationForScope(Options{ProjectRoot: root}, 1102, []string{"scope-a"})
+	got := mustResolveScope(t, Options{ProjectRoot: root}, 1102, []string{"scope-a"})
 	if got == nil {
 		t.Fatal("claim stamp must resolve")
 	}
@@ -78,7 +78,7 @@ func TestResolveContinuationForScope_UnstampedClaimStillFallsBack(t *testing.T) 
 	seedRegistry(t, root, "scope-a", "8888888888888888888888888888888888888888", 1078)
 	seedClaim(t, root, 1102, "task-a", "")
 
-	got := ResolveContinuationForScope(Options{ProjectRoot: root}, 1102, []string{"scope-a"})
+	got := mustResolveScope(t, Options{ProjectRoot: root}, 1102, []string{"scope-a"})
 	if got == nil || got.SnapshotSHA != "8888888888888888888888888888888888888888" {
 		t.Errorf("an unstamped claim must not suppress the lane-scope fallback, got %+v", got)
 	}
@@ -99,7 +99,7 @@ func TestResolveContinuationForScope_NoBindingIsNil(t *testing.T) {
 		{"blank and unknown", []string{"", "scope-zzz"}},
 	}
 	for _, tc := range cases {
-		if got := ResolveContinuationForScope(Options{ProjectRoot: root}, 1102, tc.scopes); got != nil {
+		if got := mustResolveScope(t, Options{ProjectRoot: root}, 1102, tc.scopes); got != nil {
 			t.Errorf("%s: must resolve nil, got %+v (cross-lane adoption risk)", tc.name, got)
 		}
 	}
@@ -110,11 +110,11 @@ func TestResolveContinuationForScope_ScopeOrderIsDeterministic(t *testing.T) {
 	seedRegistry(t, root, "scope-b", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", 1078)
 	seedRegistry(t, root, "scope-c", "cccccccccccccccccccccccccccccccccccccccc", 1079)
 
-	got := ResolveContinuationForScope(Options{ProjectRoot: root}, 1102, []string{"scope-a", "scope-b", "scope-c"})
+	got := mustResolveScope(t, Options{ProjectRoot: root}, 1102, []string{"scope-a", "scope-b", "scope-c"})
 	if got == nil || got.SnapshotSHA != "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" {
 		t.Fatalf("first bound scope in declared order must win, got %+v", got)
 	}
-	got = ResolveContinuationForScope(Options{ProjectRoot: root}, 1102, []string{"scope-c", "scope-b"})
+	got = mustResolveScope(t, Options{ProjectRoot: root}, 1102, []string{"scope-c", "scope-b"})
 	if got == nil || got.SnapshotSHA != "cccccccccccccccccccccccccccccccccccccccc" {
 		t.Errorf("resolution must follow the declared scope order, got %+v", got)
 	}
@@ -125,7 +125,7 @@ func TestResolveContinuationForScope_EmptySnapshotIsNotABinding(t *testing.T) {
 	if err := continuation.WriteRegistryEntry(root, "scope-a", continuation.Continuation{Cycle: 1078}); err != nil {
 		t.Fatal(err)
 	}
-	if got := ResolveContinuationForScope(Options{ProjectRoot: root}, 1102, []string{"scope-a"}); got != nil {
+	if got := mustResolveScope(t, Options{ProjectRoot: root}, 1102, []string{"scope-a"}); got != nil {
 		t.Errorf("an entry with no snapshot_sha is not a binding, got %+v", got)
 	}
 }
@@ -152,7 +152,7 @@ func TestResolveContinuationForScope_CorruptRegistryIsNilNotPanic(t *testing.T) 
 	if err := os.WriteFile(continuation.RegistryPath(root), []byte("{oops"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if got := ResolveContinuationForScope(Options{ProjectRoot: root}, 1102, []string{"scope-a"}); got != nil {
+	if got := mustResolveScope(t, Options{ProjectRoot: root}, 1102, []string{"scope-a"}); got != nil {
 		t.Errorf("corrupt registry must resolve nil (fresh start), got %+v", got)
 	}
 }

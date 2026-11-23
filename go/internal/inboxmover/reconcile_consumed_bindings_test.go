@@ -39,7 +39,7 @@ func TestReconcileConsumedBindings(t *testing.T) {
 	}
 	bind("relive", 6)
 
-	released := ReconcileConsumedBindings(Options{ProjectRoot: root, Stderr: os.Stderr})
+	released := mustReconcile(t, Options{ProjectRoot: root, Stderr: os.Stderr})
 	if len(released) != 1 || released[0] != "stray" {
 		t.Fatalf("released = %v, want exactly [stray]", released)
 	}
