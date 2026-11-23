@@ -17,9 +17,9 @@
 
 | | Count |
 |---|---|
-| Incidents mapped | 82 |
-| Distinct failure modes (coverage-map rows) | 135 |
-| ✅ covered (a test fails if the bug comes back) | 89 |
+| Incidents mapped | 83 |
+| Distinct failure modes (coverage-map rows) | 136 |
+| ✅ covered (a test fails if the bug comes back) | 90 |
 | 🟡 partial (related test, doesn't pin the exact mode) | 11 |
 | ❌ none (no regression test) | 35 |
 | ⛔ untestable (external infra / live CLI) | 0 |
@@ -38,6 +38,8 @@ Recounted on 2026-11-16: the record of the test leak under `go/` adds two rows. 
 Recounted on 2026-11-21: the 11 records of wave 183 add 11 incidents and 13 rows. Three rows are covered and 10 rows have no test yet. The covered rows are the cycle-2558 ratchet row, the cycle-2558 build-floor row and the TDD-floor row. PR #1597 and PR #1601 landed through batch PR #1604.
 
 The record of cycle 2583 (2026-11-21) adds 1 incident and 2 rows, both with no test yet.
+
+Recounted on 2026-11-22: the record of a Build floor finding in a TDD file adds one incident and one covered row.
 
 The map now holds 81 incidents and 130 rows. Of these, 89 are covered, 11 are partial and 30 have no test. Before these rows, main held 69 incidents and 115 rows. Of these, 86 were covered, 11 partial and 18 with no test. PR #1597 had flipped two of them to covered.
 
@@ -190,6 +192,7 @@ not the coverage map, which is the hand-maintained per-incident record.
 | [2026-11-21 — wave 185 stalled on the host verification lock](2026-11-21-wave-185-verification-lock-stall.md) | the audit integration tier ran `-p 1 -parallel 1` behind its own lock and timed out at 10 minutes in four cycles | `phases/audit/ciparitygate/tier.go`, `ciparity/tierscope.go` | ❌ | proposal: part of item `verify-lock-holder-gets-the-host-budget` (plan component C1) |
 | [2026-11-21 — wave 185 stalled on the host verification lock](2026-11-21-wave-185-verification-lock-stall.md) | the console watches wake on failure codes and not on a stall | console watch, `cmd/evolve/cmd_wave_watch_events.go` | ❌ | proposal: draft item `wave-watch-wakes-on-a-stall` (not filed yet) |
 | [2026-11-21 — wave 185 stalled on the host verification lock](2026-11-21-wave-185-verification-lock-stall.md) | a fleet width increase has no verification capacity check | `policy/fleet_orchestrator.go`, `hostpressure/decide.go` | ❌ | proposal: draft item `fleet-width-increase-needs-a-capacity-check` (not filed yet) |
+| [2026-11-22 — a Build floor finding in a TDD file had no route to TDD](2026-11-22-build-floor-finding-in-a-tdd-file-had-no-route-to-tdd.md) | the predicate reroute knew only a repeated unit-test failure, so a test-audit finding in `go/acs/cycle<N>/` was corrected at Build, which cannot edit it | `core/predicate_reroute.go` (`tddOwnedFailures`, `tddReroute`), `testaudit/ratchet.go` (`MissingRowPackage`) | ✅ | `core/predicate_reroute_audit_test.go::TestBuildFloor_ATestAuditFindingInACyclePredicateFileRerunsTDDWithTheFindingAtOnce` |
 
 ## Prioritized gap backlog (13-agent sweep; agent confidence in parens)
 

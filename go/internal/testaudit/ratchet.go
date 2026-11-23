@@ -65,6 +65,8 @@ var (
 	ErrStaleBaselineRow = errors.New("testaudit: baseline row matches no finding")
 )
 
+const missingRowFormat = "testaudit: %s %s %s has no baseline row"
+
 type RowError struct {
 	Kind    RowKind
 	Finding Finding
@@ -75,7 +77,15 @@ func (e *RowError) Error() string {
 	if e.Kind == RowStale {
 		return fmt.Sprintf("testaudit: baseline row %s %s %s matches no finding", f.Package, f.Test, f.Rule)
 	}
-	return fmt.Sprintf("testaudit: %s %s %s has no baseline row", f.Package, f.Test, f.Rule)
+	return fmt.Sprintf(missingRowFormat, f.Package, f.Test, f.Rule)
+}
+
+func MissingRowPackage(text string) (string, bool) {
+	var pkg, test, rule string
+	if _, err := fmt.Sscanf(text, missingRowFormat, &pkg, &test, &rule); err != nil {
+		return "", false
+	}
+	return pkg, true
 }
 
 func (e *RowError) Unwrap() error {
