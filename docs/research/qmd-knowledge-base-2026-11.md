@@ -251,28 +251,28 @@ The graph list adds the lessons of past cycles with the same class. RRF merges t
 
 ## 7. Recommendation and staged plan
 
-**Recommendation: approach D.** Keep the architecture. Build a measurement set first. Then build BM25 and RRF in Go behind `research.KB`, in shadow. Decide on vectors from the numbers. Do not adopt qmd now.
+**Recommendation: approach D.** Keep the architecture. Build a measurement set first. Then build BM25 and RRF in Go behind `research.KB`, in shadow. Recall in the pipeline stays lexical (operator answer to Q1). Do not adopt qmd now.
 
 | Id | Decision | Because | Rejected and why |
 |---|---|---|---|
 | D1 | Do not adopt qmd in the pipeline now. | F4.1: the main recall path runs in the controller before any LLM. P3.2, section 5: the generative tiers run outside the bridge. P3.3: about 2.0 GB of models. | A: breaks the bridge and isolation rules. |
 | D2 | Fix the ranker in Go first. | F4.2: the score has no IDF and no length correction. The corpus is small (F4.4). | C: leaves the known fault. |
-| D3 | Measure before any vector step. | F4.8: the gap is free-text recall, and we have no gold set. P3.3 gives no latency figure. | A2 now: the gain is unknown and the cost is real. |
+| D3 | Measure before any vector step. | F4.8: the gap is free-text recall, and we have no gold set. P3.3 gives no latency figure. | A2: closed by the operator answer to Q1. |
 | D4 | Keep one `research.KB` interface and choose the ranker by policy data. | Section 5: no feature flag, one home for each belief. `docs/architecture/code-index-cli.md:134` shows the pattern. | A second recall path beside the first. |
 
 Stages, each with its proof:
 
 | Stage | Work | Proof of done |
 |---|---|---|
-| 0. Gold set | Write 40 to 60 queries from past plans with the lessons, incident records and dossiers that the operator marks as wanted. Take the first set from `evolve kb graph recurrences`, where a repeat failure shows a lesson that was needed. Store the set as data under `docs/`. | The set exists, with a count. Today's `FileKB` has a measured recall at 5 and MRR on it. |
+| 0. Gold set | Write 40 to 60 queries from past plans with the lessons, incident records and dossiers that a bridge seat marks as wanted (answer to Q4). Take the first set from `evolve kb graph recurrences`, where a repeat failure shows a lesson that was needed. Store the set as data under `docs/`. | The set exists, with a count. Today's `FileKB` has a measured recall at 5 and MRR on it. |
 | 1. Shadow ranker | Add a BM25 and RRF ranker in a new package. It reads the same roots as `FileKB`. The orchestrator runs it beside `FileKB`, logs both lists, and uses only the `FileKB` result. | The log has both lists for each plan. Recall at 5 and MRR for each ranker on the set. |
 | 2. Decide the switch | A data rule: the new ranker replaces the old when it wins recall at 5 by an operator margin and loses no old hit. A boundary applies it. | The flip record, and a rollback on regression. |
 | 3. Widen the corpus | Add dossiers, incident records and cycle dossiers as chunked, field-weighted entries. Add `evolve kb search <text>` as a CLI verb, so that an agent and a person use the same ranker. | The verb has JSON output and a conformance test. |
-| 4. Vector comparator, optional | Only if stage 2 shows a gap on queries with no shared words. On a scratch host, run `qmd search`, `qmd vsearch` and `qmd bench` on the same set. Compare with stage 3. | A table of recall at 5 and MRR, and the latency and RAM that we measure. The operator decides. |
+| 4. Scratch-host comparator, optional | Only if stage 2 shows a gap on queries with no shared words. On a scratch host only, run `qmd search`, `qmd vsearch` and `qmd bench` on the same set. Pin the versions and set telemetry off. This is a benchmark only. No adapter path exists while Q1 stands. Item: `scratch-host-comparator-bench`. | A table of recall at 5 and MRR, and the latency and RAM that we measure. The operator decides. |
 
 What changes our mind: if stage 0 shows that recall at 5 is already high (the operator sets the bar), choose C.
 
-If stage 4 shows a large gain from vectors, build an adapter like `adapters/codeindex/trail`. It runs only `qmd search` and `qmd vsearch`. It uses a pinned version, a pre-staged model cache, cache and config paths that it sets, and a conformance suite.
+If stage 4 shows a large gain from vectors, the result is a finding for the operator only. Do not build an adapter while the answer to Q1 stands. A new operator decision on Q1 must come first.
 
 Limits of this research: we did not run qmd, so its quality, speed and RAM on our corpus are not measured. We did not verify the supply-chain score. We have no gold set yet, so the gain of B is an estimate. The README figures are the claims of the authors.
 
@@ -280,7 +280,7 @@ Consequences of D:
 
 - Good: a fix for a known ranking fault with no new library, no model and no network step. A number for the gain.
 - Cost: a few hours of labelling, and a ranker that we own and must keep.
-- Risk: a poor gold set misleads the decision. The control is that the operator marks the wanted documents and the set grows from real misses.
+- Risk: a poor gold set misleads the decision. The set grows from real misses. The bridge seat labels the set with no human check (operator answer to Q4), so the measurement rests on the seat's judgement.
 
 ## 8. Open questions for the operator
 
@@ -290,6 +290,15 @@ Consequences of D:
 4. Who labels the gold set? The operator, or a bridge seat with the operator checking a sample?
 5. If stage 4 wins, do you accept Node 22 and three native add-ons on the host, as for trail-code?
 6. Is a scratch-host run of qmd for stage 4 allowed, with the model download, outside the repository?
+
+### Operator answers (2026-11-23)
+
+- **Q1: closed.** An embedding model is an LLM query under the bridge rule. Recall inside the pipeline stays lexical (BM25 and RRF). Approach A2 is closed.
+- **Q2: moot.** Q1 closed A2, so no model runs in the hermetic cell and no model cache is needed. The question reopens only if Q1 changes.
+- **Q3: still open.** The operator has not set the recall at 5 bar that makes C good enough. Stage 0 gives the first number to judge.
+- **Q4: answered.** A bridge seat labels the gold set. No human checks a sample, at the operator's choice. Consequence: the measurement rests on the seat's judgement. A labelling fault in the seat reaches every recall figure, and nothing in the process finds it.
+- **Q5: moot.** Q1 closed A2 and stage 4 has no adapter path, so the host needs no Node 22 and no native add-ons for the pipeline.
+- **Q6: answered.** qmd can run on a scratch host only. The run is a benchmark only, with pinned versions and telemetry off. Item: `scratch-host-comparator-bench`.
 
 ## 9. Sources
 
