@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -26,6 +27,7 @@ const (
 	moveMessage    = "chore(inbox): the loop's quarantine moves from the plane"
 	quarantineDir  = Pathspec + "quarantine/"
 	consumedDir    = Pathspec + "consumed/"
+	processedDir   = Pathspec + "processed/"
 	statusCodeSize = 3
 )
 
@@ -158,29 +160,55 @@ func stampBetween(path string, head, now map[string]json.RawMessage, writable fu
 }
 
 func (w worktree) quarantineMove(ctx context.Context, g Git, status, path string) (Move, bool, error) {
-	for _, dir := range []string{quarantineDir, consumedDir} {
-		if move, ok, err := w.movedInto(ctx, g, dir, status, path); ok || err != nil {
-			return move, ok, err
-		}
-	}
-	return Move{}, false, nil
-}
-
-func (w worktree) movedInto(ctx context.Context, g Git, dir, status, path string) (Move, bool, error) {
 	if status != " D" || filepath.Dir(path) != filepath.Clean(Pathspec) {
 		return Move{}, false, nil
 	}
-	to := dir + filepath.Base(path)
-	now, ok := decodeFields(w.read(to))
-	if !ok {
+	candidates := w.decodedCandidates(filepath.Base(path))
+	if len(candidates) == 0 {
 		return Move{}, false, nil
 	}
 	head, headOK, err := itemAt(ctx, g, "HEAD", path)
 	if err != nil || !headOK {
 		return Move{}, false, err
 	}
-	_, ok = stampBetween(path, head, now, inboxmover.IsMoverWritten)
-	return Move{Path: path, QuarantinePath: to}, ok, nil
+	for _, c := range candidates {
+		if _, ok := stampBetween(path, head, c.fields, inboxmover.IsMoverWritten); ok {
+			return Move{Path: path, QuarantinePath: c.path}, true, nil
+		}
+	}
+	return Move{}, false, nil
+}
+
+type moveCandidate struct {
+	path   string
+	fields map[string]json.RawMessage
+}
+
+func (w worktree) decodedCandidates(base string) []moveCandidate {
+	paths := append([]string{quarantineDir + base, consumedDir + base}, w.processedCopies(base)...)
+	var out []moveCandidate
+	for _, to := range paths {
+		if now, ok := decodeFields(w.read(to)); ok {
+			out = append(out, moveCandidate{path: to, fields: now})
+		}
+	}
+	return out
+}
+
+func (w worktree) processedCopies(base string) []string {
+	var copies []string
+	_ = filepath.WalkDir(filepath.Join(w.root, processedDir), func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		name := d.Name()
+		if name == base || strings.HasSuffix(name, "-"+base) {
+			rel, _ := filepath.Rel(w.root, p)
+			copies = append(copies, filepath.ToSlash(rel))
+		}
+		return nil
+	})
+	return copies
 }
 
 func CommitMoves(ctx context.Context, g Git, moves []Move) error {
@@ -189,11 +217,16 @@ func CommitMoves(ctx context.Context, g Git, moves []Move) error {
 	}
 	var added, paths []string
 	for _, move := range moves {
-		added = append(added, move.QuarantinePath)
-		paths = append(paths, move.Path, move.QuarantinePath)
+		paths = append(paths, move.Path)
+		if !strings.HasPrefix(move.QuarantinePath, processedDir) {
+			added = append(added, move.QuarantinePath)
+			paths = append(paths, move.QuarantinePath)
+		}
 	}
-	if err := run(ctx, g, append([]string{"add", "--"}, added...)...); err != nil {
-		return err
+	if len(added) > 0 {
+		if err := run(ctx, g, append([]string{"add", "--"}, added...)...); err != nil {
+			return err
+		}
 	}
 	return commitPaths(ctx, g, moveMessage, paths)
 }

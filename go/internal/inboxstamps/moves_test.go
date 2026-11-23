@@ -115,3 +115,66 @@ func TestCommitMoves_NamesTheGitCommandThatFailed(t *testing.T) {
 		}
 	}
 }
+
+func TestClassify_AProcessedMoveWithOnlyTheLoopsStampsIsAMove(t *testing.T) {
+	cases := map[string]string{
+		"directly in processed":     ".evolve/inbox/processed/curated.json",
+		"in a cycle dir":            ".evolve/inbox/processed/cycle-0/curated.json",
+		"in a cycle dir with a sha": ".evolve/inbox/processed/cycle-12/deadbeef-curated.json",
+	}
+	for name, dest := range cases {
+		t.Run(name, func(t *testing.T) {
+			w := newWorld(t)
+			if err := os.Remove(filepath.Join(w.plane.Dir, curatedItem)); err != nil {
+				t.Fatal(err)
+			}
+			write(t, w.plane, ".evolve/inbox/processed/cycle-0/other.json", `{"id":"other","weight":0.5}`)
+			write(t, w.plane, dest, routeStamp("curated"))
+
+			partition, err := Classify(context.Background(), git(w.plane))
+
+			want := []Move{{Path: curatedItem, QuarantinePath: dest}}
+			if err != nil || !reflect.DeepEqual(partition.Moved, want) || len(partition.Other) != 0 {
+				t.Errorf("Classify = (%+v, %v), want Moved %+v and no other dirt", partition, err, want)
+			}
+		})
+	}
+}
+
+func TestClassify_ARewrittenProcessedCopyLeavesTheDeletionAsDirt(t *testing.T) {
+	w := newWorld(t)
+	if err := os.Remove(filepath.Join(w.plane.Dir, curatedItem)); err != nil {
+		t.Fatal(err)
+	}
+	write(t, w.plane, ".evolve/inbox/processed/cycle-0/curated.json", `{"id":"curated","weight":0.9,"failure_count":1}`)
+
+	partition, err := Classify(context.Background(), git(w.plane))
+
+	if err != nil || len(partition.Moved) != 0 || !reflect.DeepEqual(partition.Other, []string{curatedItem}) {
+		t.Errorf("Classify = (%+v, %v), want the deletion as other dirt", partition, err)
+	}
+}
+
+func TestCommitMoves_CommitsOnlyTheDeletionForAnIgnoredProcessedDestination(t *testing.T) {
+	w := newWorld(t)
+	write(t, w.plane, ".gitignore", ".evolve/inbox/processed/\n")
+	w.plane.Git("add", ".gitignore")
+	w.plane.Git("commit", "-q", "-m", "ignore processed")
+	if err := os.Remove(filepath.Join(w.plane.Dir, curatedItem)); err != nil {
+		t.Fatal(err)
+	}
+	dest := ".evolve/inbox/processed/cycle-0/curated.json"
+	write(t, w.plane, dest, `{"id":"curated","weight":0.5,"failure_count":1}`)
+
+	err := CommitMoves(context.Background(), git(w.plane), []Move{{Path: curatedItem, QuarantinePath: dest}})
+
+	if err != nil {
+		t.Fatalf("CommitMoves: %v", err)
+	}
+	if status := w.plane.Git("status", "--porcelain", "--untracked-files=no"); status != "" {
+		t.Errorf("tracked tree dirty after the commit:\n%s", status)
+	}
+	if got := w.plane.Git("ls-tree", "-r", "--name-only", "HEAD", "--", curatedItem, dest); got != "" {
+		t.Errorf("HEAD tracks %q, want neither the deleted item nor the ignored processed copy", got)
+	}
+}

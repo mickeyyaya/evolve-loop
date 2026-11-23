@@ -20,6 +20,7 @@ The loop writes into tracked inbox items in the plane when a cycle does not ship
   - When origin edited a claimed item, `git merge` and `merge --ff-only` write origin's version back to the root. There is no conflict. This makes the duplicate of the cycle-1838 incident.
   - So after the merge (`evolve sync-main`) or the fast-forward (the wave sync), the caller runs the Mover verb `inboxmover.AbsorbRootCopies`. This package only classifies; it never moves an inbox item.
   - The Mover finds each root copy by task id, removes a copy with the same bytes, and parks a copy with other bytes in `origin-conflicts/cycle-N/`. A claim copy is never overwritten, because it can carry a lane's newer stamps ([plan](../../plans/inbox-stale-claims-2026-10.md), D8).
+- **A move to quarantine, consumed, or processed is a loop move.** `Classify` accepts an unstaged deletion at the inbox root when a copy under `quarantine/`, `consumed/`, or `processed/` differs only by mover fields (`inboxmover.IsMoverWritten`). `CommitMoves` commits both paths for `quarantine/` and `consumed/`, and commits only the deletion for gitignored `processed/`.
 - **The package goes through inboxmover's facades**, never the lifecycle leaf (ADR-0079 D3).
 - **Every git failure is named**, with the subcommand and its stderr.
 
