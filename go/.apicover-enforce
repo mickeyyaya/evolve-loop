@@ -901,3 +901,4 @@
 ./internal/logread
 ./internal/wavehealth
 ./internal/mainsync
+./internal/emptytests
