@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -15,6 +16,8 @@ var goCacheShardRe = regexp.MustCompile(`^[0-9a-f]{2}$`)
 var goCacheEntryRe = regexp.MustCompile(`^[0-9a-f]+-[ad]$`)
 
 var goCacheEntryInfo = func(e fs.DirEntry) (fs.FileInfo, error) { return e.Info() }
+
+var errCacheRootNotExist = errors.New("cache root disappeared")
 
 const goMtimeRefresh = time.Hour
 
@@ -43,18 +46,23 @@ type goCacheEntry struct {
 	shard, name string
 	size        int64
 	mtime       time.Time
+	isDir       bool
 }
 
 func (e goCacheEntry) path() string { return filepath.Join(e.shard, e.name) }
 
-func TrimGoCache(dir string, b GoCacheBounds, remove func(string) error) CacheTrimReport {
+func TrimGoCache(dir string, b GoCacheBounds, remove func(string) error, opts ...TempOption) CacheTrimReport {
+	var cfg tempConfig
+	for _, o := range opts {
+		o(&cfg)
+	}
 	entries, errs := listGoCache(dir)
 	sortLeastRecentlyUsedFirst(entries)
 	rep := CacheTrimReport{Errors: errs, RemainingBytes: totalSize(entries)}
 	unused, rest := splitUnused(entries, b)
-	overCap := leastRecentlyUsedOverCap(rest, b)
-	rep.Files, rep.Bytes = rep.release(unused, b.unusedBefore(), remove)
-	rep.CapFiles, rep.CapBytes = rep.release(overCap, b.Now.Add(-GoCacheInUseWindow), remove)
+	overCap := selectOverCap(rest, b, cfg.held, &rep.Errors)
+	rep.Files, rep.Bytes = rep.releaseVictims(unused, b.unusedBefore(), remove, cfg.held)
+	rep.CapFiles, rep.CapBytes = rep.releaseVictims(overCap, b.Now.Add(-GoCacheInUseWindow), remove, nil)
 	rep.RemainingBytes -= rep.Bytes + rep.CapBytes
 	return rep
 }
@@ -85,7 +93,21 @@ func listShard(shard string) ([]goCacheEntry, []string) {
 	var entries []goCacheEntry
 	var errs []string
 	for _, e := range names {
-		if e.IsDir() || !goCacheEntryRe.MatchString(e.Name()) {
+		if !goCacheEntryRe.MatchString(e.Name()) {
+			continue
+		}
+		if e.IsDir() {
+			if !strings.HasSuffix(e.Name(), "-d") {
+				continue
+			}
+			size, newest, ok, err := statCacheDir(filepath.Join(shard, e.Name()))
+			if err != nil {
+				errs = append(errs, fmt.Sprintf("stat %s: %v", filepath.Join(shard, e.Name()), err))
+				continue
+			}
+			if ok {
+				entries = append(entries, goCacheEntry{shard: shard, name: e.Name(), size: size, mtime: newest, isDir: true})
+			}
 			continue
 		}
 		info, err := goCacheEntryInfo(e)
@@ -99,6 +121,55 @@ func listShard(shard string) ([]goCacheEntry, []string) {
 		entries = append(entries, goCacheEntry{shard: shard, name: e.Name(), size: info.Size(), mtime: info.ModTime()})
 	}
 	return entries, errs
+}
+
+func statCacheDir(root string) (size int64, newest time.Time, ok bool, err error) {
+	var rootMod time.Time
+	hasFile := false
+	walkErr := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				if p == root {
+					return errCacheRootNotExist
+				}
+				return nil
+			}
+			return err
+		}
+		if d.IsDir() {
+			if p == root {
+				info, infoErr := goCacheEntryInfo(d)
+				if infoErr != nil {
+					return infoErr
+				}
+				rootMod = info.ModTime()
+			}
+			return nil
+		}
+		info, err := goCacheEntryInfo(d)
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil
+			}
+			return err
+		}
+		size += info.Size()
+		if !hasFile || info.ModTime().After(newest) {
+			newest = info.ModTime()
+			hasFile = true
+		}
+		return nil
+	})
+	if walkErr != nil {
+		if errors.Is(walkErr, errCacheRootNotExist) {
+			return 0, time.Time{}, false, nil
+		}
+		return 0, time.Time{}, false, walkErr
+	}
+	if !hasFile {
+		newest = rootMod
+	}
+	return size, newest, true, nil
 }
 
 func splitUnused(entries []goCacheEntry, b GoCacheBounds) (unused, rest []goCacheEntry) {
@@ -126,6 +197,22 @@ func sortLeastRecentlyUsedFirst(entries []goCacheEntry) {
 }
 
 func leastRecentlyUsedOverCap(leastRecentFirst []goCacheEntry, b GoCacheBounds) []goCacheEntry {
+	return selectOverCap(leastRecentFirst, b, nil, nil)
+}
+
+func sparedByHolder(path string, held func(string) (bool, error), errs *[]string) bool {
+	if held == nil {
+		return false
+	}
+	isHeld, err := held(path)
+	if err != nil {
+		*errs = append(*errs, fmt.Sprintf("spared %s: liveness unknown: %v", path, err))
+		return true
+	}
+	return isHeld
+}
+
+func selectOverCap(leastRecentFirst []goCacheEntry, b GoCacheBounds, held func(string) (bool, error), errs *[]string) []goCacheEntry {
 	total := totalSize(leastRecentFirst)
 	if b.MaxBytes <= 0 || total <= b.MaxBytes {
 		return nil
@@ -136,6 +223,9 @@ func leastRecentlyUsedOverCap(leastRecentFirst []goCacheEntry, b GoCacheBounds) 
 		if total <= b.MaxBytes || !e.mtime.Before(inUseSince) {
 			break
 		}
+		if sparedByHolder(e.path(), held, errs) {
+			continue
+		}
 		victims = append(victims, e)
 		total -= e.size
 	}
@@ -143,13 +233,20 @@ func leastRecentlyUsedOverCap(leastRecentFirst []goCacheEntry, b GoCacheBounds) 
 }
 
 func (r *CacheTrimReport) release(victims []goCacheEntry, unusedBefore time.Time, remove func(string) error) (files int, bytes int64) {
+	return r.releaseVictims(victims, unusedBefore, remove, nil)
+}
+
+func (r *CacheTrimReport) releaseVictims(victims []goCacheEntry, unusedBefore time.Time, remove func(string) error, held func(string) (bool, error)) (files int, bytes int64) {
 	for _, e := range victims {
-		info, err := os.Lstat(e.path())
-		switch {
-		case err != nil && !errors.Is(err, fs.ErrNotExist):
+		mtime, ok, err := entryMtime(e)
+		if err != nil {
 			r.Errors = append(r.Errors, err.Error())
 			continue
-		case err == nil && !info.ModTime().Before(unusedBefore):
+		}
+		if ok && !mtime.Before(unusedBefore) {
+			continue
+		}
+		if ok && sparedByHolder(e.path(), held, &r.Errors) {
 			continue
 		}
 		if err := remove(e.path()); err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -160,6 +257,21 @@ func (r *CacheTrimReport) release(victims []goCacheEntry, unusedBefore time.Time
 		bytes += e.size
 	}
 	return files, bytes
+}
+
+func entryMtime(e goCacheEntry) (time.Time, bool, error) {
+	if e.isDir {
+		_, newest, ok, err := statCacheDir(e.path())
+		return newest, ok, err
+	}
+	info, err := os.Lstat(e.path())
+	if errors.Is(err, fs.ErrNotExist) {
+		return time.Time{}, false, nil
+	}
+	if err != nil {
+		return time.Time{}, false, err
+	}
+	return info.ModTime(), true, nil
 }
 
 func totalSize(entries []goCacheEntry) int64 {

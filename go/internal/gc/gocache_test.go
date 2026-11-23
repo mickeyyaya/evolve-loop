@@ -1,6 +1,8 @@
 package gc
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -389,5 +391,238 @@ func TestTrimGoCache_AnAgeHorizonShorterThanTheInUseWindowNeverTakesAnEntryInsid
 	}
 	if got := survivors(t, dir); !reflect.DeepEqual(got, []string{"0b/0b01-d"}) {
 		t.Errorf("survivors = %v, want the 90-minute-old entry kept", got)
+	}
+}
+
+func makeExecutableDir(t *testing.T, cache, rel string, files map[string]int, age time.Duration, now time.Time) string {
+	t.Helper()
+	root := filepath.Join(cache, filepath.FromSlash(rel))
+	stamp := now.Add(-age)
+	for name, size := range files {
+		p := filepath.Join(root, filepath.FromSlash(name))
+		writeFile(t, p, strings.Repeat("x", size))
+		if err := os.Chtimes(p, stamp, stamp); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(files) == 0 {
+		if err := os.MkdirAll(root, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Chtimes(root, stamp, stamp); err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
+
+func TestTrimGoCache_SkipsAnExecutableDirWhoseInnerFileWasTouchedAfterThePlan(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
+	dir := t.TempDir()
+	victim := makeExecutableDir(t, dir, "0a/0a01-d", map[string]int{"exe": 200}, 40*time.Hour, now)
+	touched := makeExecutableDir(t, dir, "0b/0b01-d", map[string]int{"exe": 100, "pkg/obj.o": 300}, 30*time.Hour, now)
+	target := filepath.Join(touched, "pkg", "obj.o")
+	remove := func(p string) error {
+		if p == victim {
+			if err := os.Chtimes(target, now, now); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return os.RemoveAll(p)
+	}
+
+	rep := TrimGoCache(dir, ageOnly(now), remove)
+
+	if want := (CacheTrimReport{Files: 1, Bytes: 200, RemainingBytes: 400}); !reflect.DeepEqual(rep, want) {
+		t.Fatalf("report = %+v, want %+v", rep, want)
+	}
+	if _, err := os.Stat(target); err != nil {
+		t.Errorf("the executable dir whose inner file was refreshed after planning was removed: %v", err)
+	}
+}
+
+func TestTrimGoCache_EmptyExecutableDirIsTrimmedAndUnreadableInnerTreeIsReported(t *testing.T) {
+	requireNonRootF1(t)
+	now := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
+	dir := t.TempDir()
+	emptyDir := makeExecutableDir(t, dir, "0a/0a01-d", nil, 30*time.Hour, now)
+	locked := makeExecutableDir(t, dir, "0b/0b01-d", map[string]int{"sub/bin": 100}, 30*time.Hour, now)
+	sub := filepath.Join(locked, "sub")
+	if err := os.Chmod(sub, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(sub, 0o755) })
+
+	rep := TrimGoCache(dir, ageOnly(now), os.RemoveAll)
+
+	if _, err := os.Stat(emptyDir); !os.IsNotExist(err) {
+		t.Errorf("empty stale executable dir survived: %v", err)
+	}
+	if _, err := os.Stat(locked); err != nil {
+		t.Errorf("executable dir with unreadable subdir was removed: %v", err)
+	}
+	if rep.Files != 1 || rep.Bytes != 0 || len(rep.Errors) != 1 || !strings.Contains(rep.Errors[0], "0b01-d") {
+		t.Fatalf("report = %+v, want empty dir trimmed and unreadable dir reported", rep)
+	}
+}
+
+func TestTrimGoCache_CapSkipsHeldExecutableDirAndTakesNextUnheldEntry(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
+	dir := t.TempDir()
+	heldDir := makeExecutableDir(t, dir, "0a/0a01-d", map[string]int{"exe": 500}, 20*time.Hour, now)
+	freeDir := makeExecutableDir(t, dir, "0b/0b01-d", map[string]int{"exe": 400}, 10*time.Hour, now)
+	held := func(p string) (bool, error) { return p == heldDir, nil }
+
+	rep := TrimGoCache(dir, GoCacheBounds{Now: now, MaxBytes: 600}, os.RemoveAll, SparingHeld(held))
+
+	if want := (CacheTrimReport{CapFiles: 1, CapBytes: 400, RemainingBytes: 500}); !reflect.DeepEqual(rep, want) {
+		t.Fatalf("report = %+v, want %+v", rep, want)
+	}
+	if _, err := os.Stat(heldDir); err != nil {
+		t.Errorf("held dir removed: %v", err)
+	}
+	if _, err := os.Stat(freeDir); !os.IsNotExist(err) {
+		t.Errorf("unheld dir survived although cache remained over cap: %v", err)
+	}
+}
+
+func TestListShard_IgnoresArchiveNamedDirectoryWithoutDSuffix(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	shard := filepath.Join(dir, "00")
+	writeFile(t, filepath.Join(shard, "0a1b-a", "unexpected"), "data")
+
+	entries, errs := listShard(shard)
+
+	if len(entries) != 0 || len(errs) != 0 {
+		t.Fatalf("entries=%+v errs=%q, want archive-named directory ignored", entries, errs)
+	}
+}
+
+func TestTrimGoCache_AgeTrimSparesHeldDirAndReportsLivenessFailure(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
+	dir := t.TempDir()
+	heldDir := makeExecutableDir(t, dir, "0a/0a01-d", map[string]int{"exe": 500}, 30*time.Hour, now)
+	freeDir := makeExecutableDir(t, dir, "0b/0b01-d", map[string]int{"exe": 400}, 30*time.Hour, now)
+
+	rep := TrimGoCache(dir, ageOnly(now), os.RemoveAll, SparingHeld(func(p string) (bool, error) {
+		return p == heldDir, nil
+	}))
+
+	if want := (CacheTrimReport{Files: 1, Bytes: 400, RemainingBytes: 500}); !reflect.DeepEqual(rep, want) {
+		t.Fatalf("report = %+v, want %+v", rep, want)
+	}
+	if _, err := os.Stat(heldDir); err != nil {
+		t.Errorf("held stale dir removed: %v", err)
+	}
+	if _, err := os.Stat(freeDir); !os.IsNotExist(err) {
+		t.Errorf("free stale dir survived: %v", err)
+	}
+
+	probeErr := errors.New("lsof failed")
+	errRep := TrimGoCache(dir, ageOnly(now), os.RemoveAll, SparingHeld(func(string) (bool, error) {
+		return false, probeErr
+	}))
+
+	if errRep.Files != 0 || len(errRep.Errors) != 1 || !strings.Contains(errRep.Errors[0], "liveness unknown") {
+		t.Fatalf("errRep = %+v, want liveness error recorded and held dir spared", errRep)
+	}
+	if _, err := os.Stat(heldDir); err != nil {
+		t.Errorf("dir with unknown liveness was removed: %v", err)
+	}
+}
+
+func TestTrimGoCache_FileVanishingBeforeReleaseCountsAsReleased(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
+	dir := capFixture(t, now, []cacheFile{
+		{"0a/0a01-a", 100, 40 * time.Hour},
+		{"0b/0b01-a", 100, 30 * time.Hour},
+	})
+	first := filepath.Join(dir, "0a", "0a01-a")
+	second := filepath.Join(dir, "0b", "0b01-a")
+	remove := func(p string) error {
+		if p == first {
+			if err := os.Remove(second); err != nil {
+				return err
+			}
+		}
+		return os.Remove(p)
+	}
+
+	rep := TrimGoCache(dir, ageOnly(now), remove)
+
+	if want := (CacheTrimReport{Files: 2, Bytes: 200, RemainingBytes: 0}); !reflect.DeepEqual(rep, want) {
+		t.Fatalf("report = %+v, want %+v", rep, want)
+	}
+}
+
+func TestStatCacheDir_HandlesMissingFileVanishedAndErrorPaths(t *testing.T) {
+	dir := t.TempDir()
+	if _, _, ok, err := statCacheDir(filepath.Join(dir, "missing")); ok || err != nil {
+		t.Fatalf("missing root: ok=%v err=%v, want false nil", ok, err)
+	}
+
+	regFile := filepath.Join(dir, "reg")
+	writeFile(t, regFile, "012345")
+	if size, _, ok, err := statCacheDir(regFile); !ok || err != nil || size != 6 {
+		t.Fatalf("regular file root: size=%d ok=%v err=%v, want 6 true nil", size, ok, err)
+	}
+
+	walkDir := filepath.Join(dir, "walk-d")
+	writeFile(t, filepath.Join(walkDir, "a", "trigger"), "0123456789")
+	writeFile(t, filepath.Join(walkDir, "b", "nested", "gone"), "0123456789")
+	writeFile(t, filepath.Join(walkDir, "c", "vanish"), "0123456789")
+	orig := goCacheEntryInfo
+	t.Cleanup(func() { goCacheEntryInfo = orig })
+	goCacheEntryInfo = func(e fs.DirEntry) (fs.FileInfo, error) {
+		switch e.Name() {
+		case "trigger":
+			if err := os.RemoveAll(filepath.Join(walkDir, "b")); err != nil {
+				return nil, err
+			}
+		case "vanish":
+			return nil, fs.ErrNotExist
+		}
+		return e.Info()
+	}
+	if size, _, ok, err := statCacheDir(walkDir); !ok || err != nil || size != 10 {
+		t.Fatalf("walk with vanished entries: size=%d ok=%v err=%v, want 10 true nil", size, ok, err)
+	}
+
+	boom := errors.New("stat io error")
+	goCacheEntryInfo = func(e fs.DirEntry) (fs.FileInfo, error) {
+		if e.Name() == "walk-d" {
+			return nil, boom
+		}
+		return e.Info()
+	}
+	if _, _, ok, err := statCacheDir(walkDir); ok || !errors.Is(err, boom) {
+		t.Fatalf("root stat error: ok=%v err=%v, want false boom", ok, err)
+	}
+
+	goCacheEntryInfo = func(e fs.DirEntry) (fs.FileInfo, error) {
+		if e.Name() == "trigger" {
+			return nil, boom
+		}
+		return e.Info()
+	}
+	if _, _, ok, err := statCacheDir(walkDir); ok || !errors.Is(err, boom) {
+		t.Fatalf("inner file stat error: ok=%v err=%v, want false boom", ok, err)
+	}
+}
+
+func TestStatCacheDir_ReportsUnsearchableParentError(t *testing.T) {
+	requireNonRootF1(t)
+	parent := filepath.Join(t.TempDir(), "locked")
+	target := filepath.Join(parent, "0a01-d")
+	writeFile(t, filepath.Join(target, "exe"), "x")
+	lockedDirF1(t, parent, 0o000)
+
+	if _, _, ok, err := statCacheDir(target); ok || !errors.Is(err, fs.ErrPermission) {
+		t.Fatalf("unsearchable parent: ok=%v err=%v, want false ErrPermission", ok, err)
 	}
 }

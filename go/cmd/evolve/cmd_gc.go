@@ -412,7 +412,13 @@ func (r gcRun) goCache(pol gc.Policy) bool {
 		return true
 	}
 	capBytes := pol.GoCacheMaxBytes()
-	rep := gc.TrimGoCache(dir, gc.GoCacheBounds{Now: time.Now(), UnusedFor: time.Duration(pol.GoCacheTTLHours) * time.Hour, MaxBytes: capBytes}, r.remove)
+	remove := func(p string) error {
+		if info, err := os.Lstat(p); err == nil && info.IsDir() {
+			return r.removeAll(p)
+		}
+		return r.remove(p)
+	}
+	rep := gc.TrimGoCache(dir, gc.GoCacheBounds{Now: time.Now(), UnusedFor: time.Duration(pol.GoCacheTTLHours) * time.Hour, MaxBytes: capBytes}, remove, gc.SparingHeld(gc.LiveHolderProbe(r.ctx, r.exec)))
 	if pol.GoCacheTTLHours > 0 {
 		r.summary("%d go build cache file(s) would be trimmed (%s unused > %dh in %s)", "trimmed %d go build cache file(s) (%s unused > %dh in %s)", rep.Files, gcSize(rep.Bytes), pol.GoCacheTTLHours, dir)
 	} else {

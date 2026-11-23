@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -201,5 +202,59 @@ func TestGCGoCache_AHostWithoutGoHasNoCacheToTrimWhileAnUnusableCacheFailsTheSte
 				t.Errorf("goCache failed=%v, want %v naming %q\nstdout=%s\nstderr=%s", failed, c.wantFailed, c.want, stdout.String(), stderr.String())
 			}
 		})
+	}
+}
+
+func TestGCGoCache_UsesRemoveAllForExecutableDirsAndSparesHeldOnes(t *testing.T) {
+	cache := t.TempDir()
+	t.Setenv("GOCACHE", cache)
+	heldDir := filepath.Join(cache, "0a", "0a01-d")
+	freeDir := filepath.Join(cache, "0b", "0b01-d")
+	staleFile := filepath.Join(cache, "0c", "0c01-a")
+	old := time.Now().Add(-30 * time.Hour)
+	for _, f := range []string{filepath.Join(heldDir, "exe"), filepath.Join(freeDir, "exe"), staleFile} {
+		if err := os.MkdirAll(filepath.Dir(f), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(f, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(f, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, d := range []string{heldDir, freeDir} {
+		if err := os.Chtimes(d, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var stdout, stderr bytes.Buffer
+	r := newGCRun(context.Background(), false, &stdout, &stderr)
+	r.exec = func(_ context.Context, name, _ string, _, _ []string, _ io.Reader, out, _ io.Writer) (int, error) {
+		if name == "lsof" {
+			_, _ = io.WriteString(out, "p4242\nn"+filepath.Join(heldDir, "exe")+"\n")
+		}
+		return 0, nil
+	}
+	var removedFiles, removedDirs []string
+	r.remove = func(p string) error { removedFiles = append(removedFiles, p); return os.Remove(p) }
+	r.removeAll = func(p string) error { removedDirs = append(removedDirs, p); return os.RemoveAll(p) }
+
+	failed := r.goCache(gc.Policy{GoCacheTTLHours: 24})
+
+	if failed {
+		t.Fatalf("goCache failed: stderr=%s", stderr.String())
+	}
+	if _, err := os.Stat(heldDir); err != nil {
+		t.Errorf("held dir removed: %v", err)
+	}
+	if _, err := os.Stat(freeDir); !os.IsNotExist(err) {
+		t.Errorf("free dir survived: %v", err)
+	}
+	if _, err := os.Stat(staleFile); !os.IsNotExist(err) {
+		t.Errorf("stale file survived: %v", err)
+	}
+	if len(removedDirs) != 1 || removedDirs[0] != freeDir || len(removedFiles) != 1 || removedFiles[0] != staleFile {
+		t.Errorf("removedDirs=%v removedFiles=%v", removedDirs, removedFiles)
 	}
 }
