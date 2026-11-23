@@ -3,9 +3,12 @@
 package tmuxtest
 
 import (
+	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -123,5 +126,71 @@ func TestMain_AServerThatCannotBeStoppedFailsEvenAGreenRun(t *testing.T) {
 				t.Errorf("Main = %d, want %d when the socket cannot be removed after the run", code, tc.want)
 			}
 		})
+	}
+}
+
+func TestMain_ReapsDeadTestServersBeforeRunningWithFakeProcessTable(t *testing.T) {
+	bin := t.TempDir()
+	fakeclitest.Install(t, filepath.Join(bin, "tmux"), "#!/bin/sh\nexit 0\n")
+	t.Setenv("PATH", bin)
+	t.Setenv("TMUX_TMPDIR", t.TempDir())
+	t.Setenv(bridge.TmuxSocketEnv, bridge.DeriveRunSocket(1))
+	const deadPID, livePID = 333, 444
+	prevList, prevAlive, prevKill := testSocketLister, pidAlive, serverKiller
+	t.Cleanup(func() { testSocketLister, pidAlive, serverKiller = prevList, prevAlive, prevKill })
+	testSocketLister = func() ([]string, error) {
+		return []string{
+			bridge.DeriveTestSocket(deadPID),
+			bridge.DeriveTestSocket(deadPID) + "-hermetic",
+			bridge.DeriveTestSocket(livePID),
+			bridge.DeriveTestSocket(livePID) + "-hermetic",
+		}, nil
+	}
+	pidAlive = func(pid int) bool { return pid == livePID || pid == os.Getpid() }
+	var killedDuringStart []string
+	serverKiller = func(_ context.Context, socket string) error {
+		killedDuringStart = append(killedDuringStart, socket)
+		return nil
+	}
+	var seen []string
+
+	code := Main(runFunc(func() int {
+		seen = slices.Clone(killedDuringStart)
+		return 0
+	}))
+
+	if code != 0 {
+		t.Fatalf("Main = %d, want 0", code)
+	}
+	slices.Sort(seen)
+	want := []string{
+		bridge.DeriveTestSocket(deadPID),
+		bridge.DeriveTestSocket(deadPID) + "-hermetic",
+	}
+	if !slices.Equal(seen, want) {
+		t.Fatalf("killed before test run = %v, want %v", seen, want)
+	}
+}
+
+func TestMain_ContinuesWhenReapDeadTestServersFails(t *testing.T) {
+	bin := t.TempDir()
+	fakeclitest.Install(t, filepath.Join(bin, "tmux"), "#!/bin/sh\nexit 0\n")
+	t.Setenv("PATH", bin)
+	t.Setenv("TMUX_TMPDIR", t.TempDir())
+	t.Setenv(bridge.TmuxSocketEnv, bridge.DeriveRunSocket(1))
+	prevList := testSocketLister
+	t.Cleanup(func() { testSocketLister = prevList })
+	testSocketLister = func() ([]string, error) {
+		return nil, errors.New("socket scan failed")
+	}
+	ran := false
+
+	code := Main(runFunc(func() int {
+		ran = true
+		return 0
+	}))
+
+	if code != 0 || !ran {
+		t.Fatalf("Main = %d, ran = %v; want 0 and runner executed even when reapDeadTestServers fails", code, ran)
 	}
 }

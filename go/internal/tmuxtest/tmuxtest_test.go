@@ -1,9 +1,12 @@
 package tmuxtest
 
 import (
+	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -47,5 +50,73 @@ func TestStopServer_RefusesAnEmptySocketSoItNeverKillsTheDefaultServer(t *testin
 
 	if err == nil || !strings.Contains(err.Error(), "empty socket name") {
 		t.Fatalf("StopServer(\"\") err=%v, want the empty-socket refusal", err)
+	}
+}
+
+func TestReapDeadTestServers_ReapsDeadTestSocketsAndSparesLiveAndLoopSockets(t *testing.T) {
+	t.Setenv("TMUX_TMPDIR", t.TempDir())
+	dir := bridge.TmuxSocketDir()
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	const deadPID, livePID = 111, 222
+	entries := []string{
+		bridge.DeriveTestSocket(deadPID),
+		bridge.DeriveTestSocket(deadPID) + "-hermetic",
+		bridge.DeriveTestSocket(deadPID) + "-earlykill",
+		bridge.DeriveTestSocket(livePID),
+		bridge.DeriveTestSocket(livePID) + "-hermetic",
+		bridge.DeriveRunSocket(deadPID),
+		bridge.TmuxSocket,
+		bridge.DeriveTestSocket(deadPID) + "x",
+	}
+	for _, name := range entries {
+		if err := os.WriteFile(filepath.Join(dir, name), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	prevAlive, prevKill := pidAlive, serverKiller
+	t.Cleanup(func() { pidAlive, serverKiller = prevAlive, prevKill })
+	pidAlive = func(pid int) bool { return pid == livePID }
+	var killed []string
+	serverKiller = func(_ context.Context, socket string) error {
+		killed = append(killed, socket)
+		return nil
+	}
+
+	if err := reapDeadTestServers(); err != nil {
+		t.Fatalf("reapDeadTestServers: %v", err)
+	}
+
+	slices.Sort(killed)
+	want := []string{
+		bridge.DeriveTestSocket(deadPID),
+		bridge.DeriveTestSocket(deadPID) + "-earlykill",
+		bridge.DeriveTestSocket(deadPID) + "-hermetic",
+	}
+	if !slices.Equal(killed, want) {
+		t.Fatalf("killed = %v, want %v", killed, want)
+	}
+}
+
+func TestListTestSockets_ReturnsSocketGlobError(t *testing.T) {
+	t.Setenv("TMUX_TMPDIR", "[invalid-glob")
+
+	_, err := listTestSockets()
+
+	if !errors.Is(err, filepath.ErrBadPattern) {
+		t.Fatalf("listTestSockets() err = %v, want filepath.ErrBadPattern", err)
+	}
+}
+
+func TestReapDeadTestServers_ReturnsErrorWhenReapFails(t *testing.T) {
+	prevList := testSocketLister
+	t.Cleanup(func() { testSocketLister = prevList })
+	testSocketLister = func() ([]string, error) {
+		return nil, errors.New("socket list unavailable")
+	}
+
+	if err := reapDeadTestServers(); err == nil {
+		t.Fatal("reapDeadTestServers() err = nil, want non-nil error")
 	}
 }

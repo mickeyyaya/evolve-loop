@@ -25,10 +25,13 @@ const (
 )
 
 var (
-	setenv       = os.Setenv
-	fdDir        = "/dev/fd"
-	serverPIDsMu sync.Mutex
-	serverPIDs   = map[string]int{}
+	setenv           = os.Setenv
+	fdDir            = "/dev/fd"
+	testSocketLister = listTestSockets
+	pidAlive         = swarm.ExecPidAlive
+	serverKiller     = swarm.ExecKillServer
+	serverPIDsMu     sync.Mutex
+	serverPIDs       = map[string]int{}
 )
 
 func recordServerPID(socket string, pid int) {
@@ -73,6 +76,30 @@ func isolate(socket string) error {
 		return fmt.Errorf("select socket %s: %w", socket, err)
 	}
 	return closeInheritedOnExec()
+}
+
+func listTestSockets() ([]string, error) {
+	socks, err := swarm.ExecListBridgeSockets()
+	if err != nil {
+		return nil, err
+	}
+	var testSocks []string
+	for _, s := range socks {
+		if strings.HasPrefix(s, "evolve-bridge-t") {
+			testSocks = append(testSocks, s)
+		}
+	}
+	return testSocks, nil
+}
+
+func reapDeadTestServers() error {
+	ctx, cancel := context.WithTimeout(context.Background(), serverStopTimeout)
+	defer cancel()
+	rep := swarm.ReapOrphanSockets(ctx, testSocketLister, pidAlive, serverKiller)
+	if len(rep.Errors) > 0 {
+		return errors.New(strings.Join(rep.Errors, "; "))
+	}
+	return nil
 }
 
 func stopFamily(socket string) error {
