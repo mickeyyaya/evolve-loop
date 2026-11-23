@@ -30,7 +30,7 @@ const (
 const carrierOverMovedMainSubject = "evolve: the audited change, carried over a moved main"
 
 func (cr *cycleRun) carryAuditedChangeOverMovedMain(se *ShipError) (*ShipError, string) {
-	if !namesMovedMain(se.Code) {
+	if !NamesMovedMain(se.Code) {
 		return se, ""
 	}
 	fleetRebase := se.Code == CodeGitFleetRebaseNeeded
@@ -120,7 +120,7 @@ type shipRecovery struct {
 }
 
 func (cr *cycleRun) reportRecoveryPath(r shipRecovery) {
-	if !namesMovedMain(r.routed.Code) {
+	if !NamesMovedMain(r.routed.Code) {
 		return
 	}
 	path := recoveryPathOf(r.next)

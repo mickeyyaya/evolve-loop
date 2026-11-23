@@ -171,3 +171,23 @@ func TestWorktreeShipLand_ARejectedPushLeavesNoCompletionTime(t *testing.T) {
 		t.Fatalf("CompletedAt = %q on a prepared intent", in.CompletedAt)
 	}
 }
+
+func TestWorktreeShipLand_ARebindPushRejectionUnwindsTheLaneInsteadOfKeepingTheIntentForAResume(t *testing.T) {
+	t.Parallel()
+	_, r, s, res := scriptedLanding(t, false)
+	const origin, staleMain = "0f1e2d3c4b5a69788796a5b4c3d2e1f0fedcba98", "5555555555555555555555555555555555555555"
+	r.on("push origin "+pinHead+":refs/heads/main", scriptedCall{exit: 1})
+	r.on("rev-parse origin/main", scriptedCall{stdout: origin + "\n"})
+	r.on("merge-base --is-ancestor "+origin+" "+pinHead, scriptedCall{exit: 1})
+	r.on("rev-parse refs/heads/main", scriptedCall{stdout: staleMain + "\n"})
+	r.on("merge-base --is-ancestor "+staleMain+" "+origin, scriptedCall{exit: 0})
+
+	err := s.land("")
+
+	if se, ok := core.AsShipError(err); !ok || se.Code != core.CodeGitLandingUnwindDeclined {
+		t.Fatalf("land = %v, want the lane unwind attempted (a stale local main cannot resume at the push)", err)
+	}
+	if containsLog(*res, "a retry resumes at the push") {
+		t.Errorf("logs %q: a rebind rejection must not promise a resume at the push", res.Logs)
+	}
+}

@@ -259,9 +259,14 @@ func shipVerified(ctx context.Context, opts *Options, res *RunResult) (RunResult
 }
 
 func verifyAndLandInShipWindow(ctx context.Context, opts *Options, res *RunResult) (RunResult, bool, error) {
-	ctx, release := enterShipWindow(ctx, opts, res)
+	windowCtx, release := enterShipWindow(ctx, opts, res)
 	defer release()
-	return verifyAndLand(ctx, opts, res)
+	out, landed, err := verifyAndLand(windowCtx, opts, res)
+	if err != nil {
+		syncMainAfterMovedMain(windowCtx, opts, res, err)
+		out.Logs = res.Logs
+	}
+	return out, landed, err
 }
 
 func verifyAndLand(ctx context.Context, opts *Options, res *RunResult) (RunResult, bool, error) {
