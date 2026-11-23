@@ -174,6 +174,7 @@ The column "Agent" of §5 gives the class of each core verb. These verbs are out
 | `context stats` | D | It reads the access log of other cycles, which I-5 denies to a cell. |
 | `selfheal incidents` | D | The boundary runs it. It writes the incident records and publishes `selfheal.incident` events, which are shared state ([llm-isolation.md](llm-isolation.md) §18.5). No persona runs it, and a cell refuses it. |
 | `selfheal propose` | D | The boundary runs it. It starts the orchestrator agent through `evolve agent run`. It writes the proposal records and the decisions of the catalog validator, which are shared state ([llm-isolation.md](llm-isolation.md) §18.6, §19.2). No persona runs it, and a cell refuses it. |
+| `selfheal record-doc` | D | The operator or the console runs it. It stores the path of an incident record on one incident file under `.evolve/incidents`, which is shared state ([llm-isolation.md](llm-isolation.md) §18.2). No persona runs it, and a cell refuses it. |
 | `phase <name>` | R (`dispatch`) | It starts a phase agent. |
 | `subagent run` | D | The pipeline starts fan-out workers. A cell uses the subagents of its own harness. |
 | `reset-sha`, `release` | D | operator verbs |

@@ -37,7 +37,7 @@ ADR-0154 says that no LLM controls another LLM. An "orchestrator agent" that tri
 8. **I-12 Orchestrator proposes, pipeline disposes.** A proposal names one action from a closed catalog. Go checks its preconditions.
 9. The catalog: retry with variation, reroute, quarantine, revert the last landing, open a repair item, halt and escalate. *Amended 2026-10-26:* dispatch a phase agent, on a request of a phase agent that the pipeline validated.
 10. **I-13 Bounded autonomy.** Repair budgets for each window and circuit breakers apply. Two failed repairs escalate.
-11. **I-14 Evidence closes an incident.** The red test is green, the signal clears and no index regresses.
+11. **I-14 Evidence closes an incident.** The red test is green, the signal clears and no index regresses. *Amended 2026-11-20:* the file of the incident record must also exist ([plan](../../plans/incident-knowledge-base-2026-11.md) D12).
 12. A closed incident has a recovery retrospective (ADR-0151).
 13. Detection is deterministic. The diagnosis is an LLM task. The decision and the dispatch are deterministic.
 14. A repair runs as a normal cycle: scout, TDD (reproduce), build, audit, ship.
