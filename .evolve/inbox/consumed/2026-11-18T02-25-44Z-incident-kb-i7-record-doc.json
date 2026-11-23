@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "TestIncidentClose_RefusesWithoutARecordDoc"
+  ],
+  "consumed": {
+    "at": "2026-11-23T12:55:13Z",
+    "via": "inbox curate",
+    "cycle": "console",
+    "resolution": "inbox curator: the change touched the fix surface and 1 of 1 named tests exist (commit e0b792f693c8176ced4abc1243bf2d36b3e700fb; changed go/cmd/evolve/cli_queue.go, go/cmd/evolve/cli_routing_share_test.go, go/cmd/evolve/cmd_continuation.go, go/cmd/evolve/cmd_cycle.go, go/cmd/evolve/cmd_cycle_fresh_binding_test.go, go/cmd/evolve/cmd_cycle_lane_resume.go, go/cmd/evolve/cmd_cycle_lane_resume_binding_test.go, go/cmd/evolve/cmd_cycle_lane_resume_order_test.go, go/cmd/evolve/cmd_docs_removal_design_amp_test.go, go/cmd/evolve/cmd_gc.go, go/cmd/evolve/cmd_gc_salvage_test.go, go/cmd/evolve/cmd_gc_scope.go, go/cmd/evolve/cmd_gc_scope_test.go, go/cmd/evolve/cmd_handoff.go, go/cmd/evolve/cmd_handoff_cover_test.go, go/cmd/evolve/cmd_host_inbox_claimer_root_test.go, go/cmd/evolve/cmd_inbox_signals_test.go, go/cmd/evolve/cmd_loop_coverage_test.go, go/cmd/evolve/cmd_loop_escalate.go, go/cmd/evolve/cmd_loop_pool_paused_hold_test.go, go/cmd/evolve/cmd_loop_wavesync.go, go/cmd/evolve/cmd_loop_wavesync_test.go, go/cmd/evolve/cmd_selfheal.go, go/cmd/evolve/cmd_selfheal_recorddoc_test.go, go/cmd/evolve/parallel_serial_tests_test.go, go/cmd/evolve/registry.go, go/cmd/evolve/testdata/testaudit-baseline.json, go/internal/selfheal/detect.go, go/internal/selfheal/detect_test.go, go/internal/selfheal/incident.go, go/internal/selfheal/incident_test.go, go/internal/selfheal/sources_test.go, go/internal/selfheal/store_test.go, go/internal/selfheal/verifier.go; tests found: TestIncidentClose_RefusesWithoutARecordDoc)"
+  },
+  "created_at": "2026-11-18T02:25:44Z",
+  "deps": [
+    "edit-layout-c2-regenerate-generated-conflicts"
+  ],
+  "files": [
+    "go/internal/selfheal/",
+    "go/cmd/evolve/"
+  ],
+  "fix": "Build component I7 (D12). selfheal stores only a path string and never imports incidentkb. See docs/plans/incident-knowledge-base-2026-11.md (PR #1559). The plan lands in the same batch as C2; the dependency on edit-layout-c2-regenerate-generated-conflicts waits for it.",
+  "id": "incident-kb-i7-record-doc",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "summary": "self-heal record_doc field and the refused close (I7)",
+  "title": "self-heal record_doc field and the refused close (I7)",
+  "weight": 0.7
+}
