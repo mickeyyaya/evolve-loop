@@ -66,6 +66,7 @@ func runSelfhealPropose(env selfhealEnv, w codeEnvelopeWriter, root string, pol 
 }
 
 type proposePass struct {
+	stderr    io.Writer
 	root      string
 	pol       policy.Policy
 	incidents []selfheal.Incident
@@ -92,7 +93,7 @@ func proposeDiagnoses(env selfhealEnv, root string, pol policy.Policy, stderr io
 	if len(pending) == 0 {
 		return report, nil, nil
 	}
-	pass := proposePass{root: root, pol: pol, incidents: incidents, since: now.Add(-hours(pol.HealingDetector().WindowHours))}
+	pass := proposePass{stderr: stderr, root: root, pol: pol, incidents: incidents, since: now.Add(-hours(pol.HealingDetector().WindowHours))}
 	signals, err := selfheal.LoadSignals(paths.EventChannelsRoot(evolveDir), proposeChannels, pass.since)
 	if err != nil {
 		return report, nil, err
@@ -102,12 +103,16 @@ func proposeDiagnoses(env selfhealEnv, root string, pol policy.Policy, stderr io
 		return report, nil, err
 	}
 	var proposals []selfheal.Proposal
+	var decided []decidedProposal
 	for _, inc := range pending {
-		proposals = append(proposals, decider.decide(diagnoseIncident(env, root, inc, signals, cfg.Stage, now, stderr), inc, now))
+		p := decider.decide(diagnoseIncident(env, root, inc, signals, cfg.Stage, now, stderr), inc, now)
+		proposals = append(proposals, p)
+		decided = append(decided, decidedProposal{inc: inc, p: p})
 	}
 	if err := decider.appendLedger(evolveDir); err != nil {
 		return report, nil, err
 	}
+	decider.openRepairItems(env, pass, decided)
 	for _, p := range proposals {
 		if err := selfheal.WriteProposal(selfheal.ProposalsDir(evolveDir), p); err != nil {
 			return report, nil, err

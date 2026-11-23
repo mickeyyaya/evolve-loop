@@ -81,6 +81,13 @@ undiagnosable. Its blast radius is every later cycle.
 
    *Evidence: cycles 999–1001 burned on the exact state defect that the queue had
    to fix. The console fix landed in hours (PR #345).*
+
+   *Staged path to a loop repair (X16).* The loop does not repair T0 work. In `shadow`
+   (the default of `healing.repair_cycle.stage`) the pipeline files each accepted
+   repair proposal as a console-routed item and records where it would route; the
+   console does the repair. The loop takes T1 repairs only after an operator
+   change of the stage on measured rates, and only after the lane route ships
+   ([llm-isolation.md](../architecture/llm-isolation.md) §20.2, §20.5).
 2. **Maximum reasoning, implicitly.** Pipeline issues always get the deepest
    analysis and the highest model tier. This applies to the operator session, to every
    review subagent, and to the loop phases that touch pipeline classes. Never

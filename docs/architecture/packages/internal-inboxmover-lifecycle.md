@@ -108,3 +108,7 @@
 
 - **`inboxmover-promote-mkdir-fail-loud`** ([code audit 2026-07](../../research/code-audit-2026-07/README.md)): a destination mkdir failure was returned as a NoOp success, stranding the task in `processing/`. It became `ErrMvFailed` with the item left in place.
 - **The extraction (ADR-0103 unit 06)** split `Promote` (113 lines), the drain (114) and `RecoverOrphans` (52) to meet the function limit. It folded three copies of the `*.json` walk into one iterator. It also folded the bump and the continuation shed into one rewrite instead of two renames. The measurements and the review folds are in decomposition unit 06.
+
+## FileRepair (X16)
+
+`Mover.FileRepair(raw, RepairStamp)` and `Mover.File` share one private `file` path, so a check added to one reaches the other. `FileRepair` runs the author check first (an authored `tier`, `protected_files` or lane route is refused), then writes the stamps: `route: console`, `tier` (T1 or T2, never T0) and `protected_files`. T0 is derived on read by `inboxbatch.Item.RepairTier`.

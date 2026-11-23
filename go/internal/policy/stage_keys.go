@@ -193,6 +193,7 @@ var stageReaders = map[string]stageReader{
 	"healing.orchestrator.stage":                 plainStage(func(p Policy) string { return p.HealingOrchestrator().Stage }),
 	"healing.validator.stage":                    plainStage(func(p Policy) string { return p.HealingValidator().Stage }),
 	"healing.live_reaction.stage":                plainStage(func(p Policy) string { return p.HealingLiveReaction().Stage }),
+	"healing.repair_cycle.stage":                 plainStage(func(p Policy) string { return string(p.HealingRepairCycle().Stage) }),
 	"gates.scan_cache_gate":                      plainStage(func(p Policy) string { return p.GatesConfig().ScanCacheGate }),
 	"handoff.build-audit.stage":                  handoffStage("build-audit"),
 	"handoff.intent-scout.stage":                 handoffStage("intent-scout"),
