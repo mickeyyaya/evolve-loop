@@ -119,7 +119,7 @@ func (r *Repo) Git(args ...string) string {
 	if err != nil {
 		r.tb.Fatalf("gittest: git %s in %s: %v\n%s", strings.Join(args, " "), r.Dir, err, out)
 	}
-	return strings.TrimSpace(string(out))
+	return strings.TrimRight(string(out), " \t\r\n")
 }
 
 var combinedOutput = (*exec.Cmd).CombinedOutput

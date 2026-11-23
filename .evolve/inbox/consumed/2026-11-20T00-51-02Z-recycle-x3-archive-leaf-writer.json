@@ -1,0 +1,48 @@
+{
+  "acceptance": [
+    "Red first: a round trip restores the branch, the patch and the untracked files of a fixture cycle",
+    "Red first: a ref that moved after the scan is not deleted (compare-and-delete)",
+    "The manifest hash verifies"
+  ],
+  "consumed": {
+    "at": "2026-11-23T21:34:27Z",
+    "cycle": "",
+    "via": "ship"
+  },
+  "continuation": {
+    "base_sha": "92a694b29308122a1bc819b202738180a6b8c69f",
+    "branch": "cycle-cd3ae73e-2593",
+    "cycle": 2593,
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2593/audit-fail-reason.json",
+    "snapshot_sha": "8ebfdd6ab9b8d4e96c5dc1611e7aa8b2d3c5676a",
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2593"
+  },
+  "created_at": "2026-11-20T00:51:02Z",
+  "deps": [
+    "recycle-x0-thin-bundle-writers"
+  ],
+  "files": [
+    "go/internal/gc/salvage.go",
+    "go/cmd/evolve/cmd_archive.go"
+  ],
+  "fix": "Write a leaf with a manifest, the uncommitted patch and the untracked files. A failed cycle moves its branch to refs/archive/cycles/\u003cleaf\u003e with `update-ref -d \u003cref\u003e \u003cexpected\u003e`; the ref is the one copy of the commits. Add `evolve archive restore \u003ccycle\u003e` that rebuilds the branch from the ref or a thin bundle, and the patch and the untracked files.",
+  "id": "recycle-x3-archive-leaf-writer",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "released_continuations": [
+    {
+      "base_sha": "92a694b29308122a1bc819b202738180a6b8c69f",
+      "branch": "cycle-cd3ae73e-2593",
+      "cycle": 2593,
+      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2593/audit-fail-reason.json",
+      "reason": "ship-consume-",
+      "released_at": "2026-11-23T21:34:27Z",
+      "snapshot_sha": "8ebfdd6ab9b8d4e96c5dc1611e7aa8b2d3c5676a",
+      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2593"
+    }
+  ],
+  "summary": "Plan PR #1585, decisions D5, D8, component X3. The leaf lives in OperatorSalvageDir with the existing file names; .evolve/archive is a protected root (go/internal/gc/gc.go:196-208).",
+  "title": "A cycle archive leaf in the salvage home, and `evolve archive restore`",
+  "weight": 0.8
+}

@@ -113,7 +113,7 @@ func TestApplyWorktrees_ASalvageTargetThatTurnedLiveIsRefusedUntouched(t *testin
 	}
 }
 
-func TestApplyWorktrees_SalvageRemoveKeepsARestorableCopyAndTheBranch(t *testing.T) {
+func TestApplyWorktrees_SalvageRemoveArchivesTheBranchAndKeepsARestorableCopy(t *testing.T) {
 	repo := gittest.Fixture(t)
 	if err := os.WriteFile(filepath.Join(repo.Dir, "f.txt"), []byte("base\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -150,18 +150,29 @@ func TestApplyWorktrees_SalvageRemoveKeepsARestorableCopyAndTheBranch(t *testing
 	if _, err := os.Stat(wt); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("worktree still on disk: %v", err)
 	}
-	if got := repo.Git("rev-parse", "cycle-cd3ae73e-1677"); got != tip {
-		t.Fatalf("branch tip %q, want %q: the lane's commits must survive on the kept branch", got, tip)
+	if got := repo.Git("rev-parse", "refs/archive/cycles/cycle-cd3ae73e-1677"); got != tip {
+		t.Fatalf("archive ref %q, want %q: the lane's commits must survive on the archive ref", got, tip)
+	}
+	if out, err := o.git(repo.Dir, "branch", "--list", "cycle-cd3ae73e-1677"); err != nil || strings.TrimSpace(out) != "" {
+		t.Fatalf("branch list %q (%v): the salvaged branch must move to the archive ref", out, err)
 	}
 	salvage := filepath.Join(OperatorSalvageDir(o.EvolveDir), "cycle-cd3ae73e-1677")
 	if head := readFile(t, filepath.Join(salvage, "HEAD")); !strings.HasPrefix(head, tip) {
 		t.Errorf("salvage HEAD %q does not record the tip %s", head, tip)
 	}
 	restore := filepath.Join(t.TempDir(), "restore")
-	repo.Git("worktree", "add", "-q", "--detach", restore, tip)
-	repo.Git("-C", restore, "apply", filepath.Join(salvage, "uncommitted.patch"))
+	res, err := RestoreArchive(o, 1677, restore)
+	if err != nil {
+		t.Fatalf("RestoreArchive: %v", err)
+	}
+	if want := (RestoreResult{Leaf: "cycle-cd3ae73e-1677", Branch: "cycle-cd3ae73e-1677", Head: tip, Worktree: restore}); res != want {
+		t.Errorf("RestoreArchive = %+v, want %+v", res, want)
+	}
 	if got := readFile(t, filepath.Join(restore, "f.txt")); got != "base\nlane edit\nuncommitted edit\n" {
-		t.Errorf("patch restores f.txt as %q", got)
+		t.Errorf("restore holds f.txt as %q", got)
+	}
+	if got := readFile(t, filepath.Join(restore, "sub", "new.txt")); got != "untracked\n" {
+		t.Errorf("restore holds sub/new.txt as %q", got)
 	}
 	if got := untarFile(t, filepath.Join(salvage, "untracked.tgz"), "sub/new.txt"); got != "untracked\n" {
 		t.Errorf("untracked archive holds sub/new.txt = %q", got)

@@ -440,7 +440,7 @@ func (o WorktreeOptions) keptOrSalvaged(path, branch string, dirty bool, held la
 		}
 	}
 	if reason, ok := o.salvageReason(path, branch, held); ok {
-		return WorktreeItem{Path: path, Branch: branch, Action: WorktreeActionSalvageRemove, Reason: reason}
+		return WorktreeItem{Path: path, Branch: branch, Head: o.branchHead(branch), Action: WorktreeActionSalvageRemove, Reason: reason}
 	}
 	if dirty {
 		return WorktreeItem{Path: path, Branch: branch, Action: WorktreeActionFlagDirty, Reason: "dirty worktree — preserved for manual review"}
@@ -481,7 +481,7 @@ func (h laneHolds) holds(path, branch string) bool {
 
 func (o WorktreeOptions) salvageReason(path, branch string, held laneHolds) (string, bool) {
 	if age, ok := o.finishedFor(path); ok && o.pastSalvageAge(age) {
-		return fmt.Sprintf("cycle closed out %s ago — uncommitted state salvaged to operator-salvage, branch kept", age.Round(time.Hour)), true
+		return fmt.Sprintf("cycle closed out %s ago — uncommitted state salvaged to operator-salvage, branch moved to the archive ref", age.Round(time.Hour)), true
 	}
 	if held.holds(path, branch) {
 		return "", false
@@ -494,7 +494,7 @@ func (o WorktreeOptions) salvageReason(path, branch string, held laneHolds) (str
 	if !o.pastSalvageAge(age) {
 		return "", false
 	}
-	return fmt.Sprintf("lane ended %s ago (not live, not paused, no continuation) — uncommitted state salvaged to operator-salvage, branch kept", age.Round(time.Hour)), true
+	return fmt.Sprintf("lane ended %s ago (not live, not paused, no continuation) — uncommitted state salvaged to operator-salvage, branch moved to the archive ref", age.Round(time.Hour)), true
 }
 
 func (o WorktreeOptions) pastSalvageAge(age time.Duration) bool {

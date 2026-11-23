@@ -35,6 +35,7 @@ var commands = []subcommand{
 	{Name: "dossier", Summary: "Read and verify cycle dossiers (dossier verify)", Run: runDossier},
 	{Name: "audit", Summary: "Analyze auditor calibration evidence (audit calibration)", Run: runAudit},
 	{Name: "salvage", Summary: "Report the recoverable-malformed bad_verdict rate (salvage report [-json]) and list gc's operator-salvage leaves read-only (salvage list [--json])", Run: runSalvage},
+	{Name: "archive", Summary: "Restore a failed cycle from its archive leaf: archive restore <cycle> [--worktree DIR] [--project-root P] rebuilds the branch, the uncommitted patch and the untracked files from the leaf and the archive ref or bundle; it refuses a leaf or manifest that fails its hash and a branch that exists (exit 0 restored, 1 refused, 10 usage)", Run: runArchive},
 	{Name: "soak-report", Summary: "Render the EVOLVE_PHASE_RECOVERY soak evidence table (read-only)", Run: runSoakReport},
 	{Name: "dashboard", Summary: "Serve the read-only live pipeline dashboard (dashboard [--addr A] [--project-root P] [--snapshot])", Run: runDashboard},
 	{Name: "names", Summary: "Guard naming after a rename: names check (scan) | names fix (rewrite dead tokens)", Run: runNames},

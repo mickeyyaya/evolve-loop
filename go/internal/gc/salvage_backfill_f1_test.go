@@ -85,8 +85,12 @@ func TestSalvageWorktreeBackfillF1_ACleanTreeLeavesOnlyItsHeadRecord(t *testing.
 		t.Fatalf("HEAD record = %q, %v; want the trimmed sha and the branch", head, err)
 	}
 	entries, _ := os.ReadDir(leaf)
-	if len(entries) != 1 {
-		t.Fatalf("a clean tree has no patch and no archive, got %d entries", len(entries))
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	if want := []string{salvageHeadFile, manifestFile, manifestHashFile}; len(names) != len(want) || names[0] != want[0] || names[1] != want[1] || names[2] != want[2] {
+		t.Fatalf("a clean tree has no patch and no archive, got %v, want %v", names, want)
 	}
 }
 

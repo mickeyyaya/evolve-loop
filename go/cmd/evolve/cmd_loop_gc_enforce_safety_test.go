@@ -234,8 +234,9 @@ func TestRunGCHook_TheCheckedInEnforcePolicyNeverTouchesADevWorktreeALiveLaneAnU
 	if got := f.branchHead(f.unmergedBranch); got != f.unmergedBranchHead {
 		t.Errorf("unmerged branch %s = %q, want %s", f.unmergedBranch, got, f.unmergedBranchHead)
 	}
-	if !f.gitOK("cat-file", "-e", f.snapshotSHA+"^{commit}") || !f.gitOK("merge-base", "--is-ancestor", f.snapshotSHA, "refs/heads/cycle-abc-502") {
-		t.Errorf("continuation snapshot %s is no longer a commit on the kept branch cycle-abc-502", f.snapshotSHA)
+	archived := "refs/archive/cycles/" + filepath.Base(f.snapshotLane)
+	if !f.gitOK("cat-file", "-e", f.snapshotSHA+"^{commit}") || !f.gitOK("merge-base", "--is-ancestor", f.snapshotSHA, archived) {
+		t.Errorf("continuation snapshot %s is no longer a commit on the archive ref %s of cycle-abc-502", f.snapshotSHA, archived)
 	}
 	if after, err := os.ReadFile(f.registry); err != nil || !bytes.Equal(after, f.registryBefore) {
 		t.Errorf("the continuation registry changed (err=%v):\nbefore=%s\nafter=%s", err, f.registryBefore, after)

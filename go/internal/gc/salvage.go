@@ -23,6 +23,10 @@ func (o WorktreeOptions) salvageRemoveWorktrees(items []WorktreeItem, refused ma
 		if it.Action != WorktreeActionSalvageRemove || refused[it.Path] {
 			continue
 		}
+		if got := o.branchHead(it.Branch); it.Head != "" && got != it.Head {
+			errs = append(errs, fmt.Errorf("gc: refuse %s: branch %s moved from %s to %s since the plan, %w", it.Path, it.Branch, it.Head, got, ErrTreeKept))
+			continue
+		}
 		if err := o.salvageWorktree(it.Path, it.Branch); err != nil {
 			errs = append(errs, fmt.Errorf("gc: refuse %s: salvage failed, %w: %w", it.Path, ErrTreeKept, err))
 			continue
@@ -36,6 +40,9 @@ func (o WorktreeOptions) salvageRemoveWorktrees(items []WorktreeItem, refused ma
 			continue
 		}
 		did = true
+		if err := o.archiveBranch(filepath.Base(it.Path), it); err != nil {
+			errs = append(errs, fmt.Errorf("gc: archive %s: %w", it.Branch, err))
+		}
 	}
 	return did, errs
 }
@@ -43,7 +50,10 @@ func (o WorktreeOptions) salvageRemoveWorktrees(items []WorktreeItem, refused ma
 type gitRun func(dir string, args ...string) (string, error)
 
 func (o WorktreeOptions) salvageWorktree(path, branch string) error {
-	return writeSalvageLeaf(o.git, o.EvolveDir, path, branch)
+	if err := writeSalvageLeaf(o.git, o.EvolveDir, path, branch); err != nil {
+		return err
+	}
+	return writeLeafManifest(filepath.Join(OperatorSalvageDir(o.EvolveDir), filepath.Base(path)))
 }
 
 func writeSalvageLeaf(git gitRun, evolveDir, path, branch string) error {
