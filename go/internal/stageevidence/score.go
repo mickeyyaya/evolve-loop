@@ -9,7 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"sort"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gatecontract"
 )
@@ -54,6 +54,8 @@ func (e *BrokenChainError) Unwrap() error {
 	return ErrBrokenChain
 }
 
+const ErrorCodeUntyped = "error"
+
 func ErrorCode(err error) string {
 	if err == nil {
 		return ""
@@ -70,7 +72,7 @@ func ErrorCode(err error) string {
 	if errors.Is(err, ErrCorruptStore) {
 		return "corrupt-store"
 	}
-	return "error"
+	return ErrorCodeUntyped
 }
 
 type Record struct {
@@ -87,12 +89,13 @@ type Record struct {
 }
 
 type Outcome struct {
-	Scope      ScopeKind `json:"scope,omitempty"`
-	ID         int       `json:"id"`
-	Shipped    bool      `json:"shipped,omitempty"`
-	Incomplete bool      `json:"incomplete,omitempty"`
-	Failed     []string  `json:"failed,omitempty"`
-	Routed     []string  `json:"routed,omitempty"`
+	Scope          ScopeKind `json:"scope,omitempty"`
+	ID             int       `json:"id"`
+	Shipped        bool      `json:"shipped,omitempty"`
+	Incomplete     bool      `json:"incomplete,omitempty"`
+	Failed         []string  `json:"failed,omitempty"`
+	Routed         []string  `json:"routed,omitempty"`
+	RoutesMeasured bool      `json:"routes_measured,omitempty"`
 }
 
 type Chain struct {
@@ -106,10 +109,15 @@ func PreverifiedChain(records []Record, outcomes []Outcome, digest string) Chain
 	return Chain{Records: records, Outcomes: outcomes, Digest: digest, preverified: true}
 }
 
+type NotReadyReason string
+
+const ReasonConflictsUnmeasured NotReadyReason = "conflicts_unmeasured"
+
 type Case struct {
-	Class Class `json:"class"`
-	Cycle int   `json:"cycle"`
-	Seq   int   `json:"seq"`
+	Class Class     `json:"class"`
+	Scope ScopeKind `json:"scope,omitempty"`
+	ID    int       `json:"id"`
+	Seq   int       `json:"seq"`
 }
 
 type Result struct {
@@ -119,13 +127,14 @@ type Result struct {
 	ChainDigest      string         `json:"chain_digest,omitempty"`
 	Error            string         `json:"error,omitempty"`
 	Ready            bool           `json:"ready"`
-	FirstCycle       int            `json:"first_cycle"`
-	LastCycle        int            `json:"last_cycle"`
+	NotReady         NotReadyReason `json:"not_ready,omitempty"`
+	FirstID          int            `json:"first_id"`
+	LastID           int            `json:"last_id"`
 	Decisions        int            `json:"decisions"`
 	FalseStops       int            `json:"false_stops"`
 	Escapes          int            `json:"escapes"`
 	Conflicts        int            `json:"conflicts"`
-	IncompleteCycles []int          `json:"incomplete_cycles,omitempty"`
+	IncompleteScopes []string       `json:"incomplete_scopes,omitempty"`
 	Cases            []Case         `json:"cases,omitempty"`
 	Late             []Record       `json:"late,omitempty"`
 	OtherVersions    map[string]int `json:"other_versions,omitempty"`
@@ -142,17 +151,35 @@ func (defaultScorer) Name() string {
 	return "default"
 }
 
+const (
+	FieldWouldHold = "would_hold"
+	FieldWouldStop = "would_stop"
+	FieldWouldSkip = "would_skip"
+	FieldItem      = "item"
+	FieldCheck     = "check"
+	ItemSeparator  = ","
+)
+
 func (defaultScorer) Classify(rec Record, out Outcome) Class {
-	if rec.Fields["would_hold"] == "true" && rec.Fields["item"] != "" && slices.Contains(out.Routed, rec.Fields["item"]) {
+	if rec.Fields[FieldWouldHold] == "true" && anyRouted(rec.Fields[FieldItem], out.Routed) {
 		return ClassConflict
 	}
-	if rec.Fields["would_stop"] == "true" && out.Shipped {
+	if rec.Fields[FieldWouldStop] == "true" && out.Shipped {
 		return ClassFalseStop
 	}
-	if rec.Fields["would_skip"] == "true" && rec.Fields["check"] != "" && slices.Contains(out.Failed, rec.Fields["check"]) {
+	if rec.Fields[FieldWouldSkip] == "true" && rec.Fields[FieldCheck] != "" && slices.Contains(out.Failed, rec.Fields[FieldCheck]) {
 		return ClassEscape
 	}
 	return ClassNone
+}
+
+func anyRouted(items string, routed []string) bool {
+	for _, item := range strings.Split(items, ItemSeparator) {
+		if item != "" && slices.Contains(routed, item) {
+			return true
+		}
+	}
+	return false
 }
 
 func DefaultScorer() Scorer {
@@ -163,30 +190,9 @@ func ScorerFor(_ string) Scorer {
 	return DefaultScorer()
 }
 
-type hashedRecord struct {
-	Scope   ScopeKind         `json:"scope,omitempty"`
-	ID      int               `json:"id"`
-	Session string            `json:"session,omitempty"`
-	Key     string            `json:"key"`
-	Version string            `json:"version"`
-	Kind    Kind              `json:"kind"`
-	Seq     int               `json:"seq"`
-	Fields  map[string]string `json:"fields,omitempty"`
-	Prev    string            `json:"prev,omitempty"`
-}
-
 func computeRecordHash(r Record) string {
-	payload, _ := json.Marshal(hashedRecord{
-		Scope:   r.Scope,
-		ID:      r.ID,
-		Session: r.Session,
-		Key:     r.Key,
-		Version: r.Version,
-		Kind:    r.Kind,
-		Seq:     r.Seq,
-		Fields:  r.Fields,
-		Prev:    r.Prev,
-	})
+	r.Hash = ""
+	payload, _ := json.Marshal(r)
 	sum := sha256.Sum256(payload)
 	return hex.EncodeToString(sum[:])
 }
@@ -212,29 +218,36 @@ func VerifyChain(chain Chain) error {
 	return nil
 }
 
-func indexOutcomes(list []Outcome) (map[ScopeKey]Outcome, []int) {
+func indexOutcomes(list []Outcome) (map[ScopeKey]Outcome, []string) {
 	byScope := make(map[ScopeKey]Outcome, len(list))
-	var incomplete []int
+	var incomplete []ScopeKey
 	seenIncomplete := map[ScopeKey]bool{}
 	for _, o := range list {
 		scope := o.ScopeKey()
 		byScope[scope] = o
 		if o.Incomplete && !seenIncomplete[scope] {
 			seenIncomplete[scope] = true
-			incomplete = append(incomplete, o.ID)
+			incomplete = append(incomplete, scope)
 		}
 	}
-	sort.Ints(incomplete)
-	return byScope, incomplete
+	slices.SortFunc(incomplete, compareScopes)
+	labels := make([]string, 0, len(incomplete))
+	for _, scope := range incomplete {
+		labels = append(labels, scope.String())
+	}
+	return byScope, labels
 }
 
 func tallyRecord(res *Result, r Record, out Outcome, scorer Scorer) {
 	res.Decisions++
-	if res.FirstCycle == 0 || r.ID < res.FirstCycle {
-		res.FirstCycle = r.ID
+	if _, dependsOnConflict := r.Fields[FieldWouldHold]; dependsOnConflict && !out.RoutesMeasured {
+		res.NotReady = ReasonConflictsUnmeasured
 	}
-	if r.ID > res.LastCycle {
-		res.LastCycle = r.ID
+	if res.FirstID == 0 || r.ID < res.FirstID {
+		res.FirstID = r.ID
+	}
+	if r.ID > res.LastID {
+		res.LastID = r.ID
 	}
 	c := scorer.Classify(r, out)
 	switch c {
@@ -247,7 +260,7 @@ func tallyRecord(res *Result, r Record, out Outcome, scorer Scorer) {
 	default:
 		return
 	}
-	res.Cases = append(res.Cases, Case{Class: c, Cycle: r.ID, Seq: r.Seq})
+	res.Cases = append(res.Cases, Case{Class: c, Scope: r.Scope, ID: r.ID, Seq: r.Seq})
 }
 
 func Score(chain Chain, version string, promotion gatecontract.Promotion, scorer Scorer) Result {
@@ -258,7 +271,7 @@ func Score(chain Chain, version string, promotion gatecontract.Promotion, scorer
 	res := Result{
 		Scorer:           scorer.Name(),
 		Version:          version,
-		IncompleteCycles: incomplete,
+		IncompleteScopes: incomplete,
 	}
 	if len(chain.Records) > 0 {
 		res.Key = chain.Records[0].Key
@@ -286,7 +299,8 @@ func Score(chain Chain, version string, promotion gatecontract.Promotion, scorer
 	res.Ready = res.Decisions >= minDecisions &&
 		res.Escapes <= promotion.MaxEscapes &&
 		res.FalseStops <= promotion.MaxFalseStops &&
-		res.Conflicts == 0
+		res.Conflicts == 0 &&
+		res.NotReady == ""
 	return res
 }
 

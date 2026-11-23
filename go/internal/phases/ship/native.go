@@ -114,6 +114,8 @@ type Options struct {
 	relPath func(base, target string) (string, error)
 
 	Integration *Integration
+
+	StageEvidence StageOpener
 }
 
 type Now struct {

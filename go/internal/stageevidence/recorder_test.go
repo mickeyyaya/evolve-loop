@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"sync"
 	"testing"
@@ -547,7 +548,7 @@ func TestCausePrecedenceNamesTheStrongestFault(t *testing.T) {
 		return stageevidence.Record{Session: s, Kind: stageevidence.KindClose, Fields: f}
 	}
 	gap := map[string]string{"counter." + keyA: "3"}
-	faulted := map[string]string{"fault": stageevidence.FaultWriteFailed}
+	faulted := map[string]string{"fault": stageevidence.CauseWriteFailed}
 	cases := []struct {
 		name string
 		recs []stageevidence.Record
@@ -647,5 +648,23 @@ func TestEditOfScopeIdOrSessionOfTheFirstRecordFailsVerify(t *testing.T) {
 		if err := stageevidence.VerifyChain(stageevidence.Chain{Records: changed[:1]}); !errors.Is(err, stageevidence.ErrBrokenChain) {
 			t.Errorf("editing the %s of the first record gave %v, want a broken chain", name, err)
 		}
+	}
+}
+
+func TestSealCarriesTheRoutedIdsSortedAndUniqueAndNoneWhenThereAreNone(t *testing.T) {
+	t.Parallel()
+	r, raw := sealedRig(t)
+
+	routed, _, err := stageevidence.BuildSeal(r.scope, raw, stageevidence.SealInput{Routed: []string{"b", "a", "b"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	none, _, err := stageevidence.BuildSeal(r.scope, raw, stageevidence.SealInput{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !slices.Equal(routed.Routed, []string{"a", "b"}) || none.Routed != nil {
+		t.Errorf("routed = %v, none = %v; want [a b] and nil", routed.Routed, none.Routed)
 	}
 }

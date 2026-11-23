@@ -114,13 +114,13 @@ const (
 
 var errPrePhaseSnapshot = fmt.Errorf("pre-phase main-tree snapshot failed after %d attempts, so the phase was not run", snapshotAttempts)
 
-func withSnapshotRetries(ctx context.Context, read func() error) error {
+func withSnapshotRetries(ctx context.Context, sleep func(time.Duration), read func() error) error {
 	err := read()
 	for attempt := 1; err != nil && attempt < snapshotAttempts; attempt++ {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		backoffSleep(time.Duration(attempt) * snapshotRetryBackoff)
+		sleep(time.Duration(attempt) * snapshotRetryBackoff)
 		err = read()
 	}
 	return err
@@ -132,7 +132,7 @@ func retryingDirtyPaths(read treediff.GitDirtyFn) treediff.GitDirtyFn {
 	}
 	return func(ctx context.Context, repoRoot string) ([]string, error) {
 		var paths []string
-		err := withSnapshotRetries(ctx, func() error {
+		err := withSnapshotRetries(ctx, backoffSleep, func() error {
 			var readErr error
 			paths, readErr = read(ctx, repoRoot)
 			return readErr
@@ -143,7 +143,7 @@ func retryingDirtyPaths(read treediff.GitDirtyFn) treediff.GitDirtyFn {
 
 func readMainTreeStatus(ctx context.Context, projectRoot string) (string, error) {
 	var out string
-	err := withSnapshotRetries(ctx, func() error {
+	err := withSnapshotRetries(ctx, backoffSleep, func() error {
 		stdout, code, err := gitCapture(ctx, projectRoot, "status", "--porcelain", "-uall")
 		if err != nil {
 			return err

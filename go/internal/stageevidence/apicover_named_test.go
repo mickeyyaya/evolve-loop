@@ -63,7 +63,7 @@ func TestAPICover_NamesAllStageEvidenceExports(t *testing.T) {
 	}
 	var res stageevidence.Result
 	res, err = stageevidence.Verify(context.Background(), stageevidence.FileChain(chainPath), "k", "v1", gatecontract.Promotion{MinDecisions: 1}, scorer)
-	if err != nil || res.FalseStops != 1 || res.Cases[0] != (stageevidence.Case{Class: stageevidence.ClassFalseStop, Cycle: 1, Seq: 1}) {
+	if err != nil || res.FalseStops != 1 || res.Cases[0] != (stageevidence.Case{Class: stageevidence.ClassFalseStop, ID: 1, Seq: 1}) {
 		t.Fatalf("Verify: res=%+v err=%v", res, err)
 	}
 	var scored stageevidence.Result = stageevidence.Score(c, "v1", gatecontract.Promotion{MinDecisions: 1}, scorer)
@@ -140,7 +140,7 @@ func TestAPICover_NamesTheEvidenceRecorderAndSealExports(t *testing.T) {
 	if chain.Digest != "d" {
 		t.Fatal("PreverifiedChain lost the digest")
 	}
-	causes := []string{stageevidence.CauseWriteFailed, stageevidence.CauseOpenSession, stageevidence.CauseGap, stageevidence.CauseTornTail, stageevidence.FaultWriteFailed}
+	causes := []string{stageevidence.CauseWriteFailed, stageevidence.CauseOpenSession, stageevidence.CauseGap, stageevidence.CauseTornTail}
 	for _, c := range causes {
 		if c == "" {
 			t.Fatal("empty cause code")

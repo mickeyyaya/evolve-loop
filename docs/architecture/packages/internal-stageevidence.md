@@ -10,7 +10,7 @@
 - `Seal`, `SealInput`, `BuildSeal`, `VerifyStored`, `ParseSeal` and the cause codes build and check the commitment that a seal makes.
 - `PreverifiedChain` builds a chain that a ledger reader has verified already.
 - `Class` (`ClassNone`, `ClassFalseStop`, `ClassEscape`, `ClassConflict`) classifies scored faults.
-- `ErrBrokenChain`, `ErrEmptyChain`, `ErrLedgerBroken`, `ErrCorruptStore`, `BrokenChainError`, and `ErrorCode` represent chain failures as typed values.
+- `ErrBrokenChain`, `ErrEmptyChain`, `ErrLedgerBroken`, `ErrCorruptStore`, `BrokenChainError`, and `ErrorCode` represent chain failures as typed values. `ErrorCodeUntyped` is the code of an error that is none of the four typed ones.
 - `Record`, `Outcome`, `Chain`, `Case`, and `Result` define the JSON-serializable chain and verdict data.
 - `Scorer`, `DefaultScorer`, and `ScorerFor` map each stage key to a named decision classifier.
 - `Link`, `VerifyChain`, `Score`, and `Verify` seal, validate, and score evidence chains.
@@ -22,11 +22,12 @@
 - `internal/stageevidence` imports `gatecontract`, `regressiontia`, and `sysexec`, and never imports `core`, `ship`, or `gateregistry`.
 - `VerifyChain` checks the chain of each scope key on its own. The first record of a scope has an empty `prev`.
 - `FileChain` calls `VerifyChain` on the whole file before it filters records for one stage key.
+- `Case`, `Result.FirstID`, `Result.LastID` and `Result.IncompleteScopes` use scope-neutral names. `IncompleteScopes` holds the scope labels, such as `cycle-7` and `pool-7`, so equal numbers of two scope kinds stay apart.
 - The recorder never fails a cycle. A write error calls `OnFault`, and the close marker then carries the fault, so the seal marks the scope `incomplete`. The file lock comes from the caller.
 - The recorder raises the counter of a key before it writes. A counter above the count of records is a gap that the seal reports.
 - The seal drops a torn line and counts it. It never repairs a line.
 - `BuildSeal` checks that a prior seal is a prefix of the working file. A history that was rewritten fails with `BrokenChainError`.
 - The reasons for the scope key, the markers and the seal are in the design `docs/plans/shadow-contract-k2-k4-2026-11.md` (PR #1674) and in `docs/architecture/shadow-stage-contract.md` section 10.2.
 - `Score` ignores `KindLate` records, records of other versions, and cycles with `Incomplete` outcomes.
-- `Score` sets `Ready` to true only when decisions meet `max(MinDecisions, 1)`, faults stay within limits, and `Conflicts` equals zero.
+- `Score` sets `Ready` to true only when decisions meet `max(MinDecisions, 1)`, faults stay within limits, `Conflicts` equals zero, and `NotReady` is empty. A decision that carries `would_hold` in an outcome whose `RoutesMeasured` is false sets `NotReady` to `conflicts_unmeasured`.
 - `DecisionVersion` reuses `regressiontia.ModuleLocalReach` to find module-local imports of the decider closure.
