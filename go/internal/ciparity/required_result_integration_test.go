@@ -20,6 +20,7 @@ func TestRequiredResult_RejectsMissingOrUnsuccessfulWork(t *testing.T) {
 		"LANDING_REQUIRED": "${{ needs.changes.outputs.landing }}", "LANDING_RESULT": "${{ needs.landing.result }}",
 		"INBOX_REQUIRED": "${{ needs.changes.outputs.inbox }}", "INBOX_RESULT": "${{ needs.inbox.result }}",
 		"LINT_RESULT": "${{ needs.golangci-lint.result }}", "TRAILER_CHECK_RESULT": "${{ needs.trailer-check.result }}",
+		"DOCS_TESTS_RESULT": "${{ needs.docs-tests.result }}",
 	}
 	for key, want := range bindings {
 		if step.Env[key] != want {
@@ -39,6 +40,10 @@ func TestRequiredResult_RejectsMissingOrUnsuccessfulWork(t *testing.T) {
 		{"docs_only_lint_missing", docsOnlyResult(map[string]string{"STE_LINT_RESULT": ""}), false},
 		{"docs_only_lint_skipped", docsOnlyResult(map[string]string{"STE_LINT_RESULT": "skipped"}), false},
 		{"docs_only_lint_cancelled", docsOnlyResult(map[string]string{"STE_LINT_RESULT": "cancelled"}), false},
+		{"docs_only_docs_tests_failed", docsOnlyResult(map[string]string{"DOCS_TESTS_RESULT": "failure"}), false},
+		{"docs_only_docs_tests_missing", docsOnlyResult(map[string]string{"DOCS_TESTS_RESULT": ""}), false},
+		{"docs_only_docs_tests_skipped", docsOnlyResult(map[string]string{"DOCS_TESTS_RESULT": "skipped"}), false},
+		{"docs_only_docs_tests_cancelled", docsOnlyResult(map[string]string{"DOCS_TESTS_RESULT": "cancelled"}), false},
 		{"docs_only_validate_ran", docsOnlyResult(map[string]string{"VALIDATE_RESULT": "success", "PLUGIN_RESULT": "success", "ACS_RESULT": "success"}), false},
 		{"docs_only_validate_failed", docsOnlyResult(map[string]string{"VALIDATE_RESULT": "failure"}), false},
 		{"docs_only_without_the_docs_route", docsOnlyResult(map[string]string{"DOCS_REQUIRED": "false", "STE_LINT_RESULT": "skipped"}), false},
@@ -69,9 +74,9 @@ func TestRequiredResult_RejectsMissingOrUnsuccessfulWork(t *testing.T) {
 		{"push_success_trailer_check", map[string]string{"EVENT_NAME": "push", "TRAILER_CHECK_RESULT": "success"}, false},
 		{"unknown_event_trailer_check", map[string]string{"EVENT_NAME": "merge_group", "TRAILER_CHECK_RESULT": "skipped"}, false},
 	}
-	for _, dependency := range []string{"ROUTE_RESULT", "VALIDATE_RESULT", "GO_RESULT", "LANDING_RESULT", "PLUGIN_RESULT", "ACS_RESULT", "GO_SUITE_RESULT", "LANDING_SUITE_RESULT", "STE_LINT_RESULT", "TRAILER_CHECK_RESULT", "LINT_RESULT", "DOCS_ONLY", "DOCS_REQUIRED"} {
+	for _, dependency := range []string{"ROUTE_RESULT", "VALIDATE_RESULT", "GO_RESULT", "LANDING_RESULT", "PLUGIN_RESULT", "ACS_RESULT", "GO_SUITE_RESULT", "LANDING_SUITE_RESULT", "STE_LINT_RESULT", "DOCS_TESTS_RESULT", "TRAILER_CHECK_RESULT", "LINT_RESULT", "DOCS_ONLY", "DOCS_REQUIRED"} {
 		for _, result := range []string{"failure", "cancelled", "skipped", "", "neutral", "pending"} {
-			if dependency == "STE_LINT_RESULT" && result == "skipped" {
+			if (dependency == "STE_LINT_RESULT" || dependency == "DOCS_TESTS_RESULT") && result == "skipped" {
 				continue
 			}
 			cases = append(cases, resultCase{dependency + "_" + result, map[string]string{dependency: result}, false})
@@ -96,7 +101,7 @@ func TestRequiredResult_RejectsMissingOrUnsuccessfulWork(t *testing.T) {
 }
 
 func requiredResultEnv(set map[string]string) map[string]string {
-	env := map[string]string{"EVENT_NAME": "pull_request", "TRAILER_CHECK_RESULT": "success", "INBOX_REQUIRED": "false", "INBOX_RESULT": "skipped", "DOCS_ONLY": "false", "DOCS_REQUIRED": "false", "STE_LINT_RESULT": "skipped", "ROUTE_RESULT": "success", "VALIDATE_RESULT": "success", "GO_REQUIRED": "true", "GO_RESULT": "success", "LANDING_REQUIRED": "true", "LANDING_RESULT": "success", "PLUGIN_RESULT": "success", "ACS_RESULT": "success", "GO_SUITE_RESULT": "success", "LANDING_SUITE_RESULT": "success"}
+	env := map[string]string{"EVENT_NAME": "pull_request", "TRAILER_CHECK_RESULT": "success", "INBOX_REQUIRED": "false", "INBOX_RESULT": "skipped", "DOCS_ONLY": "false", "DOCS_REQUIRED": "false", "STE_LINT_RESULT": "skipped", "DOCS_TESTS_RESULT": "skipped", "ROUTE_RESULT": "success", "VALIDATE_RESULT": "success", "GO_REQUIRED": "true", "GO_RESULT": "success", "LANDING_REQUIRED": "true", "LANDING_RESULT": "success", "PLUGIN_RESULT": "success", "ACS_RESULT": "success", "GO_SUITE_RESULT": "success", "LANDING_SUITE_RESULT": "success"}
 	for key, value := range set {
 		env[key] = value
 	}
@@ -115,7 +120,7 @@ func lintResultOnRoute(goRequired string) string {
 
 func docsOnlyResult(set map[string]string) map[string]string {
 	env := map[string]string{
-		"DOCS_ONLY": "true", "DOCS_REQUIRED": "true", "STE_LINT_RESULT": "success",
+		"DOCS_ONLY": "true", "DOCS_REQUIRED": "true", "STE_LINT_RESULT": "success", "DOCS_TESTS_RESULT": "success",
 		"VALIDATE_RESULT": "skipped", "PLUGIN_RESULT": "", "ACS_RESULT": "",
 		"GO_REQUIRED": "false", "GO_RESULT": "skipped", "GO_SUITE_RESULT": "",
 		"LANDING_REQUIRED": "false", "LANDING_RESULT": "skipped", "LANDING_SUITE_RESULT": "",

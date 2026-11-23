@@ -23,6 +23,7 @@ const (
 	ciUsage = "usage: evolve ci classify <run-id|run:N|pr:N|sha:H> [--json] [--rerun] [--project-root P]\n" +
 		"usage: evolve ci watch (--sha S | --pr N | --tag T) [--workflow W]... [--cycle N] [--project-root P]\n" +
 		"usage: evolve ci darwin-set <generate|check> [--project-root P]\n" +
+		"usage: evolve ci docs-tests [--project-root P]\n" +
 		"usage: evolve ci telemetry --jobs FILE [--job-artifacts \"JOB NAME=DIR\"]... [--json]"
 	ciClassifyPrefix = "evolve ci classify: "
 	ciModuleDir      = "go"
@@ -55,13 +56,16 @@ func parseCIClassifyArgs(args []string) (ciClassifyArgs, error) {
 	return a, err
 }
 
-func RunCI(args []string, _ io.Reader, stdout, stderr io.Writer, deps Deps) int {
+func RunCI(args []string, stdin io.Reader, stdout, stderr io.Writer, deps Deps) int {
 	current.Store(&deps)
-	return dispatchCI(args, stdout, stderr)
+	return dispatchCI(args, stdin, stdout, stderr)
 }
 
-func dispatchCI(args []string, stdout, stderr io.Writer) int {
+func dispatchCI(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 {
+		if args[0] == "docs-tests" {
+			return runCIDocsTests(args[1:], stdin, stdout, stderr)
+		}
 		if run := ciSubverbRunner(args[0]); run != nil {
 			return run(args[1:], stdout, stderr)
 		}
@@ -70,7 +74,11 @@ func dispatchCI(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, ciUsage)
 		return exitUsage
 	}
-	a, err := parseCIClassifyArgs(args[1:])
+	return runCIClassify(args[1:], stdout, stderr)
+}
+
+func runCIClassify(args []string, stdout, stderr io.Writer) int {
+	a, err := parseCIClassifyArgs(args)
 	if err != nil {
 		fmt.Fprintf(stderr, "%s%v\n%s\n", ciClassifyPrefix, err, ciUsage)
 		return exitUsage
