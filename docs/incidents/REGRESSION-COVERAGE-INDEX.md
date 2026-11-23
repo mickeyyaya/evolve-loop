@@ -17,9 +17,9 @@
 
 | | Count |
 |---|---|
-| Incidents mapped | 81 |
-| Distinct failure modes (coverage-map rows) | 130 |
-| ✅ covered (a test fails if the bug comes back) | 89 |
+| Incidents mapped | 82 |
+| Distinct failure modes (coverage-map rows) | 131 |
+| ✅ covered (a test fails if the bug comes back) | 90 |
 | 🟡 partial (related test, doesn't pin the exact mode) | 11 |
 | ❌ none (no regression test) | 30 |
 | ⛔ untestable (external infra / live CLI) | 0 |
@@ -39,7 +39,9 @@ Recounted on 2026-11-21: the 11 records of wave 183 add 11 incidents and 13 rows
 
 The record of cycle 2583 (2026-11-21) adds 1 incident and 2 rows, both with no test yet.
 
-The map now holds 81 incidents and 130 rows. Of these, 89 are covered, 11 are partial and 30 have no test. Before these rows, main held 69 incidents and 115 rows. Of these, 86 were covered, 11 partial and 18 with no test. PR #1597 had flipped two of them to covered.
+Recounted on 2026-11-22: the record of the TDD floor and the test-audit ratchet adds one incident and one covered row.
+
+The map now holds 82 incidents and 131 rows. Of these, 90 are covered, 11 are partial and 30 have no test. Before these rows, main held 69 incidents and 115 rows. Of these, 86 were covered, 11 partial and 18 with no test. PR #1597 had flipped two of them to covered.
 
 **Historical baseline.** The 2026-05-29 13-agent parallel sweep counted 14
 incidents and 73 distinct failure modes: 40 covered, 20 partial, 10 with no
@@ -183,6 +185,7 @@ not the coverage map, which is the hand-maintained per-incident record.
 | 2026-11-21 cycle 2583 parallel guard after the last correction | the floor text keeps only `--- FAIL:` and `FAIL` lines inside 400 bytes, so the line that names the failed test is dropped | `core/build_floor_retake.go`, `core/build_floor_reviewer.go` | ❌ | proposal: the same inbox item |
 | [2026-11-20 — inbox withdraw refused items that carry lifecycle stamps](2026-11-20-inbox-withdraw-refused-items-that-carry-lifecycle-stamps.md) | the boundary runbook chose `withdraw` for items that carry lifecycle stamps, and the verb refused 5 of them | console runbook, `inboxmover/lifecycle/withdraw.go` (`refuseLifecycleStamps`) | ❌ | none: the refusal is by design; the runbook check is the control |
 | [2026-11-20 — a parked lane never resumed after the main-red stop released](2026-11-20-a-parked-lane-never-resumed-after-the-main-red-stop-released.md) | `pool.resupply` skips an id that is in `known`, and `pool.settle` never clears it, so the lead todo of a paused scope is dropped | `fleet/pool.go` (`add`, `resupply`, `settle`) | ❌ | proposal: inbox item `pool-relaunches-a-parked-lane-after-the-main-red-stop-releases` (`TestPoolResupply_RelaunchesAParkedLeadAfterItsLaneExited`) |
+| [2026-11-22 — the TDD floor did not run the test-audit ratchet](2026-11-22-the-tdd-floor-did-not-run-the-test-audit-ratchet.md) | the TDD handoff floor checked only helper copies. A predicate with a skip that hides an error passed TDD. It failed at Build, where no phase can edit it. Confirmed in cycles 2599 and 2606 | `core/tdd_predicate_floor.go`, `core/build_testaudit_check.go` (`packageAuditFailures`), `cli/phasecmd/phase_verify.go` | ✅ | `core/tdd_predicate_floor_test.go::TestTddPredicateFloor_RefusesAPredicateThatSkipsToHideAnError` + `cli/phasecmd/phase_verify_tddcomment_test.go::TestPhaseVerifyTDD_PredicateThatSkipsToHideAnError_Exit1` |
 
 ## Prioritized gap backlog (13-agent sweep; agent confidence in parens)
 
