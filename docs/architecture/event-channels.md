@@ -126,7 +126,8 @@ The default channels:
 
 - One event can go to several channels. The Publisher writes it once in each channel.
 - The `signals` channel replaces the project-level `.evolve/signals.ndjson`. The per-cycle `runs/cycle-N/signals.ndjson` stays as the cycle record.
-- **State: Built (E10, 2026-10-18).** The compiled defaults are `EventsDefaults()` in `go/internal/policy/policy_events.go`. They hold the table above without the `ci` channel. The route `kind=ci.*` matches no registered kind until E11 adds `ci.completed`, and the grammar refuses such a route (§8). E7 moves the table to `policy.json`.
+- **State: Built (E10, E7).** The compiled defaults are `EventsDefaults()` in `go/internal/policy/policy_events.go`. `Policy.EventsConfig()` lays the `events` block of `policy.json` over them, by channel name. The `ci` channel is not in the compiled table. Add it in `policy.json` if you want it.
+- **Load faults.** An unknown key, or a bad `qos`, size or channel name, fails the load, as in the other strict blocks. A route that the grammar refuses (§8) does not fail the load. A default channel keeps its compiled route, and a new channel is left out. `evolve events channels` and `evolve gc` print one line for each refused route and each warning. A new channel takes `best_effort` and 128 MB unless it sets them.
 - **Names.** A name is one or more tokens separated by dots. A token matches `[a-z0-9_-]+`.
 - **Selectors.** `--channel` takes a comma list of names or patterns. `*` matches one token, and `>` matches one or more tokens at the end (NATS subjects, research F4.4). For example, if the catalog has `ci.required` and `ci.release`, `--channel 'ci.>'` selects both.
 - **Resolution.** The reader resolves the selectors when it starts. A selector that matches no channel is refused. With a wildcard, the reader also watches `.evolve/events/ch/`, and it resolves the selection again when a new channel directory appears.
@@ -235,7 +236,7 @@ A publisher never waits on a subscriber: no subscriber takes a channel lock. A s
   - **What the deadline bounds.** The deadline bounds the wait for each channel lock. It does not bound a `write` that hangs in the kernel. `close` waits for each writer goroutine with no timeout (`awaitWriter` in `go/internal/events/publisher/queue.go`). A hung `write` thus holds `close`, and so it holds the exit of the root (see Limits).
   - **More than one call.** A root can call its closer more than once, for example before a re-exec that then fails. Each call flushes and closes again. The second call writes the gap records for the events that came after the first call. The stderr line goes out once.
 - **Measured load.** About 2,000 events per day, with bursts of 50 per second (research F1.1, F1.2). A queue of 1,024 holds 20 seconds of the worst burst.
-- **Measured volume with E10 on (2026-10-18).** A cycle publishes about 138 events, and each event is about 386 bytes. 83 percent of the events are `ledger.appended`. At 8 lanes, the channel logs grow by 8 to 10 MB each day. Until E7 adds the gc category, nothing caps this growth (see Limits).
+- **Measured volume with E10 on (2026-10-18).** A cycle publishes about 138 events, and each event is about 386 bytes. 83 percent of the events are `ledger.appended`. At 8 lanes, the channel logs grow by 8 to 10 MB each day. The gc category of each channel (E7) caps this growth (§12).
 
 ### 7. The wake: arm, catch up, wait
 
@@ -443,9 +444,10 @@ Component E13 adds work-queue delivery after E12. Fan-out stays the default: eve
 
 ### 12. Retention
 
-- **One gc category for each channel** in the gcpolicy catalog (`go/internal/gcpolicy/logs.go:58`). Its home is `events/ch/<name>`, with the glob `seg-*.ndjson`. Its TTL and size cap come from the channel (§2).
-- **The tail segment is never deleted**, as for the `current` loop log.
-- **The `Protect` hook.** For each subscription that is not paused, gc keeps the segment that contains its cursor and every later segment, if the size cap allows it. For a group, the cursor is the lower of the group cursor and the oldest PEL cursor.
+- **One gc category for each channel** in the gcpolicy catalog (`gcpolicy.ChannelCategories`, built from `policy.EventsPolicy.GCChannels()`). Its home is `events/ch/<name>`, with the glob `seg-*.ndjson`. Its TTL and size cap come from the channel (§2). `evolve gc --dry-run` shows the rule keys `events.channels["<name>"].ttl_days` and `.max_total_mb`.
+- **The tail segment is never deleted**, as for the `current` loop log. This is the pin rule `PinTailSegment` of the category.
+- **The `Protect` hook (E8).** For each subscription that is not paused, gc keeps the segment that contains its cursor and every later segment, if the size cap allows it. For a group, the cursor is the lower of the group cursor and the oldest PEL cursor. E8 adds this as a second pin rule, because no cursor store exists before E8.
+- **Orphan directories.** A channel that is removed from `policy.json` leaves its directory with no category, so gc never collects it. E8 follows up.
 - **A gap from the cap.** If the cap deletes a segment that a cursor needs, the reader makes a synthetic gap record (`reason: retention`, with the two cursors). Then it resumes at the oldest base. A gap is never silent.
 - `evolve gc --dry-run` lists the channel segments with their rule.
 
@@ -592,4 +594,4 @@ Each log record has nine keys. A reader selects records with them. One writer fa
 - **A time start is a scan.** `--since` with a time reads from the oldest retained segment. The cost grows with the retention.
 - **The duplicate window is in memory.** After a restart, a copy of an event in a second channel can run again.
 - **A re-exec can lose the events of other goroutines.** `syscall.Exec` replaces the process image, so no deferred closer runs. The root thus retires its Centers just before the call (§14). A goroutine that emits between the close and the exec loses its events, and no gap record names them. The window is very small.
-- **No retention before E7.** No gc category exists for the channel segments, so no segment is deleted. A measured cycle publishes about 138 events of about 386 bytes each, and 83 percent of them are `ledger.appended`. At 8 lanes, the logs grow by 8 to 10 MB each day. Nothing caps this growth until E7 adds the gc category. E7 must land within the first month of use.
+- **Retention keeps the tail.** Each channel has a gc category with a TTL and a size cap (§12, E7). The tail segment is never deleted, so a channel always keeps its newest segment even when it is over its cap. The cursor pin (`Protect`) waits for E8.

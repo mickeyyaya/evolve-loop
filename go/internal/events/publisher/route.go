@@ -13,6 +13,11 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
+func ValidQoS(q QoS) bool {
+	_, ok := severities[q]
+	return ok
+}
+
 var severities = map[QoS]signalcenter.Severity{
 	QoSLossless:   signalcenter.SeverityIncident,
 	QoSBestEffort: signalcenter.SeverityWarn,

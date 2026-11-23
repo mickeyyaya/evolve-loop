@@ -146,3 +146,11 @@ func TestEventChannelsRoot_IsTheChDirectoryUnderTheEventsDirectoryOfTheEvolveDir
 		t.Errorf("EventChannelsRoot = %q, want %q: the Publisher, the reader and the gc category must name the same directory (spec §4)", got, want)
 	}
 }
+
+func TestEventChannelsDir_IsTheRelativeHomeThatTheRootJoins(t *testing.T) {
+	t.Parallel()
+
+	if got, want := EventChannelsRoot("e"), filepath.Join("e", filepath.FromSlash(EventChannelsDir)); got != want {
+		t.Errorf("EventChannelsRoot = %q, want %q: gc names the channel home from the same constant", got, want)
+	}
+}

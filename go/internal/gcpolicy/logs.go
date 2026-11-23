@@ -53,6 +53,8 @@ type LogCategory struct {
 	Homes         []LogHome
 	TTLDays       int
 	MaxTotalBytes int64
+	Pin           PinRule
+	RulePrefix    string
 }
 
 func (p Policy) LogCatalog() []LogCategory {

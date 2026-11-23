@@ -18,6 +18,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/faillearn"
 	"github.com/mickeyyaya/evolve-loop/go/internal/failurelog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
@@ -72,42 +73,49 @@ func (lr *loopResult) emit(w io.Writer) {
 var gcHookFn = runGCHook
 
 func runGCHook(cfg loopConfig, workspace string, stderr io.Writer) {
-	gcPol, mode, ok := loopGCMode(cfg, stderr)
+	in, mode, ok := loopGCMode(cfg, stderr)
 	if !ok {
 		return
 	}
+	gcPol := in.Policy
 
-	runRunDirGC(cfg, workspace, mode, gcPol, stderr)
+	runRunDirGC(cfg, workspace, mode, in, stderr)
 	sealLedgerGC(cfg, ledgerSealMode(mode, gcPol), gcPol.LedgerSealKeep(), stderr)
 	runWorktreeGC(cfg, workspace, mode, gcPol, stderr)
 	runDevWorktreeGC(cfg, workspace, gcPol, stderr)
 }
 
-func loopGCMode(cfg loopConfig, stderr io.Writer) (gc.Policy, string, bool) {
+type gcPlanInputs struct {
+	Policy   gc.Policy
+	Channels []gcpolicy.ChannelRetention
+}
+
+func gcPlanInputsOf(pol policy.Policy) gcPlanInputs {
+	return gcPlanInputs{Policy: gcBlock(pol), Channels: pol.EventsConfig().GCChannels()}
+}
+
+func loopGCMode(cfg loopConfig, stderr io.Writer) (gcPlanInputs, string, bool) {
 	pol, err := policy.Load(filepath.Join(cfg.EvolveDir, "policy.json"))
 	if err != nil {
 		fmt.Fprintf(stderr, "[gc] WARN: policy load failed: %v; using zero-value gc policy\n", err)
 	}
-	gcPol := gc.Policy{}
-	if pol.GC != nil {
-		gcPol = *pol.GC
-	}
-	mode := gcPol.Mode
+	in := gcPlanInputsOf(pol)
+	mode := in.Policy.Mode
 	if mode == "" {
 		mode = "shadow"
 	}
 	switch mode {
 	case "off":
-		return gcPol, mode, false
+		return in, mode, false
 	case "shadow", "enforce":
-		return gcPol, mode, true
+		return in, mode, true
 	}
 	fmt.Fprintf(stderr, "[gc] WARN: invalid gc.mode=%q (want off|shadow|enforce); skipping\n", mode)
-	return gcPol, mode, false
+	return in, mode, false
 }
 
-func runRunDirGC(cfg loopConfig, workspace, mode string, gcPol gc.Policy, stderr io.Writer) {
-	manifest, err := planRunDirGC(cfg.EvolveDir, gcPol, func(err error) {
+func runRunDirGC(cfg loopConfig, workspace, mode string, in gcPlanInputs, stderr io.Writer) {
+	manifest, err := planRunDirGC(cfg.EvolveDir, in, func(err error) {
 		fmt.Fprintf(stderr, "[gc] WARN: discover failed: %v; writing empty manifest\n", err)
 	})
 	if err != nil {
@@ -183,13 +191,13 @@ func gcManifestDir(evolveDir string) string {
 	return filepath.Join(evolveDir, "gc")
 }
 
-func planRunDirGC(evolveDir string, pol gc.Policy, discoverFailed func(error)) (gc.Manifest, error) {
+func planRunDirGC(evolveDir string, in gcPlanInputs, discoverFailed func(error)) (gc.Manifest, error) {
 	runs, err := gc.Discover(evolveDir, gc.DiscoverOptions{})
 	if err != nil {
 		discoverFailed(err)
 		runs = nil
 	}
-	return gc.Plan(gc.Options{EvolveDir: evolveDir, Runs: runs, Policy: pol})
+	return gc.Plan(gc.Options{EvolveDir: evolveDir, Runs: runs, Policy: in.Policy, Channels: in.Channels})
 }
 
 func worktreeGCOptions(projectRoot, evolveDir string, pol gc.WorktreesPolicy, log io.Writer) gc.WorktreeOptions {

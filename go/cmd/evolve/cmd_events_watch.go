@@ -37,7 +37,6 @@ func defaultEventsWatchEnv() eventsWatchEnv {
 		waiter:     newKernelWaiter,
 		newContext: watchSignalContext,
 		startOf:    proctree.StartOf,
-		events:     policy.EventsDefaults(),
 	}
 }
 
@@ -110,7 +109,11 @@ func openEventsWatch(env eventsWatchEnv, a eventsWatchArgs, stdout, stderr io.Wr
 		fmt.Fprintf(stderr, "evolve events watch: cwd: %v\n", err)
 		return nil, w, cliExitIO
 	}
-	channels, err := eventCatalog(env.events, cat)
+	ev := env.events
+	if ev.Channels == nil {
+		ev = policy.LoadForEvents(paths.PolicyPath(paths.EvolveDirOf(root)), stderr).EventsConfig()
+	}
+	channels, err := eventCatalog(ev, cat)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve events watch: %v\n", err)
 		return nil, w, cliExitIO

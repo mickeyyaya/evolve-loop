@@ -17,6 +17,7 @@ var metadataKeys = []string{"$schema", "description", "version"}
 var keyShapes = map[reflect.Type]reflect.Type{
 	reflect.TypeFor[HandoffPolicy]():      reflect.TypeFor[map[string]handoffPairJSON](),
 	reflect.TypeFor[QualityPanelPolicy](): reflect.TypeFor[qualityPanelJSON](),
+	reflect.TypeFor[EventsBlock]():        reflect.TypeFor[eventsShape](),
 }
 
 func refuseUnknownKeys(raw []byte) error {

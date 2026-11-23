@@ -86,4 +86,5 @@ type Policy struct {
 	WaveLatency        *WaveLatencyPolicy        `json:"wave_latency,omitempty"`
 	Incident           *IncidentPolicy           `json:"incident,omitempty"`
 	Telemetry          *TelemetryPolicy          `json:"telemetry,omitempty"`
+	Events             *EventsBlock              `json:"events,omitempty"`
 }
