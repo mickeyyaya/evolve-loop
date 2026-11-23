@@ -409,7 +409,22 @@ The word "adopt" keeps one meaning. The triage adoption writes the manifest, see
 
 **Failure route of the block.** The missing-manifest block carries the code `AUDIT_LEDGER_MANIFEST_MISSING` in its diagnostic. The failure classifier reads this code. A record that ends on the block, with no retro entry after it, is a `phase-refusal` that is not task level. The cycle then counts as a system-level failure.
 
-The code has no `RefusalDisposition` case yet. After a retro entry, the record is not a refusal. The test `TestFailureInputsFor_TheCodeOfAMissingManifestBlockMovesAnAuditFailToASystemLevelPhaseRefusal` pins this route.
+The diagnostic also carries the `Subject` field. Its value is the scope id of the binding that the registry holds. The classifier passes it to `RefusalSubject`, so the closeout names the scope.
+
+The code has no `RefusalDisposition` case yet. After a retro entry, the record is not a refusal. The test `TestFailureInputsFor_TheCodeOfAMissingManifestBlockMovesAnAuditFailToASystemLevelPhaseRefusal` pins this route. A disposition for the code after a retro entry is a separate inbox item: `refusal-disposition-for-manifest-missing-after-retro`.
+
+**Fresh start.** A fresh cycle can end its triage adoption with no manifest. The resolver can return nothing for a registry entry that has no snapshot. The worktree provisioner can lack `CreateFrom`. A declined adoption can fail to release its binding. The gate then blocks the audit, because it sees the binding and no manifest.
+
+The orchestrator now calls the same settle step after the triage adoption step. The `core.WithBindingSettler` option carries the step, and `freshBindingSettler` wires it. The step runs only when the adoption step returns no error. Each rule above applies without change. These parts differ:
+
+- The reason prefix in the item file is `fresh-start-cycle-<N>`. The actor is `runtime (fresh start)`. The actor of a lane resume stays `runtime (lane resume)`.
+- The event `ORCHESTRATOR_LANE_BINDING_SETTLED` carries the field `origin`. Its value is `fresh-start` or `lane-resume`. The type `core.BindingOrigin` owns both values.
+- When the step records a binding, the core seeds the disposition skeleton. It also serves the inherited findings to the builder. The builder then accounts for each row in `defect-dispositions.json`. The worktree is fresh, so the builder gets no ancestor snapshot.
+- When the step releases a binding, the cycle inherits nothing.
+
+The anti-tamper rule is unchanged. The step runs once, and only when the workspace holds no manifest. The gate never re-creates a manifest.
+
+The reach of the accepted "absent ledger" risk is wider here than on the resume path. On a fresh cycle, each cycle whose scope is bound to an ancestor with no ledger now releases the binding. If the release fails, it records the binding. The gate blocked such a cycle before. The WARN event records each case.
 
 ## Code-review rows (ADR-0124, 2026-10-07)
 

@@ -25,7 +25,7 @@ func (l *Ledger) inheritedOpen(req Request) inheritance {
 	}
 	cont, isCont, err := continuation.ReadManifest(req.Workspace)
 	if err != nil || !isCont {
-		reg, has := l.laneRegistryBinding(req)
+		_, reg, has := l.laneRegistryBinding(req)
 		if has {
 			cont, isCont = reg, true
 		}

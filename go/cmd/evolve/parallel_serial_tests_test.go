@@ -842,6 +842,7 @@ var serialTests = map[string]string{
 	"main.TestWaveEngine_PassesTheLoopsGoalToTheClaimRelease":                                                              "sets env through a helper",
 	"main.TestWireCLIRouter_AnOverrideCheckFaultIsReported":                                                                "swaps seam routingRunOverrideRefusals",
 	"main.TestWireOrchestratorDeps_AMalformedFailurePolicyWarnsAndKeepsTheDefaults":                                        "assigns runner.DefaultRouter",
+	"main.TestWireOrchestratorDeps_RegistersTheFreshBindingSettler":                                                        "calls process-global setter SetModelCatalogDirFn",
 	"main.TestWireOrchestratorDeps_AMalformedPolicyIsRefusedBeforeAnyDispatch":                                             "calls process-global setter SetModelCatalogDirFn",
 	"main.TestWireOrchestratorDeps_AProjectWithNoProfilesDirectoryRoutesAsBefore":                                          "assigns runner.DefaultRouter",
 	"main.TestWireOrchestratorDeps_ARefusedOverrideIsARoutingErrorBeforeAnyDispatch":                                       "calls process-global setter SetModelCatalogDirFn",

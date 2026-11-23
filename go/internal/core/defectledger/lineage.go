@@ -20,7 +20,7 @@ func (l *Ledger) arm(req Request) (continuation.Continuation, bool, Verdict) {
 		l.emit("Ledger.Reconcile", req, CodeManifestUnreadable, v.Diagnostics[0].Message, map[string]string{"step": "arm", "blocked": "true", "workspace": req.Workspace})
 		return continuation.Continuation{}, false, v
 	}
-	registryCont, hasRegistry := l.laneRegistryBinding(req)
+	scopeID, registryCont, hasRegistry := l.laneRegistryBinding(req)
 	switch {
 	case !isContinuation && !hasRegistry:
 		return continuation.Continuation{}, false, Verdict{}
@@ -28,6 +28,7 @@ func (l *Ledger) arm(req Request) (continuation.Continuation, bool, Verdict) {
 		registryPath := continuation.RegistryPath(req.ProjectRoot)
 		v := blockedOn(fmt.Sprintf("defect ledger: this workspace holds no continuation manifest, but the root-owned %s binds this lane's scope to cycle-%d — the manifest was deleted or never written. Inherited defects are reconciled from the registry binding; the missing manifest is itself the finding.", registryPath, registryCont.Cycle))
 		v.Diagnostics[0].Code = string(CodeManifestMissing)
+		v.Diagnostics[0].Subject = scopeID
 		l.emit("Ledger.Reconcile", req, CodeManifestMissing, v.Diagnostics[0].Message, map[string]string{"step": "arm", "blocked": "true", "registry_path": registryPath, "ancestor_cycle": strconv.Itoa(registryCont.Cycle)})
 		return registryCont, true, v
 	case hasRegistry && registryCont.Cycle != cont.Cycle:
@@ -38,9 +39,8 @@ func (l *Ledger) arm(req Request) (continuation.Continuation, bool, Verdict) {
 	return cont, true, Verdict{}
 }
 
-func (l *Ledger) laneRegistryBinding(req Request) (continuation.Continuation, bool) {
-	_, c, ok := FirstBinding(req.ProjectRoot, l.laneScope(req.Workspace))
-	return c, ok
+func (l *Ledger) laneRegistryBinding(req Request) (string, continuation.Continuation, bool) {
+	return FirstBinding(req.ProjectRoot, l.laneScope(req.Workspace))
 }
 
 func FirstBinding(projectRoot string, ids []string) (string, continuation.Continuation, bool) {
