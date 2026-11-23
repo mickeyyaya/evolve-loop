@@ -154,10 +154,8 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 					break
 				}
 				phaseErr := fmt.Errorf("phase %s: %w", next, cr.parkedOr(err))
-				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempt, phaseErr.Error(), cr.cs.PhaseStartedAt))
-				cr.o.writePhaseFailureDiag(cr.cs.WorkspacePath, string(next), cr.cycle, err, attempt)
-				cr.o.adviseOnUnclassifiedFailure(cr.ctx, cr.cycle, cr.cs.WorkspacePath, cr.req.ProjectRoot, next, err, cr.envSnap)
-				cr.recordFailureLearning(next, phaseErr, attempt)
+				cr.o.diagnoseDispatchFailure(cr.ctx, cr.learning().failing(next, err, attempt))
+				cr.failPhase(phaseOutcomeFrom(next, resp, attempt, phaseErr.Error(), cr.cs.PhaseStartedAt), phaseErr, attempt)
 				cr.noteLoginWall(next, walled)
 				return dispatchResult{}, loopAbort, wrapCycleLevelError(next, phaseErr)
 			}
@@ -184,9 +182,8 @@ func (cr *cycleRun) dispatch(next Phase) (dispatchResult, loopAction, error) {
 					break
 				}
 				ferr := fmt.Errorf("phase %s returned non-canonical verdict %q", next, resp.Verdict)
-				cr.o.recordPhaseOutcome(&cr.result, &cr.phaseTimings, cr.cs.WorkspacePath, phaseOutcomeFrom(next, resp, attempt, ferr.Error(), cr.cs.PhaseStartedAt))
 				cr.o.writePhaseFailureDiag(cr.cs.WorkspacePath, string(next), cr.cycle, ferr, attempt)
-				cr.recordFailureLearning(next, ferr, attempt)
+				cr.failPhase(phaseOutcomeFrom(next, resp, attempt, ferr.Error(), cr.cs.PhaseStartedAt), ferr, attempt)
 				return dispatchResult{}, loopAbort, wrapCycleLevelError(next, ferr)
 			}
 			fmt.Fprintf(cr.o.errOut(), "[orchestrator] WARN phase %s attempt %d/%d returned non-canonical verdict %q; relaunching\n", next, attempt, maxAttempts, resp.Verdict)

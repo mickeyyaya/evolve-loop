@@ -12,6 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -448,8 +449,8 @@ func TestResumeLifecycle_NonCanonicalVerdictFromDispatchAbortsAndRecords(t *test
 	if got.FinalVerdict != VerdictFAIL {
 		t.Errorf("FinalVerdict = %q, want %q", got.FinalVerdict, VerdictFAIL)
 	}
-	if len(got.PhasesRun) == 0 || got.PhasesRun[len(got.PhasesRun)-1] != PhaseAudit {
-		t.Errorf("the guard must record the audit phase outcome before returning, PhasesRun = %v", got.PhasesRun)
+	if want := []Phase{PhaseAudit, PhaseRetro}; !slices.Equal(got.PhasesRun, want) {
+		t.Errorf("the guard must record the audit phase outcome and then run the retrospective, PhasesRun = %v, want %v", got.PhasesRun, want)
 	}
 }
 
