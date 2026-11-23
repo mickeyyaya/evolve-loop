@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
@@ -65,13 +64,6 @@ func TestRepoContractGate_WithoutARunDirTheRawStreamStaysOnStderr(t *testing.T) 
 	}
 }
 
-func TestScanLogName_IsAToolOutputFileThatACyclePassDeletes(t *testing.T) {
-	t.Parallel()
-	if !slices.Contains(gcpolicy.ToolOutputFiles(), scanLogName) {
-		t.Errorf("gcpolicy.ToolOutputFiles() = %v does not name %q, so a PASS seal keeps the scan log", gcpolicy.ToolOutputFiles(), scanLogName)
-	}
-}
-
 type wrappedWriter struct{ w io.Writer }
 
 func (w wrappedWriter) Write(p []byte) (int, error) { return w.w.Write(p) }
@@ -95,5 +87,24 @@ func TestRunGoTestJSON_AWrappedNotesWriterNeverGetsTheRawStream(t *testing.T) {
 		if !strings.Contains(raw.String(), line) {
 			t.Errorf("the raw writer lost the line %q", line)
 		}
+	}
+}
+
+func TestOpenScanLog_CreatesTheFileThatTheCyclePassSealDeletes(t *testing.T) {
+	t.Parallel()
+	ws := t.TempDir()
+
+	f := openScanLog(ws, io.Discard)
+	if f == nil {
+		t.Fatal("openScanLog returned nil for a real workspace")
+	}
+	_ = f.Close()
+
+	entries, err := os.ReadDir(ws)
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("workspace entries = %v (err %v), want the one scan log", entries, err)
+	}
+	if got, want := entries[0].Name(), gcpolicy.ToolOutputFiles()[0]; got != want {
+		t.Errorf("scan log file = %q, want the gcpolicy name %q", got, want)
 	}
 }

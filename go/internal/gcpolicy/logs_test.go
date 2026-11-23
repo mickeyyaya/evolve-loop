@@ -2,6 +2,7 @@ package gcpolicy_test
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
@@ -177,5 +178,56 @@ func TestParseLogRunID_ReadsBackTheTimeOfARunID(t *testing.T) {
 
 	if !ok || !got.Equal(at) || badOK {
 		t.Errorf("ParseLogRunID = %v %t, bad %t; want %v true, false", got, ok, badOK, at)
+	}
+}
+
+func TestLogRunPaths_OneHelperOwnsEachPartOfTheRunDirLayout(t *testing.T) {
+	t.Parallel()
+	evolveDir := filepath.Join("root", ".evolve")
+	id := "20261008T142501Z"
+	cases := []struct{ name, got, want string }{
+		{"LogRunDir", gcpolicy.LogRunDir(evolveDir, id), filepath.Join(evolveDir, "logs", id)},
+		{"LoopLogPath", gcpolicy.LoopLogPath(evolveDir, id), filepath.Join(evolveDir, "logs", id, "loop.log")},
+		{"LegacyLogRunDir", gcpolicy.LegacyLogRunDir(evolveDir, id), filepath.Join(evolveDir, "logs", id+"-legacy")},
+	}
+	for _, c := range cases {
+		if c.got != c.want {
+			t.Errorf("%s = %q, want %q", c.name, c.got, c.want)
+		}
+	}
+}
+
+func TestToolOutputFiles_AreTheExportedNamesThatTheWritersUse(t *testing.T) {
+	t.Parallel()
+	want := []string{gcpolicy.ShipRepoContractScanLog, gcpolicy.IntegrationTierLog}
+	if got := gcpolicy.ToolOutputFiles(); !reflect.DeepEqual(got, want) {
+		t.Errorf("ToolOutputFiles() = %v, want %v", got, want)
+	}
+}
+
+func TestRunIDGlobIsASupersetOfTheRunIDRegexAndAcceptsOnlyTheLegacySuffixDirs(t *testing.T) {
+	t.Parallel()
+	ids := []string{gcpolicy.LogRunID(time.Date(2026, 10, 8, 14, 25, 1, 0, time.UTC)), gcpolicy.LogRunID(time.Date(1999, 1, 2, 3, 4, 5, 0, time.UTC)), gcpolicy.LogRunID(time.Now())}
+	for _, id := range ids {
+		cases := []struct {
+			name        string
+			regex, glob bool
+		}{
+			{id, true, true},
+			{id + gcpolicy.LegacyLogRunSuffix, false, true},
+			{id + "x", false, true},
+			{"x" + id, false, false},
+		}
+		for _, c := range cases {
+			if got := gcpolicy.IsLogRunID(c.name); got != c.regex {
+				t.Errorf("IsLogRunID(%q) = %v, want %v", c.name, got, c.regex)
+			}
+			if got := gcpolicy.IsLogRunDir(c.name); got != c.glob {
+				t.Errorf("IsLogRunDir(%q) = %v, want %v", c.name, got, c.glob)
+			}
+		}
+	}
+	if gcpolicy.LegacyLogRunSuffix != "-legacy" {
+		t.Errorf("LegacyLogRunSuffix = %q, want -legacy: gc and the console read it", gcpolicy.LegacyLogRunSuffix)
 	}
 }

@@ -240,7 +240,7 @@ func boundaryHaltSteps(a boundaryArgs, root string) []boundaryStep {
 }
 
 func boundaryLoopLogPath(root, runID string) string {
-	return filepath.Join(root, ".evolve", gcpolicy.LogsDir, runID, gcpolicy.LoopLogName)
+	return gcpolicy.LoopLogPath(filepath.Join(root, ".evolve"), runID)
 }
 
 func boundaryLaunchSteps(a boundaryArgs, root string) []boundaryStep {

@@ -17,7 +17,6 @@ import (
 const (
 	boundaryLogVerb   = "boundary-log"
 	boundaryLogPrefix = "evolve boundary-log: "
-	legacyLogSuffix   = "-legacy"
 )
 
 var errBoundaryLogLive = errors.New("a run is live")
@@ -50,17 +49,17 @@ func runBoundaryLog(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		}
 		return exitIO
 	}
-	fmt.Fprintf(stdout, "boundary: log dir %s; %s\n", filepath.Join(evolveDir, gcpolicy.LogsDir, runID), boundaryLogStepDesc(runID))
+	fmt.Fprintf(stdout, "boundary: log dir %s; %s\n", gcpolicy.LogRunDir(evolveDir, runID), boundaryLogStepDesc(runID))
 	return 0
 }
 
 func prepareBoundaryLog(evolveDir, runID string, live func() bool) error {
 	logsDir := filepath.Join(evolveDir, gcpolicy.LogsDir)
 	link := filepath.Join(evolveDir, boundaryLoopLog)
-	if err := moveLegacyLoopLog(link, filepath.Join(logsDir, runID+legacyLogSuffix), live); err != nil {
+	if err := moveLegacyLoopLog(link, gcpolicy.LegacyLogRunDir(evolveDir, runID), live); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Join(logsDir, runID), 0o755); err != nil {
+	if err := os.MkdirAll(gcpolicy.LogRunDir(evolveDir, runID), 0o755); err != nil {
 		return fmt.Errorf("make the run log dir: %w", err)
 	}
 	if err := replaceSymlink(runID, filepath.Join(logsDir, gcpolicy.LogsCurrentLink)); err != nil {
