@@ -296,6 +296,8 @@ Each cycle wrote its own copy of the same predicate helpers: 597 copies (researc
 
 `go/acs/README.md` §Predicate kit lists the helpers. The persona text of the phases that write predicates links to that list. A structure test fails when the list omits an exported function of the kit.
 
+A test-audit finding in `go/acs/cycle<N>/` can first appear at the Build floor. Build may not edit that directory, so the finding goes back to TDD at once ([incident 2026-11-22](../incidents/2026-11-22-build-floor-finding-in-a-tdd-file-had-no-route-to-tdd.md)).
+
 The TDD handoff floor names the replacement of each copy. A test helper of another package cannot be imported. If the copy wraps `acsassert.ModuleDir`, the floor says to call `acsassert.GoModuleDir`. If the body of the copy equals the body of a kit function, the floor says to call that function (for example `acsassert.ExitedPID`).
 
 If the copy wraps only a `testing.T` function, the floor says to inline it or to call that function. Otherwise the floor says to write the statements in the test function and define no helper function. A renamed helper is still a copy. `acsassert.TestingForms` maps a kit function to its `testing.T` form. The floor reads it from the source of the package.

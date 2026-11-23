@@ -18,6 +18,7 @@
 - `AuditScope` is the one rule that maps a changed path to a `Scope`. A `.go` file or a local shard gives its package. A change to `guards.json`, `fakes.json`, `unwritable-baselines.json` or a non-test `.go` file of this package sets `Whole`. Then only the full tree check can judge the change.
 - `LoadConfig` reads `fakes.json` and `guards.json` from a module root. `DefaultConfig` reads the embedded copies. Both call `parseConfig`, the one step that parses and validates. A test pins `LoadConfig` of the real module equal to `DefaultConfig`.
 - `RowError` is the typed error for one finding. Its kind is `RowMissing` (no baseline row) or `RowStale` (a row with no finding). It unwraps to `ErrNoBaselineRow` or `ErrStaleBaselineRow`. The message text is the same as before. `Problems` flattens a joined error into its parts.
+- `MissingRowPackage` reads the package of a rendered missing-row message. It shares the `missingRowFormat` constant with `RowError.Error`, so a change of the wording cannot split the writer and the reader. A stale-row message gives no package (`TestMissingRowPackage_RoundTripsEveryRenderedMissingRow`).
 - `Rebaseline` updates one package's shard or its entry in `internal/testaudit/unwritable-baselines.json`. It refuses any finding absent from an existing baseline, and it removes an empty local shard.
 
 ## Invariants

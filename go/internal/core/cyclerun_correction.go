@@ -46,12 +46,12 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 			if rounds.End {
 				return cr.endOnBlocker(next, dr, outcome, diag)
 			}
-			predicates := acsPredicateFailures(rr.Failures, cr.cycle)
-			if cr.predicateDefectRepeats(next, dr, prevPredicates, predicates) {
+			owned := tddOwnedFailures(rr.Failures, cr.cycle)
+			if route, ok := cr.tddReroute(next, dr, owned, prevPredicates); ok {
 				if rounds.Claim {
 					cr.sendRefusal(next, refused)
 				}
-				return cr.routePredicateDefectToTDD(dr, predicates), nil
+				return cr.routePredicateDefectToTDD(dr, route), nil
 			}
 			act := nextCorrection(interaction.CorrectionInput{
 				Phase:      string(next),
@@ -114,7 +114,7 @@ func (cr *cycleRun) reviewWithCorrections(next Phase, dr *dispatchResult) (loopA
 				continue
 			}
 			corr++
-			prevPredicates = predicates
+			prevPredicates = owned.Predicates
 			fmt.Fprintf(cr.o.errOut(), "[orchestrator] phase %s: contract violation (correction %d/%d) — re-dispatching with correction: %s\n",
 				next, corr, maxCorrections, rr.Reason)
 			salvageRetry := false
