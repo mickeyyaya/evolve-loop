@@ -65,10 +65,10 @@ This section is the spec of record for what each tier is for and in which order 
 | `top` | decides a dispute, or a decision that is expensive to undo. No profile uses it today. | `agy-claude` → `claude` | Opus 5.5 (Medium); opus |
 | floor seats | review the work of another phase. | `claude` only | opus or sonnet, per profile |
 
-**How agy pins stay in place.** agy has no effort flag; the effort is part of the model name. The live catalog picks a model for each tier and overrides the manifest. A catalog tier pin in `.evolve/policy.json` holds `Gemini 4 Hydrogen (Medium)` for `fast` and `Gemini 4 Hydrogen (High)` for `balanced`, and the `agy-tmux` manifest sets `Gemini 4 Argon (Medium)` for `deep` and `top`:
+**How agy pins stay in place.** agy has no effort flag; the effort is part of the model name. The live catalog picks a model for each tier and overrides the manifest. A catalog tier pin in `.evolve/policy.json` holds `Gemini 4 Hydrogen (Medium)` for `fast`, `Gemini 4 Hydrogen (High)` for `balanced` and `Gemini 4 Neon (XHigh)` for `top` (operator, 2026-11-21). The `top` pin applies only when a `top` seat walks to `agy`; the `top` chain has no `agy` today. Without a pin, the `agy-tmux` manifest sets `Gemini 4 Argon (Medium)` for `deep` and `top`:
 
 ```json
-"catalog": { "tier_pins": { "agy": { "fast": "Gemini 4 Hydrogen (Medium)", "balanced": "Gemini 4 Hydrogen (High)" } } }
+"catalog": { "tier_pins": { "agy": { "fast": "Gemini 4 Hydrogen (Medium)", "balanced": "Gemini 4 Hydrogen (High)", "top": "Gemini 4 Neon (XHigh)" } } }
 ```
 
 The pin wins over the classifier, also for a cached catalog. A pin to a model that agy does not offer makes `evolve models refresh` fail; it does not fall back. Check the result with `evolve models list`.
