@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## Added — the audit prompt carries the gate facts and the final-diff rubric (ADR-0158 decisions 20 and 21, 2026-11-24)
+
+- **The facts block.** The pipeline derives `## Gate and Floor Facts` from its own records (the ACS verdict of the last round, the handoff floor checks, the audit fail reasons, the changed unprotected functions and the changed tests) and puts it below the cycle-context boundary. The auditor does not argue these results. The host composes the block, not the model.
+- **The rubric.** The prompt of each audit round asks for `## Final Diff Regression Review` and `## Guard Honesty Check`. This build ships prompt data only: no validator, key or signal. The report check comes with the follow-up `audit-facts-empty-tests`, under its own shadow stage.
+- Docs: [internal-core-auditfacts](docs/architecture/packages/internal-core-auditfacts.md).
+
 ## Added — the log reader and `log_access` in shadow mode (logging plan H4, 2026-11-21)
 
 - **The reader.** `evolve logs digest|events|failures|index|show --cycle N` reads the log layers D0 to D3. Each verb stops at its line budget (D0 40, D1 and D2 200, D3 150). It ends with a truncation line that names a narrower query. No verb returns a whole file.

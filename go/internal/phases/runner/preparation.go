@@ -88,7 +88,7 @@ func (b *BaseRunner) preparePhaseExecution(req core.PhaseRequest) (phasePreparat
 		body = string(materialized.Digest)
 	}
 
-	prep.prompt = withLogDigest(b.hooks.ComposePrompt(body, req), req)
+	prep.prompt = withLogDigest(b.hooks.ComposePrompt(body, b.SeedContext(req)), req)
 	prep.artifactPath = filepath.Join(req.Workspace, b.hooks.ArtifactFilename(req))
 	prep.preDispatch, prep.hadPreDispatch = verdict.StatSnapshot(prep.artifactPath)
 	prep.profileDir = filepath.Join(req.ProjectRoot, ".evolve", "profiles")
