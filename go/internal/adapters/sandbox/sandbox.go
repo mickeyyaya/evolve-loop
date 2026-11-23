@@ -41,6 +41,8 @@ type Config struct {
 	ProtectedWriteSubpaths []string
 	ProtectedWritePrefixes []string
 	ProtectedWriteEnforce  bool
+
+	Messaging *MessagingScope
 }
 
 func homeStateWriteDirs(home string, omitStoredLogin bool) []string {
@@ -172,6 +174,7 @@ func GenerateSBPL(cfg Config) string {
 	writeClosingRules(&b, cfg)
 	writeExecDenyRules(&b, cfg)
 	writeProtectedWriteRules(&b, cfg, true)
+	writeMessagingRules(&b, cfg.Messaging)
 	return b.String()
 }
 
@@ -378,6 +381,7 @@ func BwrapPrefix(cfg Config) []string {
 		out = append(out, "--unshare-net")
 	}
 	out = append(out, bwrapProtectedWriteMasks(cfg)...)
+	out = append(out, bwrapMessagingMasks(cfg.Messaging)...)
 	out = append(out, bwrapFileMasks(cfg)...)
 	return append(out, bwrapExecMasks(cfg)...)
 }

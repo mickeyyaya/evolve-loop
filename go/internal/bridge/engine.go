@@ -130,6 +130,7 @@ type SandboxWrapRequest struct {
 	AllowNetwork  bool
 	HostIsolated  bool
 	SeatRoot      string
+	Messaging     *MessagingIdentity
 }
 
 func defaultIfZero(val, def int) int {
@@ -225,6 +226,7 @@ type Config struct {
 	AllowNetwork         bool
 	codexConfigPath      string
 	DispatchID           string
+	Messaging            *MessagingIdentity
 	Decision             seatlogin.Decision
 	SeatTokenFile        string
 	credentials          *ipcenv.CredentialSet

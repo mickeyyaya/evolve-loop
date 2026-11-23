@@ -103,6 +103,9 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 		}
 		cfg.RepoRoot, cfg.WritePaths = paths[0], paths[1:]
 		cfg = deps.withProtectedWrites(cfg, ownWorktree(req, cfg.WritePaths), cfg.RepoRoot)
+		if cfg, err = withMessaging(cfg, req.Messaging); err != nil {
+			return deps.refuseWrap(CauseProfile, fmt.Sprintf("sandbox messaging scope unavailable: %v", err))
+		}
 		socketDir, sockets, err := tmuxSocketGuard()
 		if err != nil {
 			return deps.refuseWrap(CauseProfile, fmt.Sprintf("sandbox tmux socket guard unavailable: %v", err))
@@ -217,6 +220,7 @@ func sandboxPrefixForLaunch(deps Deps, cfg *Config, terminalPath string) ([]stri
 		WriteSubpaths: cfg.SandboxWriteSubpaths,
 		HostIsolated:  cfg.Decision.HostIsolated,
 		SeatRoot:      cfg.Decision.Dir,
+		Messaging:     cfg.Messaging,
 	})
 }
 
