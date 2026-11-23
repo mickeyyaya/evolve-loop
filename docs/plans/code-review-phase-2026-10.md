@@ -1,5 +1,7 @@
 # Code-review phase: an independent review loop between build and audit, judged on one shared quality index (plan, 2026-10)
 
+> **Status:** partly built, 2026-11-21 (8 of 14 components on main, in shadow). Earlier status: approved by the operator on 2026-10-07.
+
 > **Purpose.** This is the living plan for the `code-review` phase.
 > - **What the phase does:**
 >   - It reviews the build's diff across every quality dimension, justifying each review it runs.
@@ -235,3 +237,26 @@ Landing 2 also carries the audit evaluation contract, components E1–E6 of [aud
 | OQ3 | test-amplification also writes source after build. | In enforce, place it before `code-review`, or count its diff as part of the fix round. Decide with OQ1. |
 | OQ4 | Does a digest that omits the Scores fully prevent anchoring? | Not fully: the raw report stays in the workspace. The persona forbids opening it, and divergence makes anchoring visible. Reconsider after the shadow data. |
 | OQ5 | Is the phase-B divergence share configured, and over what window? | Yes: `workflow.review.specialist_trigger`, defaulting to 30% audit-lower over the last 20 code cycles that scored the dimension. Revisit with data. |
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| R0/Q0 | done (shadow) | [#799](https://github.com/mickeyyaya/evolve-loop/pull/799), train [#801](https://github.com/mickeyyaya/evolve-loop/pull/801), [`f16bf48`](https://github.com/mickeyyaya/evolve-loop/commit/f16bf48f1) | none |
+| R1 | done (shadow) | [#799](https://github.com/mickeyyaya/evolve-loop/pull/799), train [#801](https://github.com/mickeyyaya/evolve-loop/pull/801), [`f16bf48`](https://github.com/mickeyyaya/evolve-loop/commit/f16bf48f1) | none |
+| Q1 | done (shadow) | [#799](https://github.com/mickeyyaya/evolve-loop/pull/799), train [#801](https://github.com/mickeyyaya/evolve-loop/pull/801), [`f16bf48`](https://github.com/mickeyyaya/evolve-loop/commit/f16bf48f1) | none |
+| R2 | done (shadow) | [#799](https://github.com/mickeyyaya/evolve-loop/pull/799), train [#801](https://github.com/mickeyyaya/evolve-loop/pull/801), [`f16bf48`](https://github.com/mickeyyaya/evolve-loop/commit/f16bf48f1) | none |
+| Q2 | done (shadow) | [#799](https://github.com/mickeyyaya/evolve-loop/pull/799), train [#801](https://github.com/mickeyyaya/evolve-loop/pull/801), [`f16bf48`](https://github.com/mickeyyaya/evolve-loop/commit/f16bf48f1) | none |
+| R3 | done (shadow) | [#799](https://github.com/mickeyyaya/evolve-loop/pull/799), train [#801](https://github.com/mickeyyaya/evolve-loop/pull/801), [`f16bf48`](https://github.com/mickeyyaya/evolve-loop/commit/f16bf48f1) | none |
+| R8a | done (shadow) | [#799](https://github.com/mickeyyaya/evolve-loop/pull/799), train [#801](https://github.com/mickeyyaya/evolve-loop/pull/801), [`f16bf48`](https://github.com/mickeyyaya/evolve-loop/commit/f16bf48f1) | none |
+| Overlay rule (after C0) | done (shadow) | [#799](https://github.com/mickeyyaya/evolve-loop/pull/799), train [#801](https://github.com/mickeyyaya/evolve-loop/pull/801), [`f16bf48`](https://github.com/mickeyyaya/evolve-loop/commit/f16bf48f1) | none |
+| Q3 | not started | none on main. `decideAfterReview` and `ReviewRepair` state do not exist in `go/internal/core/`. | `code-review-phase-q3-findings-driven-repair` |
+| Q4 | not started | none on main. `StatusDisputed` exists only as a word in `go/internal/convergence/`, not in the defect ledger. | `code-review-phase-q4-delta-re-review` (also holds the merged `audit-evaluation-contract-e5-ledger-criterion-review-plan`) |
+| Q5 | not started | none on main. `writeReviewDigest` does not exist. | `code-review-phase-q5-audit-on-the-index` (also holds the merged `audit-evaluation-contract-e4-final-audit-criteria`) |
+| Q6 | not started | none on main. The `evolve review metrics` verb does not exist. | `code-review-phase-q6-capacity-skip-metrics` |
+| R8b | not started | none | `code-review-phase-r8b-enforce-flip` |
+| Q7 | dropped | Retired on 2026-11-20 (boundary 183): the trigger data does not exist yet. File it again after 2 enforce waves. | none (consumed as retired) |
+
+Landing 1 is on main in shadow. The repair loop (Q3), delta re-review (Q4), audit on the index (Q5) and metrics (Q6) are not built. Each has an open inbox item. R8b waits for two shadow waves. Q7 is dropped until trigger data exists. The convergence plan wants the repair loop built on `Decide` (V6).
+
+V6 has no open item. See the follow-up draft `convergence-policy-v6-code-review-loop-decide`.

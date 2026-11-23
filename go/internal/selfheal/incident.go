@@ -73,6 +73,7 @@ type Incident struct {
 	Reopened    int                   `json:"reopened"`
 	Attempts    int                   `json:"attempts"`
 	ReproTest   string                `json:"repro_test"`
+	RecordDoc   string                `json:"record_doc"`
 	Summary     string                `json:"summary"`
 	OpenedAt    time.Time             `json:"opened_at"`
 	LastSeenAt  time.Time             `json:"last_seen_at"`
@@ -84,6 +85,7 @@ const (
 	CondSignalClear   = "signal-clear"
 	CondQualityHeld   = "quality-held"
 	CondRetrospective = "retrospective"
+	CondRecordDoc     = "record-doc"
 )
 
 type Conditions struct {
@@ -91,6 +93,7 @@ type Conditions struct {
 	SignalClear   bool
 	QualityHeld   bool
 	Retrospective bool
+	RecordDoc     bool
 }
 
 func (c Conditions) missing() []string {
@@ -98,7 +101,7 @@ func (c Conditions) missing() []string {
 	for _, cond := range []struct {
 		held bool
 		name string
-	}{{c.ReproGreen, CondReproGreen}, {c.SignalClear, CondSignalClear}, {c.QualityHeld, CondQualityHeld}, {c.Retrospective, CondRetrospective}} {
+	}{{c.ReproGreen, CondReproGreen}, {c.SignalClear, CondSignalClear}, {c.QualityHeld, CondQualityHeld}, {c.Retrospective, CondRetrospective}, {c.RecordDoc, CondRecordDoc}} {
 		if !cond.held {
 			out = append(out, cond.name)
 		}

@@ -1,6 +1,6 @@
 # Plan: tests and gates that keep the latency fixes in place
 
-- **Status:** proposed, 2026-10-20. Each component of §6 has an inbox item since 2026-10-27.
+- **Status:** partly built, 2026-11-18 (6 of 7 components on main; T5 is not started). Earlier status: proposed, 2026-10-20. Each component of §6 has an inbox item since 2026-10-27.
 - **Research:** [latency-gates-2026-10](../research/latency-gates-2026-10.md). **Decision:** [ADR-0144](../architecture/adr/0144-latency-is-gated-by-invariants-at-merge-and-by-trends-on-main.md).
 - **Related:** [wave-latency-2026-10](wave-latency-2026-10.md), [ci-wall-time-2026-10](ci-wall-time-2026-10.md).
 
@@ -137,3 +137,17 @@ The plan audit of 2026-10-27 filed one inbox item for each component, and each i
 - A soft gate finds a regression only after it lands on main. The hard gates cover only what a test can prove.
 - The simulation uses the distribution of four waves. A new kind of work can change the distribution, so the bound can need a new baseline.
 - The CI rule needs 10 baseline points and 10 tested runs before it turns on.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| T1 workflow tests of #988 | done | cycle commit [`c9a7ef4`](https://github.com/mickeyyaya/evolve-loop/commit/c9a7ef419e00a8428c534b2644969bc454d13669) | none (consumed) |
+| T2 wave simulation | done | cycle commit [`129ccc7`](https://github.com/mickeyyaya/evolve-loop/commit/129ccc740eee0f8231146869d2915c705208e64b); `go/internal/fleet/pool_simulation_test.go` | none (consumed) |
+| T3 W1, W5, W4 proofs | done | cycle commit [`0276608`](https://github.com/mickeyyaya/evolve-loop/commit/02766082270aaf5e98ac01231b04691a27bfa54f) | none (consumed) |
+| T4 duration ratchet | done | cycle commit [`083a556`](https://github.com/mickeyyaya/evolve-loop/commit/083a5565ebb8e307d0191d9a1b0a3b6d895398d4); `go/.test-latency.json` | none (consumed) |
+| T5 `evolve ci latency check` | not started | No `go/internal/citrend`, and `evolve ci` has no `latency` verb | none: draft `latency-gates-t5-ci-trend-gate` |
+| T6 `evolve wave latency --check` | done | cycle commit [`47a3702`](https://github.com/mickeyyaya/evolve-loop/commit/47a370296fdd76708ea85514bae717ac0432ac44); `go/cmd/evolve/cmd_wave_latency_check.go` | none (consumed) |
+| T7 boundary runs T5 and T6 | partial | cycle commit [`c33a0ee`](https://github.com/mickeyyaya/evolve-loop/commit/c33a0ee552aebe2ec3dfe72f4307ae363b00a4ee); `go/cmd/evolve/cmd_boundary.go:237-238`. The T5 step calls a verb that does not exist | `boundary-step-ci-latency-check-calls-a-missing-verb` |
+
+T5 is the one missing part. The boundary step for it is advisory, so it prints a WARN and the boundary goes on. T5 has no open inbox item, and its item is not in the consumed folder. A draft is written. It is unverified here if the T4 ratchet runs in CI.

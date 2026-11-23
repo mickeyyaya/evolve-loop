@@ -39,11 +39,11 @@ func TestItemIDAt_IsTheLoadersID(t *testing.T) {
 }
 
 func TestResolveContinuationForScope_AdoptsAnIDLessClaimByTheLoadersID(t *testing.T) {
-	inbox := t.TempDir()
+	inbox := filepath.Join(t.TempDir(), ".evolve", "inbox")
 	writeIdentityItem(t, filepath.Join(inboxbatch.ProcessingCycleDir(inbox, 5), "no-id.json"),
 		`{"continuation":{"snapshot_sha":"abc","cycle":4}}`)
 
-	got := ResolveContinuationForScope(Options{InboxDir: inbox, Stderr: os.Stderr}, 5, []string{"no-id"})
+	got := mustResolveScope(t, Options{InboxDir: inbox, Stderr: os.Stderr}, 5, []string{"no-id"})
 
 	if got == nil || got.SnapshotSHA != "abc" {
 		t.Fatalf("a claim in this lane's scope by the loader's id must be adopted, got %+v", got)

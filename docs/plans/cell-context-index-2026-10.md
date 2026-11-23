@@ -1,6 +1,6 @@
 # Plan: each phase cell gets a small assignment and a layered index that it opens on demand
 
-- **Status:** proposed, 2026-10-26. On 2026-10-27, CX1 to CX3 are merged in PR #1146, at stage `shadow`. CX4 to CX7b have inbox items (§6).
+- **Status:** partly built, 2026-10-27 (3 of 8 components on main, 5 not started). Earlier status: proposed, 2026-10-26. On 2026-10-27, CX1 to CX3 are merged in PR #1146, at stage `shadow`. CX4 to CX7b have inbox items (§6).
 - **Design:** [cell-context-index](../architecture/cell-context-index.md). **Decision:** [ADR-0154](../architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md) I-4 rule 14 and [ADR-0155](../architecture/adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md) I-12. **Research:** [cell-context-index-2026-10](../research/cell-context-index-2026-10.md).
 - **Builds on:** X5 (PR #1133), the artifact index of [llm-isolation.md](../architecture/llm-isolation.md) §8; the rule registry index of PR #1137 ([guidance-layers.md](../architecture/guidance-layers.md) §10).
 
@@ -162,3 +162,19 @@ The reason for the order: each later component reads a fact that an earlier one 
 - Q2 (closed on 2026-10-26). The field name `rule_layer` of D11 is agreed: [guidance-layers.md](../architecture/guidance-layers.md) §10.6 uses it (PR #1137).
 - Q3. A Linux cell gives no access record. A Linux source, for example an `fanotify` reader, needs root. This plan has none.
 - Q4. The open rate as a quality index of the ADR-0153 panel needs an amendment of ADR-0153. CX6 reads the log directly until then.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| CX1 Layers, budgets and policy keys | done, at `shadow` | [`d073b4a`](https://github.com/mickeyyaya/evolve-loop/commit/d073b4af241240bf2d573ef4ab6d1cb09fdad14a), [#1146](https://github.com/mickeyyaya/evolve-loop/pull/1146) | none |
+| CX2 Verbs `context index` and `context open` | done | [`d073b4a`](https://github.com/mickeyyaya/evolve-loop/commit/d073b4af241240bf2d573ef4ab6d1cb09fdad14a), [#1146](https://github.com/mickeyyaya/evolve-loop/pull/1146) | none |
+| CX3 Grant reports and access log | done | [`d073b4a`](https://github.com/mickeyyaya/evolve-loop/commit/d073b4af241240bf2d573ef4ab6d1cb09fdad14a), [#1146](https://github.com/mickeyyaya/evolve-loop/pull/1146) | none |
+| CX4 `message` and `context` sources | not started | The item left the inbox in [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443). No such class is in `go/internal/inputindex`. | none |
+| CX5 `enforce` L0 block | not started | The item left the inbox in [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443). No change on main. | none |
+| CX6 Catalog action `context-tune` | not started | The item left the inbox in [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443). No `context-tune` code on main. | none |
+| CX7a Filtered rule rows as L3 | not started | The item left the inbox in [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443). The item `guidance-cell-index-input` was filed by PR #1137. | none |
+| CX7b Other L3 sources | not started | The item left the inbox in [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443). No change on main. | none |
+
+CX4 to CX7b are not built. [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443) removed their five inbox items, so none has an open item now. Follow-up drafts restore the five items. The move of CX1 to `enforce` is unverified.
+

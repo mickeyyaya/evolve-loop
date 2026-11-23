@@ -245,6 +245,35 @@ The `parallel_evaluate` decider moves out of the unexported method `core.cycleRu
 
 *Rejected:* `core` imports the registry. That is an import cycle.
 
+### 4.4 The typed key list and the effective stage
+
+The registry covers each stage key through one typed list. The list is `policy.StageKeys()` in `go/internal/policy/stage_keys.go`. It has 48 keys:
+
+| Part | Keys | Source |
+|---|---|---|
+| The schema walk | 42 | `policy.StageFields()` walks the type `policy.Policy`. It lists each field whose JSON name ends in `stage`. |
+| The scan cache gate | 1 | `gates.scan_cache_gate`. The name ends in `_gate`, so the walk does not find it. |
+| The handoff pairs | 5 | `handoff.<pair>.stage` for each pair in `knownHandoffPairs`. The type `HandoffPolicy` keeps its pairs in an unexported map, so the walk does not find them. |
+
+The six keys outside the walk have seed entries in `go/internal/gateregistry/seed_stage_keys.go`. The scan cache gate names the signal `SHIP_SCAN_SHADOW_ESCAPE` and its emit site `escape`. The five handoff pairs have no signal yet. Each pair has one `no-signal` row in `go/internal/gateregistry/testdata/stage_violations.json`. The ceiling of that baseline moves from 82 to 87.
+
+The rule `string-typed-stage` covers only the 42 walked fields. The six keys outside the walk are exempt from it.
+
+The other `_gate` fields of `GatesPolicy` have no stage key. `TestStageKeysCoverGateAndHandoffFields` names them in one list. A new `_gate` string field fails the test until a person puts it in `StageKeys` or in that list. This is open question Q2.
+
+`policy.Policy.EffectiveStages()` returns the stage of each key in `StageKeys()`. It reads the typed configuration, so a key that has its default in Go reads as that default. A read of the `policy.json` text misses these keys. The function returns an error that names the key when a key has no reader or when its reader fails.
+
+Each key has one reader in `stageReaders`. The reader calls the accessor that the feature uses at run time. Four rules apply to the value:
+
+- A key with an optional block that is absent reads `off` when the feature is then off. This holds for `fleet.budget.stage` and `fleet.orchestrator.window.adaptive.stage`.
+- An isolation key reads the value that its consumer acts on. `policy.ResolveIsolationStage`, `policy.ResolveFlowStage` and `policy.ResolveQueueStage` are the one home of that rule. The bridge, the flow decision and the queue verb call them. A value such as `ENFORCE` reads `enforce` for `i2`, and `bogus` reads `off`.
+- An empty isolation key reads the default of its consumer. `isolation.i2`, `i3`, `i5` and `i7` read `shadow`. `isolation.i15` reads `enforce` for the exact word `enforce` and `shadow` for every other value. `isolation.i8` reads `legacy`, because an empty flow stage means the legacy path.
+- `workflow.findings_repair.code-review.stage` reads `shadow` when the policy says `enforce`. The resolver holds that stage at `shadow` today.
+
+The values of `pr.merge_window.stage` are `off` and `on`. Its reader returns them unchanged.
+
+`TestEffectiveStagesMatchEachKeyDefault` pins the default of each key. `TestEffectiveStages_ReadEachKeyFromItsOwnBlockAndNoOther` sets one key at a time through `policy.Parse`. It checks that only that key moves. `TestEveryStageKeyHasRegistryEntry` walks `StageKeys()` and fails for a key with no entry.
+
 ## 5. The conformance tests
 
 The tests live with the registry in `go/internal/gateregistry/` (the protected surface of gate-contract §6.7). Each test walks the typed policy schema. It does not walk the live `.evolve/policy.json`. That file omits every key that uses its default. At HEAD, `held_proposals`, `gates.main_red_stop`, `workflow.cycle_spend` and `integration` are absent. It does not walk the registry first.

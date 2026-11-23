@@ -163,3 +163,13 @@ func stringsContainAll(s string, parts ...string) bool {
 	}
 	return true
 }
+
+func TestPredicateName_TakesTheTextAfterTheLastColon(t *testing.T) {
+	t.Parallel()
+	tests := map[string]string{"file.go:TestX": "TestX", "a:b:TestX": "TestX", "TestX": "TestX", "": ""}
+	for ref, want := range tests {
+		if got := evidence.PredicateName(ref); got != want {
+			t.Errorf("PredicateName(%q) = %q, want %q", ref, got, want)
+		}
+	}
+}

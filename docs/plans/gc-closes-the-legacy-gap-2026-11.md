@@ -1,6 +1,6 @@
 # Plan: gc removes each worktree and branch that nothing needs
 
-- **Status:** proposed, 2026-11-09. Round 2, after the architecture review and the docs review of round 1 (section 5 lists each finding and its fix). The review comes before any build.
+- **Status:** partly built, 2026-11-21 (10 of 11 components on main; X11 unverified). Earlier status: proposed, 2026-11-09. Round 2, after the architecture review and the docs review of round 1 (section 5 lists each finding and its fix). The review comes before any build.
 - **Design:** [internal-gc](../architecture/packages/internal-gc.md), [internal-gcpolicy](../architecture/packages/internal-gcpolicy.md).
 - **Evidence:** the manual cleanup of 2026-11-09, with its manifests in `backups/session-2026-11-06/cleanup-2026-11-09/` of the hub.
 
@@ -182,3 +182,23 @@ Each component lands as one pull request with the composed floor and 100% covera
 
 - **Q1, answered 2026-11-09.** The operator said: "Clean up the remote branches also, make sure gc will do the same to include them, gc should be invoked after the cycle / wave is completed". D10 is at `enforce`, and D12 and D13 add the invocation points. The console deleted the remote branches by hand on that day, after the bundle.
 - **Q2.** How long does gc keep a bundle? This plan proposes the salvage TTL of the policy.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| X1: `refs.bundle` and verify | done | cycle 2329, [`5a85ad7`](https://github.com/mickeyyaya/evolve-loop/commit/5a85ad72d); `go/internal/gc/salvage.go`, `salvage_bundle_test.go` | none |
+| X2: landed source from `gh` | done | cycle 2296, [`b4778d1`](https://github.com/mickeyyaya/evolve-loop/commit/b4778d145); `go/internal/gc/remotegh.go:24` | none |
+| X3: rebuildable list gets `.evolve/` | done | cycle 2327, [`53bfa07`](https://github.com/mickeyyaya/evolve-loop/commit/53bfa07f0); `go/internal/gc/devleftovers.go:24` | none |
+| X4: detached and live rules | done | cycle 2299, [`4fbc173`](https://github.com/mickeyyaya/evolve-loop/commit/4fbc173d3); cycle 2322, [`aee40d4`](https://github.com/mickeyyaya/evolve-loop/commit/aee40d4d5); `devlanded.go`, `devdetached_test.go` | none |
+| X5: ended rule for lanes | done | cycle 2383, [`f86b7a1`](https://github.com/mickeyyaya/evolve-loop/commit/f86b7a1cb) (`worktrees.go`); cycle 2250, [`9a2bbe0`](https://github.com/mickeyyaya/evolve-loop/commit/9a2bbe0e1) | none |
+| X6: branch sweep | done | cycle 2244, [`b25471c`](https://github.com/mickeyyaya/evolve-loop/commit/b25471c0c); `go/internal/gc/branchsweep.go` | none |
+| X7: flag owner | done | cycle 2280, [`4f1b959`](https://github.com/mickeyyaya/evolve-loop/commit/4f1b959d5); `go/internal/gc/flagtally.go`; the flag items `gc-flag-unmerged-cycle-*` close in [#1605](https://github.com/mickeyyaya/evolve-loop/pull/1605) | none |
+| X8: remote sweep | done | cycle 2296, [`b4778d1`](https://github.com/mickeyyaya/evolve-loop/commit/b4778d145); `go/internal/gc/remotesweep.go` | none |
+| X9: amended invariants in `internal-gc.md` | done | cycle 2267, [`1670401`](https://github.com/mickeyyaya/evolve-loop/commit/167040160); `internal_gc_note_test.go:24` | none |
+| X10: cycle-end step | done | cycle 2271, [`3b9fe5a`](https://github.com/mickeyyaya/evolve-loop/commit/3b9fe5a83); `go/internal/gc/cycleseal.go` | none |
+| X11: wave-end run and `gc.wave_end.scope` | unverified: the checked-in `.evolve/policy.json` gc block has no `wave_end` key, and no Go code reads it. The note test names the key. | none found | none (draft `gc-wave-end-scope-key`) |
+
+The gc package holds each sweep of the plan. The cycle numbers come from the commit stat of each landing. A few files may belong to a neighbour commit. X11 is the open gap. The note `internal-gc.md` states the `gc.wave_end.scope` invariant, but the policy has no such key. Q2 (bundle retention) stays open. 
+
+The recycle plan adds the mandatory cycle recycle step in its own items (`recycle-x*`).

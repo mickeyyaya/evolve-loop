@@ -1,6 +1,7 @@
 # Plan: one skill writes every document that a person reads, and it is on by default
 
-- **Status:** accepted, 2026-10-12. K0, K1, K3 and K4 are in this change. K2 (the kernel preload) is done in the lane `feat/docs-write-preload`.
+- **Status:** built, 2026-10-12 (all 5 components on main).
+  - Earlier status: accepted, 2026-10-12. K0, K1, K3 and K4 are in this change. K2 (the kernel preload) is done in the lane `feat/docs-write-preload`.
 - **Decision:** [ADR-0132](../architecture/adr/0132-documents-are-written-through-one-skill.md). **Research:** [docs-write-skill-2026-10.md](../research/docs-write-skill-2026-10.md). **Skill:** [skills/docs-write/SKILL.md](../../skills/docs-write/SKILL.md).
 
 ## Table of contents
@@ -148,3 +149,15 @@ Synthesis: the result keeps the score of C on G1. It raises G2 with the types of
 ## 11. Open questions
 
 1. Must an older design set (for example the ADR-0131 set) move to the skill shape? This plan says no; a touched file follows the skill for its new text only.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| K0 documents | done | [#856](https://github.com/mickeyyaya/evolve-loop/pull/856), [`60d052f`](https://github.com/mickeyyaya/evolve-loop/commit/60d052f50) | none |
+| K1 the skill | done | [#856](https://github.com/mickeyyaya/evolve-loop/pull/856); `skills/docs-write/SKILL.md`, `COMPACT.md`, `references/` | none |
+| K2 kernel preload | done | [#862](https://github.com/mickeyyaya/evolve-loop/pull/862), [`7381ba9`](https://github.com/mickeyyaya/evolve-loop/commit/7381ba9f1) | none |
+| K3 console default line | done | `AGENTS.md:135-137` and invariant line 37; [#856](https://github.com/mickeyyaya/evolve-loop/pull/856) | none |
+| K4 `markdown-structure.md` amendment | done | `docs/conventions/markdown-structure.md:8`; [#856](https://github.com/mickeyyaya/evolve-loop/pull/856) | none |
+
+Nothing is left. D9 named the `--added` lint mode as pending; it landed as T10 of the test-system plan ([#859](https://github.com/mickeyyaya/evolve-loop/pull/859)). The skill text may still say the mode is pending: unverified. The measures of section 9 (G1, G2, G4 telemetry) have no record: unverified.

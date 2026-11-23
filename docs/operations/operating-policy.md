@@ -192,9 +192,8 @@ undiagnosable. Its blast radius is every later cycle.
 2. **Dual review before commit** (simplifier + language reviewer through
    commit-gate). An architecture change also gets an adversarial architect review.
    It must land with the ADR or the design doc that explains it.
-   - A pure-docs diff still needs both review capabilities, because docs are the primary
-     asset of the project. One `code-review-simplify` diff-review pass covers simplify and review.
-     A pure-docs diff can skip the architecture review
+   - A diff of only `.md` files gets the `docs-review` seat. The commit gate requires it in place
+     of the simplify and review capabilities, and the code reviewers do not satisfy it
      ([ADR-0115](../architecture/adr/0115-commit-gate-keeps-history-and-records-waivers.md)).
    - A comment removal needs no reviewer. The commit gate accepts a proof instead when
      every changed Go file is proven comment-only and every other file is Markdown under `docs/`.

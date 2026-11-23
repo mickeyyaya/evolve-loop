@@ -1,6 +1,6 @@
 # Plan: each subscription token has a phase, a seat, a round purpose and a step, so the operator can find and cut the largest consumer
 
-- **Status:** approved, 2026-10-27. The operator approved design A, and T1 to T9 are filed in the runtime inbox (§13).
+- **Status:** partly built, 2026-11-06 (5 of 9 components on main, 1 built with a PR open, 3 not built). Earlier status: approved, 2026-10-27. The operator approved design A, and T1 to T9 are filed in the runtime inbox (§13).
 - **Research:** [token-telemetry-2026-10](../research/token-telemetry-2026-10.md). **Decision record:** none yet. An ADR records D1 to D10 after one `shadow` wave of T1 and T7 data (§13, Q5). **Spec of the try record:** [model-attempt-telemetry.md](../architecture/model-attempt-telemetry.md). **Earlier campaign:** [token-telemetry-2026-07](token-telemetry-2026-07.md), [ADR-0071](../architecture/adr/0071-token-telemetry-attribution-and-clean-boot.md). **Related cost policy:** [cost-aware-repair-2026-10](cost-aware-repair-2026-10.md), [ADR-0158](../architecture/adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md).
 
 ## Table of contents
@@ -241,3 +241,20 @@ The data decides each cut. No cut starts before its metric has one wave of data.
 | 2026-10-27 | The operator approved design A (§5). | Status is approved. Design B stays a later stage under the conditions of §5.3. |
 | 2026-10-27 | T1 to T9 are filed in the runtime inbox (`.evolve/inbox/` of the runtime tree, 06:07Z). The inbox id of each item is the id in the §7 table. The routes are those of §7: T2, T5 and T8 go to the console, and the other six go to a lane. | The lane and the console build the items in the order of §8. |
 | 2026-10-27 | Q5: the ADR comes after one `shadow` wave of T1 and T7 data. | The ADR cites the measured data of that wave. |
+| 2026-11-21 | T8 needs no edit of `strict_keys.go`: the reflection walk covers the new `Telemetry` field. T8 touches no fence path. | The console keeps the route, because it already builds the item. |
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| T1 `token-row-attribution-from-request` | done | [`9d5b529`](https://github.com/mickeyyaya/evolve-loop/commit/9d5b52977) (cycle 2056); `Purpose` constants in `go/internal/llmcalls/record.go:50` | none |
+| T2 `token-row-declared-purpose` | not started | The item left the inbox in [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443). No `repair` or `router` purpose is in `go/internal/llmcalls`. | none |
+| T3 `token-turn-sidecar` | done | [`f181add`](https://github.com/mickeyyaya/evolve-loop/commit/f181addf46f6001bae91d012001defe66ebc1599) (cycle 2185) | none |
+| T4 `usage-observation-history` | done | [`73be29b`](https://github.com/mickeyyaya/evolve-loop/commit/73be29bcb595b6c2807e05c56bad1a179f89172e) (cycle 2062) | none |
+| T5 `claude-statusline-rate-limits` | not started | The item left the inbox in [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443). No `usage statusline` verb is on main. | none |
+| T6 `agent-run-durable-token-ledger` | done | [`2ba8b56`](https://github.com/mickeyyaya/evolve-loop/commit/2ba8b562b1084663a97bd8ddc2d8a0c718cce348) (cycle 2135) | none |
+| T7 `tokens-report-from-llm-calls` | not started | `cmd_tokens.go` has no `--by` split. Its last change is `cbe9c14d1` (2026-10-21), before the plan. | `tokens-report-from-llm-calls` |
+| T8 `token-weights-policy-key` | built, PR open | [#1623](https://github.com/mickeyyaya/evolve-loop/pull/1623) | `token-weights-policy-key` |
+| T9 `claude-advisor-rows-measured` | done | [`737352d`](https://github.com/mickeyyaya/evolve-loop/commit/737352d1bd7eb54da1ee46c0a0e00a600540729e) (cycle 2098) | none |
+
+T7 and T8 are left, and each has an open inbox item. T2 and T5 are unfinished and have no open item, because [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443) removed them. The item `token-telemetry-adr-and-enforce-flips` left the inbox in the same PR, so the ADR of D1 to D10 has no item either. Follow-up drafts cover T2, T5 and the ADR. The status of the `shadow` to `enforce` flips of T1, T3, T4, T6 and T9 is unverified.

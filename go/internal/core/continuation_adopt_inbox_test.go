@@ -11,7 +11,11 @@ func init() {
 		return inboxmover.ResolveContinuation(inboxmover.Options{ProjectRoot: root}, cycle)
 	}
 	core.RealInboxForTest.ResolveScope = func(root string, cycle int, scopeIDs []string) *continuation.Continuation {
-		return inboxmover.ResolveContinuationForScope(inboxmover.Options{ProjectRoot: root}, cycle, scopeIDs)
+		c, err := inboxmover.ResolveContinuationForScope(inboxmover.Options{ProjectRoot: root}, cycle, scopeIDs)
+		if err != nil {
+			return nil
+		}
+		return c
 	}
 	core.RealInboxForTest.Release = func(root string, cycle int, reason string) error {
 		_, err := inboxmover.ReleaseCycleProcessingWithReason(inboxmover.Options{ProjectRoot: root}, cycle, reason)

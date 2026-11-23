@@ -194,6 +194,7 @@ func TestRunLoop_ResumePhaseRunnerError(t *testing.T) {
 	if err := os.MkdirAll(wt, 0o755); err != nil {
 		t.Fatalf("mkdir wt: %v", err)
 	}
+	workspace := t.TempDir()
 
 	csContent := fmt.Sprintf(`{
   "cycle_id": 1,
@@ -214,7 +215,7 @@ func TestRunLoop_ResumePhaseRunnerError(t *testing.T) {
 	defer func() { wireOrchestratorDepsFn = prev }()
 	wireOrchestratorDepsFn = func(string, string, io.Writer, routingRun) orchDeps {
 		st := &fixtures.FakeStorage{CycleState: core.CycleState{
-			CycleID: 1, Phase: string(core.PhaseBuild), ActiveWorktree: wt,
+			CycleID: 1, Phase: string(core.PhaseBuild), ActiveWorktree: wt, WorkspacePath: workspace,
 		}}
 		ld := newFakeLedger()
 		runners := map[core.Phase]core.PhaseRunner{
@@ -233,6 +234,9 @@ func TestRunLoop_ResumePhaseRunnerError(t *testing.T) {
 	}, nil, &stdout, &stderr)
 	if rc != 2 {
 		t.Fatalf("rc=%d want 2; stderr=%q stdout=%q", rc, stderr.String(), stdout.String())
+	}
+	if _, err := os.Stat(filepath.Join(workspace, "build-failure-diag.json")); err != nil {
+		t.Fatalf("resumed build failure left no diagnosis in its workspace: %v", err)
 	}
 }
 

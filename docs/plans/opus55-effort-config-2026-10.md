@@ -2,6 +2,8 @@
 
 Console lane `cl-opus55-config`. Branch `fix/opus55-effort-config`, base `origin/main` 8945666b6.
 
+- **Status:** built, 2026-10-09 ([#815](https://github.com/mickeyyaya/evolve-loop/pull/815), landed in the boundary train [#817](https://github.com/mickeyyaya/evolve-loop/pull/817)); the effort sweep is not done. Earlier status: none was stated.
+
 ## The request
 
 The operator asked on 2026-10-08: "read the opus 5.5 user manual to summarize which what we should config to reach maximun / optimized usage". The console gave a summary and a list of items. The operator replied: "ok, execute the items you listed".
@@ -135,3 +137,21 @@ If a condition is false, deep stays at `medium`.
 ## Open questions
 
 - None. CQ1 is closed: the top tier stays Opus 5.5.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| D0 to D4, D7: effort in `cli_routing`, `EffortTable.Resolve`, compiled default | done | [#815](https://github.com/mickeyyaya/evolve-loop/pull/815) in train [#817](https://github.com/mickeyyaya/evolve-loop/pull/817); `go/internal/policy/effort.go:34`, `go/internal/policy/dispatch.go:143` | none |
+| D5, D6: retired profile fields and `cli-routing migrate` | done | [#815](https://github.com/mickeyyaya/evolve-loop/pull/815); `go/cmd/evolve/cli_routing_effort_migrate.go:19` | none |
+| D8, D9, D10: agy-claude `model_variant` channel | done | [#815](https://github.com/mickeyyaya/evolve-loop/pull/815); `go/internal/bridge/manifests/agy-claude-tmux.json:13` | none |
+| D11: authority paragraph and `<pasted_content>` note | done | [#815](https://github.com/mickeyyaya/evolve-loop/pull/815); `go/internal/bridge/phaseidentity/identity.go:82` | none |
+| D12: `WrapPasted` in triage and the advisor | done | [#815](https://github.com/mickeyyaya/evolve-loop/pull/815); `go/internal/phases/triage/triage.go:234`, `go/internal/core/advisor/context.go:53` | none |
+| D13: chain-of-thought prompt texts | done (unverified in the code: no text diff was read) | [#815](https://github.com/mickeyyaya/evolve-loop/pull/815) | none |
+| D14: top tier stays Opus 5.5 | done (no change needed) | none | none |
+| Effort sweep (arm A, arm B, decision rule) | not started: no sweep record exists | none | none (draft `opus55-effort-sweep`) |
+| Follow-up `effort-config-followups` (seven LOW clean-ups) | dropped: retired, not built, by the inbox review of 2026-11-20 | [`fd36f33`](https://github.com/mickeyyaya/evolve-loop/commit/fd36f3334) (PR 1605, bookkeeping) | none |
+| Later: move `phaseidentity` to a neutral leaf, headless system note | dropped: item `phaseidentity-neutral-leaf` retired on 2026-11-20 | none | none |
+| Later: `cli-routing explain` variant drift, line-length guard for pasted text | dropped (operator, 2026-11-22) | none | none: no failed cycle and no measured need. Old status: not started |
+
+The policy now differs from the plan table: `tdd-engineer` runs at `high` since [`b7d0c6a`](https://github.com/mickeyyaya/evolve-loop/commit/b7d0c6a44) (#981). The measured sweep never ran. It has no open item, and a draft exists. The operator dropped both small items under "Later" on 2026-11-22.

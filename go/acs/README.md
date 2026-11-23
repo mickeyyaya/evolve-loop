@@ -156,7 +156,7 @@ subprocess path is the safety net the dual-root pattern keeps correct.
 
 ### Predicate kit — use the helper, never write a copy
 
-`go/pkg/acsassert` has six helpers that cycles copied 597 times. Call them.
+`go/pkg/acsassert` has seven helpers that cycles copied 597 times. Call them.
 
 | Helper | Use |
 |---|---|
@@ -166,3 +166,4 @@ subprocess path is the safety net the dual-root pattern keeps correct.
 | `OutputTail` | Returns the last N lines of a command output. |
 | `FuncCoverage` | Returns the coverage percentage of one function from `go tool cover -func` output. |
 | `WalkModule` | Lists the module files, as slash paths relative to the root, that a filter keeps. |
+| `PathExists` | Returns true when a path can be read. Call it in place of a `pathExists` helper. |

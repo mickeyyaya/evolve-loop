@@ -1,6 +1,6 @@
 # Plan: a test system that measures once, keeps its poles short and stops new duplicates
 
-- **Status:** accepted, 2026-10-12. T0 (these documents) is in review. T1 and T2 are the first refactor slices.
+- **Status:** partly built, 2026-11-21 (17 of 18 components on main; T7 open). Earlier status: accepted, 2026-10-12. T0 (these documents) is in review. T1 and T2 are the first refactor slices.
 - **Design:** [test-system.md](../architecture/test-system.md). **Decision:** [ADR-0131](../architecture/adr/0131-one-test-run-feeds-every-coverage-gate.md). **Research:** [test-system-efficiency-2026-10.md](../research/test-system-efficiency-2026-10.md).
 - **Earlier campaign:** [test-refactoring-design-2026-09-14.md](../architecture/test-refactoring-design-2026-09-14.md). Its preservation protocol applies to each slice of this plan that removes or merges a test.
 
@@ -272,3 +272,28 @@ Each criterion has a score from 1 (bad) to 5 (good).
 ### 11.6 Verification
 
 The same full run with `-json` (research §10 method) after each step. The goal is that no package passes the budget of 180 s under `-race` on CI (D10). Each of the six packages of research F10.1 must go down.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| T0 documents | done | [#852](https://github.com/mickeyyaya/evolve-loop/pull/852), [`ef9a99b`](https://github.com/mickeyyaya/evolve-loop/commit/ef9a99bdf) | none |
+| T1 time filter, hermetic subagent test | done | [#858](https://github.com/mickeyyaya/evolve-loop/pull/858), [`0e534c2`](https://github.com/mickeyyaya/evolve-loop/commit/0e534c228) | none |
+| T2 measure once, `evolve cover strict` | done | [#861](https://github.com/mickeyyaya/evolve-loop/pull/861), [`750d293`](https://github.com/mickeyyaya/evolve-loop/commit/750d29355) | none |
+| T3 parallel skills-drift tests | done | cycle 2150, [`22dd106`](https://github.com/mickeyyaya/evolve-loop/commit/22dd1064d) | none (item consumed) |
+| T4 wall budget and timeout | done; the enforce step (`--fail-over-budget`) is still advisory, see note | [#880](https://github.com/mickeyyaya/evolve-loop/pull/880), [`787c825`](https://github.com/mickeyyaya/evolve-loop/commit/787c82519); related [`d1e620d`](https://github.com/mickeyyaya/evolve-loop/commit/d1e620df6) | none |
+| T5 duplicate ratchet | done | cycle 2231, [`2937a94`](https://github.com/mickeyyaya/evolve-loop/commit/2937a9464) (`go/.test-dup-baseline`) | none (item consumed) |
+| T6 predicate kit | done | cycle 2044, [`66b0bcc`](https://github.com/mickeyyaya/evolve-loop/commit/66b0bcc7e) | none (item consumed) |
+| T7 seam order in house rules | partial: design text in `docs/architecture/test-system.md` section 5.3; no lane brief or rule found (unverified) | [#852](https://github.com/mickeyyaya/evolve-loop/pull/852) | none |
+| T8 change-scoped iteration, shadow | done | cycle 2418, [`cd365b8`](https://github.com/mickeyyaya/evolve-loop/commit/cd365b81f) | none (item consumed) |
+| T9 `internal/core` pole | done through T11 and T16 | [#868](https://github.com/mickeyyaya/evolve-loop/pull/868), [#876](https://github.com/mickeyyaya/evolve-loop/pull/876) | none |
+| T10 STE lint alone for docs-only PR | done | [#859](https://github.com/mickeyyaya/evolve-loop/pull/859), [`8128634`](https://github.com/mickeyyaya/evolve-loop/commit/81286342f); `required.yml:157` | none |
+| T11 parallel by default | done | [#868](https://github.com/mickeyyaya/evolve-loop/pull/868), [#871](https://github.com/mickeyyaya/evolve-loop/pull/871), [#870](https://github.com/mickeyyaya/evolve-loop/pull/870) | none |
+| T12 repository template | done | [#873](https://github.com/mickeyyaya/evolve-loop/pull/873), [`189add6`](https://github.com/mickeyyaya/evolve-loop/commit/189add6fc) | none |
+| T13 one status read | done | [#874](https://github.com/mickeyyaya/evolve-loop/pull/874), [`e5f2a57`](https://github.com/mickeyyaya/evolve-loop/commit/e5f2a5738) | none |
+| T14 one build per test binary, `gotooltest` | done | [#872](https://github.com/mickeyyaya/evolve-loop/pull/872), [`d025906`](https://github.com/mickeyyaya/evolve-loop/commit/d02590637) | none |
+| T15 `SleepFn` to the runner | done | [#875](https://github.com/mickeyyaya/evolve-loop/pull/875), [`c3d9b5c`](https://github.com/mickeyyaya/evolve-loop/commit/c3d9b5cc7) | none |
+| T16 injected stderr writers | done | [#876](https://github.com/mickeyyaya/evolve-loop/pull/876), [`b824b6f`](https://github.com/mickeyyaya/evolve-loop/commit/b824b6f15) | none |
+| T17 parallel for audit, bridge, ciparity | done | [#878](https://github.com/mickeyyaya/evolve-loop/pull/878), [`dd2b310`](https://github.com/mickeyyaya/evolve-loop/commit/dd2b31060) | none |
+
+Only T7 is unfinished: the seam order sits in the design doc but not in a lane brief or a guidance rule. It has no open inbox item. A follow-up draft exists: `test-system-seam-order-in-house-rules`. The plan names the T4 enforce step as later work. That step has no item, and its entry condition (`cmd/evolve` inside 180 s) is unverified.

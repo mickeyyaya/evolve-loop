@@ -3,8 +3,13 @@ package policy
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 )
+
+var defaultHandoffStage = config.StageShadow.String()
 
 var knownHandoffPairs = []string{
 	"build-audit",
@@ -52,7 +57,7 @@ func (h *HandoffPolicy) UnmarshalJSON(raw []byte) error {
 			return fmt.Errorf("handoff: pair %q: %w", pairName, err)
 		}
 
-		stage := "shadow"
+		stage := defaultHandoffStage
 		if decoded.Stage != nil {
 			if *decoded.Stage != "shadow" && *decoded.Stage != "enforce" {
 				return fmt.Errorf("handoff: pair %q: stage %q must be %q or %q", pairName, *decoded.Stage, "shadow", "enforce")
@@ -78,7 +83,7 @@ func (h *HandoffPolicy) UnmarshalJSON(raw []byte) error {
 func (p Policy) HandoffConfig() HandoffConfig {
 	cfg := make(HandoffConfig, len(knownHandoffPairs))
 	for _, name := range knownHandoffPairs {
-		cfg[name] = HandoffPairConfig{Stage: "shadow"}
+		cfg[name] = HandoffPairConfig{Stage: defaultHandoffStage}
 	}
 	if p.Handoff == nil || p.Handoff.pairs == nil {
 		return cfg
@@ -87,4 +92,15 @@ func (p Policy) HandoffConfig() HandoffConfig {
 		cfg[name] = pair
 	}
 	return cfg
+}
+
+func HandoffStageFor(projectRoot, pair string) (string, error) {
+	pol, err := Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
+	if err != nil {
+		return defaultHandoffStage, err
+	}
+	if stage := pol.HandoffConfig()[pair].Stage; stage != "" {
+		return stage, nil
+	}
+	return defaultHandoffStage, nil
 }

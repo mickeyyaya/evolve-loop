@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
 	"sort"
 	"time"
 
@@ -37,9 +36,9 @@ func continuationRoot(fs *flag.FlagSet, args []string, rootFlag *string, stderr 
 		return "", false
 	}
 	if *rootFlag != "" {
-		return *rootFlag, true
+		return paths.AbsoluteRoot("--project-root", *rootFlag, rootWarner("evolve continuation", stderr)), true
 	}
-	wd, err := os.Getwd()
+	wd, err := processGetwd()
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve continuation: cannot resolve the project root from the working directory: %v\n", err)
 		return "", false

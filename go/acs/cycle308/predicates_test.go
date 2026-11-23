@@ -12,11 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
-func goDir(t *testing.T) string {
-	t.Helper()
-	return filepath.Join(acsassert.RepoRoot(t), "go")
-}
-
 var (
 	passLineRe = regexp.MustCompile(`(?m)^\s*--- PASS: (\S+)`)
 	anyFailRe  = regexp.MustCompile(`(?m)^\s*--- FAIL:`)
@@ -54,7 +49,7 @@ func runInbox(t *testing.T) string {
 	t.Helper()
 	inboxOnce.Do(func() {
 		stdout, stderr, _, _ := acsassert.SubprocessOutput(
-			"go", "test", "-C", goDir(t), "-count=1", "-v",
+			"go", "test", "-C", acsassert.GoModuleDir(t), "-count=1", "-v",
 			"-run", "TestReleaseCycleProcessing|TestInboxRelease", "./internal/inboxmover/")
 		inboxOut = stdout + "\n" + stderr
 	})
@@ -65,7 +60,7 @@ func runShip(t *testing.T) string {
 	t.Helper()
 	shipOnce.Do(func() {
 		stdout, stderr, _, _ := acsassert.SubprocessOutput(
-			"go", "test", "-C", goDir(t), "-count=1", "-v",
+			"go", "test", "-C", acsassert.GoModuleDir(t), "-count=1", "-v",
 			"-run", "TestInboxPromote_UnfinishedClaimReleasedOnShip", "./internal/phases/ship/")
 		shipOut = stdout + "\n" + stderr
 	})
@@ -76,7 +71,7 @@ func runTriage(t *testing.T) string {
 	t.Helper()
 	triageOnce.Do(func() {
 		stdout, stderr, _, _ := acsassert.SubprocessOutput(
-			"go", "test", "-C", goDir(t), "-count=1", "-v",
+			"go", "test", "-C", acsassert.GoModuleDir(t), "-count=1", "-v",
 			"-run", "TestCommittedFloorCount_Malformed|TestCommittedFloorCount_Absent|TestDeferredFloorPackagesDecl_Malformed|TestDeferredFloorPackagesDecl_Absent",
 			"./internal/triagecap/")
 		triageOut = stdout + "\n" + stderr
@@ -88,7 +83,7 @@ func runPreflight(t *testing.T) string {
 	t.Helper()
 	preOnce.Do(func() {
 		stdout, stderr, _, _ := acsassert.SubprocessOutput(
-			"go", "test", "-C", goDir(t), "-count=1", "-v",
+			"go", "test", "-C", acsassert.GoModuleDir(t), "-count=1", "-v",
 			"-run", "TestCLIVersionInventory|TestVersionDrift", "./internal/looppreflight/")
 		preOut = stdout + "\n" + stderr
 	})

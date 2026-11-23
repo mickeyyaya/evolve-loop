@@ -29,7 +29,7 @@ func TestProvisionedWorktree_ItsTrackedInboxCopyRefusesTheMover(t *testing.T) {
 	core.LinkGuardDepsForTesting(wt, plane, 5)
 
 	_, err := inboxmover.Claim(inboxmover.Options{ProjectRoot: wt}, "task-1", "5")
-	if err == nil || !strings.Contains(err.Error(), "EVOLVE_PROJECT_ROOT="+plane) {
+	if err == nil || !strings.Contains(err.Error(), "--project-root "+plane) {
 		t.Fatalf("err = %v, want a refusal that names the plane root %s", err, plane)
 	}
 	if _, err := os.Stat(filepath.Join(wt, ".evolve", "inbox", "task-1.json")); err != nil {

@@ -2,6 +2,8 @@ package request_test
 
 import (
 	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -159,4 +161,43 @@ func TestTDDBuild_RequestBindsALedgerThatValidates(t *testing.T) {
 		t.Fatal(err)
 	}
 	requireMetLedgerValidates(t, req)
+}
+
+func TestTDDBuild_AMissingDirectoryIsErrNoPredicates(t *testing.T) {
+	t.Parallel()
+	_, err := request.TDDBuild(filepath.Join(t.TempDir(), "absent"))
+	if !errors.Is(err, request.ErrNoPredicates) {
+		t.Fatalf("err = %v, want ErrNoPredicates", err)
+	}
+}
+
+func TestPairAbsent_MatchesOnlyTheTwoSkipKinds(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		err  error
+		want bool
+	}{
+		"no committed set":  {fmt.Errorf("x: %w", request.ErrNoCommittedSet), true},
+		"no predicates":     {fmt.Errorf("x: %w", request.ErrNoPredicates), true},
+		"missing file only": {fs.ErrNotExist, false},
+		"unresolved item":   {request.ErrUnresolvedItem, false},
+		"nil":               {nil, false},
+	}
+	for name, tc := range tests {
+		if got := request.PairAbsent(tc.err); got != tc.want {
+			t.Errorf("%s: PairAbsent = %v, want %v", name, got, tc.want)
+		}
+	}
+}
+
+func TestTDDBuild_AnUnreadableDirectoryIsAnErrorNotASkip(t *testing.T) {
+	t.Parallel()
+	file := filepath.Join(t.TempDir(), "plain")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := request.TDDBuild(file)
+	if err == nil || request.PairAbsent(err) {
+		t.Fatalf("err = %v, want a real error that PairAbsent does not match", err)
+	}
 }

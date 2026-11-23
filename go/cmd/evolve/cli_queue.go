@@ -124,7 +124,7 @@ func (c midWaveCall) stage() string {
 		fmt.Fprintf(c.stderr, "%s: WARN: the policy is unreadable, so the queue stays at stage shadow: %v\n", c.prefix, err)
 		return ""
 	}
-	return pol.IsolationQueueStage()
+	return policy.ResolveQueueStage(pol.IsolationQueueStage())
 }
 
 type queueEntry struct {

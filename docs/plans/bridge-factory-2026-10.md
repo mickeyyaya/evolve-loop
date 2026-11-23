@@ -1,6 +1,6 @@
 # Plan: every query and action on an LLM CLI goes through one bridge factory and the manifest data
 
-- **Status:** accepted, 2026-10-17 (the operator approved it).
+- **Status:** partly built, 2026-11-21 (1 of 6 components on main; F2 partial; F3, F4 and F6 not started; F5 open). Earlier status: accepted, 2026-10-17 (the operator approved it).
 - **Note (2026-11-20):** `agy-tmux` maps `fast` to `Gemini 4 Hydrogen (Medium)`, `balanced` to `Gemini 4 Hydrogen (High)`, and `deep`/`top` to `Gemini 4 Argon (Medium)`. `cli_routing.default` is `claude, agy, agy-claude`, `agents.builder` is `agy, agy-claude, claude`, `tiers.deep` is `claude, agy, agy-claude` (`share_pct` 50), and `tiers.top` is `agy-claude, claude`.
 - **Research:** [bridge-factory-2026-10](../research/bridge-factory-2026-10.md). **Design:** [agent-bridge-factory](../architecture/agent-bridge-factory.md).
 - **Decision:** [ADR-0137](../architecture/adr/0137-one-bridge-factory-resolves-every-llm-cli-and-the-manifest-holds-its-facts.md). **Related plan:** [model-tier-policy-2026-10](model-tier-policy-2026-10.md), whose components Q1–Q5 depend on this plan. **Existing design:** [agent-bridge-dispatch-contract](../architecture/agent-bridge-dispatch-contract.md).
@@ -177,3 +177,16 @@ The tier-policy plan adds components that query a CLI. Each one must use the bri
 | The factory returns a driver that a caller did not expect. | F1's test resolves every manifest. Each moved site keeps its own tests. |
 | A guard bans a legitimate case, such as the bridge's own exec layer. | The guard allows the `bridge` package and its tmux layer, and nothing else. |
 | The factory reads the global `init()` registry, which is hidden global state. | `Resolve` takes a `DriverSet`. The global registry only feeds the default `DriverSet` in `main`, and a later step removes it. |
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| F1 `bridge.Resolve` over a `DriverSet` | done | [#932](https://github.com/mickeyyaya/evolve-loop/pull/932), [`01f9a26`](https://github.com/mickeyyaya/evolve-loop/commit/01f9a26cb); `go/internal/bridge/resolve.go:51` | none |
+| F2 deep probe through the driver | dropped (operator, 2026-11-22) | cycle 2106, [`04d381d`](https://github.com/mickeyyaya/evolve-loop/commit/04d381df5); [#1328](https://github.com/mickeyyaya/evolve-loop/pull/1328), [`318e97f`](https://github.com/mickeyyaya/evolve-loop/commit/318e97fcb); `go/internal/bridge/driver.go:21`, `driver.go:77` | none: the `DriverFor` removal is cleanup with no failed cycle behind it; the `DeepProber` capability is built and `DriverFor` stays on main. Old status: partial; the `DeepProber` capability is built, and `DriverFor` and `bareDriverMap` are still on main with 3 callers outside the bridge (`go/internal/bridge/driver.go:21`, `driver.go:77`) |
+| F3 model lister in the bridge | not started: no adapter in `go/internal/bridge` | none | none (item in `inbox/quarantine`; draft `bridge-factory-f3-model-lister-in-bridge`) |
+| F4 one `bridge.Version` | not started | none | none (draft `bridge-factory-f4-one-version-call`; the item left in [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443)) |
+| F5 effort and picker in the manifest | not started | none | `bridge-factory-f5-effort-and-picker-in-manifest` |
+| F6 `internal/modelrefresh` package | not started: the package does not exist | none | none (draft `bridge-factory-f6-modelrefresh-package`; the item left in [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443)) |
+
+F3, F4 and F6 have no open item. F3 is in quarantine. The F4 and F6 items left the inbox in [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443) without a build. The operator dropped the removal of `DriverFor` and `bareDriverMap` (F2) on 2026-11-22. Section 8 components follow the tier plan: see its delivery table.

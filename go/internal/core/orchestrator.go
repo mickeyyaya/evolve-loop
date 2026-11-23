@@ -195,6 +195,8 @@ type Orchestrator struct {
 
 	continuationShed func(projectRoot string, cycle int, declined continuation.Continuation) ([]string, error)
 
+	bindingSettler func(cycle int, workspace string) *continuation.Continuation
+
 	shipWindow *shipWindowHold
 
 	worktree WorktreeProvisioner
@@ -342,12 +344,27 @@ func WithContinuationShedder(fn func(projectRoot string, cycle int, declined con
 	}
 }
 
+func WithBindingSettler(fn func(cycle int, workspace string) *continuation.Continuation) Option {
+	return func(o *Orchestrator) {
+		if fn != nil {
+			o.bindingSettler = fn
+		}
+	}
+}
+
 func (o *Orchestrator) ContinuationShedProbe(projectRoot string, cycle int, declined continuation.Continuation) ([]string, bool, error) {
 	if o.continuationShed == nil {
 		return nil, false, nil
 	}
 	shed, err := o.continuationShed(projectRoot, cycle, declined)
 	return shed, true, err
+}
+
+func (o *Orchestrator) BindingSettleProbe(cycle int, workspace string) (*continuation.Continuation, bool) {
+	if o.bindingSettler == nil {
+		return nil, false
+	}
+	return o.bindingSettler(cycle, workspace), true
 }
 
 func (o *Orchestrator) ScopePathProbe(projectRoot, taskID string) (string, bool) {
@@ -665,7 +682,7 @@ OuterLoop:
 			cr.postScoutReplan()
 		}
 		if next == PhaseTriage {
-			if err := cr.adoptContinuationAfterTriage(); err != nil {
+			if err := cr.adoptAndSettleAfterTriage(); err != nil {
 				cr.result.FinalVerdict = VerdictFAIL
 				return cr.result, err
 			}

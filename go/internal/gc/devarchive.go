@@ -30,11 +30,14 @@ func DevArchivePath(evolveDir string) string {
 }
 
 func AppendDevArchive(evolveDir string, rec DevArchiveRecord) error {
+	return appendArchiveLine(DevArchivePath(evolveDir), rec.Path, rec)
+}
+
+func appendArchiveLine(path, subject string, rec any) error {
 	line, err := json.Marshal(rec)
 	if err != nil {
-		return fmt.Errorf("gc: encode archive record for %s: %w", rec.Path, err)
+		return fmt.Errorf("gc: encode archive record for %s: %w", subject, err)
 	}
-	path := DevArchivePath(evolveDir)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("gc: create archive dir for %s: %w", path, err)
 	}

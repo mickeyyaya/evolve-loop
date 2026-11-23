@@ -1,6 +1,7 @@
 package gateregistry
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
@@ -82,8 +83,9 @@ var stageSeeds = []stageSeed{
 }
 
 func StageEntries() []gatecontract.Entry {
-	entries := make([]gatecontract.Entry, 0, len(stageSeeds))
-	for _, seed := range stageSeeds {
+	seeds := slices.Concat(stageSeeds, outsideSchemaStageSeeds)
+	entries := make([]gatecontract.Entry, 0, len(seeds))
+	for _, seed := range seeds {
 		entries = append(entries, seed.entry())
 	}
 	return entries

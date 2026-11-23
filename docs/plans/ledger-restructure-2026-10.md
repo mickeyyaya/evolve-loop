@@ -1,5 +1,7 @@
 # Ledger restructure: durable evidence, one reader, segments, incremental verify (plan, 2026-10)
 
+> **Status:** partly built, 2026-11-21 (5 of 13 components on main; C11 in review). Earlier status: approved by the operator on 2026-10-06.
+
 > **Purpose.** This is the living plan to restructure the audit ledger of the loop, `.evolve/ledger.jsonl`. The goal is a ledger that is structured, durable and cheap to read. No agent must ever load it whole.
 > - **Approved:** by the operator on 2026-10-06, in plan mode.
 > - **Evidence:** [`docs/research/ledger-structure-research-2026-10.md`](../research/ledger-structure-research-2026-10.md).
@@ -142,3 +144,23 @@ Status values: ☐ not started · ◐ in progress · ☑ landed (with PR).
 | 2026-10-07 | C12/C13 prerequisite | — | Cycle 1827 built `seal-breaks-live-only-verify-and-carry`: plain `Verify` seeds its walk from the newest segment's last line, and `Seal` appends its anchor before releasing the chain lock. With it, `durable-atomic-write-single-implementation` moved the segment writer onto `atomicwrite.Durable`, which also syncs the segment directory. C12 and C13 stay open. |
 | 2026-10-07 | C1–C5 | #788 | Phase 1 merged as `21d76b914` ("a carry's evidence outlives its cycle worktree"). |
 | 2026-10-27 | C6–C13 | — | The plan audit of 2026-10-27 filed one inbox item for each open component. Each row of section 4 names its item. |
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| C1 | done | [#788](https://github.com/mickeyyaya/evolve-loop/pull/788), [`21d76b9`](https://github.com/mickeyyaya/evolve-loop/commit/21d76b914) | none |
+| C2 | done | [#788](https://github.com/mickeyyaya/evolve-loop/pull/788), [`21d76b9`](https://github.com/mickeyyaya/evolve-loop/commit/21d76b914) | none |
+| C3 | done | [#788](https://github.com/mickeyyaya/evolve-loop/pull/788), [`21d76b9`](https://github.com/mickeyyaya/evolve-loop/commit/21d76b914) | none |
+| C4 | done | [#788](https://github.com/mickeyyaya/evolve-loop/pull/788), [`21d76b9`](https://github.com/mickeyyaya/evolve-loop/commit/21d76b914) | none |
+| C5 | done | [#788](https://github.com/mickeyyaya/evolve-loop/pull/788), [`21d76b9`](https://github.com/mickeyyaya/evolve-loop/commit/21d76b914) | none |
+| C6 | not started | none on main. `skipped_phases` exists only in `go/internal/dossier/dossier.go`, not in the ledger writer. | none (withdrawn 2026-11-13); follow-up draft `ledger-restructure-c6-collapse-phase-skipped` |
+| C7 | not started | none on main | none (withdrawn 2026-11-13); follow-up draft `ledger-restructure-c7-store-artifacts-at-append` |
+| C8 | not started | none on main. `go/internal/ledgerscan/` does not exist. | `ledger-restructure-c8-ledgerscan-one-reader` |
+| C9 | not started | none on main. `evolve ledger query` does not exist. | `ledger-restructure-c9-agent-query-verbs` |
+| C10 | not started | none on main | `ledger-restructure-c10-segment-aware-scan` |
+| C11 | in review | The console has a build in review. A seal line exists in `go/internal/adapters/ledger/seal.go` with no manifest. | `ledger-restructure-c11-seal-manifest` |
+| C12 | not started | The prerequisite landed: [`d1e4fe0`](https://github.com/mickeyyaya/evolve-loop/commit/d1e4fe000) (cycle 1827). Incremental `Verify` is not built. | `ledger-restructure-c12-incremental-verify` |
+| C13 | not started | none on main | none (withdrawn 2026-11-13); follow-up draft `ledger-restructure-c13-boundary-seal` |
+
+Phase 1 is done. Phases 2 to 4 are open. C8 to C12 have open items. C6, C7 and C13 have no open item, because the operator withdrew them in the 2026-11-13 cleanup. Follow-up drafts exist for them. C13 must wait for C12.

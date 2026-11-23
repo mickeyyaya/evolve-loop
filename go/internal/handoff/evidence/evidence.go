@@ -146,6 +146,11 @@ func readLocal(root, rel string) ([]byte, bool) {
 	return body, err == nil
 }
 
+func PredicateName(ref string) string {
+	_, name := splitRef(ref)
+	return name
+}
+
 func splitRef(ref string) (file, name string) {
 	if head, tail, found := cutLast(ref); found {
 		return head, tail

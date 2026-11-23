@@ -31,8 +31,8 @@ func TestBenchOnEscalation_AgyWallScopeFollowsTheDispatchedTier(t *testing.T) {
 	cases := []struct {
 		cli, tier, wantKey string
 	}{
-		{"agy-tmux", "deep", "agy@Gemini 4 Argon"},
-		{"agy-tmux", "top", "agy@Gemini 4 Argon"},
+		{"agy-tmux", "deep", "agy@Gemini 4 Neon"},
+		{"agy-tmux", "top", "agy@Gemini 4 Neon"},
 		{"agy-tmux", "balanced", "agy@Gemini 4 Hydrogen"},
 		{"agy-tmux", "", "agy"},
 		{"agy-tmux", "sonnet", "agy"},
@@ -67,7 +67,7 @@ func TestEscalationFor_TheTierOfTheTryScopesTheAgyWallToItsModelGroup(t *testing
 	bridgechain.BenchOnEscalation(bridgechain.EscalationFor(req, now().Add(-time.Minute)), now, nil)
 
 	active := clihealth.NewStore(root, now).Active()
-	if _, ok := active["agy@Gemini 4 Argon"]; !ok || len(active) != 1 {
-		t.Fatalf("benches %v; an escalation made from a deep agy try must bench only the Argon model group (cycle 1951)", active)
+	if _, ok := active["agy@Gemini 4 Neon"]; !ok || len(active) != 1 {
+		t.Fatalf("benches %v; an escalation made from a deep agy try must bench only the Neon model group (cycle 1951)", active)
 	}
 }

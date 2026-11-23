@@ -23,6 +23,11 @@ func TestAPICover_NamesEveryExportedSymbol(t *testing.T) {
 	if !incidentkb.IsSkipped("REGRESSION-COVERAGE-INDEX.md") || incidentkb.IsSkipped("2026-11-19-sample.md") {
 		t.Errorf("IsSkipped mismatch")
 	}
+	for name, want := range map[string]bool{"2026-11-19-sample.md": true, "2026-11-20-session-log.md": false, "REGRESSION-COVERAGE-INDEX.md": false, "2026-11-19-sample.txt": false} {
+		if incidentkb.IsRecordFile(name) != want {
+			t.Errorf("IsRecordFile(%q) = %v, want %v", name, !want, want)
+		}
+	}
 	if !incidentkb.IsLegacy("2026-11-18-old.md", []byte("# old\n")) || incidentkb.IsLegacy("2026-11-19-new.md", []byte("# new\n")) {
 		t.Errorf("IsLegacy mismatch")
 	}

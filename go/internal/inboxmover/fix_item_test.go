@@ -78,7 +78,7 @@ func TestConsumeFixItem_AFailureNamesTheFixItem(t *testing.T) {
 func TestConsumeFixItem_ReadsTheInboxOfTheOptions(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	inbox := filepath.Join(t.TempDir(), "inbox")
+	inbox := filepath.Join(root, ".evolve", "inbox")
 	pending := seedItemIn(t, inbox, "fix-main-red-abc")
 
 	if err := ConsumeFixItem(Options{ProjectRoot: root, InboxDir: inbox}, "fix-main-red-abc", PromoteOpts{Cycle: "9"}); err != nil {

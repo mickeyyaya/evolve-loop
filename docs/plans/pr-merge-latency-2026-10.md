@@ -1,6 +1,6 @@
 # Plan: a green docs, inbox or CI PR merges in a window, and a code PR merges at a boundary that the console can call early
 
-- **Status:** accepted, 2026-10-20. P2 and P2b are built in stage `off`. P4 and P5 are built. P3 is built. P5b is open. P1 is shelved: ADR-0147 replaces it.
+- **Status:** partly built, 2026-10-21 (5 of 7 rows on main). Earlier status: accepted, 2026-10-20. P2 and P2b are built in stage `off`. P3, P4 and P5 are built. P5b is open, and P1 is shelved: ADR-0147 replaces it.
 - **Decision:** [ADR-0148](../architecture/adr/0148-docs-inbox-and-ci-changes-merge-in-a-window-and-code-merges-at-a-boundary-that-the-console-can-call-early.md). **Research:** [wave-latency-2026-10](../research/wave-latency-2026-10.md) §6 (O1 to O5), [latency-gates-2026-10](../research/latency-gates-2026-10.md). **Design:** [internal-mergewindow.md](../architecture/packages/internal-mergewindow.md).
 - **Operator guide:** [wave-operations.md](../operations/wave-operations.md) §5, [operating-policy.md](../operations/operating-policy.md) §2 item 5.
 
@@ -216,3 +216,18 @@ P2 is verified by tests at 100% coverage of the new code. The tests read the liv
 - Q1: must a change to `CLAUDE.md` or `AGENTS.md` wait for a boundary? If yes, the CI router must route it as non-docs, so the two rules stay one rule.
 - Q2: what is the bound for the early boundary in D6? Answered by P2b: `pr.merge_window.early_boundary_after_s`, compiled default 3600 s (1 h, the median wait of F2).
 - Q3: in D6, is the window of the pool `fleet.count` or `fleet.min_lanes`? Answered by the operator on 2026-10-20: "Combine them to fleet count". The window is `fleet.count`.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| P1 lane ship recovers from an origin move | superseded by [ADR-0147](../architecture/adr/0147-the-wave-orchestrator-owns-integration-and-decides-when-the-wave-reaches-main.md) and [wave-integration](wave-integration-2026-10.md) | none | none |
+| P2 `evolve pr window` and the stage key | done (stage `off`) | [`70a7b5c`](https://github.com/mickeyyaya/evolve-loop/commit/70a7b5c52), [`60c665c`](https://github.com/mickeyyaya/evolve-loop/commit/60c665c58), [`88fd061`](https://github.com/mickeyyaya/evolve-loop/commit/88fd061a2) | none |
+| P2b window merge in a loop and `pr boundary` | done (stage `off`) | [`a1b1a2d`](https://github.com/mickeyyaya/evolve-loop/commit/a1b1a2da4d5e1186e7c0c4a8e6e20421fc26b5d7), [`f89e576`](https://github.com/mickeyyaya/evolve-loop/commit/f89e576d8); `go/internal/mergewindow/earlyboundary.go` | none (consumed) |
+| P3 one file per research-index entry, `pr refresh` | done | [`33db5c7`](https://github.com/mickeyyaya/evolve-loop/commit/33db5c752ff4e375950ff392fa0020aedb376be4) | none (consumed) |
+| P4 keep main green, fix-first item | done | [`b44d004`](https://github.com/mickeyyaya/evolve-loop/commit/b44d0042909f61d54f68e06ee517a5acf6facf49) | none (consumed) |
+| P5 protected route writes a loop stamp | done | [`fc3a77c`](https://github.com/mickeyyaya/evolve-loop/commit/fc3a77c2857941a25512beb9f83fcde14f222d7b) | none (consumed) |
+| P5b escalation reweight stamp | not started | `moverReweight` still calls `inbox edit` (`go/cmd/evolve/cmd_loop_escalate.go:54`) | none: draft `pr-merge-latency-p5b-escalation-reweight-stamp` |
+| Operator item: lane STE check at `enforce` | done | [`07e8099`](https://github.com/mickeyyaya/evolve-loop/commit/07e8099322eac323607d7d5982ab37ea1309e11b) | none (consumed) |
+
+The window stays off. The key `pr.merge_window.stage` is absent in `.evolve/policy.json`, so the default `off` holds, and integration is at `shadow`. The operator step 4 of section 7 waits for the integration `enforce` move. P5b has no open inbox item, so a draft is written. The measures of section 8 (G1 to G4) are not taken: unverified.

@@ -1,6 +1,6 @@
 # Plan: the pipeline files the inbox items that phase agents request
 
-- **Status:** proposed, 2026-11-17.
+- **Status:** partly built, 2026-11-21 (2 of 5 components on main, 1 PR open, 2 not started or unverified). Earlier status: proposed, 2026-11-17.
 - **Research:** the online search of section 2 (P1 to P3). No separate dossier: the facts are local, and the search answers one question.
 - **Related:** [cli-contract.md §4.3](../architecture/cli-contract.md) specifies the request kinds. [llm-isolation.md](../architecture/llm-isolation.md) gives the request channel as built. The incident is [the build agent's inbox-add requests were refused](../incidents/2026-11-17-the-build-agents-inbox-add-requests-were-refused.md) (PR #1545).
 
@@ -145,3 +145,15 @@ What changes our mind: the curator rejects more than half of the items that agen
 ## 10. Open questions
 
 - **Q1.** Does a cycle that fails still keep the items that its agents filed? This plan keeps them: the finding is true even when the cycle fails. The curator reviews each open item at the boundary. C3 adds a test that pins this case.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| C1 the decision signal carries its reason (D8) | done | [#1553](https://github.com/mickeyyaya/evolve-loop/pull/1553), [`0d74ee9`](https://github.com/mickeyyaya/evolve-loop/commit/0d74ee997); `go/internal/agentrequest/record.go:82` | none |
+| C2 an executor for each kind (D1, D6, D13) | done | [#1553](https://github.com/mickeyyaya/evolve-loop/pull/1553), [`0d74ee9`](https://github.com/mickeyyaya/evolve-loop/commit/0d74ee997); `go/internal/agentrequest/executor.go`, `kinds.go`; `KindInboxAdd` in `go/internal/agentclass/table.go:66` | none |
+| C3 the `inbox-add` executor and the shared intake | built, PR open | [#1621](https://github.com/mickeyyaya/evolve-loop/pull/1621); on main only a stub: `inboxAdd.run` refuses with the precondition `intake` (`go/internal/agentrequest/executor.go:44`) | `agent-request-inbox-add-has-no-executor` |
+| C4 severity of each kind and new failed-code text (D7) | not started | none; `go/internal/agentrequest/signals.go:25` still uses WARN for a refused request, and D7 asks for ERROR. It is unverified if #1621 covers it | `agent-request-inbox-add-has-no-executor` |
+| C5 the spec: cli-contract §4.3 and the llm-isolation "As built" rows | not started (unverified) | none found; the cli-contract grep for `inbox_requests` shows no change | none |
+
+The executor frame and the reason on the signal are on main. The intake that files the item is in [#1621](https://github.com/mickeyyaya/evolve-loop/pull/1621). One open item covers C3 and C4. C5 has no open inbox item. A follow-up draft is in `followups/agent-request-inbox-add-spec-c5.json`.

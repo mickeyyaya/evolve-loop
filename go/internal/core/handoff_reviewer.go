@@ -47,8 +47,6 @@ func NewHandoffReviewer(config policy.HandoffConfig, check HandoffChecker) Hando
 	return HandoffReviewer{config: config, check: check}
 }
 
-const handoffOutcomeInvalid = "invalid"
-
 func (r HandoffReviewer) outputTree(ctx context.Context, in ReviewInput) string {
 	if r.tree != nil {
 		return r.tree(in)
@@ -57,11 +55,7 @@ func (r HandoffReviewer) outputTree(ctx context.Context, in ReviewInput) string 
 }
 
 func staleOutputCheck(check handoff.Check, stale string) handoff.Check {
-	if stale == "" {
-		return check
-	}
-	check.Outcome = handoffOutcomeInvalid
-	check.Errors = append(slices.Clone(check.Errors), fmt.Sprintf("output_digest %s is stale: the ledger names an earlier output than the current tree", stale))
+	check.Outcome, check.Errors = handoff.ApplyStale(check.Outcome, check.Errors, stale)
 	return check
 }
 

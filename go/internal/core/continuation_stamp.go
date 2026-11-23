@@ -258,10 +258,34 @@ func (cr *cycleRun) adoptContinuationAfterTriage() error {
 	return nil
 }
 
-func (cr *cycleRun) serveContinuationContext(c *continuation.Continuation, wt string) {
+func (cr *cycleRun) adoptAndSettleAfterTriage() error {
+	if err := cr.adoptContinuationAfterTriage(); err != nil {
+		return err
+	}
+	cr.settleBinding()
+	return nil
+}
+
+func (cr *cycleRun) settleBinding() {
+	if cr.o.bindingSettler == nil {
+		return
+	}
+	c := cr.o.bindingSettler(cr.cycle, cr.cs.WorkspacePath)
+	if c == nil {
+		return
+	}
+	SeedDispositionSkeleton(cr.cs.WorkspacePath, cr.req.ProjectRoot, c.Cycle)
+	cr.serveInheritedFindings(c)
+}
+
+func (cr *cycleRun) serveInheritedFindings(c *continuation.Continuation) {
 	if findings := readContinuationFindings(c.FindingsPath, cr.o.errOut()); findings != "" {
 		cr.ctxSnap["continuation_findings"] = findings
 	}
+}
+
+func (cr *cycleRun) serveContinuationContext(c *continuation.Continuation, wt string) {
+	cr.serveInheritedFindings(c)
 	if first := continuationRepairFirst(c, wt, cr.o.errOut()); first != "" {
 		cr.ctxSnap[CtxKeyContinuationRepairFirst] = first
 	}

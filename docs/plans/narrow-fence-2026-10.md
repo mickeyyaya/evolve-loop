@@ -1,6 +1,6 @@
 # Plan: the loop works its own pipeline items behind a narrow fence and a held landing
 
-- **Status:** proposed, 2026-10-27.
+- **Status:** partly built, 2026-10-27 (5 of 8 components on main, 1 partial, 2 not started). Earlier status: proposed, 2026-10-27.
 - **Design:** [narrow-fence-and-held-proposals](../architecture/narrow-fence-and-held-proposals.md). **Decision:** [ADR-0157](../architecture/adr/0157-the-loop-works-its-own-code-a-narrow-fence-and-held-proposals.md). **Research:** [narrow-fence-2026-10](../research/narrow-fence-2026-10.md).
 
 ## Contents
@@ -135,3 +135,18 @@ The `shadow` record of PR 3 gives the second measure: the count of lane ships th
 
 - **Q1** The class "kernel-loaded instruction" is not in the list of the operator. It keeps the skills, the personas, the schemas and the rule registry that the kernel loads into each agent. The plan keeps them protected. The operator can move them out by a new decision.
 - **Q2** The explanation lifecycle call sites stay protected as a group. A later plan can replace them with pins, as D3 does for the bridge.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| N1 Narrowed manifest with class field | done | [`8a2f0e2`](https://github.com/mickeyyaya/evolve-loop/commit/8a2f0e251522fb4e5f6bce558b421b83fd868c1f), [#1167](https://github.com/mickeyyaya/evolve-loop/pull/1167); test in `go/internal/guards/integrity_surface_gate_files_test.go` | none |
+| N2 Symbol pins of the bridge | done | [`8a2f0e2`](https://github.com/mickeyyaya/evolve-loop/commit/8a2f0e251522fb4e5f6bce558b421b83fd868c1f), [#1167](https://github.com/mickeyyaya/evolve-loop/pull/1167); pins in `go/acs/regression/gatepins/predicates_test.go` | none |
+| N3 Supply proof with fixture items | done | [`8a2f0e2`](https://github.com/mickeyyaya/evolve-loop/commit/8a2f0e251522fb4e5f6bce558b421b83fd868c1f), [#1167](https://github.com/mickeyyaya/evolve-loop/pull/1167); test in `go/internal/orchestrator/supply_narrow_fence_test.go` | none |
+| H1 Policy key and hold decision | done, at `shadow` | [`930749c`](https://github.com/mickeyyaya/evolve-loop/commit/930749c3089a847078cf563dfb2b6366a46772c5), [#1168](https://github.com/mickeyyaya/evolve-loop/pull/1168); package `go/internal/heldproposal` | none |
+| H2 Landing check of the ship | done, at `shadow` | [`930749c`](https://github.com/mickeyyaya/evolve-loop/commit/930749c3089a847078cf563dfb2b6366a46772c5), [#1168](https://github.com/mickeyyaya/evolve-loop/pull/1168) | none |
+| H3 Operator verb, list and wave status line | partial | [`930749c`](https://github.com/mickeyyaya/evolve-loop/commit/930749c3089a847078cf563dfb2b6366a46772c5), [#1168](https://github.com/mickeyyaya/evolve-loop/pull/1168) adds `evolve landing` (`go/cmd/evolve/cmd_landing.go`). The status line of a held item is not built. | `held-proposal-inbox-show-line` |
+| H4 Extra adversarial audit dispatch | not started | No change on main. | `held-proposal-adversarial-audit-dispatch` |
+| H5 Admission of a held item to a lane | not started | No change on main. | `held-proposal-lane-admission` |
+
+H3 is partial, H4 and H5 are not built, and each has an open inbox item. The stage of `held_proposals.stage` is `shadow` in the commit. A move to `enforce` is unverified. Every unfinished component has an open item.

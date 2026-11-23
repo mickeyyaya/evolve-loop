@@ -1,11 +1,11 @@
 # Model currency: every dispatch runs the latest model of its line (2026-10)
 
-> Status: approved by the operator on 2026-10-05. The operator's words: "make sure the model and version will always be checked and point to the latest model".
+> **Status:** built, 2026-11-09 (6 of 6 components on main). Earlier status: approved by the operator on 2026-10-05. The operator's words: "make sure the model and version will always be checked and point to the latest model".
 >
 > - **Decision:** a newer CLI version found at a wave boundary is installed **automatically at that boundary**, smoke-tested, and the catalog is then refreshed.
 > - **Extends:** [model-discovery-and-catalog.md](../architecture/model-discovery-and-catalog.md).
 > - **Decision record:** ADR-0120, which lands with C2.
-> - **C3 status (2026-10-27):** the C3 stage flip that the operator approved landed: the checked-in policy sets `catalog.auto_refresh: true` and `catalog.refresh_stage: enforce`. Two C3 guards landed with it. The boot refresh and the `CONFIG_CATALOG_REFRESH_DEGRADED` Signal Center event landed later (cycle 2176). C2 is not built. Item: `model-currency-c3-adopt-only-live-picks`. See [C3 landing notes](#c3-landing-notes-2026-10-27).
+> - **C3 status (2026-10-27):** the C3 stage flip that the operator approved landed: the checked-in policy sets `catalog.auto_refresh: true` and `catalog.refresh_stage: enforce`. Two C3 guards landed with it. The boot refresh and the `CONFIG_CATALOG_REFRESH_DEGRADED` Signal Center event landed later (cycle 2176). C2 landed later (cycle 2223). Item: `model-currency-c3-adopt-only-live-picks`. See [C3 landing notes](#c3-landing-notes-2026-10-27).
 > - **Note (2026-11-20):** `agy-tmux` now uses `Gemini 4 Hydrogen (Medium)` at `fast`, `Gemini 4 Hydrogen (High)` at `balanced`, and `Gemini 4 Argon (Medium)` at `deep` and `top`. `cli_routing.default` is `claude, agy, agy-claude`, `agents.builder` is `agy, agy-claude, claude`, `tiers.deep` is `claude, agy, agy-claude` (`share_pct` 50), and `tiers.top` is `agy-claude, claude`.
 
 ## Context: why the loop ran Gemini 3.7 Flash while 3.8 was available
@@ -239,3 +239,15 @@ The event is still emitted. The module prefix of the registry makes the event `B
 2. **Other targets.** `agy-tmux` declares a Gemini rule (`go/internal/bridge/manifests/agy-tmux.json`). `claude-tmux` reads the `message.model` of the transcript (`go/internal/tokenusage/scanner.go:131`).
 3. **The floor.** A floor seat routes to agy-claude only after L1c judges the floor by model family. The guard for that day is in place.
 
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| C1 | done | [`0c0e85d`](https://github.com/mickeyyaya/evolve-loop/commit/0c0e85d8e) (2026-10-06) | none |
+| C2 | done | [`555b0e4`](https://github.com/mickeyyaya/evolve-loop/commit/555b0e465) (cycle 2223) | none |
+| C3 | done | [`c5e3797`](https://github.com/mickeyyaya/evolve-loop/commit/c5e379756) (cycle 2176); boot refresh and degraded signal also cycle 2176 | none |
+| C4 | done | [`0bc8cae`](https://github.com/mickeyyaya/evolve-loop/commit/0bc8caed0) (2026-10-06) | none |
+| C5 | done | [`af63f5e`](https://github.com/mickeyyaya/evolve-loop/commit/af63f5e71) (agy-claude slice); [`9c45731`](https://github.com/mickeyyaya/evolve-loop/commit/9c45731d4) (cycles 2195, 2217) | none |
+| C6 | done | [#1404](https://github.com/mickeyyaya/evolve-loop/pull/1404) ([`2267ad5`](https://github.com/mickeyyaya/evolve-loop/commit/2267ad5ca)): the `classifierCLIPreference` literal no longer exists on main. Unverified: the commit subject does not name C6. | none |
+
+All six components are on main. No open inbox item remains. The C3 landing notes still say that C2 is not built. They are history, and the table above is current. ADR-0120 must read as accepted; its status line is not checked.

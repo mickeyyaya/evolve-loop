@@ -51,35 +51,6 @@ func TestHandoffCoverage_AFailedJSONWriteIsReportedOnStderr(t *testing.T) {
 	}
 }
 
-func TestHandoffCoverage_APairWithoutARequestIsAnError(t *testing.T) {
-	t.Parallel()
-	if _, err := buildHandoffRequest(handoffSite{}, 1, "bogus"); err == nil || !strings.Contains(err.Error(), "no request for pair bogus") {
-		t.Fatalf("err = %v, want no request for pair bogus", err)
-	}
-}
-
-func TestHandoffCoverage_TheInboxResolverFindsAnItemByTheLoadersID(t *testing.T) {
-	t.Parallel()
-	p := newHCProject(t)
-	p.write(".evolve/inbox/2026-10-09-real-id.json", `{"id":"real-id"}`)
-	p.write(".evolve/inbox/2026-10-09-surreal-id.json", `{"id":"surreal-id"}`)
-	p.write(".evolve/inbox/2026-07-20-short-name.json", `{"id":"a-longer-recorded-id"}`)
-	p.write(".evolve/inbox/glued-id.json", "{}")
-	resolve := handoffInboxResolver(p.root)
-	tests := map[string]string{
-		"real-id":              filepath.Join(p.root, ".evolve", "inbox", "2026-10-09-real-id.json"),
-		"a-longer-recorded-id": filepath.Join(p.root, ".evolve", "inbox", "2026-07-20-short-name.json"),
-		"missing-id":           "",
-		"d":                    "",
-		"glued-id":             filepath.Join(p.root, ".evolve", "inbox", "glued-id.json"),
-	}
-	for id, want := range tests {
-		if got := resolve(id); got != want {
-			t.Errorf("resolve(%q) = %q, want %q", id, got, want)
-		}
-	}
-}
-
 func TestHandoffCoverage_FailureFileProblemsAreIOErrors(t *testing.T) {
 	t.Parallel()
 	tests := map[string]func(p hcProject){
@@ -103,18 +74,5 @@ func TestHandoffCoverage_FailureFileProblemsAreIOErrors(t *testing.T) {
 				t.Errorf("result = %+v, want outcome error and exit %d", res, handoffExitIO)
 			}
 		})
-	}
-}
-
-func TestHandoffCoverage_AnUnreadablePredicateFileIsNamedInTheSources(t *testing.T) {
-	t.Parallel()
-	p := newHCProject(t)
-	p.write("go/acs/cycle1950/good_test.go", "package x\n")
-	if err := os.Mkdir(filepath.Join(p.root, "go", "acs", "cycle1950", "bad.go"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	got := handoffPredicateSources(p.root, 1950)
-	if got["good_test.go"] != "package x\n" || !strings.HasPrefix(got["bad.go"], "unreadable: ") {
-		t.Errorf("sources = %v, want good_test.go read and bad.go marked unreadable", got)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core/outcome"
@@ -29,8 +30,8 @@ func TestResumeDispatch_NonCanonicalVerdict_RecordsPhaseOutcome(t *testing.T) {
 	if err == nil {
 		t.Fatal("non-canonical verdict from resumeDispatch must return an error")
 	}
-	if len(res.PhasesRun) == 0 || res.PhasesRun[len(res.PhasesRun)-1] != PhaseAudit {
-		t.Errorf("PhasesRun = %v, want trailing %s", res.PhasesRun, PhaseAudit)
+	if want := []Phase{PhaseAudit, PhaseRetro}; !slices.Equal(res.PhasesRun, want) {
+		t.Errorf("PhasesRun = %v, want %v: the audit outcome, then the retrospective", res.PhasesRun, want)
 	}
 	sidecarRaw, err := os.ReadFile(outcome.UsageSidecarPath(ws, string(PhaseAudit)))
 	if err != nil {

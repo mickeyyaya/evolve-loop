@@ -24,7 +24,14 @@
   - `TriageTDD` reads the committed set and the inbox record of each committed id. It makes one ask per acceptance entry, with the inbox source and the verbatim text. It returns `ErrNoCommittedSet` or `ErrUnresolvedItem` when it cannot build the whole request.
   - `TriageTDDFromItems` is the pure part of `TriageTDD`: it takes loaded inbox items.
   - `ForPair` takes a pair name and a `Site` (workspace, worktree, cycle and path resolver) and calls the builder of the pair. It is the one dispatch that the task contract block in `core` and `evolve handoff check` share. It returns `ErrNoRequestForPair` for a pair without a builder.
-  - `TDDBuild` parses the `_test.go` files of an ACS cycle package and makes one ask per predicate. It returns `ErrNoPredicates` for a package without one.
+  - `TDDBuild` parses the `_test.go` files of an ACS cycle package and makes one ask per predicate. It returns `ErrNoPredicates` for a package without one. It returns the same error for a directory that does not exist.
+  - `PairAbsent` is true for `ErrNoCommittedSet` and `ErrNoPredicates`. It is the one home of the skip kinds: a pair with such a request does not exist in the cycle.
+- **Predicate names.** `evidence.PredicateName` returns the text after the last colon of an evidence reference. The audit chain uses it to map an acceptance entry to a `tdd-build` ask.
+- **One evaluator.** `internal/handoff/site` evaluates one pair at a run directory and a tree. `Evaluate` builds the request, reads the ledger, validates it, resolves the evidence and decides the exit. The `evolve handoff` verbs, the H8 reviewer and the audit chain use it.
+  - `Evaluation` tells a pair with no request (`RequestAbsent`) from a pair with a request and no ledger (`LedgerAbsent`). A file that holds only the check record counts as no ledger.
+  - `Site.Stale` turns the outcome into `invalid` (`handoff.ApplyStale`).
+  - `ForPhase` falls back to the project root when the worktree is empty. `InboxResolver` finds an inbox item by its id.
+  - The package imports `core`, so `request` stays below it.
 
 ## Exits
 

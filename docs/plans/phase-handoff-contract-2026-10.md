@@ -1,6 +1,6 @@
 # Plan: every phase handoff is a request, build and check loop with three exits
 
-- **Status:** accepted, 2026-10-18 (the operator asked for the design and for its build through the loop waves).
+- **Status:** partly built, 2026-11-21 (9 of 12 components on main; H10 in review). Earlier status: accepted, 2026-10-18 (the operator asked for the design and for its build through the loop waves).
 - **Research:** [phase-handoff-contract-2026-10](../research/phase-handoff-contract-2026-10.md). **Decision:** [ADR-0141](../architecture/adr/0141-every-phase-handoff-is-a-request-build-check-loop-with-three-exits.md). **Design:** [phase-handoff-contract](../architecture/phase-handoff-contract.md).
 - **Decision numbers:** D1 to D12 of this plan are decisions 1 to 12 of ADR-0141, with the same numbers.
 
@@ -141,7 +141,7 @@ The code that makes and checks ledgers goes in a new package, `go/internal/hando
 | H8 | The handoff reviewer in the reviewer chain, at stage shadow; it writes `handoff-<pair>.json` | a cycle at stage shadow writes the result and keeps its verdict | console (`go/cmd/evolve/cmd_cycle.go`, `go/internal/core`) |
 | H9 | The personas of triage, tdd and build write their ledger; the task contract gives the request to each phase | the tdd prompt holds the request block with ask ids | console (`agents/`, `go/internal/core/task_contract.go`) |
 | H10 | The judge layer: a fidelity judge for each pair, through the bridge, on an independent seat | a judge seat on the same model as its author is refused at stage enforce | console |
-| H11 | The audit chain reads the ledgers; its deterministic links decide at stage enforce | an unmet required ask in a ledger forces the audit to FAIL | console (`go/internal/auditchain`, `go/internal/phases/audit`) |
+| H11 (done) | The audit chain reads the ledgers; its deterministic links decide at stage enforce | an unmet required ask in a ledger forces the audit to FAIL | console (`go/internal/auditchain`, `go/internal/phases/audit`, `go/internal/handoff/site`) |
 | H12 | Move each pair to `enforce`, one at a time, on its shadow evidence; first `triage-tdd` and `tdd-build` | the replay of cycles 1946 and 1950 ends blocked in round 1 | console (policy) |
 
 ## 7. Order
@@ -187,3 +187,22 @@ The order puts the pure code first. Thus lanes build most of the plan, and the c
 1. **The judge seat.** Only the claude and agy families are available. For a claude author, an agy deep seat (Gemini 4 Argon) is another family. For an agy author, a claude deep seat is another family. H10 decides the seat for each pair from the author of the cycle.
 2. **The scout → triage pair.** Its request is the scout selection, and its check is a subset check with no judge. H2 builds it. H12 decides if it needs stage enforce.
 3. **Conformal calibration.** The shadow data of H8 is the calibration set. A later plan decides if it uses that set.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| H1 types and ledger schema | done | cycle 1952, [`c14bd04`](https://github.com/mickeyyaya/evolve-loop/commit/c14bd04e4ec8be3b7e87ba845308d10856081089); `go/internal/handoff/types.go` | none |
+| H2 request builders | done | cycle 1974, [`de5a2b7`](https://github.com/mickeyyaya/evolve-loop/commit/de5a2b7f6df50f0efd11266663a9bba11606d1ce); `go/internal/handoff/request/request.go` | none |
+| H3 evidence resolvers | done | cycle 1968, [`79e2bb5`](https://github.com/mickeyyaya/evolve-loop/commit/79e2bb51e5b6db69ae6c13885484310c3270e6ad); `go/internal/handoff/evidence/evidence.go` | none |
+| H4 exit decision | done | cycle 1969, [`f1ea865`](https://github.com/mickeyyaya/evolve-loop/commit/f1ea865b040b04e86c6f67752ce6e62d7346feb2); `go/internal/handoff/exit/exit.go` | none |
+| H5 blocker proof | done | cycle 1970, [`5e9ebce`](https://github.com/mickeyyaya/evolve-loop/commit/5e9ebcedf51a0e2efa2e5c1a740c5cb8125389a3); `go/internal/handoff/exit/blocker_test.go` | none |
+| H6 policy block | done | cycle 1954, [`549a15b`](https://github.com/mickeyyaya/evolve-loop/commit/549a15b9eda2bc46d4cc40753d89d450c4885336); `go/internal/policy/handoff.go:17` | none |
+| H7 CLI `handoff check` and `handoff show` | done | cycle 1976, [`fa6b21e`](https://github.com/mickeyyaya/evolve-loop/commit/fa6b21ec97215af9a00f921cdf46d88bdfad5fff); `go/cmd/evolve/cmd_handoff.go` | none |
+| H8 reviewer in the chain, stage shadow | done | [`2dc1d4b`](https://github.com/mickeyyaya/evolve-loop/commit/2dc1d4b7a10f1bd88de964b49f48483d681b1a54) (2026-10-20); `go/cmd/evolve/handoff_review_wiring_test.go` | none |
+| H9 persona ledgers and task contract request | done | [#1332](https://github.com/mickeyyaya/evolve-loop/pull/1332), [`bc711a9`](https://github.com/mickeyyaya/evolve-loop/commit/bc711a9faedaf7246b73fd086407c555870255c2) | none |
+| H10 independent judge | in review (build exists, no PR yet) | related: cycle 2515, [`35b489c`](https://github.com/mickeyyaya/evolve-loop/commit/35b489cfb815c9a66f1fc3b9a80e25c2e9388f26) (walker part) | `handoff-h10-independent-judge`; `handoff-judge-one-seat-walker-ac-1b-console` |
+| H11 audit chain reads the ledgers | not started: no ledger reader found in `go/internal/auditchain` | none | `handoff-h11-audit-chain-ledgers` |
+| H12 enforce by pair | not started; `.evolve/policy.json` has no handoff block at stage enforce | none | `handoff-h12-enforce-by-pair` |
+
+H10 is built and in review. H11 and H12 wait on shadow data and on H10. Each has an open inbox item, so no component lacks an item. The G1 to G6 measures have no recorded live result in this review: unverified.

@@ -59,7 +59,10 @@ type ClaimRelease struct {
 }
 
 func SurveyClaims(opts Options) (ClaimSurvey, error) {
-	opts.resolveOpts()
+	opts, err := opts.resolved()
+	if err != nil {
+		return ClaimSurvey{}, err
+	}
 	list, err := lifecycle.ListClaims(opts.InboxDir)
 	if err != nil {
 		return ClaimSurvey{}, err
@@ -86,7 +89,10 @@ func ReleaseClaimKeeping(opts Options, taskID, reason string, keep KeepCopy) (Cl
 }
 
 func releaseJudged(opts Options, taskID, reason string, release claimReleaser) (ClaimRelease, error) {
-	opts.resolveOpts()
+	opts, err := opts.resolved()
+	if err != nil {
+		return ClaimRelease{}, err
+	}
 	taskID, reason = strings.TrimSpace(taskID), strings.TrimSpace(reason)
 	if taskID == "" || reason == "" {
 		return ClaimRelease{}, fmt.Errorf("%w: release requires a task id and a reason", ErrBadArgs)
@@ -106,7 +112,10 @@ func releaseJudged(opts Options, taskID, reason string, release claimReleaser) (
 }
 
 func ReleaseStaleClaims(opts Options, reason string) ([]ClaimRelease, error) {
-	opts.resolveOpts()
+	opts, err := opts.resolved()
+	if err != nil {
+		return nil, err
+	}
 	list, err := lifecycle.ListClaims(opts.InboxDir)
 	if err != nil {
 		return nil, err

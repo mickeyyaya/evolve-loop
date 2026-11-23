@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	argonScopeKey = "agy@Gemini 4 Argon"
+	argonScopeKey = "agy@Gemini 4 Neon"
 	argonWallPane = "Individual quota reached for this model. Resets in 127h38m0s."
 )
 

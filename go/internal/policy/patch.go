@@ -49,6 +49,9 @@ func Parse(raw []byte) (Policy, error) {
 	if err := p.Preflight.validate(); err != nil {
 		return Policy{}, fmt.Errorf("preflight.%w", err)
 	}
+	if err := p.Telemetry.validate(); err != nil {
+		return Policy{}, err
+	}
 	return p, nil
 }
 

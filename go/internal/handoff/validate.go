@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -90,4 +91,12 @@ func IsCheckOnly(raw []byte) bool {
 		}
 	}
 	return true
+}
+
+func ApplyStale(outcome string, errs []string, stale string) (string, []string) {
+	if stale == "" {
+		return outcome, errs
+	}
+	next := append(slices.Clone(errs), fmt.Sprintf("output_digest %s is stale: the ledger names an earlier output than the current tree", stale))
+	return "invalid", next
 }

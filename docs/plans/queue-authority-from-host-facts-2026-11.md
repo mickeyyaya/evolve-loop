@@ -1,6 +1,6 @@
 # Plan: the host lineage record decides what a cycle may do to the inbox queue
 
-- **Status:** proposed, 2026-11-05. PR 1 is built and in review on the branch `feat/one-trust-root-for-the-queue`. PR 2 to PR 4 are not built. No code of this design is on `main`.
+- **Status:** partly built, 2026-11-21 (3 of 10 components done, 3 partial, 4 not started). Earlier status: proposed, 2026-11-05. PR 1 is built and in review on the branch `feat/one-trust-root-for-the-queue`. PR 2 to PR 4 are not built. No code of this design is on `main`.
 - **Operator ruling, 2026-11-06:** D10 and ADR-0126 decision 16 are one count. A charge is one block.
 - **Design:** [queue-trust-root](../architecture/queue-trust-root.md). **Decision:** [ADR-0160](../architecture/adr/0160-the-host-lineage-record-is-the-one-trust-root-for-what-a-cycle-may-do-to-the-queue.md). **Research:** [queue-trust-root-2026-11](../research/queue-trust-root-2026-11.md).
 - **Replaces:** the design of [PR #1290](https://github.com/mickeyyaya/evolve-loop/pull/1290). The terms of this plan (pin, host record, cell, breaker, brake) are defined in the design file.
@@ -229,3 +229,22 @@ The goal of the whole plan: the next review of each PR has 0 CRITICAL findings o
 | Q5 | Does a flip of `isolation.i5.stage` to `enforce` still add value? | Yes, as a second layer. It is not part of this plan. |
 
 **What changes our mind.** If the contract test shows that a cell can write `.evolve/lineage`, the record moves to a path that the sandbox denies. The decision stays. If round 7 finds a new file in a workspace that gives authority, we revisit D1. We then ask if the record itself needs a second writer check. A false brake in two consecutive waves means that the key is too coarse, so the refusal code joins the key.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| K1 record type and `LanePin` | done | PR 1 landed as direct commits: [`caba5fb`](https://github.com/mickeyyaya/evolve-loop/commit/caba5fb88), [`0cbfd3f`](https://github.com/mickeyyaya/evolve-loop/commit/0cbfd3f5f), [`6274bf5`](https://github.com/mickeyyaya/evolve-loop/commit/6274bf52e) (2026-11-06); `go/internal/committedset/lanerecord.go` | none |
+| K2 drift signal on each exit path | dropped (operator, 2026-11-22) | same commits | none: unverified and no failed cycle cited. Old status: partial; `LaneDrift` is on main (`lanerecord.go:116`), and the exit-path wiring (D18) is unverified |
+| K3 deny and contract rows | dropped (operator, 2026-11-22) | none found | none: unverified and no failed cycle cited. Old status: partial and unverified; no `.evolve/lineage` deny was found in the sandbox or guard code |
+| K4 write failure and symlink refusal | not started: no symlink refusal or mode 0444 in `lanerecord.go` | none | none (draft `queue-authority-k4-record-write-failure-and-symlink`) |
+| K5 reference guard | done | `go/internal/committedset/lanepin_reader_guard_test.go`, `lanepin_guard_forms_test.go` (the 8 planted forms); [`6274bf5`](https://github.com/mickeyyaya/evolve-loop/commit/6274bf52e) | none |
+| T1 route at triage | dropped (operator, 2026-11-22) | none specific | none: the D7 rule is unverified and no failed cycle is cited. Old status: partial; `protectedroute.go` predates the plan ([`7e1bf2f`](https://github.com/mickeyyaya/evolve-loop/commit/7e1bf2f57)), and the D7 detection rule is unverified |
+| T2 typed reason | not started: `RouteConsoleRequest` still takes a string `Reason` (`go/internal/cli/inboxcmd/cmd_inbox_route_console.go:44`) | none | none (draft `queue-authority-t2-typed-console-route-reason`) |
+| M1 mover refusal and PASS path | done | cycle 2386, [`af0b776`](https://github.com/mickeyyaya/evolve-loop/commit/af0b77607a5c55553ae2ffe77628619ed1dfdc92); `inboxmover.FilterPromotionScope` used at `go/internal/phases/ship/postship.go:189`; item `promote-inbox-reads-agent-lists-outside-the-lane-pin` | none |
+| B1 breaker | not started: no host-fault disposition for the breaker found | none | none (draft `queue-authority-b1-breaker-charges-prebuild-failures`) |
+| B2 brake | not started: no `prebuild_brake_items` key in the Go code | none; #1290 stays superseded | none (draft `queue-authority-b2-prebuild-brake`) |
+
+The Status line of 2026-11-05 said that no code was on main. That was stale: PR 1 (K1, K5 and part of K2) landed on 2026-11-06, and M1 landed in cycle 2386. ADR-0160 and `queue-trust-root.md` read Proposed, so their status lines look stale.
+
+This review did not change them. K4, T2, B1 and B2 are not built and have no open inbox item. Four drafts are ready. The operator dropped K2, K3 and T1 on 2026-11-22.

@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/handoff"
@@ -128,5 +129,21 @@ func TestRequestDigest_TracksEveryField(t *testing.T) {
 func TestRequestDigest_EqualRequestsShareADigest(t *testing.T) {
 	if twoAskRequest().Digest() != twoAskRequest().Digest() {
 		t.Error("two equal requests produced different digests")
+	}
+}
+
+func TestApplyStale_ForcesInvalidAndNamesTheStaleDigest(t *testing.T) {
+	t.Parallel()
+	outcome, errs := handoff.ApplyStale("pass", []string{"e1"}, "")
+	if outcome != "pass" || len(errs) != 1 {
+		t.Fatalf("an empty stale digest must change nothing, got %q %v", outcome, errs)
+	}
+	input := []string{"e1"}
+	outcome, errs = handoff.ApplyStale("pass", input, "sha256:old")
+	if outcome != "invalid" || len(errs) != 2 || errs[0] != "e1" || !strings.Contains(errs[1], "sha256:old is stale") {
+		t.Fatalf("got %q %v", outcome, errs)
+	}
+	if len(input) != 1 {
+		t.Error("the input slice must not be mutated")
 	}
 }

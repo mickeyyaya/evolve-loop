@@ -38,7 +38,8 @@
     "tier_pins": {
       "agy": {
         "fast": "Gemini 4 Hydrogen (Medium)",
-        "balanced": "Gemini 4 Hydrogen (High)"
+        "balanced": "Gemini 4 Hydrogen (High)",
+        "top": "Gemini 4 Neon (XHigh)"
       }
     }
   },

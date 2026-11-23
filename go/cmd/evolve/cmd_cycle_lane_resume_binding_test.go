@@ -70,7 +70,7 @@ func TestLaneResume_ABindingWhoseAncestorLeftNoLedgerIsReleasedAndTheGateDoesNot
 	if err != nil {
 		t.Fatal(err)
 	}
-	if body, _ := os.ReadFile(loc.Path); !strings.Contains(string(body), "lane-resume-cycle-2109") {
+	if body, _ := os.ReadFile(loc.Path); !strings.Contains(string(body), "lane-resume-cycle-2109") || !strings.Contains(string(body), "runtime (lane resume)") {
 		t.Errorf("item = %s; want the release recorded with its reason", body)
 	}
 	if !strings.Contains(stderr.String(), "RELEASED the binding of item-a to cycle-2092") {
@@ -83,9 +83,9 @@ func TestScopeBinding_AFailedReleaseFallsBackToRecordingTheBinding(t *testing.T)
 	p := seedPausedLane(t, "item-a", 2109)
 	c := p.bind(t, "item-a", 2092)
 	var stderr bytes.Buffer
-	b := scopeBinding{projectRoot: p.root, stderr: &stderr, release: func(inboxmover.ReleaseRequest) (bool, error) { return false, errors.New("boom") }}
+	b := scopeBinding{projectRoot: p.root, origin: core.BindingOriginLaneResume, stderr: &stderr, release: func(inboxmover.ReleaseRequest) (bool, error) { return false, errors.New("boom") }}
 
-	b.settle(2109)
+	b.settle(2109, paths.RunWorkspace(p.root, 2109))
 
 	if m, ok, _ := continuation.ReadManifest(paths.RunWorkspace(p.root, 2109)); !ok || m.Cycle != c.Cycle {
 		t.Fatalf("manifest = %+v, %v; want the binding recorded after the failed release", m, ok)

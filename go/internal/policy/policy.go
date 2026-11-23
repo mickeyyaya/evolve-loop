@@ -85,4 +85,5 @@ type Policy struct {
 	ExpectedSignal     *ExpectedSignalPolicy     `json:"expected_signal,omitempty"`
 	WaveLatency        *WaveLatencyPolicy        `json:"wave_latency,omitempty"`
 	Incident           *IncidentPolicy           `json:"incident,omitempty"`
+	Telemetry          *TelemetryPolicy          `json:"telemetry,omitempty"`
 }

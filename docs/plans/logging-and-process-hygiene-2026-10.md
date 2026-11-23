@@ -1,6 +1,6 @@
 # Logging and process hygiene (2026-10)
 
-> **Status:** approved by the operator on 2026-10-08. Lanes H1 (log retention) and H2 (dispatch process hygiene) run at the same time. H3 to H5 come later.
+> **Status:** partly built, 2026-11-21 (H1, H2 on main; H3 partial; H4 and H5 not started). Earlier status: approved by the operator on 2026-10-08. Lanes H1 (log retention) and H2 (dispatch process hygiene) run at the same time. H3 to H5 come later.
 >
 > **Research:** [logging-and-process-cleanup-2026-10.md](../research/logging-and-process-cleanup-2026-10.md) (findings F1.1 to F6.8, refinements R1 to R21).
 >
@@ -240,3 +240,18 @@ The other review items are in the inbox item `log-retention-followups`.
 - The kubelet renames the live file and tells the runtime to open a new file (F2.5). This works only when the writer can open the file again.
 - The detached loop holds its log open for its full life. It cannot open the file again. A rename of the live file does not stop the growth, because the writer continues to write to the renamed file.
 - H1 does not rename a live file. Each launch gets a new file in a new dir, and only symlinks change. The one rename moves a legacy regular file, and only when no run is live (`runlease.LiveRuns`), after `loop-stop --wait`.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| H1: log catalog, loop log per run, gc catalog rule, K1, K3 to K6 | done | [#817](https://github.com/mickeyyaya/evolve-loop/pull/817), [`8a0662e`](https://github.com/mickeyyaya/evolve-loop/commit/8a0662ed3) | none |
+| H1 review follow-ups (`log-retention-followups`) | not started | none | `log-retention-followups` |
+| K7: drop the duplicate pane capture | partial: the copies stay on purpose (section 10.6) | none | none |
+| H2: K8 to K11, dispatch tag, reap and gc backstop | done | [#817](https://github.com/mickeyyaya/evolve-loop/pull/817), [`1df58d2`](https://github.com/mickeyyaya/evolve-loop/commit/1df58d24d); see [dispatch-process-hygiene-2026-10.md](dispatch-process-hygiene-2026-10.md) | none |
+| H3: K2 selection keys and the writer factory | partial: the factory (`go/internal/log/selection.go`) is on main; `WithSelection` has no production caller | cycle 2057, [`38eba6c`](https://github.com/mickeyyaya/evolve-loop/commit/38eba6c48) | none (draft `logging-hygiene-h3-writers-use-factory`) |
+| H4: K12, K13, `evolve logs` and `log_access` in shadow | not started: no `logs` verb and no `log_access` field on main | none | none (draft `logging-hygiene-h4-logs-reader`) |
+| H5: enforce `log_access` | not started; blocked by H4 | none | none (draft `logging-hygiene-h5-enforce-log-access`) |
+| H5 part: STE for Go strings (S10) | done in the STE plan | cycle `ste100-docs-rewrite-s10-go-log-text-rewrite`, [`1e2e9d6`](https://github.com/mickeyyaya/evolve-loop/commit/1e2e9d642) | none |
+
+The row for H2 in section 8 cites commit `2e5af9988` as the merge of H2. That commit is a later fix of PR [#1103](https://github.com/mickeyyaya/evolve-loop/pull/1103) (D23); the H2 commit is `1df58d2`. Three components are unfinished and have no open inbox item: the rest of H3, H4 and H5. The items `logging-hygiene-h4-logs-reader` and `logging-hygiene-h5-enforce-log-access` that section 8 names were never filed. Drafts exist for all three. The item `logging-hygiene-h3-selection-keys` was consumed by cycle 2057 although only the factory landed.

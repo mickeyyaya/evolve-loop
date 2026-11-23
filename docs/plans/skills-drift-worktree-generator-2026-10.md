@@ -1,6 +1,6 @@
 # Plan: the skills-drift gate grades a generator change with the worktree's own generator
 
-- **Status:** implemented in the console lane `cl-skills-drift`, opened 2026-10-09.
+- **Status:** built, 2026-10-09 ([#821](https://github.com/mickeyyaya/evolve-loop/pull/821)). The trigger (D1 to D3) is superseded by [skills-drift-host-stamp-2026-10.md](skills-drift-host-stamp-2026-10.md); residuals (a), (d) and (e) are not built. Earlier status: implemented in the console lane `cl-skills-drift`, opened 2026-10-09.
 - **Tracked item:** `skills-drift-gate-grades-with-worktree-generator` (`.evolve/inbox`, created 2026-10-07).
 - **Halt item:** `pipeline-defect-infra-systemic-cycle1840`. The console lands it separately.
 - **Lessons:** `inst-L1828a`, `inst-L1840a`.
@@ -77,3 +77,19 @@ Unit tests (no tag) pin the decision (`changesSkillsGenerator`), the report pars
   - (d) The worktree run does not emit a Signal Center event when it cannot run. The `ciparitygate` `stepFailed` seam is the model.
   - (e) The context of the worktree run is not tied to the cycle, because the `PhaseRequest` seam carries no context.
   - (f) The rule "an empty base means a diff from HEAD" has a second home: `floorBase` in `core/comment_floor.go`, which also adds `--no-renames`. `ChangedWorktreePathsSinceBase` must be its one home.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| Worktree run of `evolve skills check` in the gate (D4 to D8) | done | [#821](https://github.com/mickeyyaya/evolve-loop/pull/821), [`96cda0f`](https://github.com/mickeyyaya/evolve-loop/commit/96cda0f9e); `go/internal/phases/audit/skillsdrift.go` on main | none |
+| Trigger on a changed generator path (D1 to D3) | superseded by [skills-drift-host-stamp-2026-10.md](skills-drift-host-stamp-2026-10.md) | [#822](https://github.com/mickeyyaya/evolve-loop/pull/822), [`10d0c1d`](https://github.com/mickeyyaya/evolve-loop/commit/10d0c1d39) | none |
+| Host check after a clean worktree check (D9) | done | [#821](https://github.com/mickeyyaya/evolve-loop/pull/821), [`96cda0f`](https://github.com/mickeyyaya/evolve-loop/commit/96cda0f9e) | none |
+| Red-first tests (section 4) | done | [#821](https://github.com/mickeyyaya/evolve-loop/pull/821); three were changed in #822 | none |
+| Halt item `pipeline-defect-infra-systemic-cycle1840` | done (item is in `consumed/`) | unverified: no landing commit was traced | none |
+| Residual (a): the host owns the comparison (a render verb) | not started | no `skills render` verb exists on main | `skills-drift-gate-render-verb` (draft) |
+| Residuals (d) and (e): signal event, run context | not started | none | `skills-drift-gate-render-verb` (draft) |
+| Residuals (b) and (f): widen the trigger, one home for the empty-base rule | superseded for (b) by #822; (f) unverified | [#822](https://github.com/mickeyyaya/evolve-loop/pull/822) | none |
+| Residual (c): one registry for the generator prefix | dropped (operator, 2026-11-22) | none | none: `ssotPrefix` is no longer in `go/`, so the text is stale. Old status: unverified; the text may be stale |
+
+The gate is built and on main, and the trigger is replaced by the host-stamp plan. Residuals (a), (d) and (e) are unfinished. Their item `skills-drift-gate-generator-dependency-closure` was deleted in [`e81715d`](https://github.com/mickeyyaya/evolve-loop/commit/e81715d3e) without a build. No open inbox item covers them now. A draft item, `skills-drift-gate-render-verb`, is ready for filing.

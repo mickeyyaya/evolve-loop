@@ -1,6 +1,7 @@
 # Plan: the host writes a retrospective document for each recovery and each judgment lesson
 
-- **Status:** accepted. C1 to C3 are on `main` at stage `shadow`, and on 2026-10-27 the operator moved the stage to `enforce`. C4 is built: the policy key, the pending dir and the boundary publish. C5 is built: `closeoutCarryover` retires a judgment todo when its document is on `main`. The checked-in policy sets `enforce`, so the closeout writes into the pending dir and the boundary publish commits the pairs. C6 is open and has an inbox item (section 6).
+- **Status:** built, 2026-11-20.
+- **Earlier status:** accepted. C1 to C3 are on `main` at stage `shadow`, and on 2026-10-27 the operator moved the stage to `enforce`. C4 is built: the policy key, the pending dir and the boundary publish. C5 is built: `closeoutCarryover` retires a judgment todo when its document is on `main`. The checked-in policy sets `enforce`, so the closeout writes into the pending dir and the boundary publish commits the pairs. C6 is open and has an inbox item (section 6).
 - **Design:** [recovery-retrospective.md](../architecture/recovery-retrospective.md). **Decision:** [ADR-0151](../architecture/adr/0151-the-host-writes-a-retrospective-document-for-each-recovery-and-each-judgment-lesson.md). **Research:** [recovery-retrospective-2026-10.md](../research/recovery-retrospective-2026-10.md).
 - **Package note:** [internal-recoveryretro.md](../architecture/packages/internal-recoveryretro.md).
 
@@ -176,3 +177,17 @@ Each new and changed function has 100% measured coverage. The PR body has the ta
 
 - **Q1 (operator, decided 2026-10-27):** when does the stage move to `enforce`? The operator approved the move to `enforce` on 2026-10-27. The first recommendation was to wait for five recovery documents at `shadow`.
 - **Q2 (decided, C5):** a judgment todo keeps its long retention until its document lands. `RetireDocumentedJudgments` removes it once `docs/retrospectives/<id>.md` is on `main`, because a TTL alone drops a lesson that has no document.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| C1 `Recoveries` and `RenderRecovery` | done, at `enforce` | [`ab68e22`](https://github.com/mickeyyaya/evolve-loop/commit/ab68e22739d6bf49f0f4013503371a3bba227b12) | none |
+| C2 `JudgmentLessons` and `LessonYAML` | done, at `enforce` | [`ab68e22`](https://github.com/mickeyyaya/evolve-loop/commit/ab68e22739d6bf49f0f4013503371a3bba227b12) | none |
+| C3 `WriteShadow` at the cycle closeout | done | [`ab68e22`](https://github.com/mickeyyaya/evolve-loop/commit/ab68e22739d6bf49f0f4013503371a3bba227b12) | none |
+| C4 Stage key, pending dir and boundary publish | done | [`5af8b25`](https://github.com/mickeyyaya/evolve-loop/commit/5af8b255dbc4db8b88bee6abad6cf4cd3a3bce5f) (cycle 2266) | none |
+| C5 Judgment-todo retirement | done | [`79f39ba`](https://github.com/mickeyyaya/evolve-loop/commit/79f39ba00be9326cb507301076b8557a3a564c2a) (cycle 2555) | none |
+| C6 `docs/retrospectives/` as a recall root | done | [`85a5416`](https://github.com/mickeyyaya/evolve-loop/commit/85a54168239047f6b427339800d20a256dafa2f6) (cycle 2137); `go/internal/research/kb.go:58` | none |
+
+All six components are on main. The Status line of 2026-10-27 said that C6 was open. Cycle 2137 consumed its item on 2026-11-04. No component is left, and no follow-up is needed.
+

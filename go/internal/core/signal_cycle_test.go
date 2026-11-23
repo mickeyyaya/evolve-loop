@@ -173,3 +173,22 @@ func TestAbnormalEpilogue_AbnormalExitSealsTheCycleAsFAILWithTheAbortReason(t *t
 		t.Errorf("a normal completion emits nothing from the epilogue: %+v", *got)
 	}
 }
+
+func TestEmitLaneBindingSettled_NamesTheOriginAndNotTheResume(t *testing.T) {
+	t.Parallel()
+	c, got := recordingCenter()
+
+	var origin BindingOrigin = BindingOriginFreshStart
+	EmitLaneBindingSettled(c, BindingSettlement{Cycle: 2109, Ancestor: 2092, ScopeID: "item-a", Action: "recorded", Standing: "owed", Origin: origin})
+
+	if len(*got) != 1 {
+		t.Fatalf("events = %d, want 1", len(*got))
+	}
+	e := (*got)[0]
+	if !strings.Contains(e.Reason, "before its audit") || strings.Contains(e.Reason, "before its resume") {
+		t.Errorf("reason = %q; want it to say before its audit", e.Reason)
+	}
+	if e.Fields["origin"] != "fresh-start" {
+		t.Errorf("fields = %v; want origin fresh-start", e.Fields)
+	}
+}

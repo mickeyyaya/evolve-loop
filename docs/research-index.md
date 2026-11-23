@@ -905,10 +905,34 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [plans/wave-checkin-verb-2026-11.md](plans/wave-checkin-verb-2026-11.md) | Plan for `evolve wave checkin`. A pure evaluator reads a snapshot of the wave records and gives CONTINUE, BRAKE or FIX-LOCAL. The plan scores three designs and closes the gaps A3, A4 and the ship rate of the check-in SOP. It shows that three SOP thresholds give BRAKE on the healthy wave 184. |
 
+## 2026-11-22 — Finish the partly built features, closest to done first
+
+| Document | What it records |
+|---|---|
+| [plans/feature-finish-line-2026-11.md](plans/feature-finish-line-2026-11.md) | Plan: a queue of the 52 plans with open pieces, in the order closest to done first. It holds the five kinds of an open piece, the wave sets, the switch list and the orphan list. The operator decisions of 2026-11-22 put the shadow-contract chain K2 to K5 first and approved the 14 orphans. |
+
 ## 2026-11-22 — Sealed shadow evidence and a protected contract (K2 and K4)
 
 | Document | What it records |
 |---|---|
 | [plans/shadow-contract-k2-k4-2026-11.md](plans/shadow-contract-k2-k4-2026-11.md) | Plan (PR #1674): the design of K2, the evidence seal, and of K4 and K4b, the protected contract and its migration. It compares three axes of candidates, sets decisions D1 to D18 and orders the chain K2, K4, K3, K5. |
+
+## 2026-11-22 — A stage flips to enforce on a green shadow record (K5)
+
+| Document | What it records |
+|---|---|
+| [plans/shadow-contract-k5-stage-flip-2026-11.md](plans/shadow-contract-k5-stage-flip-2026-11.md) | Plan: the design of K5. A green key flips at a wave boundary with no operator step. It sets the green rule, the enforce-path proof, the ship class, the rollback and the build order. |
+
+## 2026-11-23 — One verb lands a console change and refuses on a skipped step
+
+| Document | What it records |
+|---|---|
+| [plans/console-land-verb-2026-11.md](plans/console-land-verb-2026-11.md) | Plan for `evolve pr submit`. It runs the steps B5 to B7 of the console check-in SOP in order and refuses on a skipped or stale step. It reuses the evaluator pattern of `wave checkin` and leaves `evolve land` unchanged. The plan scores four designs and finds that `record-pr` already waits for the host head, so the verb adds only a local head compare. |
+
+## 2026-11-23 — gc re-packs full-history salvage bundles with no loss
+
+| Document | What it records |
+|---|---|
+| [plans/gc-salvage-scope-2026-11.md](plans/gc-salvage-scope-2026-11.md) | Plan for `evolve gc --only salvage`. A survey shows 144 full-history bundles that hold 150.7 GiB. The plan scores three designs and builds the K6 migration of the recycle plan. It also closes the last full-history writer. |
 
 <!-- GENERATED:research-index END -->

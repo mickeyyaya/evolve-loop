@@ -1,6 +1,7 @@
 # Plan: `evolve cover changed`, a gate that refuses a changed function below 100%
 
-- **Status:** built, 2026-10-11, in lane `cl-cover-changed` (branch `fix/cover-changed-gate`). Fix round 1 (2026-10-12) applied the review decisions. CI enforces the gate. The loop build floor runs it at stage `shadow`.
+- **Status:** built, 2026-10-18 (the verb on main 2026-10-12; the loop floor enforces since 2026-10-18; the commit-gate lane of D2 is not built).
+  - Earlier status: built, 2026-10-11, in lane `cl-cover-changed` (branch `fix/cover-changed-gate`). Fix round 1 (2026-10-12) applied the review decisions. CI enforces the gate. The loop build floor runs it at stage `shadow`.
 - **Package notes:** [internal-covchanged.md](../architecture/packages/internal-covchanged.md).
 - **Operator text:** [runtime-reference.md](../operations/runtime-reference.md) and [go/docs/testing.md](../../go/docs/testing.md).
 
@@ -120,3 +121,21 @@ Move `cover_changed.stage` to `enforce` only when all of these are true:
 
 - **Q1. The commit-gate lane (D2).** It is the next item.
 - **Q2. A gap that a lane did not make.** A lane that touches an old function with a gap must backfill it. Watch the number of CI refusals of this kind in the first week.
+
+## Delivery status (2026-11-21)
+
+| Component | Status | Change lists | Open item |
+|---|---|---|---|
+| Diff parser `ParseDiff` | done | [`300c7cf`](https://github.com/mickeyyaya/evolve-loop/commit/300c7cfeb) | none |
+| Profile parser | done | [`300c7cf`](https://github.com/mickeyyaya/evolve-loop/commit/300c7cfeb) | none |
+| `Measure` | done | [`300c7cf`](https://github.com/mickeyyaya/evolve-loop/commit/300c7cfeb) | none |
+| `Judge` and `Verdict` | done | [`300c7cf`](https://github.com/mickeyyaya/evolve-loop/commit/300c7cfeb) | none |
+| `Workspace.Check` | done | [`300c7cf`](https://github.com/mickeyyaya/evolve-loop/commit/300c7cfeb); base-red fix, item `cover-changed-subtracts-base-red`, [#1580](https://github.com/mickeyyaya/evolve-loop/pull/1580) | none |
+| Verb `evolve cover changed` | done | [`300c7cf`](https://github.com/mickeyyaya/evolve-loop/commit/300c7cfeb) | none |
+| `make cover-changed` | done | [`300c7cf`](https://github.com/mickeyyaya/evolve-loop/commit/300c7cfeb) | none |
+| CI step in `go.yml` | done | [`300c7cf`](https://github.com/mickeyyaya/evolve-loop/commit/300c7cfeb) | none |
+| Loop build floor and `cover_changed` policy key | done; stage default is `enforce` (`go/internal/policy/budgets_recovery.go:233`) | [`f66e987`](https://github.com/mickeyyaya/evolve-loop/commit/f66e987a6), item `cycle-ship-enforces-cover-changed` | none (item consumed) |
+| Commit-gate Go lane (D2, Q1) | not started; no `covchanged` use in `go/internal/commitgate` | none | none |
+| Section 8 condition M4: one test run feeds floor checks | dropped (operator, 2026-11-22) | none | none: no evidence of the condition and no failure cited. Old status: unverified; no evidence found |
+
+The verb, the make target, the CI step and the loop floor are on main. The floor stage is now `enforce`, as the operator decided on 2026-10-27. The commit-gate lane (D2, Q1) is not built and has no open inbox item. A follow-up draft exists: `commit-gate-go-lane-runs-cover-changed`. The operator dropped the M4 condition of section 8 on 2026-11-22.

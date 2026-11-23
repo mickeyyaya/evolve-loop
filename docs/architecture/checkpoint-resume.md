@@ -107,6 +107,31 @@ Two tests guard the concurrent resume (`go/cmd/evolve/cmd_cycle_resume_concurren
 
 The test calls `laneResume.adopt` in goroutines, not `laneResume.run`. `run` sets the state file of the cycle in the process environment, which is safe only because each production lane is its own process. Two lanes that adopt the same scope are not covered here; that case is the run lease (PR #1256).
 
+## Failure of a resumed phase
+
+A resumed cycle follows the failure path of a fresh cycle. The fresh loop calls the same helper through `cycleRun.failPhase`. Each failing end of the resume loop calls `Orchestrator.failPhase` (`go/internal/core/failure_learning.go`). `failPhase` records the phase outcome, and then calls `recordFailureLearning`. The retrospective runs one time, and the failure digest names the class of the failure.
+
+These ends learn, as the fresh path does:
+
+- The typed end: a blocker end or a `resumedRejection` of the floor. The error is wrapped as a cycle-level failure.
+- A dispatch error. The end writes the phase failure diagnostic, asks the failure adviser, and notes a login wall.
+- A non-canonical verdict. The end writes the phase failure diagnostic.
+- An untyped error of the review gate.
+- An abort of the Build explanation refresh.
+
+The ends of a dispatch error, a non-canonical verdict, an untyped review error and a refresh abort return an error with no cycle-level wrapper. A refresh abort that is not about content must stop the batch, and `cmd_loop_sequential_dispatch.go` stops the batch only for an error that is not cycle-level.
+
+These ends do not learn, because the fresh path does not learn there:
+
+- No runner is registered for the phase.
+- The ledger append fails.
+- A quota wall pauses the cycle. `gateParkDeferred` defers the learning to the resume.
+- The context is canceled.
+
+Regression evidence: `TestRunCycleFromPhase_AnUntypedResumedEndRunsTheRetrospective`, `TestRunCycleFromPhase_AResumedEndThatTheFreshPathDoesNotLearnFromDispatchesNoRetrospective` and `TestRunCycleFromPhase_AResumedRefreshAbortRunsTheRetrospectiveAndStaysRaw`.
+
+The resumed loop still has no counterpart of `maybeRemediate`, of `buildGraduationCheck` and of the post-review tree-diff check. Routing the resumed loop through the dispatch code of the fresh path is open work.
+
 ## Terminal closeout
 
 Fresh and resumed execution use the same closeout semantics: final outcome reconciliation, lost-landing detection, preservation of salvageable work, carryover, and dossier creation. Terminal replay must not double-count outcomes or delete preserved work before durable state exists. Exhausting a transition bound is a diagnosed failure, not successful completion.
