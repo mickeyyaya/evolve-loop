@@ -11,7 +11,8 @@
 - **Linux sources.** `/proc/stat` gives the CPU ticks and `procs_running`. `/proc/meminfo` gives the memory: used is `MemTotal` minus `MemAvailable`, and swap is `SwapTotal` minus `SwapFree`. `/proc/diskstats` gives `io_ticks` of the whole disks `sd*`, `vd*`, `xvd*`, `nvme*n*` and `mmcblk*`. The parsers take text and `readLinux` takes the root directory, so tests use a fixture directory.
 - **macOS sources.** No cgo. `source_darwin.go` runs `vm_stat` (used is active plus wired plus compressor pages) and `sysctl -n vm.swapusage`, through `sysexec.Command`. Each tool has a deadline of 800 ms, which is shorter than the default interval.
 - **Shared parsers.** `ParseMeminfo`, `ParseVMStat` and `ParseSwapUsage` live in [internal/hostpressure](internal-hostpressure.md). `linux.go` and `macos.go` call them, so the sampler and the fleet admission controller read the host in one way. Their tests and the real-output fixtures are in that package.
-- **macOS gaps.** The parsers take text. macOS has no `cpu_busy_pct`, no `runqueue` and no `disk_busy_pct`. The design names `host_statistics` for the CPU, and that Mach call needs cgo. The design names no other CPU source for macOS, so the field is absent.
+- **macOS CPU.** `source_darwin.go` starts one `iostat -w 1` child through `sysexec.Command` (`iostat.go`). A reader goroutine parses each line: `cpu_busy_pct` is 100 minus the `id` column, which is the 4th field from the end, limited to 0-100. The feed stores the value and the time of the line. A record has no `cpu_busy_pct` when the last line is older than 2 s (`cpuLineMaxAge`), so a stalled `iostat` never serves an old value. If `iostat` does not start, records have no CPU, and the sampler writes one line to stderr that names the start error. When the stream ends, the feed writes one line to stderr that names the scan error and the close error (each is `<nil>` when there is none). The close error joins the pipe close error and the exit status of the child. After the end, records omit `cpu_busy_pct` once the last line is older than 2 s. The Mach call `host_statistics` needs cgo, so it is not used.
+- **macOS gaps.** macOS has no `runqueue` and no `disk_busy_pct`.
 - **`compute`.** `cpu_busy_pct` is the change of busy ticks over the change of all ticks between two readings. `disk_busy_pct` is the change of `io_ticks` over the elapsed time, averaged over the disks and capped at 100. A counter that goes back gives 0.
 - **`run` is the seam.** `main` passes the real source and a SIGTERM and SIGINT channel. Tests pass a fake reader and a fake stop channel. `-duration` ends a run without a signal.
 - **A failed tick.** On macOS, a failed tool skips its field for that tick and the sampler goes on. On Linux, the loop prints the error on stderr and goes on. A failed first reading, an open error, a write error or a close error gives exit code 1.
@@ -27,6 +28,8 @@
 
 - The CI step keeps no pid file, because nothing stops the sampler.
 - No file in this command needs cgo, so `CGO_ENABLED=0` builds all of it.
-- If the design adds a macOS CPU source that needs no cgo, add it in `source_darwin.go` and set `HasCPU`.
+- The freshness limit is 2 s, not one interval, because `iostat` and the ticker both run at 1 s and their phase drifts. A limit of one interval would drop records at random.
+- In the CI workflow the sampler step starts the sampler with `> /dev/null 2>&1`, so these two lines are discarded in CI. A local run shows them on the terminal. To keep them in CI, the operator redirects stderr of the sampler step to a log file.
+- The `iostat` child ends with the sampler: its next write to a closed pipe stops it.
 
 Design: [ci-telemetry-and-critical-path §6](../ci-telemetry-and-critical-path.md#6-level-4-the-runner-sampler). Plan: component C0b of [ci-wall-time-2026-10](../../plans/ci-wall-time-2026-10.md).
