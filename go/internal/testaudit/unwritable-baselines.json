@@ -742,11 +742,6 @@
     },
     {
       "package": "internal/adapters/bridge",
-      "test": "TestSetModelCatalogDirFn",
-      "rule": "no-assertion"
-    },
-    {
-      "package": "internal/adapters/bridge",
       "test": "TestValidate_ProjectsTheHostRule",
       "rule": "error-text-match"
     },
@@ -814,11 +809,6 @@
       "package": "internal/adapters/ledger",
       "test": "TestEvidenceSlotProves_AcceptsOnlyADiffThatReDerivesItsPatchIDAndDigestF2",
       "rule": "error-text-match"
-    },
-    {
-      "package": "internal/adapters/ledger",
-      "test": "TestHelperLedgerAppender",
-      "rule": "no-assertion"
     },
     {
       "package": "internal/adapters/ledger",
@@ -1009,11 +999,6 @@
       "package": "internal/baseattr",
       "test": "TestRunIn_ARunErrorNamesTheTreeAndTheLimit",
       "rule": "error-text-match"
-    },
-    {
-      "package": "internal/binaryguard",
-      "test": "TestOffender_RecordsPathAndSize",
-      "rule": "asserts-own-setup"
     },
     {
       "package": "internal/binaryguard",
@@ -1486,26 +1471,6 @@
       "rule": "error-text-match"
     },
     {
-      "package": "internal/phaseintegrity",
-      "test": "TestNamePublicAPI_Repin",
-      "rule": "asserts-own-setup"
-    },
-    {
-      "package": "internal/phaseintegrity",
-      "test": "TestNamePublicAPI_RepinIfDrifted",
-      "rule": "no-assertion"
-    },
-    {
-      "package": "internal/phaseintegrity",
-      "test": "TestSource_ImplementsDigestSource",
-      "rule": "no-assertion"
-    },
-    {
-      "package": "internal/phaseintegrity",
-      "test": "TestSource_TreeSHA_RealGitWorktree",
-      "rule": "skip-hides-error"
-    },
-    {
       "package": "internal/phases/audit/ciparitygate",
       "test": "TestApicoverNamed_EveryExportIsNamedAndExercised",
       "rule": "error-text-match"
@@ -1519,11 +1484,6 @@
       "package": "internal/phases/audit/ciparitygate",
       "test": "TestSignals_NullObjectLiveAccessorAndStreamGolden",
       "rule": "error-text-match"
-    },
-    {
-      "package": "internal/phases/runner/verdict",
-      "test": "TestDispatch_HasExactlyTheDeclaredFields",
-      "rule": "asserts-own-setup"
     },
     {
       "package": "internal/phases/runner/verdict",
