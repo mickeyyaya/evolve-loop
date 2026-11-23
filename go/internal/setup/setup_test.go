@@ -96,8 +96,8 @@ func TestTierModelsFor(t *testing.T) {
 	wantAgy := map[string]string{
 		"fast":     "Gemini 4 Hydrogen (Medium)",
 		"balanced": "Gemini 4 Hydrogen (High)",
-		"deep":     "Gemini 4 Argon (Medium)",
-		"top":      "Gemini 4 Argon (Medium)",
+		"deep":     "Gemini 4 Neon (High)",
+		"top":      "Gemini 4 Neon (XHigh)",
 	}
 	for tier, m := range wantAgy {
 		if agy[tier] != m {

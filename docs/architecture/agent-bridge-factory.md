@@ -4,7 +4,7 @@
 >
 > Status: accepted (2026-10-17). Component F1 is built (2026-10-17): `bridge.Resolve` and `bridge.DriverSet` exist.
 >
-> **Note (2026-11-20):** `agy-tmux` serves `Gemini 4 Hydrogen` at `fast` and `balanced`, and `Gemini 4 Argon (Medium)` at `deep` and `top`. Current `cli_routing` chains are in [model-routing](../reference/model-routing.md).
+> **Note (2026-11-20):** `agy-tmux` serves `Gemini 4 Hydrogen` at `fast` and `balanced`, `Gemini 4 Neon (High)` at `deep` and `Gemini 4 Neon (XHigh)` at `top` (operator, 2026-11-21). Current `cli_routing` chains are in [model-routing](../reference/model-routing.md).
 >
 > This file is the spec of record for how every caller reaches an LLM CLI. The dispatch rules stay in [agent-bridge-dispatch-contract](agent-bridge-dispatch-contract.md).
 
