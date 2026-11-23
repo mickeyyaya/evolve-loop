@@ -165,7 +165,7 @@ func verifyClass(ctx context.Context, opts *Options, res *RunResult) error {
 }
 
 func verifyManualConfirm(ctx context.Context, opts *Options, res *RunResult) error {
-	exitCode, err := opts.run(ctx, "git", stageArgs(ctx), io.Discard, opts.Stderr)
+	exitCode, err := stageManualSet(ctx, opts)
 	if err != nil || exitCode != 0 {
 		return shipErr(core.CodeGitIO, core.ShipClassTransient, core.StageVerifyClass,
 			fmt.Sprintf("ship: git add -A failed (rc=%d): %v", exitCode, err),
