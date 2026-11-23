@@ -20,6 +20,13 @@ The native adoption sequence is now:
 5. Persist the effective review base and continuation manifest before further
    phase dispatch. Preserve the ancestor snapshot and any seeded work on failure.
 
+When adoption is declined or cannot apply, the settle step releases or records
+the registry binding before the audit. The declined path releases its binding
+under its own rule (`releaseDeclinedBinding`). That rule is separate from the
+settle step. A binding that the declined path cannot release is settled by the
+settle step. See
+[Registry lifecycle](continuation-defect-ledger.md#registry-lifecycle-record-or-release-at-lane-resume-2026-11-04).
+
 The wave controller remains responsible for synchronizing local main before
 launching lanes. A moving ref cannot change the recorded adoption base after its
 SHA is resolved. A raced merge conflict is aborted and surfaced through the native

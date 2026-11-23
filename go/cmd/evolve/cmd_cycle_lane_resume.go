@@ -97,7 +97,7 @@ func (l laneResume) adopt() *core.ResumePoint {
 		l.unlease(rp)
 		return nil
 	}
-	l.binding().settle(rp.CycleID)
+	l.binding().settle(rp.CycleID, paths.RunWorkspace(l.projectRoot, rp.CycleID))
 	rp.AutoAttempts = cp.AutoResumeAttempts
 	core.EmitLaneResumed(l.signals, rp, l.scope)
 	fmt.Fprintf(l.stderr, "evolve cycle run: lane %s resumes cycle %d at phase %s (auto-resume %d of %d)\n", name, rp.CycleID, rp.Phase, rp.AutoAttempts, rp.AutoMaxAttempts)
@@ -166,6 +166,7 @@ func (l laneResume) inboxDir() string {
 
 type scopeBinding struct {
 	projectRoot string
+	origin      core.BindingOrigin
 	stderr      io.Writer
 	signals     *signalcenter.Center
 	release     func(inboxmover.ReleaseRequest) (bool, error)
@@ -180,32 +181,42 @@ type pendingBinding struct {
 }
 
 func (l laneResume) binding() scopeBinding {
-	opts := inboxmover.Options{ProjectRoot: l.projectRoot, InboxDir: l.inboxDir(), Stderr: l.stderr, Signals: l.signals}
-	return scopeBinding{projectRoot: l.projectRoot, stderr: l.stderr, signals: l.signals, release: func(req inboxmover.ReleaseRequest) (bool, error) {
-		req.By = "runtime (lane resume)"
+	return newScopeBinding(l.projectRoot, l.evolveDir, l.stderr, l.signals, core.BindingOriginLaneResume)
+}
+
+func freshBindingSettler(projectRoot, evolveDir string, stderr io.Writer, signals *signalcenter.Center) func(int, string) *continuation.Continuation {
+	return newScopeBinding(projectRoot, evolveDir, stderr, signals, core.BindingOriginFreshStart).settle
+}
+
+func newScopeBinding(projectRoot, evolveDir string, stderr io.Writer, signals *signalcenter.Center, origin core.BindingOrigin) scopeBinding {
+	opts := inboxmover.Options{ProjectRoot: projectRoot, InboxDir: filepath.Join(evolveDir, "inbox"), Stderr: stderr, Signals: signals}
+	return scopeBinding{projectRoot: projectRoot, origin: origin, stderr: stderr, signals: signals, release: func(req inboxmover.ReleaseRequest) (bool, error) {
+		req.By = "runtime (" + strings.ReplaceAll(string(origin), "-", " ") + ")"
 		_, released, err := inboxmover.ReleaseContinuationBindingFor(opts, req)
 		return released, err
 	}}
 }
 
-func (b scopeBinding) settle(cycle int) {
-	ws := paths.RunWorkspace(b.projectRoot, cycle)
+func (b scopeBinding) settle(cycle int, ws string) *continuation.Continuation {
 	if _, has, err := continuation.ReadManifest(ws); err != nil || has {
-		return
+		return nil
 	}
 	ids := core.LaneScopeIDs(ws)
 	for range ids {
 		id, c, ok := defectledger.FirstBinding(b.projectRoot, ids)
 		if !ok || c.Cycle == cycle {
-			return
+			return nil
 		}
 		p := pendingBinding{ws: ws, cycle: cycle, id: id, c: c}
 		p.standing = b.standing(p)
 		if p.standing != standingAbsent && p.standing != standingSettled || !b.releaseBinding(p) {
-			b.recordBinding(p)
-			return
+			if b.recordBinding(p) {
+				return &p.c
+			}
+			return nil
 		}
 	}
+	return nil
 }
 
 const (
@@ -234,7 +245,7 @@ func (b scopeBinding) standing(p pendingBinding) string {
 }
 
 func (b scopeBinding) releaseBinding(p pendingBinding) bool {
-	reason := fmt.Sprintf("lane-resume-cycle-%d: ancestor cycle-%d owes no defect (ledger %s) and the resumed cycle supersedes its snapshot", p.cycle, p.c.Cycle, p.standing)
+	reason := fmt.Sprintf("%s-cycle-%d: ancestor cycle-%d owes no defect (ledger %s) and the cycle supersedes its snapshot", b.origin, p.cycle, p.c.Cycle, p.standing)
 	released, err := b.release(inboxmover.ReleaseRequest{ScopeID: p.id, Cycle: p.c.Cycle, Reason: reason})
 	if err != nil || !released {
 		fmt.Fprintf(b.stderr, "evolve cycle run: cycle %d cannot release the binding of %s to cycle-%d (released %v, err %v); it records the binding\n", p.cycle, p.id, p.c.Cycle, released, err)
@@ -245,15 +256,16 @@ func (b scopeBinding) releaseBinding(p pendingBinding) bool {
 	return true
 }
 
-func (b scopeBinding) recordBinding(p pendingBinding) {
+func (b scopeBinding) recordBinding(p pendingBinding) bool {
 	if err := continuation.WriteManifest(p.ws, p.c); err != nil {
 		fmt.Fprintf(b.stderr, "evolve cycle run: cycle %d cannot record the binding of %s to cycle-%d in its manifest (%v); the defect-ledger gate blocks the audit\n", p.cycle, p.id, p.c.Cycle, err)
-		return
+		return false
 	}
-	fmt.Fprintf(b.stderr, "evolve cycle run: cycle %d RECORDED the binding of %s to cycle-%d in its manifest before its resume\n", p.cycle, p.id, p.c.Cycle)
+	fmt.Fprintf(b.stderr, "evolve cycle run: cycle %d RECORDED the binding of %s to cycle-%d in its manifest before its audit\n", p.cycle, p.id, p.c.Cycle)
 	b.settled(p, "recorded")
+	return true
 }
 
 func (b scopeBinding) settled(p pendingBinding, action string) {
-	core.EmitLaneBindingSettled(b.signals, core.BindingSettlement{Cycle: p.cycle, Ancestor: p.c.Cycle, ScopeID: p.id, Action: action, Standing: p.standing})
+	core.EmitLaneBindingSettled(b.signals, core.BindingSettlement{Cycle: p.cycle, Ancestor: p.c.Cycle, ScopeID: p.id, Action: action, Standing: p.standing, Origin: b.origin})
 }

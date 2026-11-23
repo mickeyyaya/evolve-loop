@@ -218,10 +218,10 @@ func TestScopeBinding_AFailedReleaseEmitsOnlyTheRecordedEvent(t *testing.T) {
 			actions = append(actions, e.Fields["action"])
 		}
 	})
-	b := scopeBinding{projectRoot: p.root, stderr: &bytes.Buffer{}, signals: signals,
+	b := scopeBinding{projectRoot: p.root, origin: core.BindingOriginLaneResume, stderr: &bytes.Buffer{}, signals: signals,
 		release: func(inboxmover.ReleaseRequest) (bool, error) { return false, errors.New("boom") }}
 
-	b.settle(2109)
+	b.settle(2109, paths.RunWorkspace(p.root, 2109))
 
 	if len(actions) != 1 || actions[0] != "recorded" {
 		t.Fatalf("actions = %v; want exactly one recorded event after a failed release", actions)
@@ -279,9 +279,9 @@ func TestScopeBinding_AReleaseThatDeletesNothingRecordsTheBinding(t *testing.T) 
 	p := seedPausedLane(t, "item-a", 2109)
 	c := p.bind(t, "item-a", 2092)
 	var stderr bytes.Buffer
-	b := scopeBinding{projectRoot: p.root, stderr: &stderr, release: func(inboxmover.ReleaseRequest) (bool, error) { return false, nil }}
+	b := scopeBinding{projectRoot: p.root, origin: core.BindingOriginLaneResume, stderr: &stderr, release: func(inboxmover.ReleaseRequest) (bool, error) { return false, nil }}
 
-	b.settle(2109)
+	b.settle(2109, paths.RunWorkspace(p.root, 2109))
 
 	if m, ok, _ := continuation.ReadManifest(paths.RunWorkspace(p.root, 2109)); !ok || m != c {
 		t.Fatalf("manifest = %+v, %v; want the binding recorded after a release that deleted nothing", m, ok)
@@ -296,9 +296,9 @@ func TestScopeBinding_TheReleaseNamesTheCycleItCheckedSoARebindIsNotReleased(t *
 	p := seedPausedLane(t, "item-a", 2109)
 	p.bind(t, "item-a", 2092)
 	var got inboxmover.ReleaseRequest
-	b := scopeBinding{projectRoot: p.root, stderr: &bytes.Buffer{}, release: func(r inboxmover.ReleaseRequest) (bool, error) { got = r; return false, nil }}
+	b := scopeBinding{projectRoot: p.root, origin: core.BindingOriginLaneResume, stderr: &bytes.Buffer{}, release: func(r inboxmover.ReleaseRequest) (bool, error) { got = r; return false, nil }}
 
-	b.settle(2109)
+	b.settle(2109, paths.RunWorkspace(p.root, 2109))
 
 	if got.ScopeID != "item-a" || got.Cycle != 2092 {
 		t.Fatalf("release request = %+v; want item-a pinned to the checked cycle 2092", got)

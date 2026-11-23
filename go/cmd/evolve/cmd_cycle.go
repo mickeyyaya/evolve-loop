@@ -668,7 +668,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	opts = append(opts, core.WithFailureClassReader(failureClassReader(projectRoot)))
 	opts = append(opts, core.WithScopePathResolver(scopePathResolver))
 	opts = append(opts, core.WithContinuationResolver(continuationForScope))
-	opts = append(opts, core.WithContinuationShedder(hostContinuationShedder(signals)))
+	opts = append(opts, core.WithContinuationShedder(hostContinuationShedder(signals)), core.WithBindingSettler(freshBindingSettler(projectRoot, evolveDir, console, signals)))
 	opts = append(opts, core.WithWorkflowConfig(wfCfg))
 	opts = append(opts, core.WithChronicleConfig(pol.ChronicleConfig()))
 	if fp, err := pol.FailurePolicyConfig(); err == nil {

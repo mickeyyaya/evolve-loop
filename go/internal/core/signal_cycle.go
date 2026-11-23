@@ -25,7 +25,7 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeQuotaPaused, "the dispatch ended at a wall with at least one family on quota, or no recorded cause. The cycle pauses at the named phase and stays resumable. A wall of only login or other causes does not emit this code")
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeLaneDeferred, "a fleet lane failed to provision its worktree (after fetch retries and one re-provision) and exited 5 as DEFERRED. Claims release unbumped with no digest, learning, or retro. lane_deferral_halt_ceiling consecutive deferrals halt the batch (LOOP_PIPELINE_BLOCKER_HALT rule lane-deferrals). fields.step=worktree, cause")
 	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeLaneResumed, "a fleet lane found its todo's last cycle paused at a wall and resumed it at the paused phase. The dispatch chain picks the first healthy family. Resume uses the checkpoint auto-resume budget; INFO. Fields: fields.scope, phase, attempts, max_attempts")
-	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeLaneBindingSettled, "a resumed lane cycle held no manifest while the root registry bound its scope to an older cycle. Runtime settled the binding before the resumed phase: action=released drops it, action=recorded writes it to the manifest. standing is absent, settled, owed, unreadable, or newer. Release with standing=absent drops an unproven debt (trace event, WARN). Fields: fields.scope_id, ancestor_cycle, action, standing")
+	signalcenter.RegisterCode(signalcenter.ModuleOrchestrator, CodeLaneBindingSettled, "a lane cycle held no manifest while the root registry bound its scope to an older cycle. Runtime settled the binding before the audit, at a lane resume or after the triage adoption of a fresh cycle: action=released drops it, action=recorded writes it to the manifest. standing is absent, settled, owed, unreadable, or newer. Release with standing=absent drops an unproven debt (trace event, WARN). Fields: fields.scope_id, ancestor_cycle, action, standing, origin ("+string(BindingOriginLaneResume)+" or "+string(BindingOriginFreshStart)+")")
 }
 
 func (o *Orchestrator) signalRunID() string {
@@ -100,16 +100,24 @@ func EmitLaneResumed(signals *signalcenter.Center, rp *ResumePoint, scope []stri
 	})
 }
 
+type BindingOrigin string
+
+const (
+	BindingOriginLaneResume BindingOrigin = "lane-resume"
+	BindingOriginFreshStart BindingOrigin = "fresh-start"
+)
+
 type BindingSettlement struct {
 	Cycle, Ancestor           int
 	ScopeID, Action, Standing string
+	Origin                    BindingOrigin
 }
 
 func EmitLaneBindingSettled(signals *signalcenter.Center, s BindingSettlement) {
 	signals.Emit(signalcenter.Event{
 		Cycle: s.Cycle, Module: signalcenter.ModuleOrchestrator, Origin: "core.EmitLaneBindingSettled",
 		Kind: signalcenter.KindLoopWave, Severity: signalcenter.SeverityWarn, Code: CodeLaneBindingSettled,
-		Reason: "cycle " + strconv.Itoa(s.Cycle) + " " + s.Action + " the binding of " + s.ScopeID + " to cycle-" + strconv.Itoa(s.Ancestor) + " before its resume (ancestor ledger " + s.Standing + ")",
-		Fields: map[string]string{"scope_id": s.ScopeID, "ancestor_cycle": strconv.Itoa(s.Ancestor), "action": s.Action, "standing": s.Standing},
+		Reason: "cycle " + strconv.Itoa(s.Cycle) + " " + s.Action + " the binding of " + s.ScopeID + " to cycle-" + strconv.Itoa(s.Ancestor) + " before its audit (ancestor ledger " + s.Standing + ")",
+		Fields: map[string]string{"scope_id": s.ScopeID, "ancestor_cycle": strconv.Itoa(s.Ancestor), "action": s.Action, "standing": s.Standing, "origin": string(s.Origin)},
 	})
 }

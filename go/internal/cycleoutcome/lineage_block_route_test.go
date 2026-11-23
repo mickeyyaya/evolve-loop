@@ -66,6 +66,9 @@ func TestFailureInputsFor_TheCodeOfAMissingManifestBlockMovesAnAuditFailToASyste
 	if in.Refusal != string(defectledger.CodeManifestMissing) || !in.SystemLevel {
 		t.Fatalf("inputs = refusal %q, system %v; want the refusal marker and the system level to reach the failure closeout", in.Refusal, in.SystemLevel)
 	}
+	if in.RefusalSubject != "item-a" {
+		t.Errorf("refusal subject = %q; want the scope id of the binding", in.RefusalSubject)
+	}
 	if cyclestate.RefusalDisposition(in.Refusal) != (cyclestate.Disposition{}) {
 		t.Errorf("disposition of %s = %+v; want none until one is added for it", in.Refusal, cyclestate.RefusalDisposition(in.Refusal))
 	}
