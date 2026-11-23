@@ -64,7 +64,7 @@ func TestRun_PredicatesSeeNoLaneIPCEnvironment(t *testing.T) {
 	}
 	for _, raw := range envs {
 		env := effectiveEnv(raw)
-		if got, want := evolveKeys(env), []string{"EVOLVE_PROJECT_ROOT", ipcenv.WorktreeRootKey}; strings.Join(got, ",") != strings.Join(want, ",") {
+		if got, want := evolveKeys(env), []string{ipcenv.ACSLaneEndKey, "EVOLVE_PROJECT_ROOT", ipcenv.WorktreeRootKey}; strings.Join(got, ",") != strings.Join(want, ",") {
 			t.Fatalf("predicate EVOLVE_ keys = %v, want exactly the suite's own %v (the lane's fleet, scope, width, cycle-state and tmux keys must not reach a predicate)", got, want)
 		}
 		if env["EVOLVE_PROJECT_ROOT"] != plane || env[ipcenv.WorktreeRootKey] != root {

@@ -18,6 +18,17 @@ func writePredicateDir(t *testing.T, src string) string {
 
 func lintDir(t *testing.T, src string) []FlakyFinding {
 	t.Helper()
+	var shapes []FlakyFinding
+	for _, f := range lintDirAll(t, src) {
+		if f.Class != FlakyClassUnboundedSubprocess {
+			shapes = append(shapes, f)
+		}
+	}
+	return shapes
+}
+
+func lintDirAll(t *testing.T, src string) []FlakyFinding {
+	t.Helper()
 	var report FlakyLintReport
 	report, err := LintFlakyPredicates(writePredicateDir(t, src))
 	if err != nil {
@@ -596,6 +607,24 @@ func TestC9999_GitViaHelper(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestC9999_GitViaDirHelper(t *testing.T) {
+	if _, _, _, err := acsassert.SubprocessOutputIn(".", "git", "status", "--porcelain"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestC9999_GoTestSweepViaDirHelper(t *testing.T) {
+	if _, _, code, _ := acsassert.SubprocessOutputIn(".", "go", "test", "./internal/core"); code != 0 {
+		t.Fatal(code)
+	}
+}
+
+func TestC9999_LoadGenViaDirHelper(t *testing.T) {
+	if _, _, _, err := acsassert.SubprocessOutputIn(".", "yes"); err != nil {
+		t.Fatal(err)
+	}
+}
 `
 
 func TestLintFlaky_AcsassertSubprocessOutputIsAnExecConstructor(t *testing.T) {
@@ -607,13 +636,19 @@ func TestLintFlaky_AcsassertSubprocessOutputIsAnExecConstructor(t *testing.T) {
 	if _, ok := findingFor(fs, "TestC9999_GoTestSweepViaHelper", "internal/core"); !ok {
 		t.Errorf("a go TEST through the house helper must still flag the known-slow suite; got %+v", fs)
 	}
-	if f, ok := findingFor(fs, "TestC9999_LoadGenViaHelper", "unreaped load-generation"); !ok {
-		t.Errorf("the house helper binds no context, so its load-gen is un-reaped; got %+v", fs)
-	} else if f.Class != FlakyClassResourceLeak {
-		t.Errorf("load-gen Class=%q, want %q", f.Class, FlakyClassResourceLeak)
+	for _, name := range []string{"TestC9999_LoadGenViaHelper", "TestC9999_LoadGenViaDirHelper"} {
+		if f, ok := findingFor(fs, name, "unreaped load-generation"); ok {
+			t.Errorf("%s: the house helper binds a context, so its load-gen is reaped; got %+v", name, f)
+		}
 	}
 	if _, ok := findingFor(fs, "TestC9999_GitViaHelper", "-C"); !ok {
 		t.Errorf("git through the house helper is still cwd-dependent; got %+v", fs)
+	}
+	if f, ok := findingFor(fs, "TestC9999_GitViaDirHelper", "-C"); ok {
+		t.Errorf("git through the dir helper runs in the given directory; got %+v", f)
+	}
+	if _, ok := findingFor(fs, "TestC9999_GoTestSweepViaDirHelper", "internal/core"); !ok {
+		t.Errorf("a go TEST through the dir helper must flag the known-slow suite; got %+v", fs)
 	}
 }
 
@@ -794,5 +829,50 @@ func TestLintFlaky_NarrowedPlusWideSameSuite_StillFlagged(t *testing.T) {
 	fs := lintDir(t, runNarrowedAndWideSrc)
 	if _, ok := findingFor(fs, "TestC9999_NarrowedThenWide", "internal/core"); !ok {
 		t.Errorf("one wide invocation must keep the known-slow finding; got %+v", fs)
+	}
+}
+
+const unboundedSubprocessSrc = `//go:build acs
+
+package cycle9999
+
+import (
+	"os/exec"
+	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
+)
+
+func TestC9999_RawGoRun(t *testing.T) {
+	if err := exec.Command("go", "run", "./cmd/x").Run(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestC9999_BoundedGoRun(t *testing.T) {
+	if _, _, code, _ := acsassert.SubprocessOutput("go", "run", "./cmd/x"); code != 0 {
+		t.Fatal(code)
+	}
+}
+
+func TestC9999_BoundedDirGoRun(t *testing.T) {
+	if _, _, code, _ := acsassert.SubprocessOutputIn(".", "go", "run", "./cmd/x"); code != 0 {
+		t.Fatal(code)
+	}
+}
+`
+
+func TestLintFlaky_ASubprocessStartedOutsideAcsassertIsFlagged(t *testing.T) {
+	findings := lintDirAll(t, unboundedSubprocessSrc)
+
+	raw, flagged := findingFor(findings, "TestC9999_RawGoRun", "outside acsassert")
+	if !flagged || raw.Class != FlakyClassUnboundedSubprocess {
+		t.Errorf("raw exec.Command flagged=%v class=%q, want a %q finding naming acsassert", flagged, raw.Class, FlakyClassUnboundedSubprocess)
+	}
+	if bounded, flagged := findingFor(findings, "TestC9999_BoundedGoRun", "outside acsassert"); flagged {
+		t.Errorf("acsassert.SubprocessOutput is the allowed shape, got %+v", bounded)
+	}
+	if bounded, flagged := findingFor(findings, "TestC9999_BoundedDirGoRun", "outside acsassert"); flagged {
+		t.Errorf("acsassert.SubprocessOutputIn is the allowed shape, got %+v", bounded)
 	}
 }

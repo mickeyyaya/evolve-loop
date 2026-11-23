@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 )
@@ -409,5 +410,66 @@ func TestHolder_ReadsTheLiveWidthLikeCurrent(t *testing.T) {
 	}
 	if got := Current(); got != 7 {
 		t.Errorf("Current() at live width 2 = %d, want 7", got)
+	}
+}
+
+func TestArgs_AGoTestBehindGlobalFlagsGetsTheBudgetAfterTest(t *testing.T) {
+	inLane(t, 14, "4")
+	got := Args([]string{"-C", "dir", "test", "-count=1", "./x"})
+	want := []string{"-C", "dir", "test", "-p", "3", "-parallel", "3", "-count=1", "./x"}
+	if !slices.Equal(got, want) {
+		t.Errorf("Args = %q, want %q", got, want)
+	}
+}
+
+func TestWithTimeout_InsertsTheTimeoutAfterTheTestSubcommand(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		in, want []string
+	}{
+		{"plain", []string{"test", "-count=1", "./x"}, []string{"test", "-timeout", "2m42s", "-count=1", "./x"}},
+		{"global_flags", []string{"-C", "dir", "test", "./x"}, []string{"-C", "dir", "test", "-timeout", "2m42s", "./x"}},
+		{"test_dash_C_stays_first", []string{"test", "-C", "dir", "./x"}, []string{"test", "-C", "dir", "-timeout", "2m42s", "./x"}},
+		{"test_dash_C_equals_stays_first", []string{"test", "-C=dir", "./x"}, []string{"test", "-C=dir", "-timeout", "2m42s", "./x"}},
+		{"test_alone", []string{"test"}, []string{"test", "-timeout", "2m42s"}},
+		{"test_dash_C_without_a_value", []string{"test", "-C"}, []string{"test", "-timeout", "2m42s", "-C"}},
+		{"caller_timeout", []string{"test", "-timeout=9s", "./x"}, []string{"test", "-timeout=9s", "./x"}},
+		{"caller_timeout_spaced", []string{"test", "-timeout", "9s", "./x"}, []string{"test", "-timeout", "9s", "./x"}},
+		{"not_go_test", []string{"vet", "./x"}, []string{"vet", "./x"}},
+		{"flag_value_named_test", []string{"-C", "test", "build"}, []string{"-C", "test", "build"}},
+		{"empty", nil, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := WithTimeout(tc.in, 162*time.Second); !slices.Equal(got, tc.want) {
+				t.Errorf("WithTimeout(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestWithTimeout_ABoundBelowOneMillisecondWritesNoTimeout(t *testing.T) {
+	in := []string{"test", "./x"}
+	for _, timeout := range []time.Duration{0, 999 * time.Microsecond, -time.Second} {
+		if got := WithTimeout(in, timeout); !slices.Equal(got, in) {
+			t.Errorf("WithTimeout(%v) = %q, want the argv unchanged: -timeout 0s turns the inner timeout off", timeout, got)
+		}
+	}
+}
+
+func TestWithTimeout_NeverWritesIntoTheCallersArray(t *testing.T) {
+	in := make([]string, 2, 8)
+	copy(in, []string{"test", "./x"})
+	_ = WithTimeout(in, time.Minute)
+	if got := in[:cap(in)][2]; got != "" {
+		t.Errorf("WithTimeout wrote %q past the caller's slice", got)
+	}
+}
+
+func TestArgs_ADashCAfterTestStaysTheFirstFlag(t *testing.T) {
+	inLane(t, 14, "4")
+	got := Args([]string{"test", "-C", "dir", "./x"})
+	want := []string{"test", "-C", "dir", "-p", "3", "-parallel", "3", "./x"}
+	if !slices.Equal(got, want) {
+		t.Errorf("Args = %q, want %q", got, want)
 	}
 }

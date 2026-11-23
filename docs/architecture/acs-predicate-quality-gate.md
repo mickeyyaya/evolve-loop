@@ -104,7 +104,7 @@ jq '.predicate_quality.summary' .evolve/runs/cycle-N/acs-verdict.json
 
 Layers 1–4 ask *"does this predicate assert real behavior?"*. Layer 5 asks the orthogonal question *"will this predicate assert it **reliably**?"* A behavioral predicate can still be a false-red generator. Cycles 1173/1175/1178 each FAILed on a predicate that shelled a whole-package `go test`. The un-reaped `yes` load generators of a reproducer burned 8 cores for 9 hours across batches 18–21.
 
-**Implementation:** `internal/evalqualitycheck.LintFlakyPredicates` — a deterministic `go/ast` lint over the cycle's predicate sources. Five patterns, each annotated with its [Luo et al. FSE'14](https://doi.org/10.1145/2635868.2635920) flakiness-taxonomy class:
+**Implementation:** `internal/evalqualitycheck.LintFlakyPredicates` — a deterministic `go/ast` lint over the cycle's predicate sources. Six patterns, each annotated with its [Luo et al. FSE'14](https://doi.org/10.1145/2635868.2635920) flakiness-taxonomy class:
 
 | # | Pattern | Class | Sanctioned shape |
 |---|---|---|---|
@@ -113,6 +113,7 @@ Layers 1–4 ask *"does this predicate assert real behavior?"*. Layer 5 asks the
 | 3 | hardcoded PID < 100000 in a liveness check (`syscall.Kill`, `os.FindProcess`, `kill -0`, `/proc/<pid>`) | environment | discover at runtime (`os.Getpid`, pidfile, `pgrep`) |
 | 4 | subprocess `git` without `-C` and without `cmd.Dir` | environment | `git -C <dir>`, `cmd.Dir`, or `cd` first in `sh -c` |
 | 5 | un-reaped load generation (`yes`/`stress`/shell busy loop through `exec.Command`) | resource-leak | `exec.CommandContext` + `WaitDelay` |
+| 6 | subprocess started outside `acsassert` (any raw `exec.Command` or `exec.CommandContext`). A hang there spends the whole Go lane. | unbounded-subprocess | `acsassert.SubprocessOutput` or `acsassert.GoTests` |
 
 **Gate hook — where it actually runs.** `internal/evalgate.flakyShapeGate` (Gate D) is composed into `evalgate.NewReviewer`. The per-phase `core.DeliverableReviewer` seam of the orchestrator (`core.WithReviewer`) dispatches it **at the end of the `tdd` phase**. This is the first moment that `go/acs/cycle<N>/predicates_test.go` exists. It is one phase *before* the build tokens that a flaky predicate later wastes. This is the Go-native successor to the bash `gate_build_to_audit` hook that Layer 2 describes.
 
@@ -207,7 +208,7 @@ A predicate that proves "these Go tests ran and passed" used to run `go test -v`
 - a pattern made of `^Name$` and `^(A|B)$` terms, joined by `|`, names exact tests, and `Names` must list each one;
 - events of other packages are ignored, because `go test`'s own exit code already reports them.
 
-The caller's test deadline bounds the subprocess. `GoTests` refuses a call that breaks the exact-name rule before it runs `go test`. Without this rule, a name outside `Names` is never checked, and a deleted test passes.
+One bound rule covers `GoTests` and `SubprocessOutput`: the earliest of the caller's test deadline, the lane end and the cap `subprocessCap` ([pkg-acsassert](packages/pkg-acsassert.md)). `GoTests` refuses a call that breaks the exact-name rule before it runs `go test`. Without this rule, a name outside `Names` is never checked, and a deleted test passes.
 
 Four negative controls are pinned in the tests of `pkg/acsassert`. They are printed `--- PASS:` text, an exact-name prefix collision, a post-`m.Run()` `os.Exit` and an omitted exact pattern name. Cycles 1013 and 1015 were the first predicates that used `GoTests`. On 2026-10-18, 14 files call it and 360 packages run tests by name. The next section covers the packages that do not call it.
 

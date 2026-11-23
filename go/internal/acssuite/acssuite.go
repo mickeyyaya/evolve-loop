@@ -230,6 +230,7 @@ type predicateExports struct {
 	sourceRoot   string
 	changedPkgs  []string
 	operatorKeys []string
+	laneEnd      time.Time
 }
 
 func predicateEnv(x predicateExports) []string {
@@ -240,6 +241,9 @@ func predicateEnv(x predicateExports) []string {
 	}
 	if x.sourceRoot != "" {
 		env = append(env, ipcenv.WorktreeRootKey+"="+x.sourceRoot)
+	}
+	if !x.laneEnd.IsZero() {
+		env = append(env, ipcenv.ACSLaneEndKey+"="+x.laneEnd.UTC().Format(time.RFC3339Nano))
 	}
 	if len(x.changedPkgs) > 0 {
 		env = append(env, changedPackagesKey+"="+strings.Join(x.changedPkgs, " "))
