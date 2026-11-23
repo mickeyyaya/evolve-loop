@@ -169,13 +169,20 @@ func (p Policy) DocsFloorConfig() DocsFloorPolicy {
 }
 
 type CommentFloorPolicy struct {
-	Stage string `json:"stage,omitempty"`
+	Stage        string                  `json:"stage,omitempty"`
+	HistoryStage config.GateStageSetting `json:"history_stage,omitempty"`
 }
 
 func (p Policy) CommentFloorConfig() CommentFloorPolicy {
-	c := CommentFloorPolicy{Stage: "shadow"}
-	if p.CommentFloor != nil && p.CommentFloor.Stage != "" {
+	c := CommentFloorPolicy{Stage: "shadow", HistoryStage: "shadow"}
+	if p.CommentFloor == nil {
+		return c
+	}
+	if p.CommentFloor.Stage != "" {
 		c.Stage = p.CommentFloor.Stage
+	}
+	if p.CommentFloor.HistoryStage != "" {
+		c.HistoryStage = p.CommentFloor.HistoryStage
 	}
 	return c
 }
