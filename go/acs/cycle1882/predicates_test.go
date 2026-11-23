@@ -23,9 +23,9 @@ func modelqueryDir(t *testing.T) string {
 	return filepath.Join(acsassert.RepoRoot(t), "go", "internal", "modelquery")
 }
 
-func overlayOf(t *testing.T, file string, mutate func(string) string) string {
+func overlayOf(t *testing.T, dir, file string, mutate func(string) string) string {
 	t.Helper()
-	original := filepath.Join(modelqueryDir(t), file)
+	original := filepath.Join(dir, file)
 	src, err := os.ReadFile(original)
 	if err != nil {
 		t.Fatalf("read %s: %v", original, err)
@@ -34,8 +34,7 @@ func overlayOf(t *testing.T, file string, mutate func(string) string) string {
 	if mutated == string(src) {
 		t.Fatalf("mutation left %s unchanged", file)
 	}
-	dir := t.TempDir()
-	replacement := filepath.Join(dir, file)
+	replacement := filepath.Join(t.TempDir(), file)
 	if err := os.WriteFile(replacement, []byte(mutated), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -43,17 +42,27 @@ func overlayOf(t *testing.T, file string, mutate func(string) string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	overlay := filepath.Join(dir, "overlay.json")
+	overlay := filepath.Join(filepath.Dir(replacement), "overlay.json")
 	if err := os.WriteFile(overlay, spec, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	return overlay
 }
 
+func bridgeDir(t *testing.T) string {
+	t.Helper()
+	return filepath.Join(acsassert.RepoRoot(t), "go", "internal", "bridge")
+}
+
 func runModelqueryTest(t *testing.T, run string, env []string, extra ...string) (string, bool) {
 	t.Helper()
+	return runPackageTest(t, "./internal/modelquery", run, env, extra...)
+}
+
+func runPackageTest(t *testing.T, pkg, run string, env []string, extra ...string) (string, bool) {
+	t.Helper()
 	args := append([]string{"test", "-count=1", "-run", run, "-v"}, extra...)
-	args = append(args, "./internal/modelquery")
+	args = append(args, pkg)
 	cmd := exec.Command("go", args...)
 	cmd.Dir = filepath.Join(acsassert.RepoRoot(t), "go")
 	cmd.Env = append(os.Environ(), env...)
@@ -178,58 +187,41 @@ func TestC1882_004_DecisionSurfaceFilesCarryNoComments(t *testing.T) {
 }
 
 func TestC1882_005_CommentReadingOllamaTestRetired(t *testing.T) {
-	cmd := exec.Command("go", "test", "-list", ".", "./internal/modelquery")
+	cmd := exec.Command("go", "test", "-list", ".", "./internal/bridge")
 	cmd.Dir = filepath.Join(acsassert.RepoRoot(t), "go")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("go test -list: %v\n%s", err, out)
 	}
-	if !strings.Contains(string(out), "TestOllamaListerReachesNoModel") {
-		t.Fatalf("behaviour pin TestOllamaListerReachesNoModel is gone:\n%s", out)
+	if !strings.Contains(string(out), ollamaListTest) {
+		t.Fatalf("behaviour pin %s is gone:\n%s", ollamaListTest, out)
 	}
 	if strings.Contains(string(out), "TestOllamaListMetadataExceptionDocumented") {
-		t.Errorf("TestOllamaListMetadataExceptionDocumented still reads ollama.go source text")
+		t.Errorf("TestOllamaListMetadataExceptionDocumented still reads source text")
 	}
 }
 
-func fakeOllamaPath(t *testing.T, script string) []string {
-	t.Helper()
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "ollama"), []byte("#!/bin/sh\n"+script+"\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	return []string{"PATH=" + dir + string(os.PathListSeparator) + os.Getenv("PATH")}
-}
-
-const listingWithOneModel = "printf 'NAME ID SIZE MODIFIED\\nllama3.3:latest x y z\\n'"
+const ollamaListTest = "TestModelLister_OllamaFixtureGivesTheModelIDs"
 
 func dropListedModels(src string) string {
-	return strings.Replace(src, "return parseOllamaList(out), nil", `return parseOllamaList(""), nil`, 1)
+	return strings.Replace(src, "ids = append(ids, fields[0])", "_ = fields", 1)
 }
 
-func TestC1882_006_NilRunTestCatchesLostListingWhenOllamaSucceeds(t *testing.T) {
-	overlay := overlayOf(t, "ollama.go", dropListedModels)
-	out, passed := runModelqueryTest(t, "^TestOllamaLister_NilRunStartsOllamaListThroughTheLauncher$", fakeOllamaPath(t, listingWithOneModel), "-overlay", overlay)
-	if !strings.Contains(out, "TestOllamaLister_NilRunStartsOllamaListThroughTheLauncher") {
-		t.Fatalf("nil-run test did not run:\n%s", out)
+func TestC1882_006_OllamaListTestCatchesLostListingWhenOllamaSucceeds(t *testing.T) {
+	overlay := overlayOf(t, bridgeDir(t), "model_formats.go", dropListedModels)
+	out, passed := runPackageTest(t, "./internal/bridge", "^"+ollamaListTest+"$", nil, "-overlay", overlay)
+	if !strings.Contains(out, ollamaListTest) {
+		t.Fatalf("ollama list test did not run:\n%s", out)
 	}
 	if passed {
-		t.Errorf("TestOllamaLister_NilRunStartsOllamaListThroughTheLauncher passed while the lister dropped every listed model:\n%s", out)
+		t.Errorf("%s passed while the parser dropped every listed model:\n%s", ollamaListTest, out)
 	}
 }
 
-func TestC1882_007_NilRunTestPassesOnHealthyListerEitherWay(t *testing.T) {
-	cases := map[string]string{
-		"ollama lists a model": listingWithOneModel,
-		"ollama fails":         "exit 1",
-	}
-	for name, script := range cases {
-		t.Run(name, func(t *testing.T) {
-			out, passed := runModelqueryTest(t, "^TestOllamaLister_NilRunStartsOllamaListThroughTheLauncher$", fakeOllamaPath(t, script))
-			if !passed {
-				t.Errorf("nil-run test fails on the real lister:\n%s", out)
-			}
-		})
+func TestC1882_007_OllamaListTestPassesOnTheHealthyParser(t *testing.T) {
+	out, passed := runPackageTest(t, "./internal/bridge", "^"+ollamaListTest+"$", nil)
+	if !passed {
+		t.Errorf("ollama list test fails on the real parser:\n%s", out)
 	}
 }
 

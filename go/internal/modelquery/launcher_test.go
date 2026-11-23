@@ -23,19 +23,6 @@ func useFakeLauncher(t *testing.T, out string) *[]launchCall {
 	return &calls
 }
 
-func TestAgyLister_TheDefaultRunnerStartsAgyModelsThroughTheInjectedLauncher(t *testing.T) {
-	calls := useFakeLauncher(t, "Fetching available models...\ngemini-3.8-flash-high\tGemini 3.8 Flash (High)\n")
-
-	names, err := AgyLister{}.List(context.Background(), "agy")
-
-	if err != nil || !reflect.DeepEqual(names, []string{"Gemini 3.8 Flash (High)"}) {
-		t.Fatalf("got %q, %v; want the listing that the launcher returned", names, err)
-	}
-	if !reflect.DeepEqual(*calls, []launchCall{{name: "agy", args: []string{"models"}}}) {
-		t.Errorf("launcher calls = %+v; want one `agy models`", *calls)
-	}
-}
-
 func TestHelpEffortLister_TheDefaultRunnerStartsAgyHelpThroughTheInjectedLauncher(t *testing.T) {
 	calls := useFakeLauncher(t, "  --effort   Reasoning effort for the current CLI session (low|medium|high)\n")
 
@@ -72,15 +59,5 @@ func TestRunner_TheDefaultRunnerPassesTheCallAndTheStdinToTheLauncher(t *testing
 
 	if err != nil || out != "out" || got != "ollama list in" {
 		t.Fatalf("out=%q err=%v call=%q", out, err, got)
-	}
-}
-
-func TestOllamaLister_NilRunStartsOllamaListThroughTheLauncher(t *testing.T) {
-	calls := useFakeLauncher(t, "NAME ID SIZE MODIFIED\nllama3:8b abc 4 GB 1 day ago\n")
-
-	ids, err := (OllamaLister{}).List(context.Background(), "ollama")
-
-	if err != nil || len(ids) != 1 || len(*calls) != 1 || (*calls)[0].name != "ollama" {
-		t.Fatalf("ids=%v err=%v calls=%+v; want one ollama listing through the launcher", ids, err, *calls)
 	}
 }

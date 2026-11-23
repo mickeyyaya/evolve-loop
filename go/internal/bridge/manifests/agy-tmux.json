@@ -8,7 +8,7 @@
   "launch_model_verification": {
     "label_wait_s": 10
   },
-  "parsers": {"pane": "agy-repl-v1"},
+  "parsers": {"pane": "agy-repl-v1", "models": "agy-models-v1"},
   "collectors": {"tokens": "agy-conversation-v1"},
   "capabilities": ["tools", "edit"],
   "home_reads": ["~/.gemini"],

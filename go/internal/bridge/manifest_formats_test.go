@@ -42,7 +42,7 @@ func TestParseManifest_RefusesAnUnknownFormatIDKindCapabilityOrHomeRead(t *testi
 	t.Parallel()
 	cases := map[string]string{
 		`"parsers":{"pane":"newfam-repl-v9"}`:      `parsers.pane for cli=x names "newfam-repl-v9", which is not a known format id`,
-		`"parsers":{"usage":"claude-usage-v1"}`:    `parsers.usage for cli=x is not a known kind; the kinds are pane`,
+		`"parsers":{"usage":"claude-usage-v1"}`:    `parsers.usage for cli=x is not a known kind; the kinds are models, pane`,
 		`"parsers":{"pane":"claude"}`:              `parsers.pane for cli=x names "claude"`,
 		`"home_reads":["~/."]`:                     `home_reads entry "~/." for cli=x must start with ~/`,
 		`"home_reads":["~/.SSH/id_rsa"]`:           `overlaps the secret path ~/.ssh`,
@@ -54,6 +54,7 @@ func TestParseManifest_RefusesAnUnknownFormatIDKindCapabilityOrHomeRead(t *testi
 		`"home_reads":["~/.config"]`:               `overlaps the secret path ~/.config/gh`,
 		`"home_reads":["~/.netrc"]`:                `overlaps the secret path ~/.netrc`,
 		`"home_reads":["/etc/passwd"]`:             `home_reads entry "/etc/passwd" for cli=x must start with ~/`,
+		`"parsers":{"models":"bogus"}`:             `parsers.models for cli=x names "bogus", which is not a known format id`,
 		`"home_reads":["~/"]`:                      `home_reads entry "~/" for cli=x must start with ~/`,
 		`"home_reads":["~/a/../.ssh"]`:             `carry no .. segment`,
 		`"context_window":-1`:                      `context_window for cli=x is -1`,

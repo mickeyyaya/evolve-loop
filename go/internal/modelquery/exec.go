@@ -22,20 +22,19 @@ func defaultRunner(ctx context.Context, name string, args []string, stdin string
 	return launcher(ctx, name, args, stdin)
 }
 
-func DefaultRouter(capturer ModelCapturer) Router {
-	return routerWith(capturer, nil)
+type RoutedLister interface {
+	Lister
+	Families() []string
 }
 
-func routerWith(capturer ModelCapturer, run Runner) Router {
-	agyListing := &onceLister{inner: AgyLister{Run: run}}
-	return Router{
-		ByCLI: map[string]Lister{
-			"ollama":     OllamaLister{},
-			"agy":        agyListing,
-			"agy-claude": agyListing,
-		},
-		Default: RecipeLister{Capturer: capturer},
+func DefaultRouter(capturer ModelCapturer, routed RoutedLister) Router {
+	byCLI := map[string]Lister{}
+	if routed != nil {
+		for _, family := range routed.Families() {
+			byCLI[family] = routed
+		}
 	}
+	return Router{ByCLI: byCLI, Default: RecipeLister{Capturer: capturer}}
 }
 
 type Router struct {

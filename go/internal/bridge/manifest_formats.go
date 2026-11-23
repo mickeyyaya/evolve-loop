@@ -16,6 +16,7 @@ import (
 
 const (
 	ParserPane      = "pane"
+	ParserModels    = "models"
 	CollectorTokens = "tokens"
 	CapabilityTools = "tools"
 	CapabilityEdit  = "edit"
@@ -28,7 +29,8 @@ type TranscriptSpec struct {
 }
 
 var parserFormats = map[string]func(string) bool{
-	ParserPane: knownPaneFormat,
+	ParserPane:   knownPaneFormat,
+	ParserModels: knownModelsFormat,
 }
 
 var collectorFormats = map[string]func(string) bool{

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
+	"github.com/mickeyyaya/evolve-loop/go/internal/textcap"
 )
 
 type PromptDispatcher interface {
@@ -30,11 +31,11 @@ func (c CLIClassifier) Classify(ctx context.Context, targetCLI string, modelIDs 
 	}
 	out, err := c.Dispatcher.DispatchPrompt(ctx, c.CLI, buildClassifyPrompt(targetCLI, modelIDs))
 	if err != nil {
-		return nil, fmt.Errorf("classifier %s: %w (output: %s)", c.CLI, err, truncate(out, 200))
+		return nil, fmt.Errorf("classifier %s: %w (output: %s)", c.CLI, err, ClipOutput(out))
 	}
 	objs := jsonObjects(out)
 	if len(objs) == 0 {
-		return nil, fmt.Errorf("classifier %s: no JSON object in reply: %s", c.CLI, truncate(out, 200))
+		return nil, fmt.Errorf("classifier %s: no JSON object in reply: %s", c.CLI, ClipOutput(out))
 	}
 	for _, raw := range objs {
 		var parsed map[string]string
@@ -45,7 +46,7 @@ func (c CLIClassifier) Classify(ctx context.Context, targetCLI string, modelIDs 
 			return tiers, nil
 		}
 	}
-	return nil, fmt.Errorf("classifier %s: no JSON object mapped a tier to an offered model; reply: %s", c.CLI, truncate(out, 200))
+	return nil, fmt.Errorf("classifier %s: no JSON object mapped a tier to an offered model; reply: %s", c.CLI, ClipOutput(out))
 }
 
 func sanitizeTierMap(parsed map[string]string, offered []string) map[string]string {
@@ -127,11 +128,8 @@ func jsonObjects(s string) []string {
 	return out
 }
 
-func truncate(s string, n int) string {
-	s = strings.TrimSpace(s)
-	r := []rune(s)
-	if len(r) <= n {
-		return s
-	}
-	return string(r[:n]) + "…"
+const OutputClip = 200
+
+func ClipOutput(out string) string {
+	return textcap.CapRunes(strings.TrimSpace(out), OutputClip)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
@@ -42,15 +43,8 @@ func (c familyKeepingClassifier) Classify(_ context.Context, cli string, ids []s
 	return c.answers[cli], nil
 }
 
-func TestRefresh_OneAgyListingYieldsAGeminiEntryAndAClaudeEntry(t *testing.T) {
-	listings := 0
-	run := func(_ context.Context, name string, args []string, _ string) (string, error) {
-		listings++
-		if name != "agy" || !slices.Equal(args, []string{"models"}) {
-			t.Errorf("ran %s %v, want agy models", name, args)
-		}
-		return agyModelsWithClaudeRows, nil
-	}
+func TestRefresh_OneRoutedListingSplitsIntoAGeminiEntryAndAClaudeEntry(t *testing.T) {
+	routed := &agyRowsLister{}
 	classifier := familyKeepingClassifier{
 		t:      t,
 		family: map[string]string{"agy": "gemini", "agy-claude": "claude"},
@@ -62,7 +56,7 @@ func TestRefresh_OneAgyListingYieldsAGeminiEntryAndAClaudeEntry(t *testing.T) {
 
 	cat, err := Refresh(context.Background(), RefreshDeps{
 		CLIs:            []string{"agy", "agy-claude"},
-		Lister:          routerWith(nil, run),
+		Lister:          DefaultRouter(nil, routed),
 		Classifier:      classifier,
 		AllowedFamilies: map[string][]string{"agy": {"gemini"}, "agy-claude": {"claude"}},
 		Now:             fixedNow,
@@ -71,8 +65,8 @@ func TestRefresh_OneAgyListingYieldsAGeminiEntryAndAClaudeEntry(t *testing.T) {
 		t.Fatalf("Refresh: %v", err)
 	}
 
-	if listings != 1 {
-		t.Errorf("agy models ran %d times, want once: both entries come from one listing", listings)
+	if routed.listings != 2 {
+		t.Errorf("the router asked the routed lister %d times, want once per catalog entry", routed.listings)
 	}
 	want := map[string]map[string]string{
 		"agy":        {"fast": "Gemini 3.8 Flash (Low)", "balanced": "Gemini 3.8 Flash (High)", "deep": "Gemini 3.1 Pro (High)", "top": "Gemini 3.1 Pro (High)"},
@@ -93,27 +87,17 @@ func TestRefresh_OneAgyListingYieldsAGeminiEntryAndAClaudeEntry(t *testing.T) {
 	}
 }
 
-func TestDefaultRouter_AgyAndAgyClaudeShareOneLister(t *testing.T) {
-	r := DefaultRouter(nil)
-	agy, claude := r.ByCLI["agy"], r.ByCLI["agy-claude"]
-	if agy == nil || claude == nil || agy != claude {
-		t.Fatalf("ByCLI[agy] = %v, ByCLI[agy-claude] = %v; want one shared lister, so a refresh lists agy once", agy, claude)
-	}
-}
+type agyRowsLister struct{ listings int }
 
-func TestOnceLister_AFailedListingFailsEveryEntryThatSharesIt(t *testing.T) {
-	listings := 0
-	run := func(context.Context, string, []string, string) (string, error) {
-		listings++
-		return "no model rows", nil
-	}
-	r := routerWith(nil, run)
-	for _, cli := range []string{"agy", "agy-claude"} {
-		if _, err := r.List(context.Background(), cli); err == nil {
-			t.Errorf("%s listed models from an empty listing", cli)
+func (*agyRowsLister) Families() []string { return []string{"agy", "agy-claude"} }
+
+func (l *agyRowsLister) List(context.Context, string) ([]string, error) {
+	l.listings++
+	var names []string
+	for _, line := range strings.Split(agyModelsWithClaudeRows, "\n") {
+		if _, display, ok := strings.Cut(line, "\t"); ok {
+			names = append(names, display)
 		}
 	}
-	if listings != 1 {
-		t.Errorf("agy models ran %d times, want once", listings)
-	}
+	return names, nil
 }
