@@ -935,4 +935,10 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [plans/gc-salvage-scope-2026-11.md](plans/gc-salvage-scope-2026-11.md) | Plan for `evolve gc --only salvage`. A survey shows 144 full-history bundles that hold 150.7 GiB. The plan scores three designs and builds the K6 migration of the recycle plan. It also closes the last full-history writer. |
 
+## 2026-11-24 — file grain of `cmd/evolve` already meets the item
+
+| Document | What it records |
+|---|---|
+| [research/admission-cell-grain-2026-11.md](research/admission-cell-grain-2026-11.md) | Dossier that compares the package, file set and verb-family grains on the live inbox: 0, 1016 and 954 of 1770 pairs. It finds that K1 already satisfies the item, that 14 of 60 items declare the whole directory, and that no signal records a file-grain pair. It retires branch 2385 and files two follow-up items. |
+
 <!-- GENERATED:research-index END -->
