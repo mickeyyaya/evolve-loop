@@ -141,7 +141,7 @@ The code that makes and checks ledgers goes in a new package, `go/internal/hando
 | H8 | The handoff reviewer in the reviewer chain, at stage shadow; it writes `handoff-<pair>.json` | a cycle at stage shadow writes the result and keeps its verdict | console (`go/cmd/evolve/cmd_cycle.go`, `go/internal/core`) |
 | H9 | The personas of triage, tdd and build write their ledger; the task contract gives the request to each phase | the tdd prompt holds the request block with ask ids | console (`agents/`, `go/internal/core/task_contract.go`) |
 | H10 | The judge layer: a fidelity judge for each pair, through the bridge, on an independent seat | a judge seat on the same model as its author is refused at stage enforce | console |
-| H11 | The audit chain reads the ledgers; its deterministic links decide at stage enforce | an unmet required ask in a ledger forces the audit to FAIL | console (`go/internal/auditchain`, `go/internal/phases/audit`) |
+| H11 (done) | The audit chain reads the ledgers; its deterministic links decide at stage enforce | an unmet required ask in a ledger forces the audit to FAIL | console (`go/internal/auditchain`, `go/internal/phases/audit`, `go/internal/handoff/site`) |
 | H12 | Move each pair to `enforce`, one at a time, on its shadow evidence; first `triage-tdd` and `tdd-build` | the replay of cycles 1946 and 1950 ends blocked in round 1 | console (policy) |
 
 ## 7. Order

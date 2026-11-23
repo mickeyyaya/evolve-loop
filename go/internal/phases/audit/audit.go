@@ -48,6 +48,7 @@ type hooks struct {
 	phaseIO                       config.Stage
 	ledger                        *defectledger.Ledger
 	signals                       shadowEmitter
+	buildStale                    func(req core.PhaseRequest, ledgerPath string) string
 }
 
 func (hooks) PhaseName() string       { return string(core.PhaseAudit) }
@@ -93,6 +94,7 @@ func (h hooks) Classify(artifact string, req core.PhaseRequest, _ core.BridgeRes
 	classification.prepareEvidence()
 	classification.executeRepositoryGates()
 	classification.reconcileContinuation()
+	classification.walkLedgers()
 	classification.finalize()
 
 	return classification.verdict, classification.diagnostics, string(core.PhaseShip)
@@ -399,7 +401,7 @@ func init() {
 	})
 }
 
-func recordChainShadow(artifact string, req core.PhaseRequest, narrative, shipped string, overrodeBy []string) {
+func recordChainShadow(artifact string, req core.PhaseRequest, narrative, shipped string, overrodeBy []string, findings []auditchain.LedgerFinding, note string) {
 	if req.Workspace == "" {
 		return
 	}
@@ -412,5 +414,7 @@ func recordChainShadow(artifact string, req core.PhaseRequest, narrative, shippe
 	rec := auditchain.Shadow(req.Cycle, string(core.PhaseAudit), artifact, narrative, given)
 	rec.ShippedVerdict = shipped
 	rec.OverrodeBy = overrodeBy
+	rec.LedgerFindings = findings
+	rec.LedgerNote = note
 	_ = atomicwrite.JSON(filepath.Join(req.Workspace, auditchain.ShadowRecordFile), rec)
 }

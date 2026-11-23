@@ -35,7 +35,7 @@
 | G3. "Confident" is measured. | the pass condition | each required ask met, with resolved evidence |
 | G4. The checker is independent of the author. | judge seats on the model of their author | 0 at stage enforce |
 | G5. One shared design. | new private gate types or sources of the ask | 0 |
-| G6. The audit validates against the first request. | deciding audit chain links | the deterministic links, at stage enforce |
+| G6. The audit validates against the first request. | deciding audit chain links | the deterministic links, at stage enforce (met by H11) |
 
 The order of the goals is the order of the build. G2 and G1 come first, because they stop the loss of work in cycles 1946 and 1950.
 
@@ -283,6 +283,16 @@ The ledgers form a chain. The request of each pair comes from the output of the 
 2. **Validation:** each inbox acceptance entry (the first request) maps through the chain to a `met` entry of `tdd-build`.
 3. The links of the audit chain read the ledgers as their evidence. At stage enforce, the deterministic links decide. The judged links (narrative and delivery) stay as the auditor writes them.
 
+H11 is done. The function `auditchain.WalkLedgers` is a pure rule over the evaluation of the two pairs. The audit phase builds that evaluation with `site.Evaluate`. It does not trust the check that H8 wrote into the ledger. The walk makes five checks:
+
+1. A pair is skipped when its request cannot exist. With no `tdd-build` predicates, TDD did not run. The walk skips both pairs and the record holds the note `tdd did not run`. With no committed set, the `triage-tdd` request is absent. The walk skips that pair and the validation step, but still judges `tdd-build`. The record holds the note `no committed set`.
+2. Each ledger exists. A file that holds only the check record counts as missing.
+3. Each pair has the outcome `pass`. This covers the request digest, the required asks and the evidence, because `site.Evaluate` owns those rules.
+4. The `tdd-build` ledger is not stale. The audit compares its `output_digest` with the audited tree. The `triage-tdd` ledger is never checked for staleness, because the Build phase changes the tree after it.
+5. Validation: each inbox acceptance ask has a `met` entry in the `triage-tdd` ledger. That entry points to a predicate that has a `met` entry in the `tdd-build` ledger.
+
+The gate reads the stage of the pair `build-audit` in `policy.json`. At stage shadow, the findings go to `audit-chain-shadow.json` only. At stage enforce, each finding is an error diagnostic and the verdict becomes FAIL through the override of the audit. The narrative and delivery links are not changed.
+
 Steps 1 and 2 are verification and validation in the sense of research P2.16. Each pair checks that it built what it was asked. The audit checks that the result meets the first need.
 
 ## 8. A worked example: cycle 1950
@@ -326,6 +336,9 @@ The `handoff` package depends on `inboxbatch`, `committedset` and the guards man
 | A round with no new met ask ends the loop. | the H4 test | planned |
 | A judge seat is not the model of the author at stage enforce. | `TestIndependents_AdmitsOnlyAnotherFamilyOrAStrongerTier` and `TestWalking_IndependentsFilterRefusesTheAuthorsOwnModelAndLaunchesNothing` | seam done, judge planned |
 | Each pair starts at shadow. | the H6 default test | planned |
+| At stage enforce of `build-audit`, an unmet required ask in a ledger forces the audit to FAIL. | `TestChainLedgers_AtEnforceAnUnmetRequiredAskForcesFAIL` | done |
+| At stage enforce of `build-audit`, an inbox acceptance with no met `tdd-build` entry forces the audit to FAIL. | `TestChainLedgers_AtEnforceAnAcceptanceWithNoMetBuildEntryForcesFAIL` | done |
+| At stage shadow of `build-audit`, the verdict does not change and the findings are recorded. | `TestChainLedgers_AtShadowTheVerdictDoesNotChange` | done |
 | A check at stage shadow records its result and keeps the verdict. | `TestHandoffReviewer_AtShadowACycleWritesTheCheckAndKeepsItsVerdict` | done |
 | A blocked check at stage enforce ends the cycle as blocked and keeps the worktree. | `TestHandoffReviewer_AtEnforceABlockedCheckEndsTheCycleBlockedAndKeepsTheSalvageWorktree` | done |
 | A correction at stage enforce names the unmet ask ids and the failed evidence. | `TestHandoffReviewer_AtEnforceTheRetryCorrectionListsTheUnmetAsksAndTheFailedEvidence` | done |

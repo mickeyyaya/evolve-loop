@@ -21,6 +21,9 @@ type ShadowRecord struct {
 	Diagnoses               []string `json:"diagnoses,omitempty"`
 	MissingEvidence         []string `json:"missing_evidence,omitempty"`
 	ChainErrors             []string `json:"chain_errors,omitempty"`
+
+	LedgerFindings []LedgerFinding `json:"ledger_findings,omitempty"`
+	LedgerNote     string          `json:"ledger_note,omitempty"`
 }
 
 func Shadow(cycle int, phase, content, narrative string, given []string) ShadowRecord {

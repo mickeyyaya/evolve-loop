@@ -84,3 +84,7 @@ And the teeth: **`ConcludeWithEvidence` downgrades to `unverifiable` any link re
 `go/internal/auditchain` — pure, no I/O, table-tested (98.2% coverage, apicover 28/28 with 0 false-green, race-clean). `auditchain.go` carries the chain, entailment and diagnosis; `evidence_access.go` the entitlement contract and the evidence-aware conclusion.
 
 **Staged, not shipped:** the auditor-persona section that instructs the chain (tail-placed, per the persona-strip lesson), the runner change that supplies `RequiredEvidence` to every judging phase, the `chain` block in the audit report contract (schema single-sourced with a literal example, ADR-0084 I2), and the shadow comparison.
+
+## Update (2026-11-15): the ledgers decide the deterministic links
+
+The audit chain now reads the handoff ledgers (ADR-0141, step H11). The function `auditchain.WalkLedgers` checks the `triage-tdd` and `tdd-build` ledgers. At stage enforce of the policy pair `build-audit`, its findings force the audit to FAIL. At stage shadow, the findings are only recorded in `audit-chain-shadow.json`. The narrative and delivery links are not changed. The shadow record of the chain-versus-narrative comparison still never gates.

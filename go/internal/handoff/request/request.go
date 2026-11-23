@@ -6,6 +6,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -73,6 +74,10 @@ func TriageTDD(workspace string, resolve PathResolver) (handoff.Request, error) 
 	return TriageTDDFromItems(items), nil
 }
 
+func PairAbsent(err error) bool {
+	return errors.Is(err, ErrNoCommittedSet) || errors.Is(err, ErrNoPredicates)
+}
+
 func ForPair(pair string, site Site) (handoff.Request, error) {
 	switch pair {
 	case PairTriageTDD:
@@ -107,6 +112,9 @@ const maxTestFileBytes = 4 << 20
 
 func TDDBuild(dir string) (handoff.Request, error) {
 	entries, err := os.ReadDir(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return handoff.Request{}, fmt.Errorf("%w in %s", ErrNoPredicates, dir)
+	}
 	if err != nil {
 		return handoff.Request{}, err
 	}
