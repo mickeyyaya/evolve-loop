@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/sandbox"
 	"github.com/mickeyyaya/evolve-loop/go/internal/attemptpostmortem"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tokenusage"
@@ -108,22 +109,39 @@ func validateCapabilities(cli string, capabilities []string) error {
 	return nil
 }
 
+var errHomeReadOverlapsSecret = errors.New("the entry overlaps a secret path")
+
 func validateHomeReads(cli string, reads []string) error {
 	for _, r := range reads {
-		rel, ok := strings.CutPrefix(r, "~/")
-		if !ok || path.Clean(rel) == "." || slices.Contains(strings.Split(rel, "/"), "..") {
+		rel, ok := homeReadRel(r)
+		if !ok || rel == "." || slices.Contains(strings.Split(r, "/"), "..") {
 			return fmt.Errorf("bridge:manifest: home_reads entry %q for cli=%s must start with ~/, name a path below it and carry no .. segment", r, cli)
 		}
-		if secret, overlaps := secretOverlap(strings.ToLower(path.Clean(rel))); overlaps {
-			return fmt.Errorf("bridge:manifest: home_reads entry %q for cli=%s overlaps the secret path ~/%s; the sandbox denies each secret before it grants a read", r, cli, secret)
+		if secret, overlaps := secretOverlap(rel); overlaps {
+			return fmt.Errorf("bridge:manifest: home_reads entry %q for cli=%s overlaps the secret path ~/%s; the sandbox denies each secret before it grants a read: %w", r, cli, secret, errHomeReadOverlapsSecret)
 		}
 	}
 	return nil
 }
 
+func homeReadRel(entry string) (string, bool) {
+	rel, ok := strings.CutPrefix(entry, "~/")
+	if !ok {
+		return "", false
+	}
+	return strings.ToLower(path.Clean(rel)), true
+}
+
+func pathCovers(parent, child string) bool {
+	return child == parent || strings.HasPrefix(child, parent+"/")
+}
+
 func secretOverlap(rel string) (string, bool) {
-	for _, secret := range homeSecrets {
-		if rel == secret || strings.HasPrefix(rel, secret+"/") || strings.HasPrefix(secret, rel+"/") {
+	for _, secret := range sandbox.HomeSecrets {
+		if slices.Contains(loginSecrets, secret) {
+			continue
+		}
+		if pathCovers(secret, rel) || pathCovers(rel, secret) {
 			return secret, true
 		}
 	}

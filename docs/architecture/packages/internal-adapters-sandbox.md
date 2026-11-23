@@ -31,6 +31,8 @@
 
 ## Invariants
 
+- `HomeSecrets` is the one list of the secret paths below `$HOME` that a cell cannot read. It names no CLI rule: the login files of the families are listed, and the bridge decides which cell keeps its own. `guardSecret` emits a read deny and a write deny for each existing path. A missing path gets no rule on macOS and no mask on Linux.
+
 - A nested-session hint is not a measured capability. It is not proof of outer confinement. `DetectNested` reports only a possible nested session. `CLAUDECODE_TYPE=host` marks the top-level host process. That process is not nested under another sandbox, so it can confine its children.
 - `ShouldWrap`: a measured capability outranks session hints. An unchecked nested hint stays refused. Success here does not authorize an unwrapped launch, and it does not attest an outer sandbox.
 - `ConfinementSatisfied` is fail-closed. Mode `off` is an explicit host opt-out and is never verified confinement. Any other mode is unsatisfied when the wrap did not apply, including unverified nested environments.
