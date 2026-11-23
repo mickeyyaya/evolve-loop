@@ -3,11 +3,12 @@
 package auditledger
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerscan"
 )
 
 var ErrNoAuditorForRun = errors.New("no Auditor ledger entry")
@@ -27,57 +28,81 @@ type Entry struct {
 }
 
 func AuditorRows(ledgerPath string) ([]Entry, error) {
-	raw, err := os.ReadFile(ledgerPath)
-	if err != nil {
-		return nil, fmt.Errorf("read ledger %s: %w", ledgerPath, err)
-	}
-	lines := strings.Split(string(raw), "\n")
 	var rows []Entry
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := strings.TrimSpace(lines[i])
-		if line == "" {
-			continue
-		}
+	err := scanAuditors(ledgerPath, func(e Entry) bool {
+		rows = append(rows, e)
+		return false
+	})
+	return rows, err
+}
+
+func scanAuditors(ledgerPath string, visit func(Entry) (stop bool)) error {
+	err := ledgerscan.Reverse(ledgerPath, auditorFilter(), func(line []byte) (bool, error) {
+		trimmed := bytes.TrimSpace(line)
 		var e Entry
-		if err := json.Unmarshal([]byte(line), &e); err != nil {
-			continue
+		if len(trimmed) == 0 || json.Unmarshal(trimmed, &e) != nil || !IsAuditorRow(e) {
+			return false, nil
 		}
-		if IsAuditorRow(e) {
-			rows = append(rows, e)
-		}
+		return visit(e), nil
+	})
+	if err != nil {
+		return fmt.Errorf("read ledger %s: %w", ledgerPath, err)
 	}
-	return rows, nil
+	return nil
 }
 
 func BindRun(rows []Entry, runID string) (Entry, error) {
-	if runID == "" {
-		if len(rows) > 0 {
-			return rows[0], nil
-		}
-		return Entry{}, fmt.Errorf("%w found", ErrNoAuditorForRun)
-	}
+	binder := newRunBinder(runID)
 	for _, e := range rows {
-		if e.RunID == runID {
-			return e, nil
+		if binder.offer(e) {
+			break
 		}
 	}
-	if len(rows) == 0 {
-		return Entry{}, fmt.Errorf("%w for run %s", ErrNoAuditorForRun, runID)
+	return binder.result()
+}
+
+type runBinder struct {
+	runID  string
+	newest Entry
+	seen   bool
+	bound  bool
+}
+
+func newRunBinder(runID string) *runBinder { return &runBinder{runID: runID} }
+
+func (b *runBinder) offer(e Entry) (stop bool) {
+	if !b.seen {
+		b.newest, b.seen = e, true
 	}
-	foreign := rows[0].RunID
+	if b.runID == "" || e.RunID == b.runID {
+		b.newest, b.bound = e, true
+	}
+	return b.bound
+}
+
+func (b *runBinder) result() (Entry, error) {
+	switch {
+	case b.bound:
+		return b.newest, nil
+	case !b.seen && b.runID == "":
+		return Entry{}, fmt.Errorf("%w found", ErrNoAuditorForRun)
+	case !b.seen:
+		return Entry{}, fmt.Errorf("%w for run %s", ErrNoAuditorForRun, b.runID)
+	}
+	foreign := b.newest.RunID
 	if foreign == "" {
 		foreign = "<unstamped>"
 	}
 	return Entry{}, fmt.Errorf("%w for run %s (refused to bind foreign run %s, git_head=%s)",
-		ErrNoAuditorForRun, runID, foreign, rows[0].GitHEAD)
+		ErrNoAuditorForRun, b.runID, foreign, b.newest.GitHEAD)
 }
 
 func LatestAuditorEntry(ledgerPath, runID string) (Entry, error) {
-	rows, err := AuditorRows(ledgerPath)
-	if err != nil {
+	binder := newRunBinder(runID)
+	if err := scanAuditors(ledgerPath, binder.offer); err != nil {
 		return Entry{}, err
 	}
-	return BindRun(rows, runID)
+	return binder.result()
 }
 
 func (e Entry) AuditedBase() string {
@@ -88,5 +113,14 @@ func (e Entry) AuditedBase() string {
 }
 
 func IsAuditorRow(e Entry) bool {
-	return e.Kind == "agent_subprocess" && e.Role == "auditor"
+	return e.Kind == AuditorKind && e.Role == AuditorRole
+}
+
+const (
+	AuditorKind = "agent_subprocess"
+	AuditorRole = "auditor"
+)
+
+func auditorFilter() ledgerscan.Filter {
+	return ledgerscan.Filter{Needles: [][]byte{ledgerscan.ContainsValue(AuditorKind), ledgerscan.ContainsValue(AuditorRole)}}
 }

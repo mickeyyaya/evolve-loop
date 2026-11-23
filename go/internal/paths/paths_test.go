@@ -146,3 +146,19 @@ func TestEventChannelsRoot_IsTheChDirectoryUnderTheEventsDirectoryOfTheEvolveDir
 		t.Errorf("EventChannelsRoot = %q, want %q: the Publisher, the reader and the gc category must name the same directory (spec §4)", got, want)
 	}
 }
+
+func TestLedgerFileOf_IsTheLedgerInsideTheEvolveDirAndResolveAgrees(t *testing.T) {
+	root := filepath.Join(string(filepath.Separator), "proj")
+	if got, want := LedgerFileOf(root), filepath.Join(root, ".evolve", "ledger.jsonl"); got != want {
+		t.Errorf("LedgerFileOf = %q, want %q", got, want)
+	}
+	l := Resolve(func(k string) string {
+		if k == "EVOLVE_PROJECT_ROOT" {
+			return root
+		}
+		return ""
+	}, "/cwd")
+	if l.LedgerFile != LedgerFileOf(root) {
+		t.Errorf("Resolve().LedgerFile = %q, want %q", l.LedgerFile, LedgerFileOf(root))
+	}
+}
