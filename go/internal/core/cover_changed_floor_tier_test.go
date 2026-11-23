@@ -34,11 +34,13 @@ const (
 
 func bridgeRepo(t *testing.T) (*gittest.Repo, string) {
 	t.Helper()
-	repo := gittest.Fixture(t)
-	writeFile(t, filepath.Join(repo.Dir, "go", "go.mod"), "module example.com/m\n\ngo 1.23\n")
-	writeFile(t, filepath.Join(repo.Dir, "go", "internal", "bridge", "a.go"), bridgeBaseSource)
-	repo.Git("add", "-A")
-	repo.Git("commit", "-q", "-m", "base")
+	repo := gittest.FromTemplate(t, "core-cover-tier-bridge", func(r *gittest.Repo) error {
+		r.Write("go/go.mod", "module example.com/m\n\ngo 1.23\n")
+		r.Write("go/internal/bridge/a.go", bridgeBaseSource)
+		r.Git("add", "-A")
+		r.Git("commit", "-q", "-m", "base")
+		return nil
+	})
 	base := repo.Git("rev-parse", "HEAD")
 	writeFile(t, filepath.Join(repo.Dir, "go", "internal", "bridge", "a.go"), bridgeTreeSource)
 	writeFile(t, filepath.Join(repo.Dir, "go", "internal", "bridge", "b.go"), bridgeNewFileSource)
@@ -336,11 +338,13 @@ func TestCoverChangedFailures_AFailingTieredRunNamesItsTagsInTheHeadlineAndTheRe
 }
 
 func TestCoverChangedFailures_EachPackageIsJudgedUnderItsOwnTagSet(t *testing.T) {
-	repo := gittest.Fixture(t)
-	writeFile(t, filepath.Join(repo.Dir, "go", "go.mod"), "module example.com/m\n\ngo 1.23\n")
-	writeFile(t, filepath.Join(repo.Dir, "go", "internal", "x", "keep.go"), "package x\n")
-	repo.Git("add", "-A")
-	repo.Git("commit", "-q", "-m", "base")
+	repo := gittest.FromTemplate(t, "core-cover-tier-tagset", func(r *gittest.Repo) error {
+		r.Write("go/go.mod", "module example.com/m\n\ngo 1.23\n")
+		r.Write("go/internal/x/keep.go", "package x\n")
+		r.Git("add", "-A")
+		r.Git("commit", "-q", "-m", "base")
+		return nil
+	})
 	base := repo.Git("rev-parse", "HEAD")
 	writeFile(t, filepath.Join(repo.Dir, "go", "internal", "x", "serve_floor.go"), "//go:build notmux\n\npackage x\n\nfunc Floor() int {\n\treturn 1\n}\n")
 	writeFile(t, filepath.Join(repo.Dir, "go", "internal", "x", "serve_tmux.go"), "//go:build !notmux\n\npackage x\n\nfunc Tmux() int {\n\treturn 2\n}\n")
@@ -379,12 +383,14 @@ const mixedXTreeSource = "package x\n\nfunc X(x int) int {\n\tif x > 0 {\n\t\tre
 const mixedXCovered = "example.com/m/internal/x/x.go:3.19,4.11 1 1\nexample.com/m/internal/x/x.go:4.11,6.3 1 1\nexample.com/m/internal/x/x.go:7.2,7.10 1 1\n"
 
 func TestCoverChangedFailures_AMixedChangeJudgesEachGroupOnlyOnItsOwnPackages(t *testing.T) {
-	repo := gittest.Fixture(t)
-	writeFile(t, filepath.Join(repo.Dir, "go", "go.mod"), "module example.com/m\n\ngo 1.23\n")
-	writeFile(t, filepath.Join(repo.Dir, "go", "internal", "bridge", "a.go"), bridgeBaseSource)
-	writeFile(t, filepath.Join(repo.Dir, "go", "internal", "x", "x.go"), mixedXBaseSource)
-	repo.Git("add", "-A")
-	repo.Git("commit", "-q", "-m", "base")
+	repo := gittest.FromTemplate(t, "core-cover-tier-mixed", func(r *gittest.Repo) error {
+		r.Write("go/go.mod", "module example.com/m\n\ngo 1.23\n")
+		r.Write("go/internal/bridge/a.go", bridgeBaseSource)
+		r.Write("go/internal/x/x.go", mixedXBaseSource)
+		r.Git("add", "-A")
+		r.Git("commit", "-q", "-m", "base")
+		return nil
+	})
 	base := repo.Git("rev-parse", "HEAD")
 	writeFile(t, filepath.Join(repo.Dir, "go", "internal", "bridge", "a.go"), bridgeTreeSource)
 	writeFile(t, filepath.Join(repo.Dir, "go", "internal", "bridge", "b.go"), bridgeNewFileSource)

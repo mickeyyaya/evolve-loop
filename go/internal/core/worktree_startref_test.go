@@ -12,9 +12,13 @@ import (
 
 func startRefFixture(t *testing.T) (*gittest.Repo, *gittest.Repo) {
 	t.Helper()
-	origin := gittest.Bare(t)
-	seed := gittest.Fixture(t)
-	writeCommit(t, seed, "base.txt", "base")
+	origin := gittest.BareFromTemplate(t)
+	seed := gittest.FromTemplate(t, "core-startref-seed", func(r *gittest.Repo) error {
+		r.Write("base.txt", "base")
+		r.Git("add", "base.txt")
+		r.Git("commit", "-q", "-m", "add base.txt")
+		return nil
+	})
 	seed.Git("remote", "add", "origin", origin.Dir)
 	seed.Git("push", "-q", "origin", "main")
 	return seed, gittest.Clone(t, origin.Dir)

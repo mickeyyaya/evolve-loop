@@ -56,13 +56,26 @@ func TestDefaultBuildFloorChecks_AGreenRetakeDoesNotClearATestTheCycleAdded(t *t
 	}
 }
 
+func goModBaseRepo(t *testing.T) (*gittest.Repo, string) {
+	t.Helper()
+	repo := gittest.FromTemplate(t, "core-floor-newtests-gomod", func(r *gittest.Repo) error {
+		r.Write("go/go.mod", "module example.com/m\n\ngo 1.23\n")
+		r.Git("add", "-A")
+		r.Git("commit", "-q", "-m", "base")
+		return nil
+	})
+	return repo, repo.Git("rev-parse", "HEAD")
+}
+
 func TestDefaultBuildFloorChecks_AnInheritedTestKeepsTheGreenRetake(t *testing.T) {
-	repo := gittest.Fixture(t)
-	writeFile(t, filepath.Join(repo.Dir, "go", "go.mod"), "module example.com/m\n\ngo 1.23\n")
-	writeFile(t, filepath.Join(repo.Dir, "go", "q", "q.go"), "package q\n\nfunc F() int { return 1 }\n")
-	writeFile(t, filepath.Join(repo.Dir, "go", "q", "q_test.go"), "package q\n\nimport \"testing\"\n\nfunc TestFlaky(t *testing.T) { _ = F() }\n")
-	repo.Git("add", "-A")
-	repo.Git("commit", "-q", "-m", "base")
+	repo := gittest.FromTemplate(t, "core-floor-newtests-inherited", func(r *gittest.Repo) error {
+		r.Write("go/go.mod", "module example.com/m\n\ngo 1.23\n")
+		r.Write("go/q/q.go", "package q\n\nfunc F() int { return 1 }\n")
+		r.Write("go/q/q_test.go", "package q\n\nimport \"testing\"\n\nfunc TestFlaky(t *testing.T) { _ = F() }\n")
+		r.Git("add", "-A")
+		r.Git("commit", "-q", "-m", "base")
+		return nil
+	})
 	base := repo.Git("rev-parse", "HEAD")
 	writeFile(t, filepath.Join(repo.Dir, "go", "q", "q.go"), "package q\n\nfunc F() int { return 2 }\n")
 	signals := signalcenter.New()
@@ -103,11 +116,7 @@ func TestReadFloorAdded_NoBaseOrNoWorktreeIsKnownAndSilent(t *testing.T) {
 
 func TestReadFloorAdded_AGroupingErrorAndAMissingModuleAndAnExcludedFile(t *testing.T) {
 	t.Parallel()
-	repo := gittest.Fixture(t)
-	writeFile(t, filepath.Join(repo.Dir, "go", "go.mod"), "module example.com/m\n\ngo 1.23\n")
-	repo.Git("add", "-A")
-	repo.Git("commit", "-q", "-m", "base")
-	base := repo.Git("rev-parse", "HEAD")
+	repo, base := goModBaseRepo(t)
 	var stderr strings.Builder
 	in := ReviewInput{Worktree: repo.Dir, WorktreeBaseSHA: base, Stderr: &stderr}
 
@@ -183,11 +192,7 @@ func TestRetakeFloorOutcome_AGreenRetakeOfANewTestIsRedWithTheCorrection(t *test
 
 func TestScopedCoverProfile_AGreenRetakeOfANewTestFailsTheCoverPath(t *testing.T) {
 	t.Parallel()
-	repo := gittest.Fixture(t)
-	writeFile(t, filepath.Join(repo.Dir, "go", "go.mod"), "module example.com/m\n\ngo 1.23\n")
-	repo.Git("add", "-A")
-	repo.Git("commit", "-q", "-m", "base")
-	base := repo.Git("rev-parse", "HEAD")
+	repo, base := goModBaseRepo(t)
 	marker := filepath.Join(t.TempDir(), "ran-once")
 	writeFile(t, filepath.Join(repo.Dir, "go", "q", "q.go"), "package q\n\nfunc F() int { return 1 }\n")
 	writeFile(t, filepath.Join(repo.Dir, "go", "q", "q_test.go"), fmt.Sprintf("package q\n\nimport (\n\t\"os\"\n\t\"testing\"\n)\n\nfunc TestFlaky(t *testing.T) {\n\t_ = F()\n\tif _, err := os.Stat(%q); err != nil {\n\t\t_ = os.WriteFile(%q, nil, 0o644)\n\t\tt.Fatal(\"first run\")\n\t}\n}\n", marker, marker))
@@ -228,11 +233,7 @@ func flakyNewTestJudgeRepo(t *testing.T) (ReviewInput, string) {
 
 func flakyNewTestsJudgeRepo(t *testing.T, names ...string) (ReviewInput, []string) {
 	t.Helper()
-	repo := gittest.Fixture(t)
-	writeFile(t, filepath.Join(repo.Dir, "go", "go.mod"), "module example.com/m\n\ngo 1.23\n")
-	repo.Git("add", "-A")
-	repo.Git("commit", "-q", "-m", "base")
-	base := repo.Git("rev-parse", "HEAD")
+	repo, base := goModBaseRepo(t)
 	dir := t.TempDir()
 	var body strings.Builder
 	body.WriteString("package q\n\nimport (\n\t\"os\"\n\t\"strings\"\n\t\"testing\"\n)\n")

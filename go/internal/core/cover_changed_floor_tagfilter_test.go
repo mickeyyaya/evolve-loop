@@ -78,17 +78,19 @@ func TestCoverChangedFailures_ExcludesACSTagOnlyPackageFromProfiler(t *testing.T
 
 func uncoveredAddedFunctionRepo(t *testing.T) (*gittest.Repo, string) {
 	t.Helper()
-	repo := gittest.Fixture(t)
-	writeFile(t, filepath.Join(repo.Dir, "go", "go.mod"), "module example.com/m\n\ngo 1.23\n")
-	writeFile(t, filepath.Join(repo.Dir, "go", "p", "a.go"), "package p\n\nfunc F(x int) int {\n\treturn x + 1\n}\n")
-	writeFile(t, filepath.Join(repo.Dir, "go", "p", "a_test.go"), "package p\n\nimport \"testing\"\n\nfunc TestF(t *testing.T) {\n\tif F(1) != 2 {\n\t\tt.Fatal(\"F\")\n\t}\n}\n")
-	repo.Git("add", "-A")
-	repo.Git("commit", "-q", "-m", "base")
-	base := repo.Git("rev-parse", "HEAD")
-	writeFile(t, filepath.Join(repo.Dir, "go", "p", "a.go"), "package p\n\nfunc F(x int) int {\n\treturn x + 1\n}\n\nfunc MarkTruncated(s string) string {\n\treturn s + \"...\"\n}\n")
-	writeFile(t, filepath.Join(repo.Dir, "go", "acs", "cycle1916", "predicates_test.go"), acsOnlyPredicate)
-	repo.Git("add", "-A")
-	repo.Git("commit", "-q", "-m", "build adds an untested function and its acs predicates")
+	repo := gittest.FromTemplate(t, "core-cover-tagfilter-uncovered", func(r *gittest.Repo) error {
+		r.Write("go/go.mod", "module example.com/m\n\ngo 1.23\n")
+		r.Write("go/p/a.go", "package p\n\nfunc F(x int) int {\n\treturn x + 1\n}\n")
+		r.Write("go/p/a_test.go", "package p\n\nimport \"testing\"\n\nfunc TestF(t *testing.T) {\n\tif F(1) != 2 {\n\t\tt.Fatal(\"F\")\n\t}\n}\n")
+		r.Git("add", "-A")
+		r.Git("commit", "-q", "-m", "base")
+		r.Write("go/p/a.go", "package p\n\nfunc F(x int) int {\n\treturn x + 1\n}\n\nfunc MarkTruncated(s string) string {\n\treturn s + \"...\"\n}\n")
+		r.Write("go/acs/cycle1916/predicates_test.go", acsOnlyPredicate)
+		r.Git("add", "-A")
+		r.Git("commit", "-q", "-m", "build adds an untested function and its acs predicates")
+		return nil
+	})
+	base := repo.Git("rev-parse", "HEAD~1")
 	return repo, base
 }
 

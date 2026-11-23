@@ -265,14 +265,21 @@ func selectionHolds(selections []repocontract.TestSelection, pkg, test string) b
 	})
 }
 
+func repoContractBaseRepo(t *testing.T) (*gittest.Repo, string) {
+	t.Helper()
+	repo := gittest.FromTemplate(t, "core-repocontract-gomod", func(r *gittest.Repo) error {
+		r.Write("go/go.mod", "module github.com/mickeyyaya/evolve-loop/go\n\ngo 1.23\n")
+		r.Git("add", "-A")
+		r.Git("commit", "-q", "-m", "base")
+		return nil
+	})
+	return repo, repo.Git("rev-parse", "HEAD")
+}
+
 func TestRepoContractFloorJudge_AWorkflowOnlyWorktreeRunsTheTestsThatReadIt(t *testing.T) {
 	t.Parallel()
 
-	repo := gittest.Fixture(t)
-	writeFile(t, filepath.Join(repo.Dir, "go", "go.mod"), "module github.com/mickeyyaya/evolve-loop/go\n\ngo 1.23\n")
-	repo.Git("add", "-A")
-	repo.Git("commit", "-q", "-m", "base")
-	base := repo.Git("rev-parse", "HEAD")
+	repo, base := repoContractBaseRepo(t)
 	writeFile(t, filepath.Join(repo.Dir, ".github", "workflows", "required.yml"), "name: required\n")
 	pack := &fakeRepoContractPack{}
 	in := ReviewInput{Phase: string(PhaseBuild), Worktree: repo.Dir, ProjectRoot: repo.Dir, WorktreeBaseSHA: base}
@@ -290,11 +297,7 @@ func TestRepoContractFloorJudge_AWorkflowOnlyWorktreeRunsTheTestsThatReadIt(t *t
 func TestRepoContractFloorJudge_AGoOnlyWorktreeHandsThePackOnlyGoPaths(t *testing.T) {
 	t.Parallel()
 
-	repo := gittest.Fixture(t)
-	writeFile(t, filepath.Join(repo.Dir, "go", "go.mod"), "module github.com/mickeyyaya/evolve-loop/go\n\ngo 1.23\n")
-	repo.Git("add", "-A")
-	repo.Git("commit", "-q", "-m", "base")
-	base := repo.Git("rev-parse", "HEAD")
+	repo, base := repoContractBaseRepo(t)
 	writeFile(t, filepath.Join(repo.Dir, "go", "x.go"), "package x\n")
 	pack := &fakeRepoContractPack{}
 	in := ReviewInput{Phase: string(PhaseBuild), Worktree: repo.Dir, ProjectRoot: repo.Dir, WorktreeBaseSHA: base}

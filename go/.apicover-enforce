@@ -902,3 +902,4 @@
 ./internal/wavehealth
 ./internal/mainsync
 ./internal/docstests
+./internal/gitstarts

@@ -74,17 +74,19 @@ func TestCoverChangedFailures_StrictRunner(t *testing.T) {
 
 func strictListedRepo(t *testing.T) (*gittest.Repo, string) {
 	t.Helper()
-	repo := gittest.Fixture(t)
-	writeFile(t, filepath.Join(repo.Dir, "go", "go.mod"), "module example.com/m\n\ngo 1.23\n")
-	writeFile(t, filepath.Join(repo.Dir, "go", ".cover-strict"), "./p 100\n./q 100\n")
-	writeFile(t, filepath.Join(repo.Dir, "go", "p", "a.go"), "package p\n\nfunc F(x int) int {\n\treturn x\n}\n")
-	writeFile(t, filepath.Join(repo.Dir, "go", "p", "b.go"), "package p\n\nfunc G() int {\n\treturn 2\n}\n")
-	writeFile(t, filepath.Join(repo.Dir, "go", "q", "q.go"), "package q\n\nfunc Q() int {\n\treturn 3\n}\n")
-	repo.Git("add", "-A")
-	repo.Git("commit", "-q", "-m", "base")
-	base := repo.Git("rev-parse", "HEAD")
-	writeFile(t, filepath.Join(repo.Dir, "go", "p", "a.go"), "package p\n\nfunc F(x int) int {\n\tif x > 0 {\n\t\treturn 1\n\t}\n\treturn x\n}\n")
-	repo.Git("commit", "-q", "-am", "build")
+	repo := gittest.FromTemplate(t, "core-cover-strict-listed", func(r *gittest.Repo) error {
+		r.Write("go/go.mod", "module example.com/m\n\ngo 1.23\n")
+		r.Write("go/.cover-strict", "./p 100\n./q 100\n")
+		r.Write("go/p/a.go", "package p\n\nfunc F(x int) int {\n\treturn x\n}\n")
+		r.Write("go/p/b.go", "package p\n\nfunc G() int {\n\treturn 2\n}\n")
+		r.Write("go/q/q.go", "package q\n\nfunc Q() int {\n\treturn 3\n}\n")
+		r.Git("add", "-A")
+		r.Git("commit", "-q", "-m", "base")
+		r.Write("go/p/a.go", "package p\n\nfunc F(x int) int {\n\tif x > 0 {\n\t\treturn 1\n\t}\n\treturn x\n}\n")
+		r.Git("commit", "-q", "-am", "build")
+		return nil
+	})
+	base := repo.Git("rev-parse", "HEAD~1")
 	return repo, base
 }
 

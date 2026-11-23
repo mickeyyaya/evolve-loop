@@ -30,15 +30,22 @@ func seedTestAuditConfig(t *testing.T, worktree string) {
 
 func auditRepo(t *testing.T, files map[string]string) (*gittest.Repo, string) {
 	t.Helper()
-	repo := gittest.Fixture(t)
-	writeFile(t, filepath.Join(repo.Dir, "go", "go.mod"), auditBaseModule)
-	seedTestAuditConfig(t, repo.Dir)
-	writeFile(t, filepath.Join(repo.Dir, "go", "q", "q.go"), auditBaseSource)
-	for rel, body := range files {
-		writeFile(t, filepath.Join(repo.Dir, filepath.FromSlash(rel)), body)
+	repo := gittest.FromTemplate(t, "core-testaudit-base", func(r *gittest.Repo) error {
+		r.Write("go/go.mod", auditBaseModule)
+		r.Write("go/internal/testaudit/fakes.json", auditFakesJSON)
+		r.Write("go/internal/testaudit/guards.json", auditGuardsJSON)
+		r.Write("go/q/q.go", auditBaseSource)
+		r.Git("add", "-A")
+		r.Git("commit", "-q", "-m", "base")
+		return nil
+	})
+	if len(files) > 0 {
+		for rel, body := range files {
+			writeFile(t, filepath.Join(repo.Dir, filepath.FromSlash(rel)), body)
+		}
+		repo.Git("add", "-A")
+		repo.Git("commit", "-q", "-m", "files")
 	}
-	repo.Git("add", "-A")
-	repo.Git("commit", "-q", "-m", "base")
 	return repo, repo.Git("rev-parse", "HEAD")
 }
 

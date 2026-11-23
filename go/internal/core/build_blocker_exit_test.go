@@ -72,13 +72,15 @@ func runBlockerCycleWith(t *testing.T, failures, defects []string, member func(s
 func runBlockerRounds(t *testing.T, failures []string, build claimingBuild, member func(string) bool, decision string, env map[string]string, tune func(map[Phase]PhaseRunner), extras ...blockerExtra) blockerRun {
 	t.Helper()
 	root := writeClaimableInbox(t, 1)
-	repo := gittest.Fixture(t)
-	for _, rel := range []string{selfcheckPath, breakerPath} {
-		writeBlockerFile(t, repo.Dir, rel, "package core\n")
-	}
-	writeBlockerFile(t, repo.Dir, "go/acs/cycle10/predicates_test.go", strings.ReplaceAll(cycle1950Predicates, "cycle1950", "cycle10"))
-	repo.Git("add", "-A")
-	repo.Git("commit", "-q", "-m", "base")
+	repo := gittest.FromTemplate(t, "core-blocker-exit-base", func(r *gittest.Repo) error {
+		for _, rel := range []string{selfcheckPath, breakerPath} {
+			r.Write(rel, "package core\n")
+		}
+		r.Write("go/acs/cycle10/predicates_test.go", strings.ReplaceAll(cycle1950Predicates, "cycle1950", "cycle10"))
+		r.Git("add", "-A")
+		r.Git("commit", "-q", "-m", "base")
+		return nil
+	})
 	run := blockerRun{worktree: &fakeWorktree{path: repo.Dir}}
 	runners := buildRunners(nil)
 	runners[PhaseTriage] = triageDecisionRunner{verdict: VerdictPASS, decision: decision}
@@ -182,11 +184,13 @@ func TestBuildBlockerExit_NoRouteWithoutOneCommittedItem(t *testing.T) {
 
 func TestWorktreeDiffSince_NamesChangedPathsAndTestsThatLostLines(t *testing.T) {
 	t.Parallel()
-	repo := gittest.Fixture(t)
-	writeBlockerFile(t, repo.Dir, "go/p/a_test.go", "package p\n\nfunc A() {}\n\nfunc B() {}\n")
-	writeBlockerFile(t, repo.Dir, "go/p/b_test.go", "package p\n")
-	repo.Git("add", "-A")
-	repo.Git("commit", "-q", "-m", "base")
+	repo := gittest.FromTemplate(t, "core-blocker-diff-base", func(r *gittest.Repo) error {
+		r.Write("go/p/a_test.go", "package p\n\nfunc A() {}\n\nfunc B() {}\n")
+		r.Write("go/p/b_test.go", "package p\n")
+		r.Git("add", "-A")
+		r.Git("commit", "-q", "-m", "base")
+		return nil
+	})
 	writeBlockerFile(t, repo.Dir, "go/p/a_test.go", "package p\n\nfunc A() {}\n")
 	writeBlockerFile(t, repo.Dir, "go/p/b_test.go", "package p\n\nfunc C() {}\n")
 	writeBlockerFile(t, repo.Dir, "go/p/new.go", "package p\n")
@@ -202,8 +206,10 @@ func TestWorktreeDiffSince_NamesChangedPathsAndTestsThatLostLines(t *testing.T) 
 }
 
 func TestWorktreeDiffSince_AGitFaultIsAnEvidenceFaultNotAnEmptyDiff(t *testing.T) {
-	repo := gittest.Fixture(t)
-	repo.Git("commit", "-q", "--allow-empty", "-m", "base")
+	repo := gittest.FromTemplate(t, "core-empty-commit-base", func(r *gittest.Repo) error {
+		r.Git("commit", "-q", "--allow-empty", "-m", "base")
+		return nil
+	})
 	if _, fault := worktreeDiffSince(context.Background(), t.TempDir(), "HEAD"); fault == "" {
 		t.Error("a tree that is not a repository must not read as an empty diff")
 	}

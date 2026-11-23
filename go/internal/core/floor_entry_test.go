@@ -65,17 +65,25 @@ func TestFloorEntryRun_AnUnreadableRootIsAnErrorAndTheJudgeNeverRuns(t *testing.
 	}
 }
 
+func emptyFloorCommitRepo(t *testing.T) *gittest.Repo {
+	t.Helper()
+	return gittest.FromTemplate(t, "core-floor-entry-empty", func(r *gittest.Repo) error {
+		r.Git("commit", "--allow-empty", "-m", "base")
+		return nil
+	})
+}
+
 func TestFloorPaths_ReadsTheChangeAndErrorsOnAnUnreadableBase(t *testing.T) {
 	t.Parallel()
 	if paths, err := floorPaths(context.Background(), ReviewInput{}); err != nil || paths != nil {
 		t.Errorf("floorPaths with no worktree = %v, %v, want none", paths, err)
 	}
-	repo := gittest.Fixture(t)
-	if err := os.WriteFile(filepath.Join(repo.Dir, "old.go"), []byte("package p\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	repo.Git("add", "-A")
-	repo.Git("commit", "-m", "base")
+	repo := gittest.FromTemplate(t, "core-floor-entry-oldgo", func(r *gittest.Repo) error {
+		r.Write("old.go", "package p\n")
+		r.Git("add", "-A")
+		r.Git("commit", "-m", "base")
+		return nil
+	})
 	if err := os.WriteFile(filepath.Join(repo.Dir, "new.go"), []byte("package p\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -90,8 +98,7 @@ func TestFloorPaths_ReadsTheChangeAndErrorsOnAnUnreadableBase(t *testing.T) {
 
 func TestFloorJudges_AnUnreadableBaseIsAnErrorForTheUnitAndCoverJudges(t *testing.T) {
 	t.Parallel()
-	repo := gittest.Fixture(t)
-	repo.Git("commit", "--allow-empty", "-m", "base")
+	repo := emptyFloorCommitRepo(t)
 	in := ReviewInput{Worktree: repo.Dir, ProjectRoot: repo.Dir, WorktreeBaseSHA: strings.Repeat("0", 40)}
 	for name, judge := range map[string]FloorJudge{"unit": UnitTestFloorJudge, "cover": CoverChangedFloorJudge} {
 		if lines, err := judge(context.Background(), in); err == nil || len(lines) != 0 {
@@ -102,8 +109,7 @@ func TestFloorJudges_AnUnreadableBaseIsAnErrorForTheUnitAndCoverJudges(t *testin
 
 func TestWorktreePathsSince_AFailedDiffIsAnErrorAndKeepsTheUntrackedPaths(t *testing.T) {
 	t.Parallel()
-	repo := gittest.Fixture(t)
-	repo.Git("commit", "--allow-empty", "-m", "base")
+	repo := emptyFloorCommitRepo(t)
 	if err := os.WriteFile(filepath.Join(repo.Dir, "new.go"), []byte("package p\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

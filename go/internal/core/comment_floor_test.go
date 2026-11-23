@@ -47,11 +47,13 @@ func TestCommentFloorResult_ShadowOnlyWarnsAndOffOrACleanDiffIsSilent(t *testing
 func TestCommentFloorFailures_JudgesTheWorktreeAgainstItsBaseAndSparesAMovedComment(t *testing.T) {
 	t.Parallel()
 
-	repo := gittest.Fixture(t)
-	writeFile(t, filepath.Join(repo.Dir, "go", "p", "a.go"), "package p\n\n// keeps the lease across resume.\nfunc a() {}\n")
-	writeFile(t, filepath.Join(repo.Dir, "go", "p", "old.go"), "package p\n\n// renamed along with its file.\nfunc o() {}\n")
-	repo.Git("add", "-A")
-	repo.Git("commit", "-q", "-m", "base")
+	repo := gittest.FromTemplate(t, "core-comment-floor-moved", func(r *gittest.Repo) error {
+		r.Write("go/p/a.go", "package p\n\n// keeps the lease across resume.\nfunc a() {}\n")
+		r.Write("go/p/old.go", "package p\n\n// renamed along with its file.\nfunc o() {}\n")
+		r.Git("add", "-A")
+		r.Git("commit", "-q", "-m", "base")
+		return nil
+	})
 	base := repo.Git("rev-parse", "HEAD")
 	writeFile(t, filepath.Join(repo.Dir, "go", "p", "a.go"), "package p\n")
 	writeFile(t, filepath.Join(repo.Dir, "go", "p", "lease.go"), "package p\n\n// keeps the lease across resume.\nfunc a() {}\n\n// restates the helper.\nfunc h() {}\n")
@@ -73,10 +75,12 @@ func TestCommentFloorFailures_JudgesTheWorktreeAgainstItsBaseAndSparesAMovedComm
 func TestDefaultBuildFloorChecks_RunsTheCommentFloor(t *testing.T) {
 	t.Parallel()
 
-	repo := gittest.Fixture(t)
-	writeFile(t, filepath.Join(repo.Dir, "notes", "a.go"), "package notes\n")
-	repo.Git("add", "-A")
-	repo.Git("commit", "-q", "-m", "base")
+	repo := gittest.FromTemplate(t, "core-comment-floor-default", func(r *gittest.Repo) error {
+		r.Write("notes/a.go", "package notes\n")
+		r.Git("add", "-A")
+		r.Git("commit", "-q", "-m", "base")
+		return nil
+	})
 	base := repo.Git("rev-parse", "HEAD")
 	writeFile(t, filepath.Join(repo.Dir, "notes", "a.go"), "package notes\n\n// restates the helper.\nfunc h() {}\n")
 	root := t.TempDir()

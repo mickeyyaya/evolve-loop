@@ -17,11 +17,13 @@ func steFloorFixture(t *testing.T, changed map[string]string) ReviewInput {
 	if err != nil {
 		t.Fatalf("read the standard: %v", err)
 	}
-	repo := gittest.Fixture(t)
-	writeFile(t, filepath.Join(repo.Dir, filepath.FromSlash(stelint.StandardPath)), string(standard))
-	writeFile(t, filepath.Join(repo.Dir, "docs", "old.md"), "We utilize the old text.\n")
-	repo.Git("add", "-A")
-	repo.Git("commit", "-q", "-m", "base")
+	repo := gittest.FromTemplate(t, "core-ste-floor-base", func(r *gittest.Repo) error {
+		r.Write(stelint.StandardPath, string(standard))
+		r.Write("docs/old.md", "We utilize the old text.\n")
+		r.Git("add", "-A")
+		r.Git("commit", "-q", "-m", "base")
+		return nil
+	})
 	base := repo.Git("rev-parse", "HEAD")
 	for path, body := range changed {
 		writeFile(t, filepath.Join(repo.Dir, filepath.FromSlash(path)), body)
@@ -144,14 +146,16 @@ func TestDocsFloorWarn_CleanOrOutOfScopeDocsPrintNothing(t *testing.T) {
 func TestDocsFloorWarn_AWorktreeWithoutTheStandardIsSilent(t *testing.T) {
 	t.Parallel()
 
-	repo := gittest.Fixture(t)
-	writeFile(t, filepath.Join(repo.Dir, "docs", "a.md"), "x\n")
-	repo.Git("add", "-A")
-	repo.Git("commit", "-q", "-m", "base")
-	base := repo.Git("rev-parse", "HEAD")
-	writeFile(t, filepath.Join(repo.Dir, "docs", "new.md"), longSentence(30)+"\n")
-	repo.Git("add", "-A")
-	repo.Git("commit", "-q", "-m", "change")
+	repo := gittest.FromTemplate(t, "core-ste-floor-nostd", func(r *gittest.Repo) error {
+		r.Write("docs/a.md", "x\n")
+		r.Git("add", "-A")
+		r.Git("commit", "-q", "-m", "base")
+		r.Write("docs/new.md", longSentence(30)+"\n")
+		r.Git("add", "-A")
+		r.Git("commit", "-q", "-m", "change")
+		return nil
+	})
+	base := repo.Git("rev-parse", "HEAD~1")
 	in := ReviewInput{Phase: string(PhaseBuild), ProjectRoot: t.TempDir(), Worktree: repo.Dir, WorktreeBaseSHA: base}
 
 	var sink injectedStderr
