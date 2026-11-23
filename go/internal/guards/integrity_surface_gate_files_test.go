@@ -164,6 +164,7 @@ var protectedGateFiles = []struct {
 	{"go/internal/testdup/", GateGuarantee},
 	{"go/internal/sizeratchet/", GateGuarantee},
 	{"go/internal/rawgitratchet/", GateGuarantee},
+	{"go/internal/emptytests/", GateGuarantee},
 	{"go/internal/baseattr/", GateGuarantee},
 	{"go/internal/mainstop/", GateGuarantee},
 	{"go/internal/core/base_red_floor.go", GateGuarantee},
