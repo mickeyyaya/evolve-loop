@@ -241,6 +241,7 @@ The data decides each cut. No cut starts before its metric has one wave of data.
 | 2026-10-27 | The operator approved design A (§5). | Status is approved. Design B stays a later stage under the conditions of §5.3. |
 | 2026-10-27 | T1 to T9 are filed in the runtime inbox (`.evolve/inbox/` of the runtime tree, 06:07Z). The inbox id of each item is the id in the §7 table. The routes are those of §7: T2, T5 and T8 go to the console, and the other six go to a lane. | The lane and the console build the items in the order of §8. |
 | 2026-10-27 | Q5: the ADR comes after one `shadow` wave of T1 and T7 data. | The ADR cites the measured data of that wave. |
+| 2026-11-21 | T8 needs no edit of `strict_keys.go`: the reflection walk covers the new `Telemetry` field. T8 touches no fence path. | The console keeps the route, because it already builds the item. |
 
 ## Delivery status (2026-11-21)
 
@@ -257,4 +258,3 @@ The data decides each cut. No cut starts before its metric has one wave of data.
 | T9 `claude-advisor-rows-measured` | done | [`737352d`](https://github.com/mickeyyaya/evolve-loop/commit/737352d1bd7eb54da1ee46c0a0e00a600540729e) (cycle 2098) | none |
 
 T7 and T8 are left, and each has an open inbox item. T2 and T5 are unfinished and have no open item, because [#1443](https://github.com/mickeyyaya/evolve-loop/pull/1443) removed them. The item `token-telemetry-adr-and-enforce-flips` left the inbox in the same PR, so the ADR of D1 to D10 has no item either. Follow-up drafts cover T2, T5 and the ADR. The status of the `shadow` to `enforce` flips of T1, T3, T4, T6 and T9 is unverified.
-
