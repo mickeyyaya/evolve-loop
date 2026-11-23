@@ -4,8 +4,17 @@
     "Red first: a dir with a mapped file in the injected holder snapshot stays",
     "The report bytes match the sum of the trimmed entries"
   ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2606",
+    "branch": "cycle-cd3ae73e-2606",
+    "snapshot_sha": "41862af221624efd8b8123117557ac46b6fe80ee",
+    "base_sha": "9ba6c06ca9f97daae06e7cd79c469ec5331f7335",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2606/audit-fail-reason.json",
+    "cycle": 2606
+  },
   "created_at": "2026-11-20T00:50:58Z",
   "deps": [],
+  "failure_count": 1,
   "files": [
     "go/internal/gc/gocache.go",
     "go/cmd/evolve/cmd_gc.go"
@@ -13,8 +22,15 @@
   "fix": "Treat each `<hash>-d` dir as one entry: its size is the sum of its files, and its use time is the newest mtime inside it. Count it in the cap and the age horizon. Spare a dir that holds a file open or mapped in the LiveHolderProbe snapshot (lsof -F n lists txt and mem fds). Re-check the mtime before each remove.",
   "id": "recycle-x2-gocache-counts-executable-dirs",
   "kind": "bug",
+  "last_failure_class": "capability",
+  "last_failure_cycle": 2606,
+  "last_failure_findings": "review gate: phase \"build\" deliverable rejected after 1 correction(s): build handoff floor: 1 deterministic check failure(s) — fix these exactly before handoff:\n  test-audit ratchet: testaudit: acs/cycle2606 TestC2606_010_EvolveGcSparesAnExecutableDirALiveProcessHolds skip-hides-error has no baseline row — remove the weak pattern (for error text: a sentinel error and errors.Is); Rebaseline refuses new rows",
+  "last_failure_fingerprint": "text:765035c6d93d",
+  "last_failure_reason": "cycle-failure-release",
+  "last_failure_rung": "R2",
   "origin": "console",
   "priority_class": "stability",
+  "retry_plan": "fresh-deep-plan",
   "summary": "Plan PR #1585, check K7, decision D12, component X2. TrimGoCache skips each directory entry (go/internal/gc/gocache.go:88). On 2026-11-20, 5,038 `<hash>-d` dirs held 35.9 GB (35.8 GB cached evolve binaries), 30.2 GB unused for 24 hours, while gc reported 20 GB remaining.",
   "title": "The Go cache trim counts and trims the cached executable dirs, and spares a held one",
   "weight": 0.9
