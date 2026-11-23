@@ -923,4 +923,10 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [plans/shadow-contract-k5-stage-flip-2026-11.md](plans/shadow-contract-k5-stage-flip-2026-11.md) | Plan: the design of K5. A green key flips at a wave boundary with no operator step. It sets the green rule, the enforce-path proof, the ship class, the rollback and the build order. |
 
+## 2026-11-23 — gc re-packs full-history salvage bundles with no loss
+
+| Document | What it records |
+|---|---|
+| [plans/gc-salvage-scope-2026-11.md](plans/gc-salvage-scope-2026-11.md) | Plan for `evolve gc --only salvage`. A survey shows 144 full-history bundles that hold 150.7 GiB. The plan scores three designs and builds the K6 migration of the recycle plan. It also closes the last full-history writer. |
+
 <!-- GENERATED:research-index END -->

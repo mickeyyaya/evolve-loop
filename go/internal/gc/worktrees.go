@@ -111,8 +111,16 @@ func (o WorktreeOptions) now() time.Time {
 }
 
 func (o WorktreeOptions) git(dir string, args ...string) (string, error) {
+	return o.gitWithEnv(nil, dir, args...)
+}
+
+func (o WorktreeOptions) gitCLocale(dir string, args ...string) (string, error) {
+	return o.gitWithEnv(cLocaleEnv(), dir, args...)
+}
+
+func (o WorktreeOptions) gitWithEnv(env []string, dir string, args ...string) (string, error) {
 	var out strings.Builder
-	code, err := o.Exec(context.Background(), "git", dir, args, nil, nil, &out, nil)
+	code, err := o.Exec(context.Background(), "git", dir, args, env, nil, &out, nil)
 	if err != nil {
 		return out.String(), fmt.Errorf("gc: git %s: %w", strings.Join(args, " "), err)
 	}
