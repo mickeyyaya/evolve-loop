@@ -79,6 +79,6 @@ func (a *auditClassification) finalize() {
 			a.fail("host predicate evidence", "host predicate evidence: "+err.Error())
 		}
 	}
-	recordChainShadow(a.artifact, a.req, a.narrative, a.verdict, a.overrodeBy)
+	recordChainShadow(a.artifact, a.req, a.narrative, a.verdict, a.overrodeBy, a.ledgerFindings, a.ledgerNote)
 	a.diagnostics = append(a.diagnostics, recordCascadeShadow(a.hooks.signals, a.req, a.verdict)...)
 }

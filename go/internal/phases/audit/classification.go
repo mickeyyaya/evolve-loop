@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acssuite"
+	"github.com/mickeyyaya/evolve-loop/go/internal/auditchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
 )
@@ -20,6 +21,9 @@ type auditClassification struct {
 	verdictFound bool
 	diagnostics  []core.Diagnostic
 	overrodeBy   []string
+
+	ledgerFindings []auditchain.LedgerFinding
+	ledgerNote     string
 
 	redCount      int
 	acsErr        error

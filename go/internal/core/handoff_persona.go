@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -76,6 +77,36 @@ func stampedRound(raw json.RawMessage) int {
 	return stamp.Round
 }
 
+func recordedOutputDigest(fields map[string]json.RawMessage) string {
+	var recorded string
+	_ = json.Unmarshal(fields["output_digest"], &recorded)
+	return recorded
+}
+
+func staleDigestOf(fields map[string]json.RawMessage, tree string) string {
+	recorded := recordedOutputDigest(fields)
+	if tree == "" || recorded == "" || recorded == tree || ledgerRound(fields["round"]) > stampedRound(fields["stamp"]) {
+		return ""
+	}
+	return recorded
+}
+
+func outputDigestStaleAt(path, tree string) string {
+	raw, err := ReadHandoffLedger(path)
+	if err != nil || handoff.IsCheckOnly(raw) {
+		return ""
+	}
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(raw, &fields) != nil {
+		return ""
+	}
+	return staleDigestOf(fields, tree)
+}
+
+func OutputDigestStale(ctx context.Context, projectRoot, worktree, workspace, ledgerPath string) string {
+	return outputDigestStaleAt(ledgerPath, worktreeContentSHA(ctx, projectRoot, worktree, workspace))
+}
+
 func stampLedger(path string, in ReviewInput, tree string) (string, error) {
 	raw, err := ReadHandoffLedger(path)
 	if errors.Is(err, fs.ErrNotExist) || (err == nil && handoff.IsCheckOnly(raw)) {
@@ -99,10 +130,9 @@ func stampLedger(path string, in ReviewInput, tree string) (string, error) {
 		fmt.Fprintf(in.errOut(), "[orchestrator] WARN handoff %s: no dispatch record names the author, so it is set to %s (%s)\n", filepath.Base(path), handoffUnattributed, cause)
 	}
 	stamp["author"] = author
-	var recorded string
-	_ = json.Unmarshal(fields["output_digest"], &recorded)
+	recorded := recordedOutputDigest(fields)
 	round := ledgerRound(fields["round"])
-	stale := ""
+	stale := staleDigestOf(fields, tree)
 	switch {
 	case tree == "":
 	case recorded == "":
@@ -112,8 +142,6 @@ func stampLedger(path string, in ReviewInput, tree string) (string, error) {
 	case round > stampedRound(fields["stamp"]):
 		stamp["output_digest"] = tree
 		stamp["stamp"] = handoffStamp{Round: round}
-	default:
-		stale = recorded
 	}
 	doc := make(map[string]any, len(fields)+len(stamp))
 	for key, value := range fields {

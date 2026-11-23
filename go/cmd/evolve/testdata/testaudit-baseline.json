@@ -347,11 +347,6 @@
     },
     {
       "package": "cmd/evolve",
-      "test": "TestHandoffCoverage_APairWithoutARequestIsAnError",
-      "rule": "error-text-match"
-    },
-    {
-      "package": "cmd/evolve",
       "test": "TestInboxItemFiles_ReadsTheDeclaredFilesAndReportsEachLostClaim",
       "rule": "error-text-match"
     },
