@@ -99,3 +99,15 @@ func TestWithSignals_TheFirstShipLandedSignalGivesTheShipTime(t *testing.T) {
 		t.Errorf("ShippedAt = %v, %v; want the first signal at %v", c.ShippedAt, err, want)
 	}
 }
+
+func TestWithSignals_AShipMergedEventIsNotAShip(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "signals.ndjson")
+	writeLines(t, path, `{"ts":"2026-10-21T10:00:00Z","kind":"ship.merged","phase":"ship","fields":{"cycle":"7"}}`)
+
+	c, err := withSignals(Cycle{}, path)
+
+	if err != nil || c.Shipped || !c.ShippedAt.IsZero() {
+		t.Fatalf("cycle = %+v, %v; want no ship from a ship.merged event", c, err)
+	}
+}

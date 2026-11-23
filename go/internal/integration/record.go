@@ -223,11 +223,16 @@ func (r Repo) PublishBranch(ctx context.Context, rec IntegrationRecord) error {
 }
 
 func (r Repo) StartBatchFromOrigin(ctx context.Context, wave string, index int) (Batch, error) {
+	return r.CutFromOrigin(ctx, Batch{Wave: wave, Index: index})
+}
+
+func (r Repo) CutFromOrigin(ctx context.Context, b Batch) (Batch, error) {
 	out, err := r.Git(ctx, r.Dir, "", "rev-parse", "--verify", "--end-of-options", originMainRef+"^{commit}")
 	if err != nil {
 		return Batch{}, fmt.Errorf("integration: read %s: %w", originMainRef, err)
 	}
-	return r.StartBatch(ctx, Batch{Wave: wave, Index: index, Base: strings.TrimSpace(out)})
+	b.Base = strings.TrimSpace(out)
+	return r.StartBatch(ctx, b)
 }
 
 func (r Repo) DeleteBatch(ctx context.Context, b Batch) error {

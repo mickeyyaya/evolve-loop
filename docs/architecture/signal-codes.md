@@ -543,7 +543,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_INTEGRATION_DRIVER_FAILED` | the integration driver failed a step. fields.step names the step and fields.error the error; failure writes to the wave record too, so lost signals cannot hide it |
 | `SHIP_INTEGRATION_EJECTED` | a deliverable went back to its lane. fields.cause names why (conflict, gate, or proof); fields.paths lists conflicted paths. fields.brief_file holds the long brief path |
 | `SHIP_INTEGRATION_FLUSHED` | a batch PR opened; fields.trigger names the flush trigger and fields.pr the PR |
-| `SHIP_INTEGRATION_MERGED` | a batch PR merged into main by a fast-forward to the tested tip; fields.pr names the PR and fields.tip the tip |
+| `SHIP_INTEGRATION_MERGED` | a deliverable merged into main by the fast-forward of its batch (kind ship.merged); fields.cycle names the cycle, fields.pr the batch PR and fields.tip the tested tip |
 | `SHIP_INTEGRATION_REVERTED` | the check after a merge reverted one cycle commit alone; fields.cycle names it and fields.commit the reverted commit |
 | `SHIP_INTEGRITY_TREE_DRIFT` | post-ship: the shipped tree drifted from the verified one (integrity) |
 | `SHIP_INVALID_CLASS` | verify-class: unknown ship class |

@@ -24,6 +24,10 @@ const (
 	actorOrigin = "integration.ShadowActor"
 )
 
+func IsShadow(fields map[string]string) bool {
+	return fields[fieldShadow] == shadowTrue
+}
+
 type Publisher interface {
 	Emit(signalcenter.Event)
 }

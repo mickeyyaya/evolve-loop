@@ -133,7 +133,7 @@ func TestReadWave_APlantedShippedFlagCountsNothing(t *testing.T) {
 func TestReadWave_TheStageSelectsTheShipRule(t *testing.T) {
 	t.Parallel()
 	p := newPlane(t)
-	writeDeliverable(t, p.root, "w1", deliverable(9, shipEpoch.Add(time.Minute)))
+	writeWavePool(t, p.root, 1, merged(9, shipEpoch.Add(time.Minute)))
 	enforce := shadowWindow(10)
 	enforce.Stage = policy.FleetIntegrationEnforce
 

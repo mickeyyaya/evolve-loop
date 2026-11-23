@@ -122,6 +122,7 @@ const (
 	KindShipError              Kind = "ship.error"
 	KindShipWarning            Kind = "ship.warning"
 	KindShipDelivered          Kind = "ship.delivered"
+	KindShipMerged             Kind = "ship.merged"
 	KindSystemFailure          Kind = "system.failure"
 	KindQuotaPaused            Kind = "quota.paused"
 	KindLoginRequired          Kind = "login.required"
@@ -177,7 +178,7 @@ const (
 
 var knownKinds = map[Kind]bool{
 	KindPhaseDispatched: true, KindPhaseOutcome: true, KindPhaseAborted: true, KindGateRejected: true,
-	KindGatePassed: true, KindGateCorrected: true, KindShipLanded: true, KindShipError: true, KindShipWarning: true, KindShipDelivered: true, KindSystemFailure: true,
+	KindGatePassed: true, KindGateCorrected: true, KindShipLanded: true, KindShipError: true, KindShipWarning: true, KindShipDelivered: true, KindShipMerged: true, KindSystemFailure: true,
 	KindQuotaPaused: true, KindLoginRequired: true, KindBridgeWarning: true, KindBridgeTripwire: true, KindPaneLiveness: true,
 	KindLedgerAppended: true, KindOutcomeWarning: true, KindFailureDiagWarning: true, KindCarryoverWarning: true, KindFailureLearningWarning: true, KindConfigWarning: true, KindAdvisorWarning: true, KindRunnerWarning: true, KindInboxWarning: true, KindAuditWarning: true, KindObserverWarning: true, KindCycleSealed: true, KindLoopWave: true, KindLoopHalt: true, KindLoopWarning: true,
 	KindLoopEscalation: true, KindLoopStarted: true, KindLoopExit: true, KindLoopLost: true, KindListenerPanicked: true, KindRegistryDrift: true, KindSinkDropped: true,

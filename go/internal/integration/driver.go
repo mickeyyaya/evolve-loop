@@ -136,7 +136,43 @@ func (d *Driver) actor() (Actor, error) {
 	if !ok {
 		return nil, &stepError{stepStage, fmt.Errorf("the stage %q has no actor, so the driver does not start", stage)}
 	}
+	if r, ok := a.(readiness); ok {
+		if missing := r.Missing(); len(missing) > 0 {
+			return nil, &stepError{stepStage, &MissingPortError{Stage: stage, Ports: missing}}
+		}
+	}
 	return a, nil
+}
+
+type readiness interface {
+	Missing() []string
+}
+
+type MissingPortError struct {
+	Stage string
+	Ports []string
+}
+
+func (e *MissingPortError) Error() string {
+	return fmt.Sprintf("the stage %q has no %s port, so the driver does not start", e.Stage, strings.Join(e.Ports, ", "))
+}
+
+func (d *Driver) stageLabel() string {
+	if d.Stage == nil {
+		return policy.FleetIntegrationShadow
+	}
+	stage, err := d.Stage()
+	if err != nil {
+		return policy.FleetIntegrationShadow
+	}
+	return stage
+}
+
+func (d *Driver) stampStage(fields map[string]string) map[string]string {
+	if d.stageLabel() == policy.FleetIntegrationShadow {
+		fields[fieldShadow] = shadowTrue
+	}
+	return fields
 }
 
 func (d *Driver) Tick(ctx context.Context) error { return d.run(ctx, d.flushOnce) }
@@ -414,10 +450,18 @@ func (d *Driver) flush(ctx context.Context, actor Actor, decision FlushDecision,
 	}
 	index := len(d.rec.Batches) + 1
 	res, err := actor.Flush(ctx, PendingBatch{Pool: d.Pool, Index: index, Base: base, Trigger: decision.Trigger, Members: members})
+	d.absorb(res, decision)
 	if err != nil {
 		return &stepError{stepFlush, err}
 	}
-	d.rec.Batches = append(d.rec.Batches, res.Batch)
+	d.publishFlush(decision.Trigger, res.Batch)
+	return nil
+}
+
+func (d *Driver) absorb(res FlushResult, decision FlushDecision) {
+	if res.Batch.Branch != "" {
+		d.rec.Batches = append(d.rec.Batches, res.Batch)
+	}
 	for cycle, r := range res.Members {
 		m := d.rec.Members[cycle]
 		m.Status, m.Landed = r.Status, r.Landed
@@ -425,8 +469,6 @@ func (d *Driver) flush(ctx context.Context, actor Actor, decision FlushDecision,
 	}
 	d.rec.Failures = appendFailures(d.rec.Failures, res.Failures...)
 	d.rec.Decisions = append(d.rec.Decisions, flushRecord(decision, d.now()))
-	d.publishFlush(decision.Trigger, res.Batch)
-	return nil
 }
 
 func flushRecord(decision FlushDecision, at time.Time) FlushRecord {
@@ -446,10 +488,14 @@ func cycleOfID(id string) int {
 }
 
 func (d *Driver) publishFlush(trigger FlushTrigger, b IntegrationBatch) {
+	pr := "no PR"
+	if b.PR > 0 {
+		pr = "PR " + strconv.Itoa(b.PR)
+	}
 	d.emit(signalcenter.Event{
 		Kind: signalcenter.KindShipDelivered, Code: CodeFlushed, Severity: signalcenter.SeverityInfo,
-		Reason: fmt.Sprintf("shadow: pool %d batch %d flushed on %s with no PR", d.Pool, b.Index, trigger),
-		Fields: map[string]string{fieldPool: strconv.Itoa(d.Pool), fieldBatch: b.Branch, fieldTrigger: string(trigger), fieldPR: "0", fieldShadow: shadowTrue},
+		Reason: fmt.Sprintf("%s: pool %d batch %d flushed on %s with %s", d.stageLabel(), d.Pool, b.Index, trigger, pr),
+		Fields: d.stampStage(map[string]string{fieldPool: strconv.Itoa(d.Pool), fieldBatch: b.Branch, fieldTrigger: string(trigger), fieldPR: strconv.Itoa(b.PR)}),
 	})
 }
 
@@ -513,8 +559,8 @@ func (d *Driver) fail(err error) {
 	}
 	d.emit(signalcenter.Event{
 		Kind: signalcenter.KindShipWarning, Code: CodeDriverFailed, Severity: signalcenter.SeverityWarn,
-		Reason: fmt.Sprintf("shadow: the integration driver of pool %d failed the step %s: %v", d.Pool, step, err),
-		Fields: map[string]string{fieldStep: step, fieldError: err.Error(), fieldPool: strconv.Itoa(d.Pool), fieldShadow: shadowTrue},
+		Reason: fmt.Sprintf("%s: the integration driver of pool %d failed the step %s: %v", d.stageLabel(), d.Pool, step, err),
+		Fields: d.stampStage(map[string]string{fieldStep: step, fieldError: err.Error(), fieldPool: strconv.Itoa(d.Pool)}),
 	})
 	if d.rec != nil && d.stopped == nil {
 		d.rec.Failures = appendFailures(d.rec.Failures, DriverFailure{Step: step, Error: err.Error(), At: d.now()})
