@@ -37,6 +37,7 @@ func TestExecKillServer_RemovesTheDeadServersSocketFile(t *testing.T) {
 }
 
 func TestReapOrphanSockets_ReapsTheSameDeadSocketOnlyOnce(t *testing.T) {
+	t.Setenv("TMPDIR", t.TempDir())
 	t.Setenv("TMUX_TMPDIR", t.TempDir())
 	dir := bridge.TmuxSocketDir()
 	if err := os.MkdirAll(dir, 0o700); err != nil {
@@ -78,5 +79,21 @@ func TestExecListBridgeSockets_ReportsAnUnreadableSocketDirectory(t *testing.T) 
 
 	if !errors.Is(err, filepath.ErrBadPattern) || names != nil {
 		t.Fatalf("ExecListBridgeSockets = (%v, %v), want (nil, %v)", names, err, filepath.ErrBadPattern)
+	}
+}
+
+func TestExecKillServer_RemovesAnAbsoluteSocketPath(t *testing.T) {
+	t.Setenv("TMUX_TMPDIR", t.TempDir())
+	socket := filepath.Join(t.TempDir(), "evolve-bridge-t999994")
+	if err := os.WriteFile(socket, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ExecKillServer(context.Background(), socket); err != nil {
+		t.Fatalf("ExecKillServer: %v", err)
+	}
+
+	if _, err := os.Stat(socket); !os.IsNotExist(err) {
+		t.Fatalf("socket %s still present (stat err %v)", socket, err)
 	}
 }

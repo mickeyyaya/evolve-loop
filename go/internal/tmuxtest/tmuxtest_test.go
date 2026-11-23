@@ -54,6 +54,7 @@ func TestStopServer_RefusesAnEmptySocketSoItNeverKillsTheDefaultServer(t *testin
 }
 
 func TestReapDeadTestServers_ReapsDeadTestSocketsAndSparesLiveAndLoopSockets(t *testing.T) {
+	t.Setenv("TMPDIR", t.TempDir())
 	t.Setenv("TMUX_TMPDIR", t.TempDir())
 	dir := bridge.TmuxSocketDir()
 	if err := os.MkdirAll(dir, 0o700); err != nil {

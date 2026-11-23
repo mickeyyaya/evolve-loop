@@ -128,7 +128,7 @@ func ReapOrphanSockets(ctx context.Context, list SocketLister, alive PidLiveness
 		return rep
 	}
 	for _, s := range socks {
-		m := ownerPidSocketRE.FindStringSubmatch(s)
+		m := ownerPidSocketRE.FindStringSubmatch(filepath.Base(s))
 		if m == nil {
 			continue
 		}
@@ -154,9 +154,20 @@ var socketGlob = func() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	own := bridge.TmuxSocketDir()
 	names := make([]string, 0, len(matches))
 	for _, m := range matches {
 		names = append(names, filepath.Base(m))
+	}
+	for _, dir := range registeredTestSocketDirs() {
+		if dir == own {
+			continue
+		}
+		found, err := filepath.Glob(filepath.Join(dir, "evolve-bridge-[pt]*"))
+		if err != nil {
+			return nil, err
+		}
+		names = append(names, found...)
 	}
 	return names, nil
 }
@@ -167,8 +178,14 @@ func ExecKillServer(ctx context.Context, socket string) error {
 	if socket == "" {
 		return fmt.Errorf("refusing kill-server with an empty socket name")
 	}
-	_ = tmuxRun(ctx, "-L", socket, "kill-server")
-	if err := os.Remove(filepath.Join(bridge.TmuxSocketDir(), socket)); err != nil && !os.IsNotExist(err) {
+	path := filepath.Join(bridge.TmuxSocketDir(), socket)
+	args := []string{"-L", socket, "kill-server"}
+	if filepath.IsAbs(socket) {
+		path = socket
+		args = []string{"-S", socket, "kill-server"}
+	}
+	_ = tmuxRun(ctx, args...)
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove dead socket %s: %w", socket, err)
 	}
 	return nil

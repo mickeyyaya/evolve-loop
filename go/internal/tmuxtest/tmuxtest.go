@@ -68,6 +68,9 @@ func Main(m runner) int {
 		fmt.Fprintf(os.Stderr, "tmuxtest: %v\n", err)
 		return 1
 	}
+	if err := swarm.RegisterTestSocketDir(bridge.TmuxSocketDir()); err != nil {
+		fmt.Fprintf(os.Stderr, "tmuxtest: register the socket dir: %v\n", err)
+	}
 	return serve(m, socket)
 }
 
@@ -85,7 +88,7 @@ func listTestSockets() ([]string, error) {
 	}
 	var testSocks []string
 	for _, s := range socks {
-		if strings.HasPrefix(s, "evolve-bridge-t") {
+		if strings.HasPrefix(filepath.Base(s), "evolve-bridge-t") {
 			testSocks = append(testSocks, s)
 		}
 	}
