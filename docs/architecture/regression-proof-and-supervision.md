@@ -1,6 +1,6 @@
 # Regression proof and supervision: a fix proves itself, and a stuck agent says why
 
-**Status:** proposed, 2026-11-04. Each new name in this file is a proposal until its component lands: `GUARD_DENIED`, `guard_refused`, `FIX_PROOF_*`, `FLOOR_RETAKE_*`, `regression_proof.stage`, `Fix-Journey` and `go/test/journeys`.
+**Status:** proposed, 2026-11-04. `ISOLATION_GUARD_DENIED` and `guard_refused` are implemented (see section 6). Each other new name in this file is a proposal until its component lands: `FIX_PROOF_*`, `FLOOR_RETAKE_*`, `regression_proof.stage`, `Fix-Journey` and `go/test/journeys`.
 
 > [ADR-0159](adr/0159-the-loop-keeps-its-integration-train-and-takes-six-practices-from-the-2026-harness-projects.md) · plan: [harness-practices-2026-11](../plans/harness-practices-2026-11.md) and [§10 of the integration plan](../plans/wave-integration-2026-10.md#10-amendment-of-2026-11-04-console-prs-enter-the-train) · research: [harness-practices-2026-11](../research/harness-practices-2026-11.md).
 > This file is the spec of record for the regression proof gate, the journey registry, derived cycle liveness, the terminal refusal and the floor retake. [wave-orchestrator](wave-orchestrator.md) holds the integration train.
@@ -147,13 +147,16 @@ The chain treats each stall as transient. A guard denial does not depend on the 
 
 ### Solution
 
-Each guard denial emits `GUARD_DENIED` with the run id. When a stall limit ends a run, the bridge reads the denials of that run. A denial in the run makes the terminal reason `guard_refused`:
+Each guard denial emits `ISOLATION_GUARD_DENIED`. The guard command writes it to `<evolve-dir>/signals.ndjson`. The hook has no run id, so the event carries the working directory and a `neutral` flag. Only the `ship` guard is family-neutral. The `role`, `phase` and `docdelete` guards run in Claude Code panes only, so their events never end a chain.
 
-- The dispatch chain stops.
-- `evolve selfheal propose` stops the pass, and it records each other incident as skipped with this reason.
+The bridge records the size of the stream file of the pane when a launch starts. When a stall limit ends the launch (exit 81), the bridge reads the events after that offset. A neutral denial from the pane directory makes the cause `guard_refused`. A typed infrastructure cause (`pane_lost`, `transient_upstream` and the others) keeps its own code.
+
+- `TieringExit` is the one home of the chain rule. It maps exit 81 with the cause `guard_refused` to the exit `ExitGuardRefused`. That exit is in no trigger list, so the dispatch chain stops after one try.
+- A guard refusal benches no family and does not surface a wall.
+- `evolve agent run` copies the cause into the field `cause_code` of its envelope. `evolve selfheal propose` stops the pass on that cause. It records each other incident as `skipped` with the reason `guard_refused`. A `skipped` proposal is proposed again with the retry rule of a `failed` one.
 - The summary names the guard and the path.
 
-A stall with no denial keeps today's behavior.
+A stall with no denial keeps today's behavior. The pane can write its own stream file, so a forged event can only shorten a chain. It never makes a phase pass. A denial by the sandbox, the worktree fence or the `evolve ship` gate does not emit the event yet.
 
 ## 7. Floor parity
 

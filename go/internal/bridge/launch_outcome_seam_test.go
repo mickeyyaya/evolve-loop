@@ -106,7 +106,7 @@ func nonTestSourcesWhere(t *testing.T, matches func(body string) bool) []string 
 func TestLaunchOutcome_OneClassificationSite(t *testing.T) {
 	t.Parallel()
 	for needle, want := range map[string][]string{
-		"launchoutcome.Classify(":  {"internal/bridge/engine.go"},
+		"launchoutcome.Attempt{":   {"internal/bridge/engine.go"},
 		"launchoutcome.CauseCode(": {"internal/bridge/attempt_telemetry.go"},
 		"ValidateRequest(req)":     {"internal/adapters/bridge/bridge.go", "internal/bridge/engine.go"},
 	} {

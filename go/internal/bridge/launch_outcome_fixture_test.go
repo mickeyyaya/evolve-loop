@@ -45,6 +45,8 @@ func (launchOutcomeFixtureDriver) Launch(_ context.Context, cfg *Config, deps De
 			code, _ = strconv.Atoi(strings.TrimPrefix(flag, "exit="))
 		case strings.HasPrefix(flag, "stderr="):
 			fmt.Fprint(deps.Stderr, launchStderrFixtures[strings.TrimPrefix(flag, "stderr=")])
+		case strings.HasPrefix(flag, "deny="):
+			writeFixtureDenial(strings.TrimPrefix(flag, "deny="))
 		case flag == "artifact=both":
 			_ = os.WriteFile(cfg.Artifact, []byte(launchFixtureArtifactBody), 0o644)
 			_ = os.WriteFile(cfg.StdoutLog, []byte(launchFixtureScrollbackBody), 0o644)

@@ -13,6 +13,7 @@ import (
 
 	gobridge "github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/agentcmd"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxfile"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
@@ -102,8 +103,13 @@ func proposeDiagnoses(env selfhealEnv, root string, pol policy.Policy, stderr io
 		return report, nil, err
 	}
 	var proposals []selfheal.Proposal
-	for _, inc := range pending {
-		proposals = append(proposals, decider.decide(diagnoseIncident(env, root, inc, signals, cfg.Stage, now, stderr), inc, now))
+	for i, inc := range pending {
+		p := diagnoseIncident(env, root, inc, signals, cfg.Stage, now, stderr)
+		proposals = append(proposals, decider.decide(p, inc, now))
+		if p.State == selfheal.ProposalSkipped {
+			proposals = append(proposals, skippedAfterRefusal(pending[i+1:], inc, cfg.Stage, now)...)
+			break
+		}
 	}
 	if err := decider.appendLedger(evolveDir); err != nil {
 		return report, nil, err
@@ -116,6 +122,15 @@ func proposeDiagnoses(env selfhealEnv, root string, pol policy.Policy, stderr io
 	}
 	decider.publish(env, root, stderr)
 	return report, decider.warnings, nil
+}
+
+func skippedAfterRefusal(rest []selfheal.Incident, refused selfheal.Incident, stage string, now time.Time) []selfheal.Proposal {
+	reason := core.CauseGuardRefused + ": the pass stopped after the guard refusal of " + refused.ID
+	out := make([]selfheal.Proposal, 0, len(rest))
+	for _, inc := range rest {
+		out = append(out, selfheal.NewProposal(inc, stage, "", now).Skipped(reason))
+	}
+	return out
 }
 
 func hours(n int) time.Duration { return time.Duration(n) * time.Hour }
@@ -166,7 +181,7 @@ func decisionInventory(env selfhealEnv, pass proposePass) (selfheal.Inventory, [
 func (d *proposalDecider) decide(p selfheal.Proposal, inc selfheal.Incident, now time.Time) selfheal.Proposal {
 	var decision selfheal.Decision
 	switch {
-	case !d.on || p.State == selfheal.ProposalFailed:
+	case !d.on || p.NeverDiagnosed():
 		return p
 	case p.State == selfheal.ProposalRefused:
 		decision = d.validator.Refuse(inc, errors.New(p.Error), now)
@@ -205,6 +220,10 @@ func diagnoseIncident(env selfhealEnv, root string, inc selfheal.Incident, signa
 	}
 	run, err := runOrchestratorAgent(env, root, inc, stderr)
 	p := selfheal.NewProposal(inc, stage, run.RunLabel, now)
+	var refused GuardRefusedError
+	if errors.As(err, &refused) {
+		return p.Skipped(err.Error())
+	}
 	if err != nil {
 		return p.Failed(err)
 	}

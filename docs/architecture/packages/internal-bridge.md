@@ -277,6 +277,15 @@ The spec is [llm-isolation.md](../llm-isolation.md) §8.5 and §9.
 - `SandboxWrapRequest.Tag` carries `Config.DispatchID`. The profile puts it in the message of each guarded rule.
 - `launchSwept` calls `Deps.reportReadViolations` after the launch. On macOS it reads the sandbox reports of the tag through `Deps.SandboxReports` (`NewEngine` sets `logShowReports`, which runs `/usr/bin/log show --style ndjson`). `parseReadReports` keeps one report for each rule, target and process name, at most 20. It keeps the process name and the process id of each report line, and an absent name or id stays empty. `emitReadViolation` emits `ISOLATION_I4_VIOLATION` or `ISOLATION_I5_VIOLATION` with `action=logged` for an allowed read and `action=refused` for a denied read, and `source=sbpl-report`. The `process` and `pid` fields name the program that made the read, so the operator can find the source of a secret read.
 
+### The guard-refusal window (`denial_window.go`)
+
+A guard denial is a fact of the pane, read by the try. `Engine.launchModel` opens a `denialWindow` before `runAttempt`. The window holds the size of `<working dir>/.evolve/signals.ndjson` and the working directory. After an exit 81 the window reads the events from that offset and passes them to `launchoutcome.GuardRefusal`.
+
+- **The hook writes into the pane directory, not into the project root.** `.claude/settings.json` runs `guard ship --evolve-dir "$CLAUDE_PROJECT_DIR/.evolve"`, and Claude Code sets `CLAUDE_PROJECT_DIR` to the directory where the pane starts. `HookEvolveDir(workingDir)` is the one home of that path. `resolveWorkingDir` is the one home of the working directory, and `prepareTmuxREPL` calls it too. `TestHookEvolveDir_IsTheDirectoryTheShipHookWritesTo` parses the real hook command, so the two paths cannot drift.
+- **The refusal is computed once.** `recordModelAttempt` takes the `Refusal`, so the `llmcalls` row and `BridgeResponse.CauseCode` always agree. A boot-loss cause overrides the classified cause only on exit 80, so it never meets a refusal.
+- **The grain is the try.** A denial before the launch offset, of another working directory, or from a family-bound guard never matches. Without `--worktree` a standalone run shares the caller directory, so there the offset is the only separator. A missing or unreadable stream means no match, which is the old behavior.
+- **Limit.** The comparison is by path string. A hook `cwd` that differs by a symlink from the worktree path does not match, and the chain then walks as before.
+
 ### The driver factory (`resolve.go`)
 
 *Added 2026-10-17 by component F1 of [bridge-factory-2026-10](../../plans/bridge-factory-2026-10.md) ([ADR-0137](../adr/0137-one-bridge-factory-resolves-every-llm-cli-and-the-manifest-holds-its-facts.md)). The spec of record is [agent-bridge-factory](../agent-bridge-factory.md) §2 and §3.*

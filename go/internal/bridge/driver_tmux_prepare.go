@@ -27,12 +27,13 @@ type replPreparation struct {
 func prepareTmuxREPL(ctx context.Context, cfg *Config, deps Deps, lp tmuxLaunch) (replPreparation, int, error) {
 	prep := replPreparation{prefix: "[" + lp.name + "]"}
 
-	prep.workingDir = cfg.Worktree
-	if prep.workingDir == "" {
+	if cfg.Worktree == "" {
 		if v, _ := lookupEnv(deps, ipcenv.FleetKey); envchain.BoolValue(v, false) {
 			return prep, ExitBadFlags, fmt.Errorf("%s %w", prep.prefix, errWorktreeRequired)
 		}
-		prep.workingDir, _ = os.Getwd()
+	}
+	prep.workingDir = resolveWorkingDir(cfg.Worktree)
+	if cfg.Worktree == "" {
 		fmt.Fprintf(deps.Stderr, "%s WARN no worktree designated — falling back to process cwd %s (single-driver mode only; fleet mode refuses this)\n", prep.prefix, prep.workingDir)
 	}
 	if !IsDir(prep.workingDir) {

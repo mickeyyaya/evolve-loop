@@ -191,7 +191,7 @@ Each component has 100% coverage on each changed function, a test that is red wi
 | Component | Status | Change lists | Open item |
 |---|---|---|---|
 | R1 `role-guard-derives-the-active-cycle` | done | [`87e2e16`](https://github.com/mickeyyaya/evolve-loop/commit/87e2e16732d86e439c32f4238e222d72dc8a0425) | none |
-| R2 `guard-denial-ends-the-dispatch-chain` | not started | No change on main. | `guard-denial-ends-the-dispatch-chain` |
+| R2 `guard-denial-ends-the-dispatch-chain` | built, in review (2026-11-23) | Branch `console/c8-guard-denial-ends-the-dispatch-chain-r2`. Rule: `llmroute.TieringExit`. Signal: `ISOLATION_GUARD_DENIED` from `guards.EmitDenial`. Spec: section 6 of [regression-proof-and-supervision.md](../architecture/regression-proof-and-supervision.md). | The sandbox deny report, the worktree fence and the `evolve ship` gate do not emit the event yet (open work, not a defect of this item). |
 | R3 `build-floor-keeps-audit-rules` | done | [`5e774df`](https://github.com/mickeyyaya/evolve-loop/commit/5e774dfa33619e05aa6e16551b97af5a036df02c) (`go/internal/core/build_floor_retake.go`) | none |
 | R4 `landed-identity-zero-context` | done | [`7738221`](https://github.com/mickeyyaya/evolve-loop/commit/77382212342b4f8d8225486f3b9478e271ac7356), [PR #1580](https://github.com/mickeyyaya/evolve-loop/pull/1580) (consume record only) | none |
 | R5 `journey-registry-and-trailer` | not started | No `Fix-Journey` code on main. | `journey-registry-and-trailer` |

@@ -79,6 +79,7 @@ var serialTests = map[string]string{
 	"main.TestRunPlanAndExecute_AFailedPassStopsWithItsCode":                                                          "resets the phase registry",
 	"main.TestRunPlanAndExecute_AMalformedRequestExits1":                                                              "resets the phase registry",
 	"main.TestRunPlanAndExecute_ThePlanPathDefaultsToTheWorkspaceThenTheWorkingDirectory":                             "resets the phase registry and changes the working directory",
+	"main.TestSelfhealPropose_ASkippedIncidentIsProposedAgainAfterTheBackoff":                                         "swaps runner.DefaultRouter through fakeBridgeAgent",
 	"main.TestWireOrchestratorDeps_AnAdvisorWithoutARouteRefusesTheWiring":                                            "swaps runner.DefaultRouter",
 	"main.TestLanding_ABrokenRecordAndAFailedWriteAreErrors":                                                          "swaps seam landingCredential",
 	"main.TestLanding_AProcessWithoutTheDispatchCredentialCannotDecide":                                               "swaps seam landingCredential",

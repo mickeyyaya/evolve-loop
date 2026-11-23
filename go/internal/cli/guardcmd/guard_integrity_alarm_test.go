@@ -39,7 +39,7 @@ func TestRunGuard_RoleControlPlaneEdit_DeniesAndAlarms(t *testing.T) {
 	gate := filepath.Join(worktree, "go/acs/regression/flagreaders/readers_test.go")
 	input := `{"tool_name":"Edit","tool_input":{"file_path":"` + gate + `"}}`
 	var stdout, stderr bytes.Buffer
-	rc := RunGuard([]string{"--evolve-dir", evolveDir, "role"}, strings.NewReader(input), &stdout, &stderr)
+	rc := runVerb([]string{"--evolve-dir", evolveDir, "role"}, strings.NewReader(input), &stdout, &stderr)
 	if rc != 2 {
 		t.Fatalf("expected exit 2 (deny) for control-plane edit, got %d; stderr=%s", rc, stderr.String())
 	}
@@ -72,7 +72,7 @@ func TestRunGuard_RoleNormalSourceEdit_NoAlarm(t *testing.T) {
 	src := filepath.Join(worktree, "go/internal/widget/widget.go")
 	input := `{"tool_name":"Edit","tool_input":{"file_path":"` + src + `"}}`
 	var stdout, stderr bytes.Buffer
-	rc := RunGuard([]string{"--evolve-dir", evolveDir, "role"}, strings.NewReader(input), &stdout, &stderr)
+	rc := runVerb([]string{"--evolve-dir", evolveDir, "role"}, strings.NewReader(input), &stdout, &stderr)
 	if rc != 0 {
 		t.Fatalf("expected exit 0 (allow) for normal source, got %d; stderr=%s", rc, stderr.String())
 	}

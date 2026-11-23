@@ -120,6 +120,10 @@ The plan row X14 asks for "a closed action catalog, a validator, repair budgets 
 - **The order of the checks.** The catalog and the tier come first, because a wrong action has no preconditions to check. The repair controls come last. So a refusal names the most specific cause, and an action that cannot run never spends a budget slot.
 - **Inventory loads only on demand.** The verb reads the inbox, the ship journal and the ledger only when a pass has a pending incident. A missing inbox directory is an empty inventory. A corrupt ledger is exit 2, because the ledger is a record of this package. An unreadable ship journal is a warning: the boundary goes on, and each `revert-last-landing` is refused with `landing-in-window`.
 
+A guard refusal of the orchestrator seat stops the pass. `runAgentSeat` returns `GuardRefusedError` when the envelope cause is `guard_refused`. The loop of `proposeDiagnoses` breaks on it. It records the incident, and each unread incident of the pass, with the state `skipped` and the reason `guard_refused`. `ProposalRefused` is not reused, because it means that the catalog validator refused a diagnosis.
+
+`Proposal.NeverDiagnosed` is true for `failed` and `skipped`, so `Pending` proposes both again after the retry backoff. `decide` records no decision for them. `requestHandoff` treats the error as a plain failed seat.
+
 The verb `evolve selfheal propose` runs the validator after it parses each diagnosis. It appends the decisions of the pass to the ledger first. Then it writes the proposal records (field `decision`) and publishes the events.
 
 The ledger is the source of the budget. So after a fault before the ledger write, no proposal record has a decision that the ledger lacks. A fault after the ledger write makes the next pass decide the incident again, and the budget counts it twice. That error refuses more repairs, not fewer.

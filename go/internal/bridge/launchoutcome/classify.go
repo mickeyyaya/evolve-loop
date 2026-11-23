@@ -17,18 +17,30 @@ type Outcome struct {
 	Err          error
 }
 
+type Attempt struct {
+	Code    int
+	CtxErr  error
+	Stderr  string
+	Refusal Refusal
+}
+
 func Classify(code int, ctxErr error, stderr string) Outcome {
+	return Attempt{Code: code, CtxErr: ctxErr, Stderr: stderr}.Classify()
+}
+
+func (a Attempt) Classify() Outcome {
+	code, ctxErr, stderr := a.Code, a.CtxErr, a.Stderr
 	if code == ExitOK {
 		return Outcome{}
 	}
 	row := classOf(code)
-	out := Outcome{ExitCode: code, CauseCode: causeCodeOf(row, stderr), CtxCancelled: ctxErr != nil, Signal: row.signal}
+	out := Outcome{ExitCode: code, CauseCode: causeCodeOf(row, stderr, a.Refusal), CtxCancelled: ctxErr != nil, Signal: row.signal}
 	if row.code == ExitUnknownPrompt && quotaCauses[out.CauseCode] {
 		out.Signal = CodeExitQuotaWall
 	}
 	msg := fmt.Sprintf("bridge: launch exit=%d", code)
-	if cause := causeLine(code, stderr); cause != "" {
-		msg += ": " + cause
+	if detail := a.detail(out.CauseCode); detail != "" {
+		msg += ": " + detail
 	}
 	sentinel := row.sentinel
 	if row.sentinelOnCancel && ctxErr == nil {
@@ -45,6 +57,13 @@ func Classify(code int, ctxErr error, stderr string) Outcome {
 
 var quotaCauses = map[string]bool{"rate_limit": true, "exhausted": true}
 
+func (a Attempt) detail(cause string) string {
+	if cause == core.CauseGuardRefused {
+		return a.Refusal.Text()
+	}
+	return causeLine(a.Code, a.Stderr)
+}
+
 func causeLine(code int, stderr string) string {
 	cause := firstDiagnosticLine(stderr)
 	if code == ExitArtifactTimeout {
@@ -60,9 +79,13 @@ func causeLine(code int, stderr string) string {
 	return cause
 }
 
-func causeCodeOf(row exitClass, stderr string) string {
+func causeCodeOf(row exitClass, stderr string, refusal Refusal) string {
 	if row.code == ExitArtifactTimeout {
-		if cause := timeoutCauseCode(stderr); cause != "" {
+		cause := timeoutCauseCode(stderr)
+		if refusal.Present() && (cause == "" || cause == string(TimeoutIncomplete)) {
+			return core.CauseGuardRefused
+		}
+		if cause != "" {
 			return cause
 		}
 	}
@@ -75,8 +98,12 @@ func causeCodeOf(row exitClass, stderr string) string {
 }
 
 func CauseCode(code int, stderr string) string {
-	if code == ExitOK {
+	return Attempt{Code: code, Stderr: stderr}.CauseCode()
+}
+
+func (a Attempt) CauseCode() string {
+	if a.Code == ExitOK {
 		return ""
 	}
-	return causeCodeOf(classOf(code), stderr)
+	return causeCodeOf(classOf(a.Code), a.Stderr, a.Refusal)
 }
