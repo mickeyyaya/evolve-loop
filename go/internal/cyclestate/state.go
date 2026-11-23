@@ -72,6 +72,7 @@ type CycleState struct {
 	ShipRecoveryStamped             []string       `json:"ship_recovery_stamped,omitempty"`
 	AuditDeclineReason              string         `json:"audit_decline_reason,omitempty"`
 	AuditDispatches                 int            `json:"audit_dispatches,omitempty"`
+	ReviewRepair                    *ReviewRepair  `json:"review_repair,omitempty"`
 	AuditRepairActive               bool           `json:"audit_repair_active,omitempty"`
 	FailureDecisionUntrusted        bool           `json:"failure_decision_untrusted,omitempty"`
 	PredicateRepairBrief            string         `json:"predicate_repair_brief,omitempty"`
