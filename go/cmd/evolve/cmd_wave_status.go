@@ -47,6 +47,7 @@ type waveStatusReport struct {
 	Benched       []clihealth.Entry       `json:"benched,omitempty"`
 	Seats         []waveSeat              `json:"seats"`
 	Health        *pipelinerates.WaveView `json:"health,omitempty"`
+	Host          *waveHostReading        `json:"host,omitempty"`
 }
 
 func parseWaveReadArgs(args []string) (projectRoot string, asJSON bool, err error) {
@@ -137,6 +138,9 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 	report.Runs, report.Measures = runs, runs[len(runs)-1].Measures
 	report.Warnings = append(report.Warnings, measureWarnings...)
 	report.Health, report.Warnings = waveHealth(plane.root, env.now(), report.Warnings)
+	var hostWarnings []string
+	report.Host, hostWarnings = readWaveHost(plane.evolveDir, cur)
+	report.Warnings = append(report.Warnings, hostWarnings...)
 	if over := len(cycles) - waveStatusMaxCycles; over > 0 {
 		cycles, report.CyclesOmitted = cycles[over:], over
 	}
@@ -184,6 +188,7 @@ func writeWaveStatusText(w io.Writer, r waveStatusReport) {
 	if r.Health != nil {
 		fmt.Fprintln(w, r.Health.Line())
 	}
+	writeWaveHostText(w, r.Host)
 	if r.CyclesOmitted > 0 {
 		fmt.Fprintf(w, "  (%d older cycle(s) not shown)\n", r.CyclesOmitted)
 	}
@@ -349,7 +354,7 @@ func (w *waveWatcher) pollSignals() error {
 		if sig.Kind != signalcenter.KindLoopWave {
 			continue
 		}
-		if sig.Severity != signalcenter.SeverityWarn && !isPoolTransition(sig.Code) {
+		if !sig.Severity.AtLeast(signalcenter.SeverityWarn) && !isPoolTransition(sig.Code) {
 			continue
 		}
 		e := wave.Event{Kind: wave.EventPool, Detail: poolEventDetail(sig)}
@@ -366,6 +371,7 @@ func isPoolTransition(c signalcenter.Code) bool {
 		orchestrator.CodeLaneExited,
 		orchestrator.CodeLaneBackfilled,
 		orchestrator.CodePoolIdle,
+		orchestrator.CodePoolFloorHold,
 		orchestrator.CodeLaneStalled,
 		orchestrator.CodeLaneLateExit:
 		return true

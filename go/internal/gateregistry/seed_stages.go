@@ -5,6 +5,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gatecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/hostsentinel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -22,6 +23,20 @@ var stageSeeds = []stageSeed{
 	{key: "inbox.curator.stage"},
 	{key: "inbox.curator.trailer.stage"},
 	{key: "gc.remote_sweep.stage"},
+	{
+		key:     "gc.sentinel.hold.stage",
+		signal:  hostsentinel.CodeWouldHold,
+		site:    gatecontract.EmitSite{Path: "internal/hostsentinel/signals.go", Func: "WouldHold", Ref: "CodeWouldHold"},
+		fields:  []string{"would_hold", "free_bytes", "floor_bytes"},
+		closure: []string{"internal/hostsentinel"},
+	},
+	{
+		key:     "gc.sentinel.release.stage",
+		signal:  hostsentinel.CodeWouldRelease,
+		site:    gatecontract.EmitSite{Path: "internal/hostsentinel/signals.go", Func: "WouldRelease", Ref: "CodeWouldRelease"},
+		fields:  []string{"scopes", "free_bytes", "cache_bytes"},
+		closure: []string{"internal/hostsentinel"},
+	},
 	{key: "pr.merge_window.stage"},
 	{key: "workflow.findings_repair.code-review.stage"},
 	{key: "workflow.convergence.stage"},

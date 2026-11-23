@@ -171,10 +171,13 @@ func (b *loopBatchCoordinator) poolRunner(fleetConfig policy.FleetConfig, poolLa
 	if fleetConfig.Orchestrator.Stage == orchestrator.StageEnforce {
 		return b.orchestratedRun(fleetConfig, poolLaunch, iteration), "orchestrator"
 	}
-	return rollingPool(fleetConfig, poolLaunch, liveWidthFile(b.cfg.EvolveDir)), "rolling"
+	return rollingPool(fleetConfig, poolLaunch, liveWidthFile(b.cfg.EvolveDir), poolControl{hold: b.floorHold, halted: b.poolHalted}), "rolling"
 }
 
 func (b *loopBatchCoordinator) dispatchPool(iteration int, fleetConfig policy.FleetConfig, launch cycleLaunch) forkOutcome {
+	hold, stopSentinel := b.startSentinel(b.ctx)
+	defer stopSentinel()
+	b.floorHold = hold
 	run, mode := b.poolRunner(fleetConfig, launch.LaunchFn(), iteration)
 	ran, results, err := planAndRunPool(
 		b.ctx,
