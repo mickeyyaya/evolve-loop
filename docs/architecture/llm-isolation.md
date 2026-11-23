@@ -917,7 +917,9 @@ The cause is in the host setup. The git credential helper of the host for `https
 
 **S1. Git asks no credential helper in a cell.** The key set of `gittest.IsolateHostCredentials` (`internal/gittest/credentials.go`) moves to one production home, `ipcenv.CredentialIsolation(ghConfigDir, gitConfigGlobal)`. It returns a typed set with two parts:
 
-- `Set`: `GIT_CONFIG_GLOBAL` at the path that the caller gives, `GIT_CONFIG_NOSYSTEM=1`, `GIT_TERMINAL_PROMPT=0`, `GIT_SSH_COMMAND=ssh -o BatchMode=yes`, and `GH_CONFIG_DIR` at an empty dir of the workspace. `gittest` passes `os.DevNull` for the global config. A cell passes the file `<workspace>/gitconfig`.
+- `Set`: `GIT_CONFIG_GLOBAL` at the path that the caller gives, `GIT_CONFIG_NOSYSTEM=1`, `GIT_TERMINAL_PROMPT=0`, `GIT_SSH_COMMAND` at the constant `ipcenv.GitSSHCommand`, and `GH_CONFIG_DIR` at an empty dir of the workspace. `gittest` passes `os.DevNull` for the global config. A cell passes the file `<workspace>/gitconfig`.
+- The ssh command reads no ssh config, offers no agent and no key file, and never prompts. A cell fetch over ssh fails with an error. It never uses a key of the host. No cell and no phase fetches over ssh.
+- The contract tests `TestAgentSandboxContract_N8b_ACellGhCallSaysNotLoggedInAndReadsNoHostConfig` and `TestAgentSandboxContract_N8c_ACellGitHasNoCredentialHelper` run `gh` and `git` in the sandbox with the env of `Deps.cellEnv`, against a fake home.
 - `Unset`: `GH_TOKEN` and `GITHUB_TOKEN`. The key is dropped from the parent env, the manifest env (`cliEnv`, `default_env`) and `Deps.Env`.
 
 The builder commits in its worktree, and the git evidence of completion waits for that commit. Thus the cell keeps the commit identity.
