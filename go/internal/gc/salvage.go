@@ -89,8 +89,8 @@ const salvageOriginMainRef = "refs/remotes/origin/main"
 
 func bundleVerified(git gitRun, dir, file, ref, tip string) error {
 	args := []string{"bundle", "create", file, ref}
-	if hasOriginMain(git, dir) {
-		if count, ok := commitsAhead(git, dir, salvageOriginMainRef, tip); ok {
+	if _, err := originMainSHA(git, dir); err == nil {
+		if count, err := commitsAhead(git, dir, salvageOriginMainRef, tip); err == nil {
 			if count == 0 {
 				return nil
 			}
@@ -100,10 +100,7 @@ func bundleVerified(git gitRun, dir, file, ref, tip string) error {
 	if _, err := git(dir, args...); err != nil {
 		return err
 	}
-	if _, err := git(dir, "bundle", "verify", file); err != nil {
-		return err
-	}
-	heads, err := git(dir, "bundle", "list-heads", file)
+	_, heads, err := verifyBundle(git, dir, file)
 	if err != nil {
 		return err
 	}
@@ -113,21 +110,33 @@ func bundleVerified(git gitRun, dir, file, ref, tip string) error {
 	return nil
 }
 
-func hasOriginMain(git gitRun, dir string) bool {
-	out, err := git(dir, "rev-parse", "--verify", "--quiet", salvageOriginMainRef)
-	return err == nil && salvageHeadSHARe.MatchString(strings.TrimSpace(out))
+func verifyBundle(git gitRun, dir, file string) (verified, heads string, err error) {
+	if verified, err = git(dir, "bundle", "verify", file); err != nil {
+		return "", "", err
+	}
+	heads, err = git(dir, "bundle", "list-heads", file)
+	return verified, heads, err
 }
 
-func commitsAhead(git gitRun, dir, base, tip string) (int, bool) {
+func originMainSHA(git gitRun, dir string) (string, error) {
+	out, err := git(dir, "rev-parse", "--verify", "--quiet", salvageOriginMainRef)
+	sha := strings.TrimSpace(out)
+	if err == nil && !salvageHeadSHARe.MatchString(sha) {
+		err = fmt.Errorf("%s resolves to %q", salvageOriginMainRef, sha)
+	}
+	return sha, err
+}
+
+func commitsAhead(git gitRun, dir, base, tip string) (int, error) {
 	out, err := git(dir, "rev-list", "--count", base+".."+tip)
 	if err != nil {
-		return 0, false
+		return 0, err
 	}
 	n, err := strconv.Atoi(strings.TrimSpace(out))
-	if err != nil || n < 0 {
-		return 0, false
+	if err == nil && n < 0 {
+		err = fmt.Errorf("rev-list counted %d commits", n)
 	}
-	return n, true
+	return n, err
 }
 
 func archiveUntracked(root, nulList, dest string) (err error) {

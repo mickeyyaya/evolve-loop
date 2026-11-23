@@ -175,7 +175,7 @@ func TestRemoteSweepApply_EnforceBundlesVerifiesThenDeletes(t *testing.T) {
 	if err := ApplyRemoteSweep(context.Background(), o, deleteItemRS()); err != nil {
 		t.Fatal(err)
 	}
-	want := "git fetch|git rev-parse|git bundle create|git bundle verify|git bundle list-heads"
+	want := "git fetch|git rev-parse|git rev-parse|git rev-list|git bundle create|git bundle verify|git bundle list-heads"
 	if got := strings.Join(calls, "|"); got != want {
 		t.Errorf("git calls = %s, want %s", got, want)
 	}
@@ -209,7 +209,7 @@ func TestRemoteSweepApply_EachFailureKeepsTheBranchAndNamesIt(t *testing.T) {
 		{"bundle create fails", with("git bundle create", gitReplyF1{code: 1}), "bundle failed, branch kept"},
 		{"bundle verify fails", with("git bundle verify", gitReplyF1{code: 1}), "bundle failed, branch kept"},
 		{"list-heads fails", with("git bundle list-heads", gitReplyF1{err: boom}), "boom"},
-		{"bundle lacks the tip", with("git bundle list-heads", gitReplyF1{out: "abc refs/remotes/origin/feat/x"}), "does not hold feat/x"},
+		{"bundle lacks the tip", with("git bundle list-heads", gitReplyF1{out: "abc refs/remotes/origin/feat/x"}), "does not hold refs/remotes/origin/feat/x"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

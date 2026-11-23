@@ -929,4 +929,10 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [plans/console-land-verb-2026-11.md](plans/console-land-verb-2026-11.md) | Plan for `evolve pr submit`. It runs the steps B5 to B7 of the console check-in SOP in order and refuses on a skipped or stale step. It reuses the evaluator pattern of `wave checkin` and leaves `evolve land` unchanged. The plan scores four designs and finds that `record-pr` already waits for the host head, so the verb adds only a local head compare. |
 
+## 2026-11-23 — gc re-packs full-history salvage bundles with no loss
+
+| Document | What it records |
+|---|---|
+| [plans/gc-salvage-scope-2026-11.md](plans/gc-salvage-scope-2026-11.md) | Plan for `evolve gc --only salvage`. A survey shows 144 full-history bundles that hold 150.7 GiB. The plan scores three designs and builds the K6 migration of the recycle plan. It also closes the last full-history writer. |
+
 <!-- GENERATED:research-index END -->

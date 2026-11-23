@@ -191,18 +191,9 @@ func (o RemoteSweepOptions) saveTip(ctx context.Context, it RemoteItem) error {
 }
 
 func (o RemoteSweepOptions) bundleRef(ctx context.Context, dir, ref string, it RemoteItem) error {
-	file := filepath.Join(dir, salvageBundleFile)
-	for _, step := range [][]string{{"bundle", "create", file, ref}, {"bundle", "verify", file}} {
-		if _, err := o.remoteGit(ctx, step...); err != nil {
-			return fmt.Errorf("bundle failed, branch kept: %w", err)
-		}
-	}
-	heads, err := o.remoteGit(ctx, "bundle", "list-heads", file)
-	if err != nil {
-		return err
-	}
-	if !strings.Contains(heads, it.Head+" "+ref) {
-		return fmt.Errorf("bundle %s does not hold %s@%s", file, it.Branch, it.Head)
+	git := func(_ string, args ...string) (string, error) { return o.remoteGit(ctx, args...) }
+	if err := bundleVerified(git, o.ProjectRoot, filepath.Join(dir, salvageBundleFile), ref, it.Head); err != nil {
+		return fmt.Errorf("bundle failed, branch kept: %w", err)
 	}
 	return os.WriteFile(filepath.Join(dir, salvageHeadFile), []byte(it.Head+" "+it.Branch+"\n"), 0o644)
 }
