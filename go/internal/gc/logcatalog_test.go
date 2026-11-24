@@ -285,3 +285,80 @@ func TestPlan_LogCatalogKeepsALogWhoseWriterPIDFileCannotBeRead(t *testing.T) {
 		t.Errorf("an unreadable writer pid file must count as a live writer, but the dir was planned: %+v", it)
 	}
 }
+
+func planOrphans(t *testing.T, dir string) map[string]Item {
+	t.Helper()
+	m, err := Plan(Options{EvolveDir: dir, Policy: Policy{LogsTTLDays: 30}, Now: nowT0})
+	if err != nil {
+		t.Fatalf("Plan: %v", err)
+	}
+	return planItems(t, m)
+}
+
+func TestPlan_LogCatalogDeletesAnOrphanWriterPIDFileWhoseLogIsGone(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	deadOrphan := filepath.Join(dir, "loop-gone.log")
+	liveOrphan := filepath.Join(dir, "wave-gone.log")
+	badOrphan := filepath.Join(dir, "loop-bad.log")
+	kept := filepath.Join(dir, "loop-kept.log")
+	writeWriterPID(t, deadOrphan, deadPID(t))
+	writeWriterPID(t, liveOrphan, os.Getpid())
+	writeFile(t, badOrphan+gcpolicy.LogWriterPIDSuffix, "not a pid")
+	writeAged(t, kept, 10, daysAgo(1))
+	writeWriterPID(t, kept, deadPID(t))
+
+	items := planOrphans(t, dir)
+
+	if it := items[deadOrphan+gcpolicy.LogWriterPIDSuffix]; it.Rule != "logs.console.orphan_marker" {
+		t.Errorf("dead-pid orphan marker: planned %+v, want delete by logs.console.orphan_marker", it)
+	}
+	for _, p := range []string{liveOrphan, badOrphan, kept} {
+		if it, ok := items[p+gcpolicy.LogWriterPIDSuffix]; ok {
+			t.Errorf("%s marker was planned: %+v, want it kept", filepath.Base(p), it)
+		}
+	}
+}
+
+func TestPlan_LogCatalogLeavesARunDirMarkerToItsDir(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	run := filepath.Join(dir, "logs", "20260101T000000Z")
+	writeAged(t, filepath.Join(run, gcpolicy.LoopLogName), 10, daysAgo(1))
+	writeWriterPID(t, filepath.Join(run, "other.log"), deadPID(t))
+
+	items := planOrphans(t, dir)
+
+	if it, ok := items[filepath.Join(run, "other.log"+gcpolicy.LogWriterPIDSuffix)]; ok {
+		t.Errorf("a marker inside a run dir was planned by the orphan pass: %+v", it)
+	}
+}
+
+func TestPlan_LogCatalogKeepsTheCurrentRunDirWhenTheLinkNamesItByAnotherPath(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	logs := filepath.Join(dir, "logs")
+	run := filepath.Join(logs, "20260101T000000Z")
+	writeAged(t, filepath.Join(run, gcpolicy.LoopLogName), 10, daysAgo(90))
+	symlink(t, logs, filepath.Join(dir, "alias"))
+	symlink(t, filepath.Join(dir, "alias", "20260101T000000Z"), filepath.Join(logs, gcpolicy.LogsCurrentLink))
+
+	m, err := Plan(Options{EvolveDir: dir, Policy: Policy{LogsTTLDays: 1}, Now: func() time.Time { return time.Now().Add(400 * 24 * time.Hour) }})
+	if err != nil {
+		t.Fatalf("Plan: %v", err)
+	}
+
+	if it, ok := planItems(t, m)[run]; ok {
+		t.Errorf("the current run dir was planned: %+v, want it kept (same dir by os.SameFile)", it)
+	}
+}
+
+func TestIsCurrentLog_AnEmptyCurrentNeverMatches(t *testing.T) {
+	t.Parallel()
+	if isCurrentLog(t.TempDir(), "") {
+		t.Error("isCurrentLog with no current link = true, want false")
+	}
+	if !isCurrentLog("/x", "/x") {
+		t.Error("equal paths = false, want true")
+	}
+}

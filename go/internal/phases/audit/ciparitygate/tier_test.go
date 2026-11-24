@@ -12,6 +12,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 )
 
 func TestTierAttempts_ScrubbedEnvIsCapturedOnceAndIdenticalOnBothAttempts(t *testing.T) {
@@ -375,5 +376,26 @@ func TestIntegrationTier_EndToEndThroughFakes(t *testing.T) {
 	}
 	if e = only(t, *events, CodeGateStepFailed); e.Fields["step"] != "tier_attempt" || !strings.HasPrefix(e.Fields["cmd"], "go test -race -count=1 -timeout 20m -p 4 -parallel 4 -tags integration") {
 		t.Errorf("GATE_STEP_FAILED: %+v", e)
+	}
+}
+
+func TestTierLog_WritesTheFileThatTheCyclePassSealDeletes(t *testing.T) {
+	t.Parallel()
+	ws := t.TempDir()
+	l := &tierLog{workspace: ws}
+
+	if err := l.append(1, "", attempt{}); err != nil {
+		t.Fatalf("append: %v", err)
+	}
+
+	entries, err := os.ReadDir(ws)
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("workspace entries = %v (err %v), want the one tier log", entries, err)
+	}
+	if got, want := entries[0].Name(), gcpolicy.ToolOutputFiles()[1]; got != want {
+		t.Errorf("tier log file = %q, want the gcpolicy name %q", got, want)
+	}
+	if got, want := tierWhere(""), ciparity.TierLogName+" unavailable"; got != want {
+		t.Errorf("tierWhere(\"\") = %q, want %q", got, want)
 	}
 }

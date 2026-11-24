@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
@@ -108,7 +109,7 @@ func startDetachedLoop(cfg loopConfig, attr *syscall.SysProcAttr) (detachedLaunc
 
 func recordLogWriter(logPath string, pid int) error {
 	path := logPath + gcpolicy.LogWriterPIDSuffix
-	if err := os.WriteFile(path, []byte(strconv.Itoa(pid)+"\n"), 0o644); err != nil {
+	if err := atomicwrite.Bytes(path, []byte(strconv.Itoa(pid)+"\n")); err != nil {
 		return fmt.Errorf("record the log writer pid in %s: %w", path, err)
 	}
 	return nil

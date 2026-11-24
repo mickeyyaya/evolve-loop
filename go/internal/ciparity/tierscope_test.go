@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/covchanged"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/testhost"
 )
 
@@ -34,6 +35,14 @@ func TestTierLockPath_IsTheLockOfTheAuditRetake(t *testing.T) {
 	}
 	if TierLockWait <= 0 {
 		t.Errorf("TierLockWait = %v, want a positive bound", TierLockWait)
+	}
+}
+
+func TestTierLogName_IsTheGcPolicyPinnedIntegrationTierLog(t *testing.T) {
+	t.Parallel()
+	got, want := TierLogName, "integration-tier.log"
+	if got != want || got != gcpolicy.IntegrationTierLog {
+		t.Errorf("TierLogName = %q, want the gc-pinned %q", got, want)
 	}
 }
 

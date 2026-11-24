@@ -33,6 +33,7 @@ func (lp logPlanner) planCatalog(evolveDir string, cats []gcpolicy.LogCategory) 
 	current := currentLogRunDir(evolveDir)
 	for _, cat := range cats {
 		lp.planCategory(cat, lp.collect(evolveDir, cat.Homes, current))
+		lp.planOrphanMarkers(evolveDir, cat)
 	}
 }
 
@@ -77,13 +78,40 @@ func (lp logPlanner) collect(evolveDir string, homes []gcpolicy.LogHome, current
 		}
 		for _, p := range matches {
 			if e, ok := logEntryAt(p, h.IsDir); ok {
-				e.pinned = p == current || logWriterLive(p, h.IsDir)
+				e.pinned = isCurrentLog(p, current) || logWriterLive(p, h.IsDir)
 				e.marker = fileMarker(p, h.IsDir)
 				out = append(out, e)
 			}
 		}
 	}
 	return out
+}
+
+func isCurrentLog(path, current string) bool {
+	if current == "" {
+		return false
+	}
+	if path == current {
+		return true
+	}
+	a, aerr := os.Stat(path)
+	b, berr := os.Stat(current)
+	return aerr == nil && berr == nil && os.SameFile(a, b)
+}
+
+func (lp logPlanner) planOrphanMarkers(evolveDir string, cat gcpolicy.LogCategory) {
+	for _, h := range cat.Homes {
+		if h.IsDir {
+			continue
+		}
+		markers, _ := filepath.Glob(filepath.Join(evolveDir, h.Dir, h.Glob+gcpolicy.LogWriterPIDSuffix))
+		for _, m := range markers {
+			logPath := strings.TrimSuffix(m, gcpolicy.LogWriterPIDSuffix)
+			if _, err := os.Lstat(logPath); errors.Is(err, fs.ErrNotExist) && !logWriterLive(logPath, false) {
+				lp.add(m, ActionDelete, "logs."+cat.Name+".orphan_marker")
+			}
+		}
+	}
 }
 
 func fileMarker(path string, isDir bool) string {
