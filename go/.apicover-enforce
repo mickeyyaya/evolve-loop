@@ -903,3 +903,4 @@
 ./internal/mainsync
 ./internal/docstests
 ./internal/gitstarts
+./internal/promptboundary
