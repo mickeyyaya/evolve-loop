@@ -273,34 +273,6 @@ func writeDeliverable(t *testing.T, root, waveName string, r integration.Deliver
 	return path
 }
 
-func TestShipsIn_AtEnforceADeliverableRecordInTheWindowCountsWithNoLandingRecord(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	writeDeliverable(t, root, "w1", deliverable(7, shipEpoch.Add(time.Minute)))
-	writeDeliverable(t, root, "w2", deliverable(8, shipEpoch.Add(3*time.Hour)))
-	writeDeliverable(t, root, "w2", deliverable(7, shipEpoch.Add(time.Minute)))
-
-	ids, fails := wave.ShipsIn(root, policy.FleetIntegrationEnforce, shipEpoch, shipEpoch.Add(time.Hour))
-
-	if !reflect.DeepEqual(ids, []int{7}) || len(fails) != 0 {
-		t.Fatalf("ids %v, failures %v; want [7] once and none", ids, fails)
-	}
-}
-
-func TestShipsIn_AtEnforceTheWindowHoldsFromAndNotTo(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	writeDeliverable(t, root, "w1", deliverable(7, shipEpoch))
-	writeDeliverable(t, root, "w1", deliverable(8, shipEpoch.Add(time.Hour)))
-
-	ids, _ := wave.ShipsIn(root, policy.FleetIntegrationEnforce, shipEpoch, shipEpoch.Add(time.Hour))
-	open, _ := wave.ShipsIn(root, policy.FleetIntegrationEnforce, shipEpoch, time.Time{})
-
-	if !reflect.DeepEqual(ids, []int{7}) || !reflect.DeepEqual(open, []int{7, 8}) {
-		t.Fatalf("ids %v, open %v; want [7] and [7 8]", ids, open)
-	}
-}
-
 func TestShipsIn_AtEnforceAConsolePRRecordAndTheJournalCountNothing(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
@@ -322,10 +294,85 @@ func TestShipsIn_AtEnforceAConsolePRRecordAndTheJournalCountNothing(t *testing.T
 	}
 }
 
-func TestShipsIn_AtShadowADeliverableRecordWithoutALandingCountsNothing(t *testing.T) {
+const poolBase = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+type mergedMember struct {
+	cycle  int
+	status integration.MemberStatus
+	landed bool
+	flush  []time.Time
+}
+
+func writeWavePool(t *testing.T, root string, pool int, members ...mergedMember) string {
+	t.Helper()
+	rec := integration.WaveRecord{Pool: pool, Epoch: 1, ShadowBase: poolBase, Members: map[int]integration.MemberState{}}
+	for _, m := range members {
+		rec.Members[m.cycle] = integration.MemberState{Status: m.status, Landed: m.landed}
+		for _, at := range m.flush {
+			rec.Decisions = append(rec.Decisions, integration.FlushRecord{Trigger: integration.TriggerWaveEnd, At: at, Flush: []int{m.cycle}})
+		}
+	}
+	path, err := integration.WriteWaveRecord(root, rec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func merged(cycle int, at ...time.Time) mergedMember {
+	return mergedMember{cycle: cycle, status: integration.MemberMerged, landed: true, flush: at}
+}
+
+func TestShipsIn_AtEnforceCountsMergedMembersOfTheWaveRecordNotDeliveredRecords(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	writeDeliverable(t, root, "w1", deliverable(7, shipEpoch.Add(time.Minute)))
+	writeDeliverable(t, root, "1", deliverable(5, shipEpoch.Add(time.Minute)))
+	writeWavePool(t, root, 1,
+		merged(7, shipEpoch.Add(time.Minute)),
+		mergedMember{cycle: 8, status: integration.MemberEjected, flush: []time.Time{shipEpoch.Add(time.Minute)}},
+		mergedMember{cycle: 9, status: integration.MemberPending},
+		mergedMember{cycle: 10, status: integration.MemberMerged, flush: []time.Time{shipEpoch.Add(time.Minute)}},
+		merged(11, shipEpoch.Add(3*time.Hour)),
+	)
+
+	ids, fails := wave.ShipsIn(root, policy.FleetIntegrationEnforce, shipEpoch, shipEpoch.Add(time.Hour))
+
+	if !reflect.DeepEqual(ids, []int{7}) || len(fails) != 0 {
+		t.Fatalf("ids %v, failures %v; want [7] (delivered, ejected, pending, unlanded and late members count nothing)", ids, fails)
+	}
+}
+
+func TestShipsIn_AtEnforceAMemberTakesTheTimeOfItsLatestFlush(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeWavePool(t, root, 1, merged(7, shipEpoch.Add(time.Minute), shipEpoch.Add(2*time.Hour)))
+
+	early, _ := wave.ShipsIn(root, policy.FleetIntegrationEnforce, shipEpoch, shipEpoch.Add(time.Hour))
+	late, _ := wave.ShipsIn(root, policy.FleetIntegrationEnforce, shipEpoch.Add(time.Hour), time.Time{})
+
+	if len(early) != 0 || !reflect.DeepEqual(late, []int{7}) {
+		t.Fatalf("early %v, late %v; want none and [7]", early, late)
+	}
+}
+
+func TestShipsIn_AtEnforceTheWindowHoldsFromAndNotTo(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeWavePool(t, root, 1, merged(7, shipEpoch), merged(8, shipEpoch.Add(time.Hour)))
+	writeWavePool(t, root, 2, merged(9, shipEpoch.Add(time.Minute)))
+
+	ids, _ := wave.ShipsIn(root, policy.FleetIntegrationEnforce, shipEpoch, shipEpoch.Add(time.Hour))
+	open, _ := wave.ShipsIn(root, policy.FleetIntegrationEnforce, shipEpoch, time.Time{})
+
+	if !reflect.DeepEqual(ids, []int{7, 9}) || !reflect.DeepEqual(open, []int{7, 8, 9}) {
+		t.Fatalf("ids %v, open %v; want [7 9] and [7 8 9]", ids, open)
+	}
+}
+
+func TestShipsIn_AtShadowAMergedWaveRecordCountsNothing(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeWavePool(t, root, 1, merged(7, shipEpoch.Add(time.Minute)))
 
 	ids, _ := shadowShips(root, shipEpoch, time.Time{})
 
@@ -334,58 +381,26 @@ func TestShipsIn_AtShadowADeliverableRecordWithoutALandingCountsNothing(t *testi
 	}
 }
 
-func TestShipsIn_AtEnforceABrokenRecordIsAFailureAndAMissingWavesDirIsNot(t *testing.T) {
+func TestShipsIn_AtEnforceABrokenWaveRecordIsAFailureAndNoRecordIsNot(t *testing.T) {
 	t.Parallel()
 	empty, fails := wave.ShipsIn(t.TempDir(), policy.FleetIntegrationEnforce, shipEpoch, time.Time{})
 	if len(empty) != 0 || len(fails) != 0 {
-		t.Fatalf("no waves dir: ids %v, failures %v", empty, fails)
+		t.Fatalf("no record: ids %v, failures %v", empty, fails)
 	}
 
 	root := t.TempDir()
-	good := writeDeliverable(t, root, "w1", deliverable(7, shipEpoch.Add(time.Minute)))
-	bad := filepath.Join(filepath.Dir(good), "deliverable-8.json")
+	good := writeWavePool(t, root, 1, merged(7, shipEpoch.Add(time.Minute)))
+	bad := integration.WaveRecordPath(root, 2)
 	if err := os.WriteFile(bad, []byte("{torn"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(filepath.Dir(good), "notes.txt"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(root, ".evolve", "waves", "other"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+
 	ids, fails := wave.ShipsIn(root, policy.FleetIntegrationEnforce, shipEpoch, time.Time{})
+
 	if !reflect.DeepEqual(ids, []int{7}) || len(fails) != 1 || fails[0].Path != bad {
 		t.Fatalf("ids %v, failures %v; want [7] and one failure at %s", ids, fails, bad)
-	}
-
-	wavesFile := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(wavesFile, ".evolve"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(wavesFile, ".evolve", "waves"), []byte("x"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	_, fails = wave.ShipsIn(wavesFile, policy.FleetIntegrationEnforce, shipEpoch, time.Time{})
-	if len(fails) != 1 {
-		t.Fatalf("an unreadable waves dir: failures %v, want one", fails)
-	}
-}
-
-func TestShipsIn_AtEnforceAnUnreadableWaveDirIsAFailure(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	dir := integration.WaveDir(root, "w1")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(dir, 0o000); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
-
-	_, fails := wave.ShipsIn(root, policy.FleetIntegrationEnforce, shipEpoch, time.Time{})
-
-	if len(fails) != 1 || fails[0].Path != dir {
-		t.Fatalf("failures %v, want one at %s", fails, dir)
 	}
 }

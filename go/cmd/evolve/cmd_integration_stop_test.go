@@ -535,3 +535,47 @@ func TestIntegrationProductionEnv_TheKeyRunRunsGoTestOnTheRevision(t *testing.T)
 		t.Errorf("red commit: %v, %v; green commit: %v, %v; want the key red on the first commit and green on the second", onRed, redErr, onGreen, greenErr)
 	}
 }
+
+func TestStopJourney_TheEnforceMergerPutsTheStopGateOnMainAndOnCI(t *testing.T) {
+	t.Parallel()
+	s := newStopJourney(t, "enforce")
+	s.holdStop()
+	s.red = []baseattr.Key{stopJourneyKey}
+	s.gh.conclusion = "failure"
+	s.gh.main.tip = ""
+	var warn bytes.Buffer
+	merger := s.env.enforceMerger(s.root, &warn)
+	tip := s.originMain()
+
+	ffErr := merger.Main.FastForward(context.Background(), tip)
+	verdict, watchErr := merger.CI.Watch(context.Background(), integration.PR{Number: 7, Tip: tip})
+
+	if !errors.Is(ffErr, selfheal.ErrMainRedHold) || s.originMain() != tip {
+		t.Errorf("FastForward = %v, want the hold and a main that did not move", ffErr)
+	}
+	if verdict != integration.Red || !errors.Is(watchErr, selfheal.ErrMainRedHold) {
+		t.Errorf("Watch = %v, %v, want a red verdict and the hold", verdict, watchErr)
+	}
+}
+
+func TestProductionEnforceActor_AStopThatHoldsBlocksItsMergeOfMain(t *testing.T) {
+	t.Parallel()
+	s := newStopJourney(t, "enforce")
+	s.holdStop()
+	s.red = []baseattr.Key{stopJourneyKey}
+	s.gh.main.tip = ""
+	b, _ := driverCoordinator(t)
+	b.cfg.ProjectRoot = s.root
+	b.integrationEnvOf = func(string, time.Time) integrationEnv { return s.env }
+	actor, ok := b.productionEnforceActor(integration.Repo{Dir: s.root, Git: s.env.Git}, 7).(integration.EnforceActor)
+	if !ok {
+		t.Fatal("productionEnforceActor does not return an EnforceActor")
+	}
+	tip := s.originMain()
+
+	ffErr := actor.Merger.Main.FastForward(context.Background(), tip)
+
+	if !errors.Is(ffErr, selfheal.ErrMainRedHold) || s.originMain() != tip {
+		t.Fatalf("FastForward = %v, want the hold and a main that did not move", ffErr)
+	}
+}

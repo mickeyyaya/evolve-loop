@@ -649,7 +649,10 @@ The cycle's production composition root, `wireOrchestratorDeps` in `cmd_cycle.go
 ## The ship count of a wave (B5)
 
 - **One reader.** `buildWaveStatus`, `waveWatcher.poll`, `lastWaveFacts` and `zeroShipHalt` read a wave through `wave.ReadWave` (`readWaveOf` in `cmd_wave_status.go`). A wave is a time window with a floor. The first `From` of the status entries is `wave.RunFrom(rec)`. The stage comes from `shipStageOf`, and a bad policy gives the shadow stage with a warning.
-- **The ship count.** The count is `wave.ShipsIn`: a ship is a journal entry of the class `cycle` with a complete landing record of the same SHA. At the stage `enforce`, it is a deliverable record. A `shipped` flag in `run.json` or `phase-timing.json` counts nothing.
+- **The ship count.** The count is `wave.ShipsIn`: a ship is a journal entry of the class `cycle` with a complete landing record of the same SHA. At the stage `enforce`, it is a member that a persisted wave record (`.evolve/waves/integration-<pool>.json`) holds as `merged` and `landed`. The time is the latest flush of the member (`mergedIn`).
+  - A delivered record that was ejected or is still pending counts nothing.
+  - An unreadable record is a `ReadFailure`. Then the zero-ship halt does not count the wave.
+  - A `shipped` flag in `run.json` or `phase-timing.json` counts nothing.
 - **The status.** `Facts.Outcome` counts `Ships` when the read set it. A cycle at or below the floor that the wave resumed or shipped is a member, and its row ends with ` (resumed)`. `measureWaveRuns` gets only the cycles above the floor, so a wave prints one number over its life.
 - **The halt.** `zeroShipTally` holds one `from`, one `floor` and one entry for each wave. It has no ship state of its own. `run` sets `from` to the start time of the coordinator, beside `batchStartCycle`.
 - **The boundary.** The first boundary of a process adds no entry. A later boundary reads `[from, now)` with the floor, then sets `from` to `now`. It adds an entry when the wave has members or ships. The floor is `max(floor, highest id)`.

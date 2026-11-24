@@ -15,18 +15,6 @@ import (
 
 const testSHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
-type recordingLanding struct {
-	ejected map[int]string
-}
-
-func (l *recordingLanding) NoteEjected(_ context.Context, cycle int, briefPath string) error {
-	if l.ejected == nil {
-		l.ejected = map[int]string{}
-	}
-	l.ejected[cycle] = briefPath
-	return nil
-}
-
 type stubEnforcePorts struct {
 	briefPath string
 	requeued  []int
@@ -79,11 +67,9 @@ func TestStageActors_RegistersEnforceOnlyWhenNonNil(t *testing.T) {
 	}
 }
 
-func TestEnforceActor_LandingFeedNotifiedOnEjection(t *testing.T) {
+func TestEnforceActor_AnEjectionIsRequeuedWithItsBrief(t *testing.T) {
 	t.Parallel()
 	ports := &stubEnforcePorts{briefPath: "/tmp/brief-9.txt"}
-	landing := &recordingLanding{}
-	var feed LandingFeed = landing
 	var plane PlaneSync = ports
 	var requeue Requeuer = ports
 	var briefs BriefStore = ports
@@ -98,7 +84,6 @@ func TestEnforceActor_LandingFeedNotifiedOnEjection(t *testing.T) {
 			},
 		},
 		Plane:   plane,
-		Landing: feed,
 		Requeue: requeue,
 		Briefs:  briefs,
 		Promote: promote,
@@ -110,8 +95,8 @@ func TestEnforceActor_LandingFeedNotifiedOnEjection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Flush: %v", err)
 	}
-	if res.Members[9].Status != MemberEjected || landing.ejected[9] != "/tmp/brief-9.txt" {
-		t.Fatalf("ejection result = %+v, landing = %v", res.Members[9], landing.ejected)
+	if res.Members[9].Status != MemberEjected {
+		t.Fatalf("ejection result = %+v", res.Members[9])
 	}
 	if !slices.Equal(ports.requeued, []int{9}) {
 		t.Fatalf("requeued = %v, want [9]", ports.requeued)
@@ -292,7 +277,6 @@ func TestWriteRecordWith_WriteOnceLinkFailure(t *testing.T) {
 type failingPort struct {
 	briefErr   error
 	requeueErr error
-	landingErr error
 	promoteErr error
 	syncOut    SyncOutcome
 	syncErr    error
@@ -302,7 +286,6 @@ func (p failingPort) Write(context.Context, *Ejection) (string, error) { return 
 func (p failingPort) Requeue(context.Context, DeliverableRecord, string) error {
 	return p.requeueErr
 }
-func (p failingPort) NoteEjected(context.Context, int, string) error { return p.landingErr }
 func (p failingPort) Promote(context.Context, DeliverableRecord) error {
 	return p.promoteErr
 }
@@ -349,10 +332,9 @@ func TestEnforceActor_ErrorBranches(t *testing.T) {
 		}{
 			{"brief", failingPort{briefErr: cause}, "brief"},
 			{"requeue", failingPort{requeueErr: cause}, "requeue"},
-			{"landing", failingPort{landingErr: cause}, "landing"},
 		} {
 			var res FlushResult
-			a := EnforceActor{Briefs: tc.port, Requeue: tc.port, Landing: tc.port}
+			a := EnforceActor{Briefs: tc.port, Requeue: tc.port}
 			if err := a.ejectMember(ctx, rec, cause, &res); err == nil || len(res.Failures) != 1 || res.Failures[0].Step != tc.step {
 				t.Fatalf("%s: failures=%+v err=%v", tc.name, res.Failures, err)
 			}

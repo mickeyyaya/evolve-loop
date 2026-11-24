@@ -1,12 +1,8 @@
 package wave
 
 import (
-	"errors"
 	"fmt"
-	"io/fs"
-	"os"
-	"path/filepath"
-	"strings"
+	"slices"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
@@ -14,12 +10,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shipjournal"
-)
-
-const (
-	wavesDirName      = "waves"
-	waveDirPrefix     = "integration-"
-	deliverablePrefix = "deliverable-"
 )
 
 type shipWindow struct {
@@ -42,7 +32,7 @@ func ShipsIn(root, stage string, from, to time.Time) ([]int, []ReadFailure) {
 	var ids map[int]bool
 	var failures []ReadFailure
 	if stage == policy.FleetIntegrationEnforce {
-		ids, failures = deliveredIn(evolveDir, w)
+		ids, failures = mergedIn(root, w)
 	} else {
 		ids, failures = landedIn(evolveDir, w)
 	}
@@ -95,45 +85,36 @@ func landedAt(evolveDir string, e shipjournal.Entry) (time.Time, []ReadFailure) 
 	return completed, nil
 }
 
-func deliveredIn(evolveDir string, w shipWindow) (map[int]bool, []ReadFailure) {
+func mergedIn(root string, w shipWindow) (map[int]bool, []ReadFailure) {
 	ids := map[int]bool{}
-	wavesDir := filepath.Join(evolveDir, wavesDirName)
-	waves, err := os.ReadDir(wavesDir)
-	if errors.Is(err, fs.ErrNotExist) {
-		return ids, nil
-	}
-	if err != nil {
-		return ids, []ReadFailure{{Path: wavesDir, Err: err}}
-	}
+	store := integration.FileWaveStore{Root: root}
 	var failures []ReadFailure
-	for _, d := range waves {
-		if !d.IsDir() || !strings.HasPrefix(d.Name(), waveDirPrefix) {
+	for _, pool := range store.Pools() {
+		rec, _, err := store.Read(pool)
+		if err != nil {
+			failures = append(failures, ReadFailure{Path: integration.WaveRecordPath(root, pool), Err: err})
 			continue
 		}
-		failures = append(failures, deliveredInWave(filepath.Join(wavesDir, d.Name()), w, ids)...)
+		for cycle, at := range mergedAt(rec) {
+			if w.holds(at) {
+				ids[cycle] = true
+			}
+		}
 	}
 	return ids, failures
 }
 
-func deliveredInWave(dir string, w shipWindow, ids map[int]bool) []ReadFailure {
-	files, err := os.ReadDir(dir)
-	if err != nil {
-		return []ReadFailure{{Path: dir, Err: err}}
-	}
-	var failures []ReadFailure
-	for _, f := range files {
-		if !strings.HasPrefix(f.Name(), deliverablePrefix) || filepath.Ext(f.Name()) != ".json" {
+func mergedAt(rec integration.WaveRecord) map[int]time.Time {
+	out := map[int]time.Time{}
+	for cycle, m := range rec.Members {
+		if m.Status != integration.MemberMerged || !m.Landed {
 			continue
 		}
-		path := filepath.Join(dir, f.Name())
-		r, err := integration.ReadRecord(path)
-		if err != nil {
-			failures = append(failures, ReadFailure{Path: path, Err: err})
-			continue
-		}
-		if !r.Console() && w.holds(r.DeliveredAt) {
-			ids[r.Cycle] = true
+		for _, d := range rec.Decisions {
+			if slices.Contains(d.Flush, cycle) && d.At.After(out[cycle]) {
+				out[cycle] = d.At
+			}
 		}
 	}
-	return failures
+	return out
 }
