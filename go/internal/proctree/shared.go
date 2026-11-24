@@ -13,7 +13,6 @@ const (
 	commHas
 	argIs
 	argThen
-	progWith
 )
 
 type sharedRule struct {
@@ -27,7 +26,6 @@ var sharedHelpers = []sharedRule{
 	{match: argThen, needle: "daemon", next: "run"},
 	{match: argIs, needle: "bg-pty-host"},
 	{match: argIs, needle: "bg-spare"},
-	{match: progWith, needle: "ollama", next: "serve"},
 	{match: commHas, needle: "chrome"},
 	{match: commHas, needle: "chromium"},
 }
@@ -45,8 +43,6 @@ func (r sharedRule) matches(p Process) bool {
 		return slices.ContainsFunc(names, func(n string) bool { return strings.Contains(n, r.needle) })
 	case argIs:
 		return len(p.Args) > 1 && slices.Contains(p.Args[1:], r.needle)
-	case progWith:
-		return slices.Contains(names, r.needle) && len(p.Args) > 1 && slices.Contains(p.Args[1:], r.next)
 	default:
 		i := slices.Index(p.Args, r.needle)
 		return i > 0 && i+1 < len(p.Args) && p.Args[i+1] == r.next

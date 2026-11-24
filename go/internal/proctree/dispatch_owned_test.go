@@ -37,7 +37,7 @@ func TestDispatchOwned_ATagAloneKillsOnlyAnAllowListedProgram(t *testing.T) {
 		{"a name that only starts like python", taggedProc(11, "pythonista", "pythonista"), false},
 		{"a family binary", taggedProc(12, "/Users/x/.local/bin/claude", "claude", "-p", "x"), true},
 		{"ollama run", taggedProc(13, "ollama", "ollama", "run", "m"), true},
-		{"ollama serve", taggedProc(14, "ollama", "ollama", "serve"), false},
+		{"ollama serve", taggedProc(14, "ollama", "ollama", "serve"), true},
 		{"a Claude Code daemon", taggedProc(15, "claude", "claude", "daemon", "run"), false},
 		{"a truncated comm completed by argv0", taggedProc(16, "uvx-extra-lon", "uvx-extra-long"), false},
 		{"a truncated allow-listed comm", taggedProc(17, "python3.12-long", "python3.12-long"), false},
@@ -79,16 +79,6 @@ func TestDispatchOwned_ARecordedSharedHelperNeedsALivePaneAttachment(t *testing.
 	}
 	if !attached(chrome) {
 		t.Errorf("a recorded shared helper that is a live pane descendant was not selected")
-	}
-}
-
-func TestSharedHelper_OllamaServeIsSharedButOllamaRunIsNot(t *testing.T) {
-	t.Parallel()
-	if !SharedHelper(Process{Comm: "/opt/homebrew/bin/ollama", Args: []string{"ollama", "serve"}}) {
-		t.Errorf("ollama serve must be in the shared class")
-	}
-	if SharedHelper(Process{Comm: "ollama", Args: []string{"ollama", "run", "m"}}) || SharedHelper(Process{Comm: "ollama"}) {
-		t.Errorf("ollama without serve must not be shared")
 	}
 }
 
