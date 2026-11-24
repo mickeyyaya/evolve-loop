@@ -43,12 +43,13 @@ var selfhealSchemas = map[string]string{selfhealVerbIncidents: "evolve.selfheal.
 var selfhealChannels = []string{"errors", "loop"}
 
 type selfhealEnv struct {
-	agent     agentSeat
-	now       func() time.Time
-	gh        func(ctx context.Context, root string, args ...string) (string, error)
-	declared  func(family string) bool
-	families  func() []string
-	newCenter func(root, evolveDir string, console io.Writer) (*signalcenter.Center, func())
+	agent        agentSeat
+	now          func() time.Time
+	gh           func(ctx context.Context, root string, args ...string) (string, error)
+	declared     func(family string) bool
+	families     func() []string
+	auditRefused func(root string) (bool, error)
+	newCenter    func(root, evolveDir string, console io.Writer) (*signalcenter.Center, func())
 }
 
 type selfhealTransition struct {
@@ -63,7 +64,7 @@ type selfhealReport struct {
 }
 
 func runSelfheal(args []string, _ io.Reader, stdout, stderr io.Writer) int {
-	return runSelfhealWith(selfhealEnv{agent: runAgentCommand, now: time.Now, gh: ghOutput, declared: bridge.UsageWindowsDeclared, families: bridge.InteractiveFamilies, newCenter: newSelfhealCenter}, args, stdout, stderr)
+	return runSelfhealWith(selfhealEnv{agent: runAgentCommand, now: time.Now, gh: ghOutput, declared: bridge.UsageWindowsDeclared, families: bridge.InteractiveFamilies, auditRefused: productionAuditRefused, newCenter: newSelfhealCenter}, args, stdout, stderr)
 }
 
 func newSelfhealCenter(root, evolveDir string, console io.Writer) (*signalcenter.Center, func()) {

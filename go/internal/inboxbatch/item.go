@@ -15,6 +15,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gateclass"
 )
 
 type Item struct {
@@ -37,6 +38,7 @@ type Item struct {
 	RoutedBy          json.RawMessage            `json:"routed_by,omitempty"`
 	LandedSHA         json.RawMessage            `json:"landed_sha,omitempty"`
 	InjectedBy        string                     `json:"injected_by"`
+	Tier              json.RawMessage            `json:"tier,omitempty"`
 	Continuation      *continuation.Continuation `json:"continuation,omitempty"`
 	Acceptance        []string                   `json:"acceptance,omitempty"`
 	DeliverableKind   string                     `json:"deliverable_kind,omitempty"`
@@ -412,4 +414,18 @@ func StripControl(s string) string {
 		}
 		return r
 	}, s)
+}
+
+func (it Item) RepairTier() gateclass.Tier {
+	return RepairTierOf(stampText(it.Tier), it.ProtectedFiles)
+}
+
+func RepairTierOf(stamp string, protectedFiles []string) gateclass.Tier {
+	if len(protectedFiles) > 0 {
+		return gateclass.T0
+	}
+	if tier := gateclass.Tier(stamp); tier == gateclass.T1 || tier == gateclass.T2 {
+		return tier
+	}
+	return ""
 }

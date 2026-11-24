@@ -501,6 +501,7 @@ func TestStageSeeds_PinTheDescriptorOfEachPopulatedRow(t *testing.T) {
 		"parallel_evaluate.stage":                  {"PARALLEL_EVALUATE_SHADOW", gatecontract.EmitSite{}, nil, nil},
 		"held_proposals.stage":                     {"SHIP_HOLD_SHADOW", gatecontract.EmitSite{Path: "internal/phases/ship/held_proposal_gate.go", Func: "emitShadow", Ref: "CodeHoldShadow"}, []string{"cycle", "tree", "reasons"}, []string{"internal/heldproposal"}},
 		"fleet.orchestrator.window.adaptive.stage": {"LOOP_ORCH_HOST_PRESSURE", gatecontract.EmitSite{Path: "internal/orchestrator/host_pressure.go", Func: "HostPressure", Ref: "CodeHostPressure"}, []string{"old", "new", "sized", "cause", "stage", "applied", "cpus", "load1", "load_per_core", "mem_available_pct", "swap_used_mb", "score"}, []string{"internal/hostpressure"}},
+		"healing.repair_cycle.stage":               {"HEALING_REPAIR_ROUTED", gatecontract.EmitSite{Path: "internal/selfheal/repair_item.go", Func: "repairRouted", Ref: "CodeRepairRouted"}, []string{"stage", "tier", "would_route", "would_refuse_audit"}, nil},
 		"audit_cascade.stage":                      {"AUDIT_CASCADE_SHADOW", gatecontract.EmitSite{}, nil, []string{"internal/auditcascade"}},
 		"gates.scan_cache_gate":                    {"SHIP_SCAN_SHADOW_ESCAPE", gatecontract.EmitSite{Path: "internal/phases/ship/scanshadow.go", Func: "escape", Ref: "CodeScanShadowEscape"}, []string{"package", "key", "tags", "flags", "gate"}, []string{"internal/testkey", "internal/testverdict"}},
 	}

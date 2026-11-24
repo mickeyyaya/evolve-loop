@@ -8,6 +8,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gatecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
+	"github.com/mickeyyaya/evolve-loop/go/internal/selfheal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -80,6 +81,12 @@ var stageSeeds = []stageSeed{
 	{key: "healing.orchestrator.stage"},
 	{key: "healing.validator.stage"},
 	{key: "healing.live_reaction.stage"},
+	{
+		key:    "healing.repair_cycle.stage",
+		signal: selfheal.CodeRepairRouted,
+		site:   gatecontract.EmitSite{Path: "internal/selfheal/repair_item.go", Func: "repairRouted", Ref: "CodeRepairRouted"},
+		fields: []string{"stage", "tier", "would_route", "would_refuse_audit"},
+	},
 }
 
 func StageEntries() []gatecontract.Entry {
