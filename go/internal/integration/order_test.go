@@ -90,3 +90,50 @@ func TestOrderDeliverablesPurity(t *testing.T) {
 		t.Fatalf("input mutated: %v", batch)
 	}
 }
+
+func ratchetListsRecord(pr int) DeliverableRecord {
+	return DeliverableRecord{Source: SourceConsolePR, PR: pr, Audit: AuditBinding{Class: RatchetListsClass}}
+}
+
+func TestOrderDeliverablesComposesTheRatchetListsPRLast(t *testing.T) {
+	t0 := time.Date(2026, 11, 20, 10, 0, 0, 0, time.UTC)
+	lane := DeliverableRecord{Cycle: 9, InboxRank: 5, DeliveredAt: t0}
+	console := DeliverableRecord{Source: SourceConsolePR, PR: 90}
+	ratchet := ratchetListsRecord(12)
+	byID := map[string]DeliverableRecord{}
+	items := []Deliverable{}
+	for _, r := range []DeliverableRecord{ratchet, console, lane} {
+		byID[r.Deliverable().ID] = r
+		items = append(items, r.Deliverable())
+	}
+
+	got := OrderDeliverables(items)
+
+	if len(got) != 3 || got[2].ID != "pr-12" {
+		t.Fatalf("order = %v, want the ratchet lists PR last", got)
+	}
+}
+
+func TestOrderDeliverablesTailKeyBeatsEveryOtherKey(t *testing.T) {
+	tail := Deliverable{ID: "a", Tail: true}
+	other := Deliverable{ID: "b", InboxRank: 9, Risky: true, VerificationCost: 99, DeliveredAt: time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)}
+	if c := compareDeliverables(tail, other); c <= 0 {
+		t.Fatalf("tail vs other = %d, want > 0", c)
+	}
+	if c := compareDeliverables(other, tail); c >= 0 {
+		t.Fatalf("other vs tail = %d, want < 0", c)
+	}
+	if c := compareDeliverables(tail, Deliverable{ID: "a", Tail: true}); c != 0 {
+		t.Fatalf("tail vs tail = %d, want 0", c)
+	}
+}
+
+func TestDeliverableTailsOnlyTheRatchetListsClass(t *testing.T) {
+	if !ratchetListsRecord(3).Deliverable().Tail {
+		t.Error("a ratchet-lists record must tail")
+	}
+	docs := DeliverableRecord{Source: SourceConsolePR, PR: 4, Audit: AuditBinding{Class: "docs-review"}}
+	if docs.Deliverable().Tail {
+		t.Error("a docs-review record must not tail")
+	}
+}

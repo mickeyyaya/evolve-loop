@@ -102,6 +102,12 @@ var stageSeeds = []stageSeed{
 	{key: "healing.orchestrator.stage"},
 	{key: "healing.validator.stage"},
 	{key: "healing.live_reaction.stage"},
+	{
+		key:    "boundary.ratchet_merge.stage",
+		signal: signalcenter.CodeCLIRatchetMergeDecision,
+		site:   gatecontract.EmitSite{Path: "cmd/evolve/cmd_boundary_ratchet_record.go", Func: "emitRatchetRecordDecision", Ref: "CodeCLIRatchetMergeDecision"},
+		fields: []string{"stage", "pr", "head", "decision", "reason", "head_gate", "content_gate", "scans", "skipped_push", "candidate"},
+	},
 }
 
 func StageEntries() []gatecontract.Entry {

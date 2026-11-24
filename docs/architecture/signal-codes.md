@@ -147,6 +147,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 |---|---|
 | `CLI_QUEUE_FAILED` | the boundary failed to apply a queued CLI request (cli-contract.md §4 rule 3). The request moved to .evolve/queue/failed/. Fields: verb, request, rc, shelf |
 | `CLI_QUEUE_UNLANDED` | the applied queue left tracked changes beyond the loop stamps; the next sync-main refuses them until an operator lands them (cli-contract.md §4.6); fields paths |
+| `CLI_RATCHET_MERGE_DECISION` | at boundary.ratchet_merge.stage shadow or enforce, the boundary step ratchet-tighten decided whether to record its pull request for the next integration batch. fields.stage, pr, head, decision (would_record, recorded, already_recorded, no_record or none), reason (a typed refusal such as scan_size_red, head_moved or stale_open_pr), head_gate, content_gate, scans, skipped_push (true when the push of an unchanged tip was skipped) and candidate give the decision and each gate |
 | `CLI_SEAT_TOKEN_MOVED` | the operator ran evolve auth seat-token set or clear; fields.verb names the verb and fields.at the time; the token is never in the signal |
 
 ### config

@@ -68,6 +68,12 @@ func initUnresolved(items []Deliverable) []map[string]struct{} {
 }
 
 func compareDeliverables(a, b Deliverable) int {
+	if a.Tail != b.Tail {
+		if b.Tail {
+			return -1
+		}
+		return 1
+	}
 	if a.InboxRank != b.InboxRank {
 		if a.InboxRank < b.InboxRank {
 			return -1

@@ -25,6 +25,7 @@ type Deliverable struct {
 	Deps               []string
 	UnblocksCount      int
 	VerificationCost   int
+	Tail               bool
 }
 
 type FlushPolicy struct {
