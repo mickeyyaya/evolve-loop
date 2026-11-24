@@ -60,6 +60,8 @@ const (
 	ActionAcceptWithLimits Action = "AcceptWithLimits"
 	ActionAdjudicate       Action = "Adjudicate"
 	ActionStop             Action = "Stop"
+	ActionRedesign         Action = "Redesign"
+	ActionToOperator       Action = "ToOperator"
 )
 
 type Finding struct {
@@ -113,6 +115,7 @@ type MassFunc func(round int, atBar []Finding) float64
 
 type Input struct {
 	Loop       Loop                      `json:"loop"`
+	Subject    string                    `json:"subject,omitempty"`
 	Round      int                       `json:"round"`
 	Rounds     []Judgment                `json:"rounds"`
 	Components map[string]ComponentFacts `json:"components,omitempty"`
@@ -121,6 +124,8 @@ type Input struct {
 	Mass       MassFunc                  `json:"-"`
 	Headroom   HeadroomTable             `json:"-"`
 	Config     policy.ConvergenceConfig  `json:"-"`
+	Blocks     int                       `json:"-"`
+	Redesigns  int                       `json:"-"`
 }
 
 type Decision struct {

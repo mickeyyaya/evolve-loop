@@ -3,8 +3,10 @@ package convergence
 import "slices"
 
 const (
-	roleFixer = "fixer"
-	roleJudge = "judge"
+	roleFixer    = "fixer"
+	roleJudge    = "judge"
+	maxBlocks    = 3
+	maxRedesigns = 1
 )
 
 type scopeExit struct {
@@ -42,10 +44,25 @@ func (c decider) choose() Decision {
 	switch {
 	case len(strict) == 0:
 		return c.land(exit)
+	case c.in.Blocks > maxBlocks:
+		return c.escalate(exit)
 	case c.next == 3:
 		return c.exitScope(strict)
 	}
 	return c.proceed(strict, exit)
+}
+
+func (c decider) escalate(exit scopeExit) Decision {
+	keep := c.keepBest(c.bar, exit.exempt())
+	file := c.openIDs(keep)
+	action := ActionRedesign
+	if c.in.Redesigns >= maxRedesigns {
+		action = ActionToOperator
+	}
+	return Decision{
+		Rung: 3, Action: action, BlockingBar: c.bar, File: file, SplitComponent: exit.split,
+		LandRound: keep, Redesign: c.redesign(exit), Reasons: c.stopReasons(exit.split, len(file), keep),
+	}
 }
 
 func (c decider) earlyExit() scopeExit {

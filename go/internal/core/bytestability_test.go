@@ -16,6 +16,7 @@ var additiveStateKeys = []string{
 	"triageThroughput",
 	"stateRevision",
 	"lastAllocatedCycleNumber",
+	"blockCounts",
 }
 
 var legacyLedgerEntryKeys = []string{

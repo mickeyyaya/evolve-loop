@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/storage"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/convergence"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -22,7 +24,10 @@ const (
 	exitConvergenceWrite = 1
 )
 
-var errConvergenceUsage = errors.New(convergenceUsage)
+var (
+	errConvergenceUsage     = errors.New(convergenceUsage)
+	errConvergenceStateRead = errors.New("read host state")
+)
 
 type convergenceRequest struct {
 	input  string
@@ -42,14 +47,18 @@ func runConvergence(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve convergence decide: %v\n", err)
 		return exitConvergenceBad
 	}
-	cfg, err := loadConvergenceConfig(stderr)
+	root := envOrCwd("EVOLVE_PROJECT_ROOT")
+	cfg, err := loadConvergenceConfig(root, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "convergence decide: %v\n", err)
 		return exitConvergenceRead
 	}
-	in, err := readConvergenceInput(req.input, cfg)
+	in, err := readConvergenceInput(req.input, root, cfg)
 	if err != nil {
 		fmt.Fprintf(stderr, "convergence decide: %v\n", err)
+		if errors.Is(err, errConvergenceStateRead) {
+			return exitConvergenceRead
+		}
 		return exitConvergenceBad
 	}
 	d := convergence.Decide(in)
@@ -72,8 +81,7 @@ func parseConvergenceArgs(args []string, stderr io.Writer) (convergenceRequest, 
 	return req, nil
 }
 
-func loadConvergenceConfig(stderr io.Writer) (policy.ConvergenceConfig, error) {
-	root := envOrCwd("EVOLVE_PROJECT_ROOT")
+func loadConvergenceConfig(root string, stderr io.Writer) (policy.ConvergenceConfig, error) {
 	pol, err := policy.Load(filepath.Join(root, ".evolve", "policy.json"))
 	if err != nil {
 		return policy.ConvergenceConfig{}, err
@@ -85,7 +93,7 @@ func loadConvergenceConfig(stderr io.Writer) (policy.ConvergenceConfig, error) {
 	return cfg, nil
 }
 
-func readConvergenceInput(path string, cfg policy.ConvergenceConfig) (convergence.Input, error) {
+func readConvergenceInput(path, root string, cfg policy.ConvergenceConfig) (convergence.Input, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return convergence.Input{}, err
@@ -104,6 +112,14 @@ func readConvergenceInput(path string, cfg policy.ConvergenceConfig) (convergenc
 	}
 	if err := in.Validate(); err != nil {
 		return convergence.Input{}, fmt.Errorf("%s: %w", path, err)
+	}
+	if in.Subject != "" {
+		st, err := storage.New(filepath.Join(root, ".evolve")).ReadState(context.Background())
+		if err != nil {
+			return convergence.Input{}, fmt.Errorf("%w: %v", errConvergenceStateRead, err)
+		}
+		counts := st.BlockCounts[in.Subject]
+		in.Blocks, in.Redesigns = counts.Blocks, counts.Redesigns
 	}
 	return in, nil
 }

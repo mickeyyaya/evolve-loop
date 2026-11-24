@@ -7,7 +7,7 @@
 > - the doc review: C1, C2, H1–H5, M1, M2 and L1–L3, all applied;
 > - the research refinements CR1–CR8, and the operator's answer on headroom (top = Opus 5.5 at xhigh effort).
 >
-> **Revision 3** (2026-11-05) adds one escalation path, with a redesign rung after the retries (§3.3). No code for this revision exists yet.
+> **Revision 3** (2026-11-05) adds one escalation path, with a redesign rung after the retries (§3.3). Cycle 2621 adds `ActionRedesign`, `ActionToOperator`, `Input.Subject`, and `cyclestate.BlockCount` (`pipeline-blockers-r1-one-block-count`); the remaining R3–R6 items follow separately.
 >
 > **Operator directives (2026-10-07):**
 > - *"It just retry for too many times."*
@@ -379,7 +379,7 @@ Today's tier tables have **no** deep→top headroom in any family:
 }
 ```
 
-- **`max_blocks` and `max_redesigns`** land with plan component R2. Strict decoding refuses them until then.
+- **`max_blocks` and `max_redesigns`** stay out of `policy.json` until a later item adds them to `internal/policy`. Strict decoding refuses them, and `convergence` uses the compiled limits of 3 blocks and 1 redesign.
 - **Defaults and decoding:** compiled defaults live in `internal/policy`. Unknown keys are rejected, and unknown enum words warn and resolve to the default (§2.1 rule 10).
 - **`stage`:**
   - `shadow`: loops compute and signal the decision.

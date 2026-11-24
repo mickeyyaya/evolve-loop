@@ -12,6 +12,12 @@ type State struct {
 	TriageThroughput         []TriageThroughputEntry `json:"triageThroughput,omitempty"`
 	StateRevision            int                     `json:"stateRevision,omitempty"`
 	LastAllocatedCycleNumber int                     `json:"lastAllocatedCycleNumber,omitempty"`
+	BlockCounts              map[string]BlockCount   `json:"blockCounts,omitempty"`
+}
+
+type BlockCount struct {
+	Blocks    int `json:"blocks"`
+	Redesigns int `json:"redesigns,omitempty"`
 }
 
 type TriageThroughputEntry struct {

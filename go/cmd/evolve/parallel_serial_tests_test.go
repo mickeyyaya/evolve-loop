@@ -215,6 +215,7 @@ var serialTests = map[string]string{
 	"main.TestCmd_ConvergenceDecide_BadInputExits10":                                                                  "sets env through a helper",
 	"main.TestCmd_ConvergenceDecide_EveryLoopButTheConsoleLaneExits10NamingItsInProcessCaller":                        "sets env through a helper",
 	"main.TestCmd_ConvergenceDecide_HumanTextNamesTheDecisionAndEveryReason":                                          "sets env through a helper",
+	"main.TestCmd_ConvergenceDecide_ReadsHostBlockCountFromState":                                                     "sets env through a helper",
 	"main.TestCmd_ConvergenceDecide_TheL2ReplayLandsAtRoundThreeThroughRungTwo":                                       "sets env through a helper",
 	"main.TestCmd_ConvergenceDecide_ThePolicysConvergenceBlockSetsTheBudget":                                          "sets env through a helper",
 	"main.TestCmd_ConvergenceDecide_TodaysClaudeTierTableHasNoDeepToTopHeadroom":                                      "sets env through a helper",

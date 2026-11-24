@@ -18,6 +18,7 @@ func TestState_RoundTrip(t *testing.T) {
 		TriageThroughput:         []TriageThroughputEntry{{Cycle: 6, Floors: 2}},
 		StateRevision:            4,
 		LastAllocatedCycleNumber: 8,
+		BlockCounts:              map[string]BlockCount{"t1": {Blocks: 4, Redesigns: 1}},
 	}
 	b, err := json.Marshal(in)
 	if err != nil {
@@ -33,6 +34,7 @@ func TestState_RoundTrip(t *testing.T) {
 	for _, want := range []string{
 		`"lastCycleNumber"`, `"failedApproaches"`, `"carryoverTodos"`, `"currentBatch"`,
 		`"cycleAccruedCostUSD"`, `"retrospected"`, `"first_seen_cycle"`, `"floors"`,
+		`"blockCounts"`, `"blocks"`, `"redesigns"`,
 	} {
 		if !strings.Contains(string(b), want) {
 			t.Errorf("State JSON missing wire field %s; got %s", want, b)
@@ -77,7 +79,7 @@ func TestStateOmitempty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	for _, absent := range []string{"failedApproaches", "carryoverTodos", "triageThroughput", "setupCompletedAt", "setupVersion", "stateRevision", "lastAllocatedCycleNumber"} {
+	for _, absent := range []string{"failedApproaches", "carryoverTodos", "triageThroughput", "setupCompletedAt", "setupVersion", "stateRevision", "lastAllocatedCycleNumber", "blockCounts"} {
 		if strings.Contains(string(b), absent) {
 			t.Errorf("zero State should omit %q; got %s", absent, b)
 		}

@@ -22,6 +22,7 @@ func (c decider) reason(code string, fields ...string) string {
 
 const (
 	guardCauseName     = "landing-guard"
+	blocksCauseName    = "blocks"
 	landingGuardSignal = "CONVERGENCE_LANDING_GUARD"
 )
 
@@ -40,6 +41,8 @@ func (c decider) rungReason(d Decision) string {
 	switch {
 	case slices.ContainsFunc(d.Reasons, isLandingGuardReason):
 		cause = guardCauseName
+	case d.Action == ActionRedesign || d.Action == ActionToOperator:
+		cause = blocksCauseName
 	case d.Action == ActionLand:
 		_, cause = c.landRung()
 	}

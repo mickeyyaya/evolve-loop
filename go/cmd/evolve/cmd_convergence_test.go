@@ -260,3 +260,50 @@ func TestCmd_Convergence_IsARegisteredVerb(t *testing.T) {
 		t.Fatalf("rc = %d stdout = %q stderr = %q", rc, stdout.String(), stderr.String())
 	}
 }
+
+func TestCmd_ConvergenceDecide_ReadsHostBlockCountFromState(t *testing.T) {
+	root := convergenceRoot(t, "")
+	roundsPath := filepath.Join(root, "subject-rounds.json")
+	roundsBody := `{"loop":"console-lane","subject":"task-1","round":0,"rounds":[{"index":0,"findings":[{"id":"h1","severity":"HIGH","status":"OPEN"}]}]}`
+	if err := os.WriteFile(roundsPath, []byte(roundsBody), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	evolveDir := filepath.Join(root, ".evolve")
+	if err := os.MkdirAll(evolveDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	statePath := filepath.Join(evolveDir, "state.json")
+
+	rc, stdout, stderr := runDecide(t, "--input", roundsPath, "--json")
+	if rc != 0 || decodeDecision(t, stdout).Action != convergence.ActionContinue {
+		t.Fatalf("absent state.json: rc=%d stdout=%q stderr=%q", rc, stdout, stderr)
+	}
+
+	for _, tc := range []struct {
+		name  string
+		state string
+		want  convergence.Action
+	}{
+		{"three blocks continues", `{"blockCounts":{"task-1":{"blocks":3}}}`, convergence.ActionContinue},
+		{"four blocks redesigns", `{"blockCounts":{"task-1":{"blocks":4}}}`, convergence.ActionRedesign},
+		{"four blocks after redesign routes to operator", `{"blockCounts":{"task-1":{"blocks":4,"redesigns":1}}}`, convergence.ActionToOperator},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := os.WriteFile(statePath, []byte(tc.state), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			rc, stdout, stderr := runDecide(t, "--input", roundsPath, "--json")
+			if rc != 0 || decodeDecision(t, stdout).Action != tc.want {
+				t.Fatalf("rc=%d stdout=%q stderr=%q want %s", rc, stdout, stderr, tc.want)
+			}
+		})
+	}
+
+	if err := os.WriteFile(statePath, []byte("{malformed"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rc, stdout, stderr = runDecide(t, "--input", roundsPath, "--json")
+	if rc != 2 || stdout != "" || !strings.Contains(stderr, "read host state") {
+		t.Fatalf("malformed state.json: rc=%d stdout=%q stderr=%q, want exit 2", rc, stdout, stderr)
+	}
+}
