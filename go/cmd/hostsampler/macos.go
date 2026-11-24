@@ -28,8 +28,9 @@ func readTool(run func(string, ...string) ([]byte, error), parse func(string) (f
 	return v, err == nil
 }
 
-func readMacOS(run func(string, ...string) ([]byte, error), now func() time.Time) Counters {
+func readMacOS(run func(string, ...string) ([]byte, error), now func() time.Time, cpu func(time.Time) (float64, bool)) Counters {
 	c := Counters{At: now()}
+	c.CPUPct, c.HasCPUPct = cpu(c.At)
 	c.MemUsedMB, c.HasMem = readTool(run, hostpressure.ParseVMStat, "vm_stat")
 	c.SwapUsedMB, c.HasSwap = readTool(run, hostpressure.ParseSwapUsage, "sysctl", "-n", "vm.swapusage")
 	return c
