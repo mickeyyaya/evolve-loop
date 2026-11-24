@@ -59,7 +59,7 @@ func Resolve(lookupEnv func(string) string, cwd string) Layout {
 		EvolveDir:      evolveDir,
 		StateFile:      filepath.Join(evolveDir, "state.json"),
 		CycleStateFile: cycleStateFile,
-		LedgerFile:     filepath.Join(evolveDir, "ledger.jsonl"),
+		LedgerFile:     filepath.Join(evolveDir, ledgerFileName),
 		ProfilesDir:    filepath.Join(pluginRoot, ".evolve", "profiles"),
 		AdaptersDir:    adaptersDir,
 		CapabilityDir:  adaptersDir,
@@ -112,7 +112,13 @@ func FailureDigestRecordPath(evolveDir string, cycle int) string {
 
 const evolveDirName = ".evolve"
 
+const ledgerFileName = "ledger.jsonl"
+
 func EvolveDirOf(projectRoot string) string { return filepath.Join(projectRoot, evolveDirName) }
+
+func LedgerFileOf(projectRoot string) string {
+	return filepath.Join(EvolveDirOf(projectRoot), ledgerFileName)
+}
 
 func EventChannelsRoot(evolveDir string) string { return filepath.Join(evolveDir, "events", "ch") }
 

@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/treedelta"
 )
@@ -66,7 +67,7 @@ func boundCarryRecord(opts *Options) (ledger.CompositionVerdict, bool, string) {
 	if ref == "" {
 		return ledger.CompositionVerdict{}, false, "the audit binding names no audit artifact"
 	}
-	rec, found, err := ledger.LatestCompositionVerdict(filepath.Join(opts.ProjectRoot, ".evolve", "ledger.jsonl"), ledger.IdenticalRebaseMethod, ref)
+	rec, found, err := ledger.LatestCompositionVerdict(paths.LedgerFileOf(opts.ProjectRoot), ledger.IdenticalRebaseMethod, ref)
 	switch {
 	case err != nil:
 		return rec, false, "the ledger is unreadable: " + err.Error()
