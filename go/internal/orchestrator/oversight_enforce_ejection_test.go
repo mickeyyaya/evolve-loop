@@ -12,6 +12,10 @@ import (
 
 const enforceBase = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
+type nopRequeue struct{}
+
+func (nopRequeue) Requeue(context.Context, integration.DeliverableRecord, string) error { return nil }
+
 type redCI struct{}
 
 func (redCI) Open(_ context.Context, b integration.Batch) (integration.PR, error) {
@@ -49,6 +53,7 @@ func (f *fixture) enforceActor() integration.EnforceActor {
 			},
 		},
 		Briefs:  briefsIn{dir: f.t.TempDir()},
+		Requeue: nopRequeue{},
 		Publish: sendsTo{f: f},
 	}
 }

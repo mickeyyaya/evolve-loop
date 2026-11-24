@@ -36,6 +36,8 @@ type loopBatchCoordinator struct {
 	lastGraph    graphLoad
 
 	newDriver         func(pool int) (*integration.Driver, error)
+	newEnforceActor   func(repo integration.Repo, pool int) integration.Actor
+	integrationEnvOf  func(root string, now time.Time) integrationEnv
 	driverFinishLimit time.Duration
 	driverTick        time.Duration
 	oversightSource   func() (orchestrator.Source, error)

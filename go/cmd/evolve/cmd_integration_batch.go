@@ -52,6 +52,12 @@ func (e integrationEnv) ports() batchPorts {
 	return batchPorts{Repo: repo, CI: integration.GhCI{Repo: repo, Gh: e.Gh, Settle: e.Settle, Runs: runs}, Main: integration.GitMain{Repo: repo}, Runs: runs}
 }
 
+func (e integrationEnv) enforceMerger(projectRoot string, warn io.Writer) integration.Merger {
+	p := e.ports()
+	gate := e.stopGate(projectRoot, warn)
+	return integration.Merger{CI: gate.CI(p.CI), Main: gate.Main(p.Main)}
+}
+
 func (e integrationEnv) train(projectRoot string, warn io.Writer) (integration.Train, *integration.RunLog) {
 	p := e.ports()
 	gate := e.stopGate(projectRoot, warn)

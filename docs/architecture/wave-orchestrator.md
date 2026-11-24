@@ -722,7 +722,7 @@ When the CI is green and `origin/main` still equals the batch base, the orchestr
 - The integration record `.evolve/waves/integration-<wave>.json` holds the branch, the tip, the open PR, the members and the loop lease epoch. Each branch write uses `--force-with-lease` on the recorded tip. On a resume, the new lease holder adopts the branch or discards it, and closes a PR of an older epoch.
 - The cells of a deliverable stay held until its merge. An ejected deliverable goes back to its lane, so a new lane in the same cell can still conflict with it.
 - One blocking `gh run watch` child in `internal/integration` wakes the orchestrator on the CI result. The `max_age_minutes` flush uses one `time.AfterFunc` for the oldest deliverable, in `internal/integration`. `internal/orchestrator` keeps its no-timer guard.
-- After each merge, the plane's `main` moves by a fast-forward (I11). It holds no local-only commit, because of D12.
+- After each merge, the plane's `main` moves by a fast-forward (I11, built in slice 1 of I14). `EnforceActor.Flush` calls `SyncToOrigin` after a merge, and a plane that does not move is a driver failure, never a retraction of the merge. It holds no local-only commit, because of D12.
 
 #### The test strategy for the combined tree (D16 to D18)
 
@@ -750,6 +750,12 @@ Each lane passed its own tests on its own base. The integration branch holds a t
 | `enforce` | Over 10 batches, the batch red rate is below one in three. The median time from delivery to merge is at most the per-lane baseline. |
 
 The merge window of the PR-latency plan (P2) waits for `enforce` (D15). At `enforce`, the window of §10 takes its conflict feed from `SHIP_INTEGRATION_EJECTED` with `cause=conflict`, and the ship and zero-ship counters count merged deliverables (D21).
+
+**State of D21 (slice 1 of I14).** The code is built and enforce is refused until the ports of slice 2 and the gate of slice 4 exist (`MissingPortError`). Three parts exist:
+
+- `Oversight.ejected` is the one feeder of the conflict input. It skips an event that carries the shadow stamp (`integration.IsShadow`).
+- `EnforceActor` emits `SHIP_INTEGRATION_MERGED` with the kind `ship.merged`. `Oversight.merged` frees the cells of the lane and gives the window its growth signal. The kind is distinct, so no `ship.landed` reader sees it.
+- `wave.ShipsIn` at `enforce` counts the members that the persisted wave record holds as `merged` and `landed`. It does not read the signal. Spec: [integration-driver](integration-driver.md) section 10.
 
 #### Config keys, signals and commands
 

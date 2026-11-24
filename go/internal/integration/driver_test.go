@@ -197,7 +197,7 @@ func TestDriver_EnforceHasNoActorSoTheDriverRefusesToStart(t *testing.T) {
 	if e.Fields["step"] != "stage" || e.Severity != signalcenter.SeverityWarn || e.Kind != signalcenter.KindShipWarning {
 		t.Errorf("event = %+v", e)
 	}
-	wantReason := `shadow: the integration driver of pool 5 failed the step stage: stage: the stage "enforce" has no actor, so the driver does not start`
+	wantReason := `enforce: the integration driver of pool 5 failed the step stage: stage: the stage "enforce" has no actor, so the driver does not start`
 	if e.Reason != wantReason {
 		t.Errorf("reason = %q, want %q", e.Reason, wantReason)
 	}

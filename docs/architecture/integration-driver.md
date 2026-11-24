@@ -190,13 +190,23 @@ Shadow answers four questions: the order, the overlap, the conflict count and th
    - Each tick derives from the owner context. A timer tick also follows the loop context through `context.AfterFunc`. The request tick does not.
    - On a cancelled loop, `finish` prints one line first, because a second interrupt is ignored for up to about 65 s.
 8. **After the limit.** Past the limit, the record lacks its wave-end decision, so the wave is `not clean`. The repair route writes `Ended`. `LastCycle` is written at wave end. It is the highest cycle number that the allocator holds at that time (`State.HighestCycleNumber`).
-9. **Zero-ship.** At shadow, zero-ship uses `CountShips`, as today. Zero-ship at the next `prepareIteration` reads the record. At enforce, `core.CountWaveShips(stage, cycles, rec)` counts `merged` plus in-flight members, so an open batch is not zero.
+9. **Zero-ship.** At shadow, zero-ship uses `CountShips`, as today. At enforce, `wave.ShipsIn` calls `mergedIn` (`go/internal/wave/ships.go:88`). It reads each persisted wave record and counts a member that is `merged` and `landed`.
+   - The time of the member is the latest `Decisions[].At` that flushed it.
+   - A record that does not parse is a `ReadFailure`. Then `zeroShipHalt` does not count the wave.
+   - The record is the one home of "merged". No counter reads the `SHIP_INTEGRATION_MERGED` signal.
 
-**The window port.** `integration.LandingFeed` is a small interface that `integration` declares. `*orchestrator.Window` satisfies it. A pool gets its feed, and the rolling pool gets a null feed, because it has no window. D21 says that the feed comes from `SHIP_INTEGRATION_EJECTED`. The fact is the same, and the driver knows it first, so the feed comes from the driver.
+**The window feed.** `Oversight` is the one feeder of the window.
+
+- `Oversight.ejected` (`go/internal/orchestrator/oversight.go:223`) calls `Landing.Conflict()` for an event of `SHIP_INTEGRATION_EJECTED` with `cause=conflict`.
+- It skips an event that `integration.IsShadow` marks. So a shadow ejection never halves a live window.
+- `Oversight.merged` (`oversight.go:247`) handles the kind `ship.merged` and gives the growth signal.
+- `integration.LandingFeed` and `EnforceActor.Landing` are deleted, so no second feeder exists.
+- `EnforceActor` emits `SHIP_INTEGRATION_MERGED` with the kind `ship.merged` for each landed member.
+- The kind is new. So `pipelinerates`, the inbox curator and the legacy stream do not read it as a `ship.landed`.
 
 **Single homes.** `integration.CodeMerged`, `CodeComposed` and `CodeFlushed` join `CodeEjected`. `phases/ship/deliverable.go` keeps the registry and uses them. The staged I11 with its private copies is dropped before PR (a). Its conflict is at `core/parallel_default_test.go`.
 
-**Plane sync.** `core.FastForwardPlaneMain` does not land. PR (c) extracts `syncToOrigin` (§9).
+**Plane sync.** `EnforceActor.Flush` calls `syncPlane` (`go/internal/integration/enforce_actor.go:122`) after a merge. It calls `PlaneOf(repo)`, which wraps `SyncToOrigin`. The result goes to `FlushResult.Failures` only. A blocked or diverged plane does not retract the merge. PR (c) still extracts `syncToOrigin` for the mid-wave strategy (§9).
 
 ## 7. The clean-wave verdict and the signals
 
@@ -227,7 +237,13 @@ It prints the batches, the members and their states, the order, the decisions, t
 
 **The signals.** Each signal has the six parts of ADR-0161. `SHIP_INTEGRATION_DRIVER_FAILED` names the step and the error. The driver also writes the failure to the record, so a lost signal cannot hide it.
 
-**Gate order.** Until PR (c) lands, the driver refuses to start at `fleet.integration.stage=enforce`. It emits `_DRIVER_FAILED`, because `Actors` has no enforce entry. `status` prints `enforce: not ready (no enforce actor)`. This is wiring data, not a flag. I9 stays the operator's decision.
+**Gate order.** The root builds the production `EnforceActor` (`go/cmd/evolve/cmd_loop_driver.go:135`). The driver owns the interface `readiness`, and `actor()` (`go/internal/integration/driver.go:130`) asks an actor for `Missing()`.
+
+- While a port is absent, `Check` returns `*MissingPortError`. The driver does not start at `fleet.integration.stage=enforce`.
+- It emits `_DRIVER_FAILED` with the stage `enforce`.
+- The production root today lacks `Requeue`, `Promote`, `Briefs` and the `Gate`.
+- The merge ports are not a gap. `integrationEnv.enforceMerger` wraps `CI` and `Main` in the `StopGate`, as `integrationEnv.train` does. So an enforce merge never bypasses the stop-the-line hold. `TestStopJourney_TheEnforceMergerPutsTheStopGateOnMainAndOnCI` and `TestProductionEnforceActor_AStopThatHoldsBlocksItsMergeOfMain` pin it.
+- This is wiring data, not a flag. I9 stays the operator's decision.
 
 ## 8. Rows
 
@@ -276,7 +292,20 @@ PR (c) also settles these facts.
 
 ## 10. Limits and the split
 
+**Built in slice 1 (I11 rows).**
+
+- The production `EnforceActor` at the composition root, with `Merger` ports from `integrationEnv.ports()`, the `LaneBatcher` and the plane sync.
+- `LaneBatcher.For(PendingBatch)` gives each compose call its own identity. It deletes the ref of its own flush, fetches `origin/main` with an explicit refspec, and cuts the branch from the live head. The batch index has one home, `PendingBatch.Index`. The base that the cut used goes back through `Composition.Batch.Base` into the wave record.
+- `Driver.flush` absorbs the result of `Flush` before it returns an error. A merge followed by an error is thus in the record.
+- `publishFlush` and `fail` report the real stage and the PR of the batch.
+- The readiness refusal (`MissingPortError`), the plane sync, `Oversight.ejected` as the one conflict feeder, `ship.merged` with `Oversight.merged`, and `mergedIn` as the counter source.
+
 **Limits.**
+
+- Enforce stays refused until slice 2 supplies `Requeue`, `Promote` and `Briefs`, and slice 4 supplies the `Gate`. The end-to-end test injects fake ports.
+- The time of a merge in `mergedIn` is the time of the flush, a few minutes after the PR merged at most.
+- With the orchestrator at `enforce`, an ejection stamped shadow still briefs and holds its lane (`Oversight.ejected` has no shadow filter for those actions). The filter covers only the window feed. This is old behavior and a later item changes it.
+- The batcher fetch uses its own explicit refspec. The item `integration-sync-to-origin-uses-the-mainsync-fetch` moves the one fetch rule into `mainsync`.
 
 - Enforce paths get their first live run at I9. PR (c) adds a fixture soak. The author of the first card did not read `cmd_fleet_soak_pool.go`, and it can hold the shape.
 - The cost of `BatchTest` at enforce is not measured.
@@ -293,7 +322,7 @@ PR (c) also settles these facts.
 |---|---|
 | (a) | Names, the pool id through to the lane, the move of `landedByIdentity` to `RecordForCommit`, `IsAncestor` and the wave record type |
 | (b) | Records home, epoch on `loopConfig`, private ref, `Driver`, `ShadowActor`, goroutine, `runFork` and `settleFork`, I8 with the verdict. Enforce refuses to start |
-| (c) | `EnforceActor`, lane batcher, gate adapters, early `Watch` and cancel, `Requeue`, bookkeeping flush, `syncToOrigin`, window feed, zero-ship, soak and the removal of `PrefixCheck` |
+| (c) | `EnforceActor`, lane batcher, gate adapters, early `Watch` and cancel, `Requeue`, bookkeeping flush, `syncToOrigin`, window feed, zero-ship, soak and the removal of `PrefixCheck`. Split in four slices: slice 1 (built) holds the actor, the batcher, the plane sync, the feeds and the counter. Slice 2 holds F2, F3, finding 3 and the production ports. Slice 3 holds F11, F12, findings 4 and 5 and the `Moved` verdict. Slice 4 holds the gate adapters, the soak and the removal of `PrefixCheck` |
 
 The shadow scope builds from this document with no further card round. The review ran three rounds on the card.
 

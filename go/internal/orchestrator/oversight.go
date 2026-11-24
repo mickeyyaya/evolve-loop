@@ -120,6 +120,8 @@ func (o *Oversight) handle(e signalcenter.Event) {
 		o.ejected(e)
 	case e.Kind == signalcenter.KindCycleSealed:
 		o.sealed(e)
+	case e.Kind == signalcenter.KindShipMerged:
+		o.merged(e)
 	case e.Kind == signalcenter.KindShipLanded:
 		o.landed(e)
 	case e.Kind == signalcenter.KindLoopHalt:
@@ -219,18 +221,65 @@ func (o *Oversight) ejectee(cycle int) (held, bool) {
 }
 
 func (o *Oversight) ejected(e signalcenter.Event) {
+	if o.ended[e.Cycle] {
+		return
+	}
 	h, ok := o.ejectee(e.Cycle)
-	if !ok || o.ended[e.Cycle] {
+	var a action
+	if e.Fields[integration.FieldCause] == integration.CauseConflict && !integration.IsShadow(e.Fields) {
+		a.add("count_conflict", o.countConflict)
+	}
+	switch {
+	case !ok:
+	case !h.live:
+		a.lane = h.lane.Key
+		a.add("lane_left", nil)
+	default:
+		a.lane = h.lane.Key
+		a.add("brief_lane", func() { o.Intake.Hold(h.lane.Key); o.sendBrief(h.lane.Key, e) })
+		a.add("hold_cells", nil)
+	}
+	if len(a.names) > 0 {
+		o.do(e, a)
+	}
+}
+
+func (o *Oversight) merged(e signalcenter.Event) {
+	if o.ended[e.Cycle] {
 		return
 	}
-	if !h.live {
-		o.do(e, action{names: []string{"lane_left"}, lane: h.lane.Key})
+	o.ended[e.Cycle] = true
+	h, ok := o.ejectee(e.Cycle)
+	delete(o.delivered, e.Cycle)
+	delete(o.conflicts, e.Cycle)
+	var a action
+	if ok {
+		a.lane = h.lane.Key
+	}
+	if ok && h.live {
+		a.add("free_cells", func() { o.Intake.Free(h.lane.Key) })
+	}
+	a.add("count_clean_landing", func() { o.countLanding(false) })
+	if ok && h.live {
+		a.add("backfill", nil)
+	}
+	o.do(e, a)
+}
+
+func (o *Oversight) countConflict() { o.countLanding(true) }
+
+func (a *action) add(name string, apply func()) {
+	a.names = append(a.names, name)
+	if apply == nil {
 		return
 	}
-	o.do(e, action{names: []string{"brief_lane", "hold_cells"}, lane: h.lane.Key, apply: func() {
-		o.Intake.Hold(h.lane.Key)
-		o.sendBrief(h.lane.Key, e)
-	}})
+	prev := a.apply
+	a.apply = func() {
+		if prev != nil {
+			prev()
+		}
+		apply()
+	}
 }
 
 func (o *Oversight) signalUnlocated(e signalcenter.Event) {

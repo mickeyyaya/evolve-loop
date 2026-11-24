@@ -30,7 +30,7 @@ func init() {
 		codeIntegrationComposed:  "a deliverable composed onto the integration branch and passed its L1 gates; fields.wave, fields.cycle and fields.batch name it",
 		codeIntegrationEjected:   "a deliverable went back to its lane. fields.cause names why (conflict, gate, or proof); fields.paths lists conflicted paths. fields.brief_file holds the long brief path",
 		codeIntegrationFlushed:   "a batch PR opened; fields.trigger names the flush trigger and fields.pr the PR",
-		codeIntegrationMerged:    "a batch PR merged into main by a fast-forward to the tested tip; fields.pr names the PR and fields.tip the tip",
+		codeIntegrationMerged:    "a deliverable merged into main by the fast-forward of its batch (kind ship.merged); fields.cycle names the cycle, fields.pr the batch PR and fields.tip the tested tip",
 		codeIntegrationReverted:  "the check after a merge reverted one cycle commit alone; fields.cycle names it and fields.commit the reverted commit",
 	} {
 		signalcenter.RegisterCode(signalcenter.ModuleShip, c, doc)
