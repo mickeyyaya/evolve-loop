@@ -62,6 +62,8 @@ const (
 
 const ClassifierAgent = "model-classifier"
 
+const HeldAuditKey = "held-proposal-audit"
+
 type Request struct {
 	Agent        string
 	Phase        string
