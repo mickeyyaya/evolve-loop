@@ -27,3 +27,10 @@
 ## Findings
 
 - None open.
+
+## The working-tree inventory
+
+- **Purpose.** `PresentFiles(ctx, git)` lists the files that are present in the working tree: tracked files and untracked files that git does not ignore. A caller that reads file contents uses it, for example `evolve yaml check`. The paths are sorted and relative to the git directory.
+- **Deleted files are excluded.** `git ls-files --cached` still lists a tracked file that was deleted and not staged. `PresentFiles` runs `git ls-files -z --deleted` and removes those paths. A caller thus never reads a file that is not on disk.
+- **Precedents.** `go/internal/phases/ship/scanshadow_tree.go:36` and `go/internal/core/ship_recovery.go:257` list `--cached --others` and do not remove the deleted files. They are not changed. `PresentFiles` is the one home of the inventory with the subtraction.
+- **Pinned by.** `TestPresentFiles_ListsTrackedAndUntrackedAndSkipsDeletedAndIgnored`, `TestPresentFiles_AGitFailureOutsideARepositoryIsAnError` and `TestPresentFiles_AFailingDeletedListingIsAnErrorAfterTheFirstListing`.
