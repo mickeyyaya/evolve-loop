@@ -89,3 +89,18 @@ func TestSentinelStage_OnlyTheEnforceValueEnforces(t *testing.T) {
 		}
 	}
 }
+
+func TestSentinelStageBlock_EffectiveDefaultsToShadowUnlessEnforce(t *testing.T) {
+	t.Parallel()
+	cases := map[gcpolicy.SentinelStage]gcpolicy.SentinelStage{
+		gcpolicy.SentinelStageEnforce: gcpolicy.SentinelStageEnforce,
+		gcpolicy.SentinelStageShadow:  gcpolicy.SentinelStageShadow,
+		"":                            gcpolicy.SentinelStageShadow,
+		"Enforce":                     gcpolicy.SentinelStageShadow,
+	}
+	for stage, want := range cases {
+		if got := (gcpolicy.SentinelStageBlock{Stage: stage}).Effective(); got != want {
+			t.Errorf("stage %q: Effective() = %q, want %q", stage, got, want)
+		}
+	}
+}
