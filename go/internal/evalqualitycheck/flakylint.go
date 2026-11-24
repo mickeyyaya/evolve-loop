@@ -14,10 +14,11 @@ import (
 )
 
 const (
-	FlakyClassAsyncWait    = "async-wait"
-	FlakyClassConcurrency  = "concurrency"
-	FlakyClassResourceLeak = "resource-leak"
-	FlakyClassEnvironment  = "environment"
+	FlakyClassAsyncWait           = "async-wait"
+	FlakyClassConcurrency         = "concurrency"
+	FlakyClassResourceLeak        = "resource-leak"
+	FlakyClassEnvironment         = "environment"
+	FlakyClassUnboundedSubprocess = "unbounded-subprocess"
 )
 
 type FlakyFinding struct {
@@ -252,13 +253,17 @@ func lintExecCall(call *ast.CallExpr, consts map[string]string, anchored map[str
 	if !ok || len(argv) == 0 {
 		return
 	}
+	if !isBoundedSubprocessCall(call) {
+		add(FlakyClassUnboundedSubprocess,
+			"subprocess started outside acsassert: a raw exec has no bound, so a hang spends the whole Go lane; use acsassert.SubprocessOutput or acsassert.GoTests")
+	}
 	switch argv[0] {
 	case "go":
 		if len(argv) > 1 && argv[1] == "test" {
 			lintGoTestArgs(argv[2:], add)
 		}
 	case "git":
-		if !argsContainStringLit(call.Args, "-C", consts) {
+		if !anchorsDirectory(call) && !argsContainStringLit(call.Args, "-C", consts) {
 			if name := assigned[call]; name == "" || !anchored[name] {
 				add(FlakyClassEnvironment,
 					"git without -C: subprocess git resolves the repo from process cwd (main tree vs worktree vs fleet lane); pass -C <dir> or set cmd.Dir")

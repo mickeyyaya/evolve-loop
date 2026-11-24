@@ -24,6 +24,7 @@ type predicateLintGateWording struct {
 	gateName, label, subject, headline, advice, finding string
 	findingSrc, findingVerdict                          string
 	findingBlocks                                       bool
+	findingCount                                        string
 }
 
 var predicateLintGateWordings = []predicateLintGateWording{
@@ -33,6 +34,7 @@ var predicateLintGateWordings = []predicateLintGateWording{
 		advice:         "These shapes flake under fleet load (Luo FSE'14 async-wait/concurrency classes); rewrite before they enter the ACS corpus.",
 		findingSrc:     flakyPredicateSrc,
 		findingVerdict: " ADVISORY: never blocks",
+		findingCount:   "2",
 	},
 	{
 		gateName: "unsatisfiable-predicate-shape", label: "unsatisfiable-lint", subject: "predicate",
@@ -41,6 +43,7 @@ var predicateLintGateWordings = []predicateLintGateWording{
 		findingSrc:     unsatisfiablePredicateSrc,
 		findingVerdict: " BLOCKING at enforce: 1 of the 1 finding(s), listed first",
 		findingBlocks:  true,
+		findingCount:   "1",
 	},
 }
 
@@ -74,7 +77,7 @@ func TestPredicateLintGates_MessagesAreUnchanged(t *testing.T) {
 			}
 		}
 		got, block := g.check(core.ReviewInput{Phase: "tdd", Workspace: ws, Worktree: findings})
-		prefix := w.headline + " authored for cycle4242: 1 finding(s) across 1 linted file(s) — " + w.finding
+		prefix := w.headline + " authored for cycle4242: " + w.findingCount + " finding(s) across 1 linted file(s) — " + w.finding
 		suffix := ". " + w.advice + w.findingVerdict
 		if block != w.findingBlocks || !strings.HasPrefix(got, prefix) || !strings.HasSuffix(got, suffix) {
 			t.Errorf("%s: block=%v findings reason %q, want prefix %q and suffix %q", w.gateName, block, got, prefix, suffix)
@@ -86,6 +89,8 @@ func TestPredicateLintGates_ReasonsCapFindingsWithAVisibleCount(t *testing.T) {
 	sweep := "\nfunc TestC4242_Sweep%d(t *testing.T) {\n\tif err := exec.Command(\"go\", \"test\", \"./...\").Run(); err != nil {\n\t\tt.Fatal(err)\n\t}\n}\n"
 	gone := "\nfunc TestC4242_Gone%d(t *testing.T) {\n\tif acsassert.FileExists(t, \"legacy.md\") {\n\t\tt.Errorf(\"legacy.md still exists\")\n\t}\n}\n"
 	for gateName, fn := range map[string]string{"flaky-predicate-shape": sweep, "unsatisfiable-predicate-shape": gone} {
+		perFunc := map[string]int{"flaky-predicate-shape": 2, "unsatisfiable-predicate-shape": 1}[gateName]
+		total := 8 * perFunc
 		var b strings.Builder
 		b.WriteString("//go:build acs\n\npackage cycle4242\n\nimport (\n\t\"os/exec\"\n\t\"testing\"\n\n\t\"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert\"\n)\n")
 		for i := 0; i < 8; i++ {
@@ -94,7 +99,7 @@ func TestPredicateLintGates_ReasonsCapFindingsWithAVisibleCount(t *testing.T) {
 		wt := t.TempDir()
 		writeCyclePredicates(t, wt, 4242, b.String())
 		reason, _ := gateNamed(t, gateName).check(core.ReviewInput{Phase: "tdd", Workspace: cycleWorkspace(t, 4242), Worktree: wt})
-		if !strings.Contains(reason, "8 finding(s)") || !strings.Contains(reason, "(+3 more)") || strings.Count(reason, "TestC4242_") != 5 {
+		if !strings.Contains(reason, strconv.Itoa(total)+" finding(s)") || !strings.Contains(reason, "(+"+strconv.Itoa(total-5)+" more)") || strings.Count(reason, "TestC4242_") != 5 {
 			t.Errorf("%s must list five findings and state how many it elided; got %q", gateName, reason)
 		}
 	}

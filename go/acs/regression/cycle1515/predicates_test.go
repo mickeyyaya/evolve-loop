@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -15,6 +14,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/continuation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxtest"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 const scopeID = "context-fill-telemetry-and-cap"
@@ -41,10 +41,8 @@ func TestMain(m *testing.M) {
 		return
 	}
 	bin := filepath.Join(dir, "evolve-under-test")
-	cmd := exec.Command("go", "build", "-o", bin, "./cmd/evolve")
-	cmd.Dir = goMod
-	if out, berr := cmd.CombinedOutput(); berr != nil {
-		buildErr = fmt.Sprintf("go build ./cmd/evolve (dir=%s): %v\n%s", goMod, berr, out)
+	if stdout, stderr, _, berr := acsassert.SubprocessOutput("go", "-C", goMod, "build", "-o", bin, "./cmd/evolve"); berr != nil {
+		buildErr = fmt.Sprintf("go build ./cmd/evolve (dir=%s): %v\n%s%s", goMod, berr, stdout, stderr)
 	} else {
 		evolveBin = bin
 	}
@@ -83,19 +81,11 @@ func requireBinary(t *testing.T) string {
 
 func runCLI(t *testing.T, projectRoot string, args ...string) (string, string, int) {
 	t.Helper()
-	cmd := exec.Command(requireBinary(t), args...)
-	cmd.Dir = projectRoot
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	code := 0
-	if ee, ok := err.(*exec.ExitError); ok {
-		code = ee.ExitCode()
-	} else if err != nil {
+	stdout, stderr, code, err := acsassert.SubprocessOutputIn(projectRoot, requireBinary(t), args...)
+	if code == -1 {
 		t.Fatalf("running %v in %s: %v", args, projectRoot, err)
 	}
-	return stdout.String(), stderr.String(), code
+	return stdout, stderr, code
 }
 
 func binding(cycle int) continuation.Continuation {

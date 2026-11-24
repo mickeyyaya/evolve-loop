@@ -181,3 +181,21 @@ func TestWholeRepoGates_ArgVectorsMatchTheGolden(t *testing.T) {
 		t.Errorf("apicover argv drifted:\n got %q\nwant %q", seen, want)
 	}
 }
+
+func TestOffenderLines_FallbackSkipsPassingPackages(t *testing.T) {
+	passing := "ok  \tgithub.com/x/regression/cycle101\t0.4s\nok  \tgithub.com/x/regression/cycle102\t0.3s\n?   \tgithub.com/x/regression/cycle103\t[no test files]\n"
+	for _, tc := range []struct {
+		name, out string
+		want      []string
+	}{
+		{"only_passing_lines", strings.Repeat(passing, 3), []string{"no failure marker in the output; the command exited non-zero"}},
+		{"passing_lines_beside_a_real_line", passing + "go: downloading x\n", []string{"go: downloading x"}},
+		{"a_marker_still_wins", passing + "--- FAIL: TestX (0.00s)\n", []string{"--- FAIL: TestX (0.00s)"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := offenderLines(tc.out); !slices.Equal(got, tc.want) {
+				t.Errorf("offenderLines = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

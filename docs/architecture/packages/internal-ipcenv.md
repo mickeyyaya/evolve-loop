@@ -22,6 +22,10 @@
 - **`FleetLiveWidthKey`** (`EVOLVE_FLEET_LIVE_WIDTH`) gives each pool lane the absolute path of the live width file.
   - The pool writes that file at each lane start and each lane end. `lanebudget.Current` reads it.
   - A lane cell receives the key beside `FleetWidthKey`. Pinned by `TestIpcenv_ConstValues`, `TestMarkers_AreClassAOfTheControlFlagInventory` and `TestCellMarkers_AreTheMarkersThatReachAnLLMCell`.
+- **`ACSLaneEndKey`** (`EVOLVE_ACS_LANE_END`) gives each predicate the end of the Go lane budget, as an RFC 3339 time.
+  - `acssuite` sets it for each predicate process from the shared lane deadline. `acsassert` reads it to bound each predicate subprocess.
+  - It is a protocol key, so `acs.predicate_env` cannot name it and the scrub drops a stale host copy. No cell receives it.
+  - Pinned by `TestIpcenv_ConstValues`, `TestMarkers_AreClassAOfTheControlFlagInventory` and `TestRunGoTest_PredicatesReceiveTheLaneEnd`.
 - **`FleetReachHolderKey`** (`EVOLVE_FLEET_REACH_HOLDER`) is set for a lane that only the optimistic admission rule admitted (ADR-0143 W1b). It names the lane in flight that the import-reach rule holds it behind. The orchestrator pool sets it, and the lane process reads it to report a composed-gate failure or a rebase conflict.
   - The orchestrator scales the ship-recovery budget of a contention-class error (`shipRecoveryBudget`: the larger of 2 and width plus 1). The width is the number of siblings that race for main.
   - `core.fleetWidthFromEnv` reads it from `CycleRequest.Env`, never from `os.Getenv`. So fleet siblings cannot leak their width into each other.

@@ -4,7 +4,6 @@ package apicover
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -81,11 +80,9 @@ func goList(t *testing.T, goDir string, args ...string) string {
 
 func goListRaw(t *testing.T, goDir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("go", append([]string{"list"}, args...)...)
-	cmd.Dir = goDir
-	out, err := cmd.Output()
+	out, stderr, _, err := acsassert.SubprocessOutput("go", append([]string{"-C", goDir, "list"}, args...)...)
 	if err != nil {
-		t.Fatalf("go list %v (in %s): %v", args, goDir, err)
+		t.Fatalf("go list %v (in %s): %v\n%s", args, goDir, err, stderr)
 	}
-	return string(out)
+	return out
 }

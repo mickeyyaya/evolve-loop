@@ -28,6 +28,9 @@ func TestIpcenv_ConstValues(t *testing.T) {
 	if ipcenv.FleetReachHolderKey != "EVOLVE_FLEET_REACH_HOLDER" {
 		t.Errorf("FleetReachHolderKey = %q, want %q", ipcenv.FleetReachHolderKey, "EVOLVE_FLEET_REACH_HOLDER")
 	}
+	if ipcenv.ACSLaneEndKey != "EVOLVE_ACS_LANE_END" {
+		t.Errorf("ACSLaneEndKey = %q, want %q", ipcenv.ACSLaneEndKey, "EVOLVE_ACS_LANE_END")
+	}
 	if ipcenv.CycleStateFileKey != "EVOLVE_CYCLE_STATE_FILE" {
 		t.Errorf("CycleStateFileKey = %q, want %q", ipcenv.CycleStateFileKey, "EVOLVE_CYCLE_STATE_FILE")
 	}
