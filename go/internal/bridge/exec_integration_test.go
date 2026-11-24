@@ -13,6 +13,13 @@ import (
 	"time"
 )
 
+type cancelOnWrite context.CancelFunc
+
+func (c cancelOnWrite) Write(p []byte) (int, error) {
+	c()
+	return len(p), nil
+}
+
 func TestExecRunner_Real(t *testing.T) {
 	t.Parallel()
 	var out bytes.Buffer
@@ -28,9 +35,9 @@ func TestExecRunner_Real(t *testing.T) {
 	if err == nil || code != -1 {
 		t.Fatalf("missing binary: code=%d err=%v, want (-1, err)", code, err)
 	}
-	ctxCancel, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctxCancel, cancel := context.WithCancel(itBoundedContext(t, itLaunchDeadline))
 	defer cancel()
-	code, err = execRunner(ctxCancel, "sh", "", []string{"-c", "sleep 10"}, nil, nil, &out, &out)
+	code, err = execRunner(ctxCancel, "sh", "", []string{"-c", "echo up; sleep 10"}, nil, nil, cancelOnWrite(cancel), &out)
 	if code != -1 || err != nil {
 		t.Fatalf("ctx-cancel mid-Wait: code=%d err=%v, want (-1, nil)", code, err)
 	}
