@@ -23,7 +23,7 @@ func TestAPICover_NamesAllStageEvidenceExports(t *testing.T) {
 		Kind:    stageevidence.KindDecision,
 		ID:      1,
 		Seq:     1,
-		Fields:  map[string]string{"would_stop": "true"},
+		Fields:  map[string]string{stageevidence.FieldWouldStop: "true"},
 	})
 	r2 := stageevidence.Link("", stageevidence.Record{
 		Key:     "k",
@@ -46,7 +46,7 @@ func TestAPICover_NamesAllStageEvidenceExports(t *testing.T) {
 	if got := scorer.Classify(stageevidence.Record{}, stageevidence.Outcome{}); got != stageevidence.ClassNone {
 		t.Fatalf("expected ClassNone, got %v", got)
 	}
-	if got := scorer.Classify(stageevidence.Record{Fields: map[string]string{"would_skip": "true", "check": "c"}}, stageevidence.Outcome{Failed: []string{"c"}}); got != stageevidence.ClassEscape {
+	if got := scorer.Classify(stageevidence.Record{Fields: map[string]string{stageevidence.FieldWouldSkip: "true", stageevidence.FieldCheck: "c"}}, stageevidence.Outcome{Failed: []string{"c"}}); got != stageevidence.ClassEscape {
 		t.Fatalf("expected ClassEscape, got %v", got)
 	}
 	if got := scorer.Classify(stageevidence.Record{Fields: map[string]string{"would_hold": "true", "item": "i"}}, stageevidence.Outcome{Routed: []string{"i"}}); got != stageevidence.ClassConflict {
@@ -62,6 +62,10 @@ func TestAPICover_NamesAllStageEvidenceExports(t *testing.T) {
 		t.Fatal(err)
 	}
 	var res stageevidence.Result
+	var notReady stageevidence.NotReadyReason = stageevidence.ReasonConflictsUnmeasured
+	if res.NotReady == notReady {
+		t.Fatal("a zero Result must not carry a not-ready reason")
+	}
 	res, err = stageevidence.Verify(context.Background(), stageevidence.FileChain(chainPath), "k", "v1", gatecontract.Promotion{MinDecisions: 1}, scorer)
 	if err != nil || res.FalseStops != 1 || res.Cases[0] != (stageevidence.Case{Class: stageevidence.ClassFalseStop, ID: 1, Seq: 1}) {
 		t.Fatalf("Verify: res=%+v err=%v", res, err)
