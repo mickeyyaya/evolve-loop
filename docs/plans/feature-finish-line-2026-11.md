@@ -264,7 +264,7 @@ Rows with the same next action are grouped. The column Rank is the rank of secti
 | 23 | wave-integration | Branch protection in two steps | a | The console builds `main-branch-protection-in-two-steps`. |
 | 24 | code-index-backends | G4 default route callers to gotypes | a | A lane builds `code-index-backends-g4-default-route-gotypes` in wave 188. |
 | 25 | console-build-or-route | K4 boundary reroute of console routes | d | Triage of 2026-11-21 dropped the draft `console-build-or-route-k4-reroute-record` (scratchpad `plans/triage-52.tsv`): it is a task of the operator at the boundary, not a code item. |
-| 25 | console-build-or-route | K5 split of the cmd/evolve admission cell | a | The console builds `cmd-evolve-cell-is-too-coarse-for-8-lanes`. |
+| 25 | console-build-or-route | K5 split of the cmd/evolve admission cell | a | Decided 2026-11-24 (approach A): K1 file grain meets the item. See [admission-cell-grain-2026-11](../research/admission-cell-grain-2026-11.md). Follow-ups: `hub-items-name-their-files-at-intake`, `admission-records-file-grain-pairs`. |
 | 26 | inbox-classifier-room | Tier B ADR and held-proposal admission | e | Dropped by the operator on 2026-11-22 (OD2). |
 | 27 | workspace-hygiene | S5 batch-end hook, shadow default, operator surface | a | `recycle-x4-mandatory-recycle-step` waits for `recycle-x5-continuation-reads-the-leaf` and `recycle-x1a-check-registry-worktrees`. `recycle-x9-loop-runs-host-checks` waits for `recycle-x4-mandatory-recycle-step` and `recycle-x1b-check-registry-run-dirs` and `recycle-x1c-check-registry-cache`. |
 | 28 | admission-cmd-evolve-cell | K2 self-registering verbs | a | A lane builds `cmd-evolve-self-registering-verbs` in wave 188. |
