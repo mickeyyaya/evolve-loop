@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,19 +27,27 @@ func holdLandingCredential(t *testing.T, held bool) {
 
 func landingRoot(t *testing.T, status string) (root, report string) {
 	t.Helper()
+	return landingRootAudited(t, status, heldproposal.AuditPass, "claude")
+}
+
+func landingRootAudited(t *testing.T, status, verdict, auditFamily string) (root, report string) {
+	t.Helper()
 	holdLandingCredential(t, true)
 	root = t.TempDir()
+	evolveDir := filepath.Join(root, ".evolve")
 	if status != "" {
-		rec := heldproposal.Record{Cycle: 9, Status: status, Commit: "c", Tree: "tree9", Reasons: []string{"kind:pipeline-repair"}, At: time.Now()}
-		if err := heldproposal.WriteRecord(filepath.Join(root, ".evolve"), rec); err != nil {
+		rec := heldproposal.Record{Cycle: 9, Status: status, Commit: "c", Tree: "tree9", Reasons: []string{"kind:pipeline-repair"}, At: time.Now(), DiffSHA256: "diff9", BuilderFamilies: []string{"gemini"}}
+		if err := heldproposal.WriteRecord(evolveDir, rec); err != nil {
 			t.Fatal(err)
 		}
 	}
-	report = filepath.Join(root, "audit.md")
-	if err := os.WriteFile(report, []byte("Verdict: PASS\n"), 0o644); err != nil {
-		t.Fatal(err)
+	if verdict != "" {
+		audit := heldproposal.AuditReport{Cycle: 9, Tree: "tree9", DiffSHA256: "diff9", Family: auditFamily, CLI: auditFamily + "-tmux", Tier: "deep", Verdict: verdict}
+		if err := heldproposal.WriteAuditReport(evolveDir, audit, []byte("# audit\n")); err != nil {
+			t.Fatal(err)
+		}
 	}
-	return root, report
+	return root, heldproposal.AuditReportPath(evolveDir, 9)
 }
 
 func runLandingArgs(args ...string) (int, string, string) {
@@ -56,7 +65,7 @@ func TestLanding_TheOperatorApprovesTheHeldTree(t *testing.T) {
 		t.Fatalf("rc %d out %q err %q", rc, out, errs)
 	}
 	a, found, err := heldproposal.ReadApproval(filepath.Join(root, ".evolve"), 9)
-	if err != nil || !found || a.Decision != heldproposal.DecisionApprove || a.Tree != "tree9" || a.Audit != report {
+	if err != nil || !found || a.Decision != heldproposal.DecisionApprove || a.Tree != "tree9" || a.Audit != heldproposal.AuditReportPath(filepath.Join(root, ".evolve"), 9) {
 		t.Errorf("approval = %+v, %v, %v", a, found, err)
 	}
 	if rec, _, _ := heldproposal.ReadRecord(filepath.Join(root, ".evolve"), 9); rec.Status != heldproposal.StatusApproved {
@@ -67,7 +76,89 @@ func TestLanding_TheOperatorApprovesTheHeldTree(t *testing.T) {
 	}
 }
 
+func checkApprovalNeedsAPassingAuditFromAnotherModelFamily(t *testing.T) {
+	t.Helper()
+	absent, _ := landingRootAudited(t, heldproposal.StatusHeld, "", "")
+	failed, _ := landingRootAudited(t, heldproposal.StatusHeld, heldproposal.AuditFail, "claude")
+	waiting, _ := landingRootAudited(t, heldproposal.StatusHeld, heldproposal.AuditWait, "")
+	builder, _ := landingRootAudited(t, heldproposal.StatusHeld, heldproposal.AuditPass, "gemini")
+	cases := []struct {
+		name, root, want string
+		sentinel         error
+	}{
+		{"an absent report", absent, "no adversarial audit report", heldproposal.ErrAuditMissing},
+		{"a FAIL report", failed, "did not pass", heldproposal.ErrAuditNotPass},
+		{"a WAIT report", waiting, "did not pass", heldproposal.ErrAuditNotPass},
+		{"a report of the builder family", builder, "built the change", heldproposal.ErrAuditBuilderFamily},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rc, _, errs := runLandingArgs("approve", "--cycle", "9", "--tree", "tree9", "--operator", "--project-root", tc.root)
+			if rc != 1 || !strings.Contains(errs, tc.want) || !strings.Contains(errs, "refused") {
+				t.Errorf("rc %d err %q, want a refusal that names %q", rc, errs, tc.want)
+			}
+			if _, found, _ := heldproposal.ReadApproval(filepath.Join(tc.root, ".evolve"), 9); found {
+				t.Error("a refused approval wrote an approval")
+			}
+			evolveDir := filepath.Join(tc.root, ".evolve")
+			rec, _, _ := heldproposal.ReadRecord(evolveDir, 9)
+			report, body, found, _ := heldproposal.ReadAuditReport(evolveDir, 9)
+			if err := heldproposal.VerifyAudit(rec, report, found, body); !errors.Is(err, tc.sentinel) {
+				t.Errorf("the shared verifier says %v, want %v", err, tc.sentinel)
+			}
+		})
+	}
+}
+
+func checkAnAuditReportPathOtherThanTheHoldsOwnIsRefused(t *testing.T) {
+	t.Helper()
+	corrupt, _ := landingRoot(t, heldproposal.StatusHeld)
+	if err := os.WriteFile(heldproposal.AuditReportPath(filepath.Join(corrupt, ".evolve"), 9), []byte("{bad"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if rc, _, errs := runLandingArgs("approve", "--cycle", "9", "--tree", "tree9", "--operator", "--project-root", corrupt); rc != 1 || !strings.Contains(errs, "parse") {
+		t.Errorf("a corrupt report: rc %d err %q, want a refusal", rc, errs)
+	}
+	if rc, _, errs := runLandingArgs("audit", "--cycle", "9", "--project-root", corrupt); rc != 2 || !strings.Contains(errs, "parse") {
+		t.Errorf("audit over a corrupt report: rc %d err %q, want a dispatch error", rc, errs)
+	}
+	root, _ := landingRoot(t, heldproposal.StatusHeld)
+	other := filepath.Join(root, "audit.md")
+	if err := os.WriteFile(other, []byte("Verdict: PASS\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rc, _, errs := runLandingArgs("approve", "--cycle", "9", "--tree", "tree9", "--audit-report", other, "--operator", "--project-root", root)
+	if rc != 1 || !strings.Contains(errs, "other than the audit report of the hold") {
+		t.Errorf("rc %d err %q, want a refusal of a foreign report path", rc, errs)
+	}
+}
+
+func checkTheAuditVerbIsGatedByTheCredentialAndTheHold(t *testing.T) {
+	t.Helper()
+	root, _ := landingRootAudited(t, heldproposal.StatusHeld, "", "")
+	none, _ := landingRootAudited(t, "", "", "")
+	if rc, _, errs := runLandingArgs("audit", "--cycle", "9", "--project-root", none); rc != 1 || !strings.Contains(errs, "no held-for-operator record") {
+		t.Errorf("no hold: rc %d err %q", rc, errs)
+	}
+	if rc, _, _ := runLandingArgs("audit", "--project-root", root); rc != 10 {
+		t.Errorf("no cycle: rc %d, want usage 10", rc)
+	}
+	rc, _, errs := runLandingArgs("audit", "--cycle", "9", "--project-root", root)
+	if rc != 0 {
+		t.Fatalf("audit of a hold with no builder attribution: rc %d err %q, want the wait recorded", rc, errs)
+	}
+	report, _, found, _ := heldproposal.ReadAuditReport(filepath.Join(root, ".evolve"), 9)
+	if !found || report.Verdict != heldproposal.AuditWait {
+		t.Errorf("report = %+v found %v, want a WAIT report: a hold whose diff file is absent never launches", report, found)
+	}
+	holdLandingCredential(t, false)
+	if rc, _, errs := runLandingArgs("audit", "--cycle", "9", "--project-root", root); rc != 1 || !strings.Contains(errs, "dispatch credential") {
+		t.Errorf("no credential: rc %d err %q", rc, errs)
+	}
+}
+
 func TestLanding_AProcessWithoutTheDispatchCredentialCannotDecide(t *testing.T) {
+	t.Run("the audit verb", checkTheAuditVerbIsGatedByTheCredentialAndTheHold)
 	root, report := landingRoot(t, heldproposal.StatusHeld)
 	holdLandingCredential(t, false)
 
@@ -96,6 +187,8 @@ func TestLanding_TheOperatorRejectsTheHeldTree(t *testing.T) {
 }
 
 func TestLanding_EachRefusalWritesNoApproval(t *testing.T) {
+	t.Run("the audit of the hold", checkApprovalNeedsAPassingAuditFromAnotherModelFamily)
+	t.Run("a foreign audit report path", checkAnAuditReportPathOtherThanTheHoldsOwnIsRefused)
 	held, report := landingRoot(t, heldproposal.StatusHeld)
 	shadow, _ := landingRoot(t, heldproposal.StatusWouldHold)
 	none, _ := landingRoot(t, "")
@@ -104,9 +197,7 @@ func TestLanding_EachRefusalWritesNoApproval(t *testing.T) {
 		args             []string
 	}{
 		{"no --operator", held, "needs --operator", []string{"approve", "--cycle", "9", "--tree", "tree9", "--audit-report", report}},
-		{"no audit report", held, "needs --audit-report", []string{"approve", "--cycle", "9", "--tree", "tree9", "--operator"}},
-		{"an absent audit report", held, "the audit report", []string{"approve", "--cycle", "9", "--tree", "tree9", "--audit-report", filepath.Join(held, "absent.md"), "--operator"}},
-		{"an audit report that is a directory", held, "is a directory", []string{"approve", "--cycle", "9", "--tree", "tree9", "--audit-report", held, "--operator"}},
+		{"a foreign audit report", held, "other than the audit report", []string{"approve", "--cycle", "9", "--tree", "tree9", "--audit-report", filepath.Join(held, "absent.md"), "--operator"}},
 		{"a later tree", held, "tree differs", []string{"approve", "--cycle", "9", "--tree", "tree10", "--audit-report", report, "--operator"}},
 		{"a shadow record", shadow, "no held-for-operator record", []string{"reject", "--cycle", "9", "--tree", "tree9", "--operator"}},
 		{"no record", none, "no held-for-operator record", []string{"reject", "--cycle", "9", "--tree", "tree9", "--operator"}},
@@ -170,7 +261,7 @@ func TestLanding_TheProjectRootDefaultsToTheEnvironmentRoot(t *testing.T) {
 
 func TestLanding_UsageErrors(t *testing.T) {
 	t.Parallel()
-	for _, args := range [][]string{{}, {"merge"}, {"approve", "--cycle", "0", "--tree", "x"}, {"reject", "--cycle", "9"}, {"list", "--bogus"}, {"approve", "--bogus"}} {
+	for _, args := range [][]string{{}, {"merge"}, {"approve", "--cycle", "0", "--tree", "x"}, {"reject", "--cycle", "9"}, {"list", "--bogus"}, {"approve", "--bogus"}, {"audit"}, {"audit", "--cycle", "9", "--tree", "x"}, {"audit", "--cycle", "9", "--operator"}, {"audit", "--cycle", "9", "extra"}} {
 		if rc, _, errs := runLandingArgs(args...); rc != 10 || errs == "" {
 			t.Errorf("args %v: rc %d err %q, want usage 10", args, rc, errs)
 		}

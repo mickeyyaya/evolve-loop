@@ -67,6 +67,7 @@ func (c *compiler) compileDeclared(t Table) Table {
 	t.agentKeys = maps.Clone(c.agentKeys)
 	c.checkTwoSources()
 	c.checkAgents(t)
+	c.checkHeldAuditKey(t)
 	c.checkProfileLessLaunches(t)
 	return t
 }
@@ -224,6 +225,9 @@ func (c *compiler) compileAgents() (map[string][]string, map[string]string) {
 }
 
 func (c *compiler) agentOf(key string) (string, bool) {
+	if key == HeldAuditKey {
+		return key, true
+	}
 	if c.isProfile(key) {
 		return key, true
 	}
