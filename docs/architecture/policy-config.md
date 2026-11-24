@@ -279,6 +279,14 @@ The block configures the live reaction of the incident detector ([internal-selfh
 |---|---|---|---|
 | `stage` | `off` arms nothing. `shadow` writes the incident record and emits the `selfheal.incident` event with the field `reaction` `would_brake`. `enforce` also engages the loop brake `.evolve/loop-stop` once, so the rolling pool admits no new lane. | `shadow` | a value other than `off`, `shadow` or `enforce` |
 
+## Repair cycle (`healing.repair_cycle`)
+
+The block configures the filing of repair items by `evolve selfheal propose` ([llm-isolation.md §20.5](llm-isolation.md#205-as-built-x16-shadow)).
+
+| Key | Meaning | Default | Refused |
+|---|---|---|---|
+| `stage` | `off` files no item. `shadow` files each accepted `open-repair-item` proposal as a console-routed item and emits `HEALING_REPAIR_ROUTED`. | `shadow` | `enforce` (until the item `selfheal-repair-t1-lane-route` ships) and any value other than `off` or `shadow` |
+
 ## Convergence policy (`workflow.convergence`)
 
 The block configures `internal/convergence`, the one rule every repeat-until-accepted loop uses to choose its next rung ([ADR-0126](adr/0126-every-iterative-loop-converges-or-escalates.md), [design](convergence-policy.md) §8; `evolve convergence decide` prints a decision). Absent means the compiled defaults below.

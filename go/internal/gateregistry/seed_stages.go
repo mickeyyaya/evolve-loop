@@ -9,6 +9,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/hostsentinel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
+	"github.com/mickeyyaya/evolve-loop/go/internal/selfheal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -107,6 +108,12 @@ var stageSeeds = []stageSeed{
 		signal: signalcenter.CodeCLIRatchetMergeDecision,
 		site:   gatecontract.EmitSite{Path: "cmd/evolve/cmd_boundary_ratchet_record.go", Func: "emitRatchetRecordDecision", Ref: "CodeCLIRatchetMergeDecision"},
 		fields: []string{"stage", "pr", "head", "decision", "reason", "head_gate", "content_gate", "scans", "skipped_push", "candidate"},
+	},
+	{
+		key:    "healing.repair_cycle.stage",
+		signal: selfheal.CodeRepairRouted,
+		site:   gatecontract.EmitSite{Path: "internal/selfheal/repair_item.go", Func: "repairRouted", Ref: "CodeRepairRouted"},
+		fields: []string{"stage", "tier", "would_route", "would_refuse_audit"},
 	},
 }
 

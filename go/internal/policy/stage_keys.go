@@ -207,6 +207,7 @@ var stageReaders = map[string]stageReader{
 	"healing.validator.stage":                    plainStage(func(p Policy) string { return p.HealingValidator().Stage }),
 	"healing.live_reaction.stage":                plainStage(func(p Policy) string { return p.HealingLiveReaction().Stage }),
 	"boundary.ratchet_merge.stage":               plainStage(func(p Policy) string { return string(p.RatchetMergeStage()) }),
+	"healing.repair_cycle.stage":                 plainStage(func(p Policy) string { return string(p.HealingRepairCycle().Stage) }),
 	"gates.scan_cache_gate":                      plainStage(func(p Policy) string { return p.GatesConfig().ScanCacheGate }),
 	"handoff.build-audit.stage":                  handoffStage("build-audit"),
 	"handoff.intent-scout.stage":                 handoffStage("intent-scout"),

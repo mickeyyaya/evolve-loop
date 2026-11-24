@@ -54,7 +54,11 @@ func facadeCalls(opts Options) map[string]func() error {
 			_, err := RouteConsoleRequest(opts, RouteRequest{TaskID: "task-1", Reason: "r", Cycle: 9})
 			return err
 		},
-		"File":          func() error { _, err := File(opts, []byte(`{"id":"task-3"}`)); return err },
+		"File": func() error { _, err := File(opts, []byte(`{"id":"task-3"}`)); return err },
+		"FileRepair": func() error {
+			_, err := FileRepair(opts, []byte(`{"id":"task-3"}`), RepairStamp{Tier: "T1"})
+			return err
+		},
 		"Edit":          func() error { _, err := Edit(opts, "task-1", nil); return err },
 		"EditHeld":      func() error { _, err := EditHeld(opts, "task-1", 9, nil); return err },
 		"Withdraw":      func() error { _, err := Withdraw(opts, "task-1", "r"); return err },

@@ -43,6 +43,7 @@ func (r FieldRole) IsStamp() bool {
 
 const (
 	RouteField                   = "route"
+	RouteConsoleAutoValue        = "console"
 	RoutedReasonField            = "routed_reason"
 	RoutedCycleField             = "routed_cycle"
 	RoutedAtField                = "routed_at"
@@ -62,6 +63,7 @@ const (
 	RetiredCycleField            = "retired_cycle"
 	GitSHAField                  = "git_sha"
 	ProtectedFilesField          = "protected_files"
+	TierField                    = "tier"
 	PremiseVerifiedAtField       = "premise_verified_at"
 	PremiseVerifiedSHAField      = "premise_verified_sha"
 	PremiseVerifiedEvidenceField = "premise_verified_evidence"
@@ -122,6 +124,7 @@ var fieldRoles = map[string]FieldRole{
 	EvidenceVerifiedField:       loopStamp,
 	StaleDropCountField:         loopCounter,
 	ProtectedFilesField:         loopGrowOnly,
+	TierField:                   loopStamp,
 
 	PremiseVerifiedAtField:       operatorStamp,
 	PremiseVerifiedSHAField:      operatorStamp,
