@@ -17,6 +17,8 @@ func fixture(t *testing.T, name string) string {
 	return string(raw)
 }
 
+func noCPU(time.Time) (float64, bool) { return 0, false }
+
 func fakeRunner(outputs map[string]string, fail string) func(string, ...string) ([]byte, error) {
 	return func(name string, args ...string) ([]byte, error) {
 		if name == fail {
@@ -29,7 +31,7 @@ func fakeRunner(outputs map[string]string, fail string) func(string, ...string) 
 func TestReadMacOS_MemorySwapAndNoCPU(t *testing.T) {
 	at := time.Unix(9, 0)
 	run := fakeRunner(map[string]string{"vm_stat": fixture(t, "vm_stat.txt"), "sysctl": "total = 1M  used = 2.00M  free = 1M"}, "")
-	got := readMacOS(run, func() time.Time { return at })
+	got := readMacOS(run, func() time.Time { return at }, noCPU)
 	if got.HasCPU || got.HasRunQueue || got.DiskCount != 0 || !got.HasSwap || got.SwapUsedMB != 2 || !got.At.Equal(at) {
 		t.Fatalf("got %+v", got)
 	}
@@ -52,7 +54,7 @@ func TestReadMacOS_ToolFailureSkipsOnlyThatField(t *testing.T) {
 		{"sysctl unparsable", map[string]string{"vm_stat": vm, "sysctl": "junk"}, "", true, false},
 	}
 	for _, c := range cases {
-		got := readMacOS(fakeRunner(c.outputs, c.fail), time.Now)
+		got := readMacOS(fakeRunner(c.outputs, c.fail), time.Now, noCPU)
 		if got.HasMem != c.wantMem || got.HasSwap != c.wantSwap {
 			t.Errorf("%s: got %+v", c.name, got)
 		}
