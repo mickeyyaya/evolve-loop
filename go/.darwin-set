@@ -21,4 +21,5 @@
 ./internal/preflight
 ./internal/proctree
 ./internal/reportdoc
+./internal/term
 ./internal/testhost

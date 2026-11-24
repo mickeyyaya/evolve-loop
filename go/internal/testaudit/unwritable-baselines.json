@@ -1067,11 +1067,6 @@
     },
     {
       "package": "internal/commentaudit",
-      "test": "TestReplaceFile_ReportsAFailedWriteRemovesTheTempAndKeepsTheTargetF2",
-      "rule": "error-text-match"
-    },
-    {
-      "package": "internal/commentaudit",
       "test": "TestRewrittenHistoryPages_AnUnreadablePageIsAnError",
       "rule": "error-text-match"
     },
