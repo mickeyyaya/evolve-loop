@@ -74,8 +74,8 @@ func TestIdleCause_EachTransitionNamesOneCauseOfTheClosedSet(t *testing.T) {
 	}
 }
 
-func TestIdleCause_TheClosedSetHasEightCauses(t *testing.T) {
-	want := []IdleCause{"family_held", "run_cap", "supply_empty", "admission_refused", "bench", "operator_stop", "host_pressure", "system_halt"}
+func TestIdleCause_TheClosedSetHasNineCauses(t *testing.T) {
+	want := []IdleCause{"family_held", "run_cap", "supply_empty", "admission_refused", "bench", "operator_stop", "host_pressure", "system_halt", "disk_floor"}
 	if len(IdleCauses) != len(want) {
 		t.Fatalf("IdleCauses = %v, want %v", IdleCauses, want)
 	}
@@ -135,7 +135,7 @@ func TestPool_TransitionPublishesTheCauseOfAnIdleTransition(t *testing.T) {
 }
 
 func TestIdleCauseList_NamesEveryCauseOfTheClosedSet(t *testing.T) {
-	want := "family_held, run_cap, supply_empty, admission_refused, bench, operator_stop, host_pressure or system_halt"
+	want := "family_held, run_cap, supply_empty, admission_refused, bench, operator_stop, host_pressure, system_halt or disk_floor"
 	if idleCauseList != want {
 		t.Errorf("idleCauseList = %q, want %q", idleCauseList, want)
 	}

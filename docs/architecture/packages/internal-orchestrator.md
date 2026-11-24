@@ -202,3 +202,9 @@ The window takes a second limit, the host ceiling. The package starts no timer f
 - **The codes.** `LOOP_ORCH_HOST_PRESSURE` (INFO) carries `old`, `new`, `sized`, `cause`, `stage`, `applied` and the reading. `LOOP_HOST_PRESSURE_BLIND` (WARN) carries `error` and `os`. `Publish.HostPressure` and `Publish.HostBlind` send them.
 - **Width does not change for supply.** 8 admissible items under a ceiling of 12 open 8 lanes and raise no underfill WARN (`TestPool_SupplyEightAdmissibleOfTwelveCapOpensEightLanesAndRaisesNoUnderfillWarn`).
 - **A shrink never stops a lane.** Pinned by `TestPool_HighPressureCeilingStopsBackfillButKeepsRunningCycles`.
+
+## Disk floor hold (plan host-sentinel-inside-the-loop)
+
+- **`Pool.Hold`.** It passes the `fleet.Hold` of the host sentinel to `fleet.PoolConfig`. The hold lives in the fleet pool, not in the window. A second writer of the window ceiling overwrites the host pressure value.
+- **The idle cause `disk_floor`.** `idleCause` returns it right after `system_halt` when the transition has `Held` set. The underfill WARN skips this cause, as it does for `host_pressure`, so a hold is never reported as underfill or as `supply_empty` (`TestPool_AHoldReportsDiskFloorNotUnderfill`).
+- **The code.** `LOOP_ORCH_POOL_FLOOR_HOLD` (INFO) maps from `PoolFloorHold`. It carries `held`, `live` and `target`. It is not an idle or held transition, so it never raises an underfill WARN.

@@ -355,6 +355,23 @@ The cycle's production composition root, `wireOrchestratorDeps` in `cmd_cycle.go
   - `coreVerbSchema` gives `agent capabilities` the envelope schema of each core verb.
   - `dispatchGate.refuse` reads the credential through `dispatchcred.Admit`. When the process does not hold it, the gate emits `ISOLATION_I3_VIOLATION` through a Center of the role `dispatch`, and at `enforce` it exits 3. `TestMain` points `defaultDispatchGate` at a temporary store.
 
+### Host sentinel (`cmd_loop_sentinel*.go`, `cmd_gc_midwave.go`)
+
+The sentinel is a background task of the loop process. `dispatchPool` starts it before the pool runner starts, and it stops when the pool run returns. The plan is [host-sentinel-inside-the-loop-2026-11](../../plans/host-sentinel-inside-the-loop-2026-11.md).
+
+The decision core is in [internal-hostsentinel.md](internal-hostsentinel.md).
+
+- **Why above the runner choice.** `poolRunner` selects `orchestratedRun` only when `fleet.orchestrator.stage` is `enforce`. A sentinel inside it does not run under `rollingPool`. So `dispatchPool` starts it and gives one `fleet.FloorHold` to both runners. `rollingPool` takes `poolControl` and passes `Halted` as well, so a brake ends a held pool under both runners.
+- **The first sample reads only free disk.** The cache walk and the process listing delay each pool start. The first sample runs before the runner, so the hold is set before the first lane launches. A release that this sample finds is deferred to the first tick.
+- **Ticks.** The timer is `gc.sentinel.interval_s`. Each 10th tick is a full reading: the Go cache size, the owner-dead tmux servers and the orphan processes. `sentinelReader` takes the minimum free disk over the temp dir, the project root and the Go cache dir. It counts servers with the predicate of `ReapOrphanSockets` and orphans with `FinishedCycleOrphans`, each with a no-op kill.
+  - A failed optional reading warns once and stays unread.
+  - A failed free-disk reading counts toward `HOST_SENTINEL_BLIND`, which goes out once after 3 failures in a row.
+- **The mid-wave release.** `midWaveRun` takes the gc lease with a wait of 0 and runs `gcRun.cacheScope`. A held lease gives `HOST_RELEASE_SKIPPED` and no wait. The run has the budget `gc.sentinel.release_budget_s`.
+  - It uses a `gcRun` with `cancellable` set. A stop cancels each child, and `cacheScope` skips the temp step after a stop. A stop still waits for a `TrimGoCache` walk in progress, because that function takes no context.
+  - The freed bytes are the free-disk delta. The cache is measured again after the trim, because the trim skips the `<hash>-d` entries.
+- **No process release.** The sentinel only counts orphans and servers. Sessions, sockets and sealed-cycle processes have live sweeps already. The dead-owner case of `StaleDispatch` can also stop a dispatch of a held cycle.
+- **`wave status`.** It reads the log dir from `wave.Record.LogPath` and prints the last line of `host-sentinel.ndjson` and of `host-pressure.ndjson`. `wave watch` prints `HOST_LANE_HOLD`, `LOOP_ORCH_POOL_FLOOR_HOLD` and the stuck incident.
+
 ## Invariants
 
 - **Routing and the bridge agree on every driver's binary** (2026-10-06). `llmroute` cannot import `bridge`, so its driver → binary table is a mirror, and the composition root, which imports both, checks it: every `bridge.DriverNames()` entry is an `llmroute.KnownDriver` whose `llmroute.Binary` is its manifest's `binary`, and every `llmroute.Drivers()` entry is a registered bridge driver. Pinned by `TestDriverBinaryParity_EveryRegisteredBridgeDriverIsKnownToRoutingOnItsManifestBinary` and `TestDriverBinaryParity_EveryRoutingDriverIsARegisteredBridgeDriver`.

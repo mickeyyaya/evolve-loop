@@ -131,6 +131,16 @@ func gcRemoteStage(p Policy) string {
 	return p.GC.RemoteStage()
 }
 
+func gcSentinelStage(block func(gcpolicy.SentinelPolicy) gcpolicy.SentinelStageBlock) func(Policy) string {
+	return func(p Policy) string {
+		var sentinel gcpolicy.SentinelPolicy
+		if p.GC != nil {
+			sentinel = p.GC.Sentinel
+		}
+		return string(block(sentinel).Effective())
+	}
+}
+
 func fleetBudgetStage(p Policy) string {
 	if budget := p.FleetConfig().Budget; budget != nil {
 		return budget.Stage
@@ -154,6 +164,8 @@ var stageReaders = map[string]stageReader{
 	"inbox.curator.stage":                        plainStage(func(p Policy) string { return p.InboxCuratorConfig().Stage }),
 	"inbox.curator.trailer.stage":                plainStage(Policy.InboxTrailerStage),
 	"gc.remote_sweep.stage":                      plainStage(gcRemoteStage),
+	"gc.sentinel.hold.stage":                     plainStage(gcSentinelStage(func(s gcpolicy.SentinelPolicy) gcpolicy.SentinelStageBlock { return s.Hold })),
+	"gc.sentinel.release.stage":                  plainStage(gcSentinelStage(func(s gcpolicy.SentinelPolicy) gcpolicy.SentinelStageBlock { return s.Release })),
 	"pr.merge_window.stage":                      Policy.PRMergeWindowStage,
 	"workflow.findings_repair.code-review.stage": plainStage(func(p Policy) string { return p.WorkflowConfig().CodeReviewRepair.Stage }),
 	"workflow.convergence.stage":                 plainStage(func(p Policy) string { return p.ConvergenceConfig().Stage }),
