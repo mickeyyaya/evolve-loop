@@ -5,14 +5,18 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/incidentkb"
 )
 
 func TestAPICover_NamesEveryExportedSymbol(t *testing.T) {
 	t.Parallel()
-	if incidentkb.Schema != "incident-record/1" || incidentkb.RelDir == "" || incidentkb.LegacyCutoff != "2026-11-19" {
-		t.Fatalf("unexpected constants: %q %q %q", incidentkb.Schema, incidentkb.RelDir, incidentkb.LegacyCutoff)
+	if _, err := time.Parse("2006-01-02", incidentkb.LegacyCutoff); incidentkb.Schema != "incident-record/1" || incidentkb.RelDir == "" || err != nil {
+		t.Fatalf("unexpected constants: %q %q %q (%v)", incidentkb.Schema, incidentkb.RelDir, incidentkb.LegacyCutoff, err)
+	}
+	if incidentkb.ErrMissingMarker == nil || incidentkb.ErrOverlappingMarkers == nil {
+		t.Fatal("the marker errors must be set")
 	}
 	if len(incidentkb.RequiredSections) != 10 {
 		t.Fatalf("RequiredSections = %d, want 10", len(incidentkb.RequiredSections))
@@ -28,7 +32,8 @@ func TestAPICover_NamesEveryExportedSymbol(t *testing.T) {
 			t.Errorf("IsRecordFile(%q) = %v, want %v", name, !want, want)
 		}
 	}
-	if !incidentkb.IsLegacy("2026-11-18-old.md", []byte("# old\n")) || incidentkb.IsLegacy("2026-11-19-new.md", []byte("# new\n")) {
+	dayBefore := dayShiftedFromCutoff(t, -1) + "-old.md"
+	if !incidentkb.IsLegacy(dayBefore, []byte("# old\n")) || incidentkb.IsLegacy(incidentkb.LegacyCutoff+"-new.md", []byte("# new\n")) {
 		t.Errorf("IsLegacy mismatch")
 	}
 
@@ -55,6 +60,9 @@ func TestAPICover_NamesEveryExportedSymbol(t *testing.T) {
 	rendered, err := incidentkb.Render([]byte(doc))
 	if err != nil {
 		t.Fatalf("Render: %v", err)
+	}
+	if again, err := incidentkb.RenderFor(rec.ID, []byte(doc)); err != nil || string(again) != string(rendered) {
+		t.Errorf("RenderFor = %v", err)
 	}
 	if probs := incidentkb.CheckBytes(rec.ID, rendered); len(probs) != 0 {
 		t.Errorf("CheckBytes = %v", probs)

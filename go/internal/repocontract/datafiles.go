@@ -222,6 +222,17 @@ var dataFileReads = []DataFileRead{
 	{Path: "docs/", TestSelection: TestSelection{Package: "./internal/bridge", Tests: []string{
 		"TestAutoRespond_TrustRulesDoNotMatchThisRepositorysOwnFiles",
 	}}},
+	{Path: "docs/incidents/", TestSelection: TestSelection{Package: "./internal/incidentkb", Tests: []string{
+		"TestRealTree_EveryRecordPassesTheCheck",
+	}}},
+	{Path: "skills/docs-write/references/templates.md", TestSelection: TestSelection{Package: "./internal/incidentkb", Tests: []string{
+		"TestTemplate_ARecordThatLacksSectionSevenFails",
+		"TestTemplate_FilledAndRenderedItPassesTheCheck",
+		"TestTemplate_TheIncidentBlockHasTheTenSectionsInOrder",
+	}}},
+	{Path: "skills/issue-record/SKILL.md", TestSelection: TestSelection{Package: "./internal/incidentkb", Tests: []string{
+		"TestSkill_TheProcedureNamesTheRenderAndCheckVerbs",
+	}}},
 	{Path: "docs/incidents/2026-08-27-plan-mode-dialog-blind-spot.md", TestSelection: TestSelection{Package: "./internal/bridge", Tests: []string{
 		"TestAutoRespond_PlanModeDoesNotMatchThisRepositorysOwnFiles",
 	}}},

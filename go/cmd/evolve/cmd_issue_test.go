@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/incidentkb"
 )
@@ -226,5 +227,161 @@ verified_at: ""
 	}
 	if out, code := runIssueArgs("list", "--project-root", badRoot); code != 1 {
 		t.Errorf("list non-dir docs/incidents = %d\n%s", code, out)
+	}
+}
+
+const (
+	renderTestID  = "2026-11-25-render-fixture"
+	renderTestDoc = `---
+schema: incident-record/1
+id: 2026-11-25-render-fixture
+title: render fixture
+level: record
+status: fixed
+actions:
+  - {id: A1, type: prevent, owner: console, item: item-1, pr: 12, done: "done", state: done}
+---
+
+## Summary
+
+<!-- GENERATED:status BEGIN -->
+<!-- GENERATED:status END -->
+
+## Trigger and level
+
+## Timeline
+
+## Key logs
+
+## Root cause and contributing factors
+
+## Analysis
+
+## Approaches taken
+
+## Actions
+
+<!-- GENERATED:actions BEGIN -->
+<!-- GENERATED:actions END -->
+
+## Effectiveness
+
+<!-- GENERATED:effectiveness BEGIN -->
+<!-- GENERATED:effectiveness END -->
+
+## Lessons
+`
+)
+
+func writeRenderFixture(t *testing.T, doc string) (root, path string) {
+	t.Helper()
+	root = t.TempDir()
+	if err := os.MkdirAll(incidentkb.Dir(root), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	path = incidentkb.RecordPath(root, renderTestID)
+	if err := os.WriteFile(path, []byte(doc), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return root, path
+}
+
+func TestRunIssue_RenderFillsTheMarkersAndTheCheckThenPasses(t *testing.T) {
+	t.Parallel()
+	root, path := writeRenderFixture(t, renderTestDoc)
+	if out, code := runIssueArgs("check", "--project-root", root, renderTestID); code != 1 || !strings.Contains(out, "rendered status section does not match frontmatter") {
+		t.Fatalf("before render: exit %d\n%s", code, out)
+	}
+	if out, code := runIssueArgs("render", "--project-root", root, renderTestID); code != 0 || !strings.Contains(out, "rendered "+renderTestID) {
+		t.Fatalf("render: exit %d\n%s", code, out)
+	}
+	want, err := incidentkb.Render([]byte(renderTestDoc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil || string(got) != string(want) {
+		t.Fatalf("the file is not the render of the frontmatter: %v", err)
+	}
+	if out, code := runIssueArgs("check", "--project-root", root, renderTestID); code != 0 {
+		t.Fatalf("after render: exit %d\n%s", code, out)
+	}
+}
+
+func TestRunIssue_RenderLeavesARenderedFileUntouched(t *testing.T) {
+	t.Parallel()
+	root, path := writeRenderFixture(t, renderTestDoc)
+	if _, code := runIssueArgs("render", "--project-root", root, renderTestID); code != 0 {
+		t.Fatal("first render failed")
+	}
+	past := time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC)
+	if err := os.Chtimes(path, past, past); err != nil {
+		t.Fatal(err)
+	}
+	if _, code := runIssueArgs("render", "--project-root", root, renderTestID); code != 0 {
+		t.Fatal("second render failed")
+	}
+	info, err := os.Stat(path)
+	if err != nil || !info.ModTime().Equal(past) {
+		t.Fatalf("a second render rewrote the file: %v %v", info.ModTime(), err)
+	}
+}
+
+func TestRunIssue_RenderRefusesAndLeavesTheFileAlone(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		doc  string
+		id   string
+		want string
+	}{
+		"a bad level":      {strings.Replace(renderTestDoc, "level: record", "level: loud", 1), renderTestID, "level"},
+		"an id mismatch":   {strings.Replace(renderTestDoc, "id: "+renderTestID, "id: 2026-11-25-typo", 1), renderTestID, "does not match filename"},
+		"a missing marker": {strings.Replace(renderTestDoc, "<!-- GENERATED:status BEGIN -->\n", "", 1), renderTestID, "missing generated marker"},
+		"a missing file":   {renderTestDoc, "2026-11-25-absent", "no such file"},
+		"a bad id":         {renderTestDoc, "not-an-id", "must look like"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			root, path := writeRenderFixture(t, c.doc)
+			out, code := runIssueArgs("render", "--project-root", root, c.id)
+			if code != 1 || !strings.Contains(out, c.want) {
+				t.Fatalf("exit %d, want 1 naming %q\n%s", code, c.want, out)
+			}
+			got, err := os.ReadFile(path)
+			if err != nil || string(got) != c.doc {
+				t.Fatalf("a refused render changed the file: %v", err)
+			}
+		})
+	}
+}
+
+func TestRunIssue_RenderUsageErrorsExitTen(t *testing.T) {
+	t.Parallel()
+	for _, args := range [][]string{{"render"}, {"render", "a", "b"}, {"render", "--bogus"}} {
+		if out, code := runIssueArgs(args...); code != 10 {
+			t.Errorf("runIssue(%v) = %d, want 10\n%s", args, code, out)
+		}
+	}
+	if out, _ := runIssueArgs("nonsense"); !strings.Contains(out, "render") {
+		t.Errorf("the unknown-verb line omits render:\n%s", out)
+	}
+}
+
+func TestRunIssue_RenderReportsAWriteThatFailsAndKeepsTheFile(t *testing.T) {
+	t.Parallel()
+	root, path := writeRenderFixture(t, renderTestDoc)
+	dir := filepath.Dir(path)
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+	out, code := runIssueArgs("render", "--project-root", root, renderTestID)
+	if code != 1 || !strings.Contains(out, "evolve issue render:") {
+		t.Fatalf("exit %d, want 1\n%s", code, out)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil || string(got) != renderTestDoc {
+		t.Fatalf("a failed write changed the file: %v", err)
 	}
 }
