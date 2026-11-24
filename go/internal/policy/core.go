@@ -189,6 +189,8 @@ func BaseCLI(cli string) string {
 	return profiles.BaseCLI(cli)
 }
 
+const DeepTier = "deep"
+
 var tierNames = []string{"fast", "balanced", "deep", "top"}
 
 func TierNames() []string {

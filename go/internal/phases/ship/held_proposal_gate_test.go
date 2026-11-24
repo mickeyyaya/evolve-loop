@@ -20,6 +20,8 @@ const (
 	heldCommit = "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee00"
 	heldTree   = "7ee7ee007ee7ee007ee7ee007ee7ee007ee7ee00"
 	heldCycle  = 41
+	heldBase   = "ba5eba5eba5eba5eba5eba5eba5eba5eba5eba5e"
+	heldDiff   = "diff --git a/go/internal/guards/role.go b/go/internal/guards/role.go\n"
 )
 
 type heldFixture struct {
@@ -42,6 +44,8 @@ func newHeldFixture(t *testing.T, stage string, changed ...string) *heldFixture 
 	f.rec = newArgvRecorder(f.opts)
 	f.rec.on("diff --name-only -z --no-renames main "+heldCommit, scriptedCall{stdout: strings.Join(changed, "\x00")})
 	f.rec.on("rev-parse "+heldCommit+"^{tree}", scriptedCall{stdout: heldTree + "\n"})
+	f.rec.on("rev-parse main", scriptedCall{stdout: heldBase + "\n"})
+	f.rec.on("diff "+heldBase+" "+heldCommit, scriptedCall{stdout: heldDiff})
 	return f
 }
 
@@ -53,6 +57,19 @@ func (f *heldFixture) claim(t *testing.T, kind string) {
 func (f *heldFixture) check() error {
 	logf := func(format string, args ...any) { f.logs = append(f.logs, fmt.Sprintf(format, args...)) }
 	return refuseUnapprovedHeldProposal(context.Background(), f.opts, logf, "main", heldCommit)
+}
+
+func (f *heldFixture) audited(t *testing.T, verdict string) {
+	t.Helper()
+	rec, found, err := heldproposal.ReadRecord(f.evolveDir(), heldCycle)
+	if err != nil || !found {
+		t.Fatalf("no hold record to audit: %v %v", found, err)
+	}
+	rec.BuilderFamilies = []string{"gemini"}
+	report := heldproposal.AuditReport{Cycle: heldCycle, Tree: rec.Tree, DiffSHA256: rec.DiffSHA256, BuilderFamilies: rec.BuilderFamilies, Family: "claude", CLI: "claude-tmux", Tier: "deep", Verdict: verdict}
+	if err := errors.Join(heldproposal.WriteRecord(f.evolveDir(), rec), heldproposal.WriteAuditReport(f.evolveDir(), report, []byte("# audit\n"))); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func (f *heldFixture) evolveDir() string { return filepath.Join(f.opts.ProjectRoot, ".evolve") }
@@ -90,6 +107,7 @@ func TestHeldProposal_AnApprovalLandsOnlyTheTreeThatItNames(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantShipErr(t, f.check(), shiperr.CodeHeldForOperator, core.ShipClassPrecondition, "")
+	f.audited(t, heldproposal.AuditPass)
 
 	if err := heldproposal.WriteApproval(f.evolveDir(), heldproposal.Approval{Cycle: heldCycle, Tree: heldTree, Decision: heldproposal.DecisionApprove}); err != nil {
 		t.Fatal(err)
@@ -126,8 +144,11 @@ func TestHeldProposal_AnApprovalWithNoHoldRecordOfItsTreeHoldsAgain(t *testing.T
 func TestHeldProposal_TheVerbsTerminalStatusStillLandsTheApprovedTree(t *testing.T) {
 	t.Parallel()
 	f := newHeldFixture(t, "enforce", "go/internal/guards/role.go")
+	diffDigest := heldproposal.DigestOf([]byte(heldDiff))
+	report := heldproposal.AuditReport{Cycle: heldCycle, Tree: heldTree, DiffSHA256: diffDigest, Family: "claude", CLI: "claude-tmux", Tier: "deep", Verdict: heldproposal.AuditPass}
 	for _, write := range []error{
-		heldproposal.WriteRecord(f.evolveDir(), heldproposal.Record{Cycle: heldCycle, Status: heldproposal.StatusApproved, Tree: heldTree}),
+		heldproposal.WriteRecord(f.evolveDir(), heldproposal.Record{Cycle: heldCycle, Status: heldproposal.StatusApproved, Tree: heldTree, DiffSHA256: diffDigest, BuilderFamilies: []string{"gemini"}}),
+		heldproposal.WriteAuditReport(f.evolveDir(), report, []byte("# audit\n")),
 		heldproposal.WriteApproval(f.evolveDir(), heldproposal.Approval{Cycle: heldCycle, Tree: heldTree, Decision: heldproposal.DecisionApprove}),
 	} {
 		if write != nil {

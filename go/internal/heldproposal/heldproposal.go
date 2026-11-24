@@ -72,6 +72,10 @@ type Record struct {
 	Reasons  []string  `json:"reasons"`
 	Requires []string  `json:"requires"`
 	At       time.Time `json:"at"`
+
+	Base            string   `json:"base,omitempty"`
+	BuilderFamilies []string `json:"builder_families,omitempty"`
+	DiffSHA256      string   `json:"diff_sha256,omitempty"`
 }
 
 type Approval struct {
@@ -178,6 +182,27 @@ func cycleOf(name string) (int, bool) {
 	}
 	n, err := strconv.Atoi(digits)
 	return n, err == nil && n > 0
+}
+
+func writeBytes(path string, raw []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("heldproposal: create %s: %w", filepath.Dir(path), err)
+	}
+	if err := atomicwrite.Bytes(path, raw); err != nil {
+		return fmt.Errorf("heldproposal: write %s: %w", path, err)
+	}
+	return nil
+}
+
+func readBytes(path string) ([]byte, bool, error) {
+	raw, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("heldproposal: read %s: %w", path, err)
+	}
+	return raw, true, nil
 }
 
 func write(path string, v any) error {
