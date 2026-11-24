@@ -22,11 +22,15 @@ func ensureSeatHolder(home string) ([]string, error) {
 	if err := os.MkdirAll(dir, seatHolderMode); err != nil {
 		return nil, err
 	}
-	spellings := []string{dir}
-	if real := canonicalOrSelf(dir); real != dir {
+	return pathSpellings(dir), nil
+}
+
+func pathSpellings(path string) []string {
+	spellings := []string{path}
+	if real := canonicalOrSelf(path); real != path {
 		spellings = append(spellings, real)
 	}
-	return spellings, nil
+	return spellings
 }
 
 func seatHolderRefusal(err error) string {
