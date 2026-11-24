@@ -15,9 +15,50 @@ import (
 
 const ratchetUsage = "usage: evolve ratchet check [size|rawgit] [--root DIR] | evolve ratchet tighten [--check] [--root DIR] [--project-root P]"
 
-var ratchetScans = map[string]func(root string, stderr io.Writer) bool{
-	"size":   sizeRatchetClean,
-	"rawgit": rawGitRatchetClean,
+type ratchetScanEntry struct {
+	key    string
+	reason string
+	run    func(root string) (note string, err error)
+}
+
+var ratchetScanTable = []ratchetScanEntry{
+	{"size", "scan_size_red", func(root string) (string, error) { return "", sizeratchet.Scan(root) }},
+	{"rawgit", "scan_rawgit_red", rawgitratchet.Scan},
+}
+
+var ratchetScans = scanAdapters(ratchetScanTable)
+
+func scanAdapters(table []ratchetScanEntry) map[string]func(root string, stderr io.Writer) bool {
+	adapters := make(map[string]func(string, io.Writer) bool, len(table))
+	for _, entry := range table {
+		adapters[entry.key] = func(root string, stderr io.Writer) bool {
+			note, err := entry.run(root)
+			if note != "" {
+				fmt.Fprintln(stderr, "evolve ratchet: "+note)
+			}
+			if err != nil {
+				fmt.Fprintln(stderr, err)
+			}
+			return err == nil
+		}
+	}
+	return adapters
+}
+
+type ratchetScanError struct {
+	reason string
+	err    error
+}
+
+func (e *ratchetScanError) Error() string { return e.err.Error() }
+
+func runRatchetScans(root string) error {
+	for _, entry := range ratchetScanTable {
+		if _, err := entry.run(root); err != nil {
+			return &ratchetScanError{reason: entry.reason, err: err}
+		}
+	}
+	return nil
 }
 
 var ratchetVerbs = map[string]func(args []string, stdout, stderr io.Writer) int{
@@ -115,24 +156,4 @@ func selectRatchets(positional []string) ([]string, error) {
 		return nil, fmt.Errorf("unknown ratchet %q", positional[0])
 	}
 	return positional, nil
-}
-
-func sizeRatchetClean(root string, stderr io.Writer) bool {
-	if err := sizeratchet.Scan(root); err != nil {
-		fmt.Fprintln(stderr, err)
-		return false
-	}
-	return true
-}
-
-func rawGitRatchetClean(root string, stderr io.Writer) bool {
-	note, err := rawgitratchet.Scan(root)
-	if note != "" {
-		fmt.Fprintln(stderr, "evolve ratchet: "+note)
-	}
-	if err != nil {
-		fmt.Fprintln(stderr, err)
-		return false
-	}
-	return true
 }

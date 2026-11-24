@@ -14,9 +14,11 @@ import (
 )
 
 const (
-	closesInboxKey  = "Closes-Inbox: "
-	auditKindKey    = "Evolve-Audit-Kind: "
-	KindCommitChain = "commit-chain"
+	closesInboxKey    = "Closes-Inbox: "
+	noInboxIDsLine    = closesInboxKey + "none"
+	RatchetListsClass = "ratchet-lists"
+	auditKindKey      = "Evolve-Audit-Kind: "
+	KindCommitChain   = "commit-chain"
 )
 
 func FindPRRecord(root string, pr int) (DeliverableRecord, bool) {
@@ -88,33 +90,36 @@ func ClassBinding(ev Evidence, class string, covers func(paths []string) bool) (
 	return AuditBinding{Class: class, ArtifactSHA: digest(append([]string{class, ev.DiffSHA}, ev.Commits...)...)}, nil
 }
 
-func (r Repo) closingIDs(ctx context.Context, commits []CommitIdentity) ([]string, error) {
-	var ids []string
+func (r Repo) closingIDs(ctx context.Context, commits []CommitIdentity) (ids []string, declared bool, err error) {
 	for _, commit := range commits {
 		body, err := r.Git(ctx, r.Dir, "", "log", "-1", "--format=%B", "--end-of-options", commit.SHA)
 		if err != nil {
-			return nil, fmt.Errorf("integration: read the message of %s: %w", commit.SHA, err)
+			return nil, false, fmt.Errorf("integration: read the message of %s: %w", commit.SHA, err)
 		}
+		declared = declared || closesinbox.Declares([]byte(body))
 		for _, id := range closesinbox.IDs([]byte(body)) {
 			if !slices.Contains(ids, id) {
 				ids = append(ids, id)
 			}
 		}
 	}
-	return ids, nil
+	return ids, declared, nil
 }
 
 func (c Composer) message(ctx context.Context, rec DeliverableRecord) (string, error) {
 	if !rec.Console() {
 		return composeMessage(rec), nil
 	}
-	ids, err := c.Repo.closingIDs(ctx, rec.Commits)
+	ids, declared, err := c.Repo.closingIDs(ctx, rec.Commits)
 	if err != nil {
 		return "", err
 	}
 	lines := []string{"evolve-pr " + strconv.Itoa(rec.PR) + ": integrate", "", sourcePRLine(rec.PR)}
 	for _, id := range ids {
 		lines = append(lines, closesInboxKey+id)
+	}
+	if len(ids) == 0 && declared {
+		lines = append(lines, noInboxIDsLine)
 	}
 	if rec.Audit.Kind != "" {
 		lines = append(lines, auditKindKey+rec.Audit.Kind)

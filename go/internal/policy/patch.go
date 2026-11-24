@@ -23,16 +23,11 @@ func Parse(raw []byte) (Policy, error) {
 	if err := p.Workflow.validate(); err != nil {
 		return Policy{}, err
 	}
-	if p.Isolation != nil {
-		if err := p.Isolation.Context.validate(); err != nil {
-			return Policy{}, fmt.Errorf("isolation.context: %w", err)
-		}
-		if err := p.Isolation.DispatchRequests.validate(); err != nil {
-			return Policy{}, fmt.Errorf("isolation.dispatch_requests: %w", err)
-		}
-		if err := p.Isolation.InboxRequests.validate(); err != nil {
-			return Policy{}, fmt.Errorf("isolation.inbox_requests: %w", err)
-		}
+	if err := p.Isolation.validate(); err != nil {
+		return Policy{}, err
+	}
+	if err := p.Boundary.validate(); err != nil {
+		return Policy{}, err
 	}
 	if err := p.Catalog.validate(); err != nil {
 		return Policy{}, err
@@ -53,6 +48,22 @@ func Parse(raw []byte) (Policy, error) {
 		return Policy{}, err
 	}
 	return p, nil
+}
+
+func (i *IsolationPolicy) validate() error {
+	if i == nil {
+		return nil
+	}
+	if err := i.Context.validate(); err != nil {
+		return fmt.Errorf("isolation.context: %w", err)
+	}
+	if err := i.DispatchRequests.validate(); err != nil {
+		return fmt.Errorf("isolation.dispatch_requests: %w", err)
+	}
+	if err := i.InboxRequests.validate(); err != nil {
+		return fmt.Errorf("isolation.inbox_requests: %w", err)
+	}
+	return nil
 }
 
 func (w *WorkflowPolicy) validate() error {
