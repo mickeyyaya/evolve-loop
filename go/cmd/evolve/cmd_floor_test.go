@@ -12,7 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var floorTiers = []string{"fmt", "vet", "integration", "e2e", "acs-durable", "apicover", "cover", "ratchet"}
+var floorTiers = []string{"fmt", "vet", "integration", "e2e", "acs-durable", "apicover", "cover", "ratchet", "yaml"}
 
 type floorCIStep struct {
 	tier     string
