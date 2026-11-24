@@ -85,6 +85,9 @@ func authUsageError(stderr io.Writer, err error) int {
 }
 
 func (c seatTokenCall) set(path string) int {
+	if c.env.IsTTY != nil && c.env.IsTTY(c.env.Stdin) {
+		return authUsageError(c.err, errors.New("stdin is a terminal, so the token would show on the screen. Next: run read -rs SEAT_TOK, paste the token, then printf %s \"$SEAT_TOK\" | evolve auth seat-token set --project-root <root>"))
+	}
 	raw, err := io.ReadAll(io.LimitReader(c.env.Stdin, seatTokenMaxBytes+2))
 	if err != nil {
 		fmt.Fprintf(c.err, "%sread stdin: %v\n", c.prefix(), err)

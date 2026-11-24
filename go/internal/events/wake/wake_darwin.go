@@ -5,6 +5,7 @@ package wake
 import (
 	"errors"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/internal/term"
 	"os"
 	"slices"
 	"syscall"
@@ -12,12 +13,11 @@ import (
 )
 
 const (
-	termiosRequest = syscall.TIOCGETA
-	userIdent      = 1
-	dirNotes       = syscall.NOTE_WRITE
-	fileNotes      = syscall.NOTE_WRITE | syscall.NOTE_EXTEND | syscall.NOTE_DELETE | syscall.NOTE_RENAME | syscall.NOTE_ATTRIB
-	addCleared     = syscall.EV_ADD | syscall.EV_CLEAR
-	watchOpenMode  = syscall.O_EVTONLY | syscall.O_CLOEXEC
+	userIdent     = 1
+	dirNotes      = syscall.NOTE_WRITE
+	fileNotes     = syscall.NOTE_WRITE | syscall.NOTE_EXTEND | syscall.NOTE_DELETE | syscall.NOTE_RENAME | syscall.NOTE_ATTRIB
+	addCleared    = syscall.EV_ADD | syscall.EV_CLEAR
+	watchOpenMode = syscall.O_EVTONLY | syscall.O_CLOEXEC
 )
 
 var localFilesystems = map[string]bool{"apfs": true, "hfs": true}
@@ -31,7 +31,7 @@ type kqueuePort struct {
 	isTerminal func(fd int) bool
 }
 
-var hostKqueue = kqueuePort{syscall.Kqueue, syscall.Kevent, syscall.Open, syscall.Statfs, syscall.Close, isTerminal}
+var hostKqueue = kqueuePort{syscall.Kqueue, syscall.Kevent, syscall.Open, syscall.Statfs, syscall.Close, term.IsFD}
 
 type kqueueKernel struct {
 	port    kqueuePort

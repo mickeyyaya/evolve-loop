@@ -15,14 +15,17 @@ var doctorSeatInspect = func() seatlogin.Health {
 
 func runDoctorSeat(stdout, stderr io.Writer) int {
 	h := doctorSeatInspect()
-	switch h.State {
-	case seatlogin.StateNone, seatlogin.StateIsolated:
+	switch h.State.Severity() {
+	case seatlogin.SeverityOK:
 		fmt.Fprintf(stdout, "OK: %s\n", h.Message)
 		return 0
-	case seatlogin.StateBad:
+	case seatlogin.SeverityWarn:
+		fmt.Fprintf(stderr, "WARN: %s\n", h.Message)
+		return 0
+	case seatlogin.SeverityHalt:
 		fmt.Fprintf(stderr, "WARN: %s\n", h.Message)
 		return 1
 	}
-	fmt.Fprintf(stderr, "WARN: %s\n", h.Message)
-	return 0
+	fmt.Fprintf(stderr, "WARN: unknown seat state: %s\n", h.Message)
+	return 1
 }

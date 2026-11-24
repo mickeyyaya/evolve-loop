@@ -19,3 +19,9 @@ The bridge calls `Resolve` at two doors: `launchSwept` and `launchPane` for a sm
 ## Inspect
 
 `Inspect(home, deps)` names the state of the host for `evolve doctor seat` and for the `seat-login` check of the loop preflight. A bad holder is a halt in the preflight. A seat directory that holds `settings.json` but no holder is a warning, because only an isolated launch writes that file. A seat directory with no `settings.json` reads as no token. A seat directory that is not a directory is a warning. The verb `seat-token clear` removes `settings.json`, so that a cleared host reads as no token and no message holds a token.
+
+A holder at or past the age in `TokenWarnAgeDays` gives `StateExpiring`. The age counts from the file time. The loop preflight and `evolve doctor seat` warn and name the renewal steps.
+
+A file time in the future counts as 0 days. `Deps.Now` is the clock. A nil `Now` uses the wall clock. `Inspect` states the holder once, and it reads the file time and the token from that one state.
+
+Each state has one severity, from `State.Severity`. The doctor and the preflight both read it. A state with no entry is unknown, and both fail on it.
