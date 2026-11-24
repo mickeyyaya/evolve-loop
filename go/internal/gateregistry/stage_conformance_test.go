@@ -503,6 +503,17 @@ func TestStageSeeds_PinTheDescriptorOfEachPopulatedRow(t *testing.T) {
 		"fleet.orchestrator.window.adaptive.stage": {"LOOP_ORCH_HOST_PRESSURE", gatecontract.EmitSite{Path: "internal/orchestrator/host_pressure.go", Func: "HostPressure", Ref: "CodeHostPressure"}, []string{"old", "new", "sized", "cause", "stage", "applied", "cpus", "load1", "load_per_core", "mem_available_pct", "swap_used_mb", "score"}, []string{"internal/hostpressure"}},
 		"audit_cascade.stage":                      {"AUDIT_CASCADE_SHADOW", gatecontract.EmitSite{}, nil, []string{"internal/auditcascade"}},
 		"gates.scan_cache_gate":                    {"SHIP_SCAN_SHADOW_ESCAPE", gatecontract.EmitSite{Path: "internal/phases/ship/scanshadow.go", Func: "escape", Ref: "CodeScanShadowEscape"}, []string{"package", "key", "tags", "flags", "gate"}, []string{"internal/testkey", "internal/testverdict"}},
+		"gc.sentinel.hold.stage":                   {"HOST_WOULD_HOLD", gatecontract.EmitSite{Path: "internal/hostsentinel/signals.go", Func: "WouldHold", Ref: "CodeWouldHold"}, []string{"would_hold", "free_bytes", "floor_bytes"}, []string{"internal/hostsentinel"}},
+		"gc.sentinel.release.stage":                {"HOST_WOULD_RELEASE", gatecontract.EmitSite{Path: "internal/hostsentinel/signals.go", Func: "WouldRelease", Ref: "CodeWouldRelease"}, []string{"scopes", "free_bytes", "cache_bytes"}, []string{"internal/hostsentinel"}},
+	}
+	seeded := map[string]bool{}
+	for _, e := range StageEntries() {
+		seeded[e.Name] = true
+	}
+	for key := range want {
+		if !seeded[key] {
+			t.Errorf("the pinned row %s has no seed entry", key)
+		}
 	}
 	for _, e := range StageEntries() {
 		w := want[e.Name]

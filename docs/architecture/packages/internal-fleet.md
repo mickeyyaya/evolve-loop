@@ -82,6 +82,11 @@
   So `FreshenSpecs` rebuilds that value on a copy, because the caller shares the input map. A todo whose triage card has no `files` stays an id-only island.
 - **The pool claims before it launches.** `RunPool` claims the files of a lane and counts the lane before its goroutine starts. Correctness comes from that order. The rendezvous and `Gosched` calls are hints and do not order the launch callbacks. The test lets one lane finish only after both start callbacks, because the callback order depends on the scheduler.
 - **A bridge between lanes is a collision.** A todo that spans two buckets bridges two concurrent lanes on the shared tree, so `Partition` defers it. The package graph also connects files of different lanes through `ipcenv`. `TestPartitionGraph_PackageGraphConnectedTodos_NeverSplitAcrossBuckets` pins this.
+- **The floor hold.** `PoolConfig.Hold` holds new lane starts while it is held. The `Hold` interface has `Held` and `Wake`, and `FloorHold` is the one implementation. `open()` returns false while held, and `width()` stays as it is. Running lanes continue.
+  - The loop waits while it holds, and the wait has a stop clause. It ends on a cancel of the context, on `Halted`, and when `MaxLaunches` is reached. Without it, a pool with no running lane waits for a clear that a brake never sends. So the sentinel calls `Poke` on each tick while the hold is on, and the pool checks the clause again.
+  - `fill` sets a `blocked` flag when the hold stops a start and a todo or a resupply can still follow. The wait reads the flag, not the hold. A clear that arrives before the loop checks the hold still ends in a wake and a start (`TestPool_AClearBetweenTheFirstFillAndTheLoopStillStartsTheTodo`).
+  - The `select` handles `ctx.Done()` once and then sets its channel to nil. A cancel with running lanes does not spin the loop.
+  - The pool emits `PoolFloorHold` once when the hold starts and once when it ends. A wake runs `fill`, and then `resupply` when a slot stays free.
 
 ## Findings
 

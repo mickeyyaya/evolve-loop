@@ -45,6 +45,8 @@ type loopBatchCoordinator struct {
 	hostSamples       func([]byte) error
 	hostTicker        func(time.Duration) (<-chan time.Time, func())
 	startHooks        cycleStartHooks
+	sentinel          sentinelPorts
+	floorHold         fleet.Hold
 }
 
 func (b *loopBatchCoordinator) run() int {

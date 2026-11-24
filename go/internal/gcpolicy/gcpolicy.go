@@ -31,6 +31,7 @@ type Policy struct {
 	Worktrees    WorktreesPolicy    `json:"worktrees,omitempty"`
 	DevWorktrees DevWorktreesPolicy `json:"dev_worktrees,omitempty"`
 	RemoteSweep  RemoteSweepPolicy  `json:"remote_sweep,omitempty"`
+	Sentinel     SentinelPolicy     `json:"sentinel,omitempty"`
 }
 
 type RunsPolicy struct {
