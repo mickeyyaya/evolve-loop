@@ -906,3 +906,4 @@
 
 # hostsentinel — the pure decision core, signal codes and publisher of the loop host sentinel (plan host-sentinel-inside-the-loop-2026-11).
 ./internal/hostsentinel
+./internal/promptboundary

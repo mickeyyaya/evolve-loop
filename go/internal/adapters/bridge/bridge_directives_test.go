@@ -24,15 +24,13 @@ func TestInjectOperatorDirectives(t *testing.T) {
 
 func TestOperatorDirectivesComposeOrder(t *testing.T) {
 	withRules := injectRulesPrefix("BODY", "RULE TEXT")
-	withDirectives := injectOperatorDirectives(withRules, "## Operator Directives\n\nDIR")
-	composed := injectCorrectionPrefix(withDirectives, "CORR")
+	composed := injectOperatorDirectives(withRules, "## Operator Directives\n\nDIR")
 
-	corr := strings.Index(composed, "## Correction")
 	dir := strings.Index(composed, "## Operator Directives")
 	rules := strings.Index(composed, "## Rules")
 	body := strings.Index(composed, "BODY")
-	if !(corr == 0 && corr < dir && dir < rules && rules < body) {
-		t.Fatalf("order must be correction<directives<rules<body; got corr=%d dir=%d rules=%d body=%d\n%s", corr, dir, rules, body, composed)
+	if !(dir == 0 && dir < rules && rules < body) {
+		t.Fatalf("order must be directives<rules<body; got dir=%d rules=%d body=%d\n%s", dir, rules, body, composed)
 	}
 }
 

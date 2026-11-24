@@ -3,7 +3,9 @@
 package cycle534
 
 import (
+	"maps"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -19,6 +21,7 @@ import (
 	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
 	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/tdd"
 	_ "github.com/mickeyyaya/evolve-loop/go/internal/phases/triage"
+	"github.com/mickeyyaya/evolve-loop/go/internal/promptboundary"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
@@ -46,15 +49,7 @@ func composers(t *testing.T) map[string]promptComposer {
 	}
 	if len(out) < minAuditedPhases {
 		t.Fatalf("cache-stable audit covered only %d phases (%v); expected >= %d BaseRunner-based composers — the ComposePrompt seam is missing",
-			len(out), keys(out), minAuditedPhases)
-	}
-	return out
-}
-
-func keys(m map[string]promptComposer) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
+			len(out), slices.Sorted(maps.Keys(out)), minAuditedPhases)
 	}
 	return out
 }
@@ -63,8 +58,8 @@ func TestC534_001_StaticPrefixByteIdenticalAcrossCycles(t *testing.T) {
 	reqA := core.PhaseRequest{Cycle: 100, GoalHash: "aaaa1111", ProjectRoot: acsassert.RepoRoot(t), Workspace: "/ws/cycle-100"}
 	reqB := core.PhaseRequest{Cycle: 200, GoalHash: "bbbb2222", ProjectRoot: acsassert.RepoRoot(t), Workspace: "/ws/cycle-200"}
 	for name, pc := range composers(t) {
-		prefixA := runner.StaticPrefix(pc.ComposePrompt(staticBody, reqA))
-		prefixB := runner.StaticPrefix(pc.ComposePrompt(staticBody, reqB))
+		prefixA := promptboundary.StaticPrefix(pc.ComposePrompt(staticBody, reqA))
+		prefixB := promptboundary.StaticPrefix(pc.ComposePrompt(staticBody, reqB))
 		if prefixA != prefixB {
 			t.Errorf("phase %q: static prefix drifted between cycle 100 and cycle 200\n cycle100: %q\n cycle200: %q", name, prefixA, prefixB)
 		}
@@ -82,7 +77,7 @@ func TestC534_002_DynamicTokensNeverInPrefix(t *testing.T) {
 	)
 	req := core.PhaseRequest{Cycle: 987654, GoalHash: goalTok, ProjectRoot: acsassert.RepoRoot(t), Workspace: wsTok}
 	for name, pc := range composers(t) {
-		prefix := runner.StaticPrefix(pc.ComposePrompt(staticBody, req))
+		prefix := promptboundary.StaticPrefix(pc.ComposePrompt(staticBody, req))
 		for _, tok := range []string{cycleTok, goalTok, wsTok} {
 			if strings.Contains(prefix, tok) {
 				t.Errorf("phase %q: dynamic token %q leaked into the cache-stable prefix:\n%s", name, tok, prefix)
@@ -94,9 +89,9 @@ func TestC534_002_DynamicTokensNeverInPrefix(t *testing.T) {
 func TestC534_003_GuardDetectsEarlyInjection(t *testing.T) {
 	req := core.PhaseRequest{Cycle: 42, GoalHash: "cafe", ProjectRoot: acsassert.RepoRoot(t), Workspace: "/ws/42"}
 	clean := runner.BaseCycleContext(staticBody, req)
-	cleanPrefix := runner.StaticPrefix(clean)
+	cleanPrefix := promptboundary.StaticPrefix(clean)
 	mutated := "- cycle: 200\n" + clean
-	mutatedPrefix := runner.StaticPrefix(mutated)
+	mutatedPrefix := promptboundary.StaticPrefix(mutated)
 	if mutatedPrefix == cleanPrefix {
 		t.Fatalf("StaticPrefix is a tautology: an early-injected dynamic value produced the same prefix\n clean:   %q\n mutated: %q", cleanPrefix, mutatedPrefix)
 	}
@@ -108,8 +103,8 @@ func TestC534_003_GuardDetectsEarlyInjection(t *testing.T) {
 func TestC534_004_EmptyBodyYieldsStableEmptyPrefix(t *testing.T) {
 	reqA := core.PhaseRequest{Cycle: 1, GoalHash: "g1", ProjectRoot: "/p", Workspace: "/w1"}
 	reqB := core.PhaseRequest{Cycle: 2, GoalHash: "g2", ProjectRoot: "/p", Workspace: "/w2"}
-	prefixA := runner.StaticPrefix(runner.BaseCycleContext("", reqA))
-	prefixB := runner.StaticPrefix(runner.BaseCycleContext("", reqB))
+	prefixA := promptboundary.StaticPrefix(runner.BaseCycleContext("", reqA))
+	prefixB := promptboundary.StaticPrefix(runner.BaseCycleContext("", reqB))
 	if prefixA != "" {
 		t.Errorf("empty body must yield an empty static prefix; got %q", prefixA)
 	}
