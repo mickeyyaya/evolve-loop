@@ -261,6 +261,16 @@ The similarity is the token Jaccard of the title and the acceptance of two items
 
 `inbox.curator.trailer.stage` sets the stage of `evolve inbox trailer-check --range`. `shadow` (the default) prints violations and exits 0. `enforce` prints violations and exits 1. Any other value or unknown key fails `policy.Load`.
 
+## Boundary ratchet record (`boundary.ratchet_merge`)
+
+`boundary.ratchet_merge.stage` sets what the boundary step `ratchet-tighten` does with its pull request. The words are `off`, `shadow` and `enforce`. An absent key or an empty word means `shadow`.
+
+- `off` records nothing and emits no signal.
+- `shadow` reports `would record` and records nothing.
+- `enforce` records the PR for the next integration batch.
+
+Any other word or unknown key fails `policy.Load`. The field type is the named string type `RatchetMergeStage`. An unreadable policy file gives no record and the reason `policy_unreadable`.
+
 ## Live incident reaction (`healing.live_reaction`)
 
 The block configures the live reaction of the incident detector ([internal-selfheal.md](packages/internal-selfheal.md#the-live-reaction)). Each cycle process runs it on a `cycle.sealed` event with the verdict FAIL. It opens an incident at once when a `pipeline-code` failure class fails for the third time ([failure-identity-lifecycle.md §4](failure-identity-lifecycle.md#4-failure-class-fingerprint)).

@@ -28,6 +28,10 @@ type fakeGH struct {
 	failVerb string
 	lease    string
 	calls    [][]string
+
+	afterCreate func(createArgs []string) string
+	listFn      func() string
+	failGit     func(args []string) bool
 }
 
 func (f *fakeGH) install(t *testing.T) {
@@ -42,6 +46,10 @@ func (f *fakeGH) run(ctx context.Context, name, dir string, args, env []string, 
 		fmt.Fprintf(stdout, "%s\t%s\n", f.lease, args[len(args)-1])
 		return 0, nil
 	}
+	if name == "git" && f.failGit != nil && f.failGit(args) {
+		fmt.Fprintln(stderr, "git refused")
+		return 1, nil
+	}
 	if name != "gh" {
 		return sysexec.DefaultRunner(ctx, name, dir, args, env, stdin, stdout, stderr)
 	}
@@ -51,7 +59,14 @@ func (f *fakeGH) run(ctx context.Context, name, dir string, args, env []string, 
 		return 1, nil
 	}
 	if len(args) > 1 && args[1] == "list" {
-		fmt.Fprint(stdout, listForBase(f.list, flagAfter(args, "--base")))
+		list := f.list
+		if f.listFn != nil {
+			list = f.listFn()
+		}
+		if create := f.created(); create != nil && f.afterCreate != nil {
+			list = f.afterCreate(create)
+		}
+		fmt.Fprint(stdout, listForBase(list, flagAfter(args, "--base")))
 	}
 	return 0, nil
 }
@@ -104,6 +119,7 @@ func newRatchetOrigin(t *testing.T, funcLines int, offenders string) ratchetOrig
 func newRatchetOriginWith(t *testing.T, funcLines int, offenders, rawBaseline string) ratchetOrigin {
 	t.Helper()
 	seed := gittest.Fixture(t)
+	seed.Write(".gitignore", ".evolve/\n")
 	seed.Write("go/internal/fixture/raw_test.go", "package fixture\n\nimport \"testing\"\n\nfunc TestRaw(t *testing.T) {\n\t_ = []string{"+strconv.Quote("gi"+"t")+", "+strconv.Quote("in"+"it")+"}\n}\n")
 	seed.Write(rawGitBaselinePath, rawBaseline)
 	var src strings.Builder
@@ -175,7 +191,7 @@ func TestBoundaryRatchetTighten_OpensAPullRequestFromADatedBranch(t *testing.T) 
 	create := gh.created()
 	branch := flagAfter(create, "--head")
 	if !strings.HasPrefix(branch, ratchetBranchPrefix+time.Now().UTC().Format("2006-01")) || flagAfter(create, "--base") != "main" ||
-		flagAfter(create, "--title") != ratchetTightenMessage || !strings.Contains(flagAfter(create, "--body"), "internal/fixture.Big: 90 -> 64") {
+		flagAfter(create, "--title") != ratchetTightenTitle || !strings.Contains(flagAfter(create, "--body"), "internal/fixture.Big: 90 -> 64") {
 		t.Fatalf("gh pr create argv %q, want a PR from a dated %s branch into main that lists the changes", create, ratchetBranchPrefix)
 	}
 	if !strings.Contains(out, "opened a pull request from "+branch) {
@@ -271,8 +287,10 @@ func TestBoundaryRatchetTighten_ATightListLandsNothing(t *testing.T) {
 	if rc != 0 || errOut != "" || !strings.Contains(out, "ratchet tighten: tight") || o.originHead() != before {
 		t.Fatalf("rc=%d stdout=%q stderr=%q origin moved=%v, want a tight report and no commit", rc, out, errOut, o.originHead() != before)
 	}
-	if len(gh.calls) != 0 {
-		t.Errorf("gh ran %q for a tight list", gh.calls)
+	for _, call := range gh.calls {
+		if len(call) < 2 || call[0] != "pr" || call[1] != "list" {
+			t.Errorf("gh ran %q for a tight list: only the look for a stale PR is allowed", call)
+		}
 	}
 	o.planeIsUntouched(t)
 }

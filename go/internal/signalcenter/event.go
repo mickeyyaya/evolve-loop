@@ -216,6 +216,8 @@ const (
 	CodeParallelEvaluateShadow Code = "PARALLEL_EVALUATE_SHADOW"
 )
 
+const CodeCLIRatchetMergeDecision Code = "CLI_RATCHET_MERGE_DECISION"
+
 const CodeLatencyBudgetExceeded Code = "LATENCY_BUDGET_EXCEEDED"
 
 const CodeHostDiskLow Code = "HOST_DISK_LOW"
