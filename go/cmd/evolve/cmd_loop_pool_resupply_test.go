@@ -82,7 +82,7 @@ func TestRollingPool_KeepsTheFixedBacklogAndNeverAsksForResupply(t *testing.T) {
 		t.Fatal("the rolling pool asked for a resupply; it has no launch cap, so its backlog stays fixed")
 		return nil, nil
 	}
-	if res := rollingPool(fc, launch, "")(context.Background(), []fleet.Todo{{ID: "A"}}, resupply); len(res) != 1 {
+	if res := rollingPool(fc, launch, "", poolControl{})(context.Background(), []fleet.Todo{{ID: "A"}}, resupply); len(res) != 1 {
 		t.Errorf("results = %d, want 1", len(res))
 	}
 }
@@ -96,7 +96,7 @@ func TestRollingPool_TellsEachLaneWhereTheLiveWidthLives(t *testing.T) {
 		env = spec.Env
 		return 0, nil
 	}
-	rollingPool(fc, launch, path)(context.Background(), []fleet.Todo{{ID: "A"}}, nil)
+	rollingPool(fc, launch, path, poolControl{})(context.Background(), []fleet.Todo{{ID: "A"}}, nil)
 	if env[ipcenv.FleetLiveWidthKey] != path || env[ipcenv.FleetWidthKey] != "2" {
 		t.Errorf("lane env = %v, want %s=%s beside the spawn width", env, ipcenv.FleetLiveWidthKey, path)
 	}
@@ -117,7 +117,7 @@ func TestLiveWidthFile_LivesUnderThePlaneEvolveDirectory(t *testing.T) {
 func TestDispatchPool_TheProductionRunnerPassesTheLiveWidthFileToEachLane(t *testing.T) {
 	t.Parallel()
 	evolveDir := t.TempDir()
-	b := &loopBatchCoordinator{cfg: loopConfig{EvolveDir: evolveDir}}
+	b := &loopBatchCoordinator{ctx: context.Background(), cfg: loopConfig{EvolveDir: evolveDir}}
 	fc := policy.FleetConfig{Count: 2, PlanSource: "triage", Scheduling: "pool"}
 	var env map[string]string
 	launch := func(_ context.Context, spec fleet.CycleSpec) (int, error) {

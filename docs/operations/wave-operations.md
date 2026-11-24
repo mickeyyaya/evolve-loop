@@ -43,6 +43,12 @@ This page tells the console (an operator or an LLM) how to run each wave through
   - The JSON gives each duration in nanoseconds. A wave that is still live is read to its last signal.
   - Run `evolve wave latency --check` to judge every wave against the live-lane floor and the gate-share ceiling. Each verdict reports `live_share`, `gate_share`, and `lock_wait_share`, where `gate_share` excludes lock wait from host time.
   - The definitions are in [internal-lanetime.md](../architecture/packages/internal-lanetime.md). The plan is [wave-latency-2026-10](../plans/wave-latency-2026-10.md).
+- The host sentinel runs inside the loop and reads the host each `gc.sentinel.interval_s`. `wave status` shows its last sample on the `host:` lines (JSON `host`), and the load sample on the `load:` line. The plan is [host-sentinel-inside-the-loop-2026-11](../plans/host-sentinel-inside-the-loop-2026-11.md).
+  - The sentinel emits typed `HOST_*` signals when a reading crosses a limit. The codes are in [signal-codes.md](../architecture/signal-codes.md). `wave watch` prints `HOST_LANE_HOLD` and the stuck incident `HOST_LANE_HOLD_STUCK`.
+  - Both stages are `shadow`: `gc.sentinel.hold.stage` and `gc.sentinel.release.stage`. At shadow the sentinel sets no hold and runs no release. It emits `HOST_WOULD_HOLD` and `HOST_WOULD_RELEASE` to show the action of enforce.
+  - At enforce, the release runs only `evolve gc --only cache` in process. It takes the gc lease with no wait, and it skips when another gc holds the lease. A live lane keeps its worktree, its sessions and its processes.
+  - At enforce, free disk under `gc.disk_floor_gb` holds new lanes. Running lanes continue. The hold clears at `gc.disk_warn_gb`. A held pool shows the idle cause `disk_floor` and never shows underfill.
+  - The boundary gc stays unchanged. The sentinel does not replace it.
 - To follow the wave, run `evolve wave watch` under a monitor. It prints one line for each phase change, seal, deadline stop, ship and quota pause. It exits when the loop exits. When a newer wave starts, it prints `wave-started` and follows the newer wave.
 
 ## 3. At the boundary

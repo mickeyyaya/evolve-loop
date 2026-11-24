@@ -25,6 +25,7 @@ type PoolConfig struct {
 	Halted      func() bool
 	Kick        <-chan struct{}
 	Window      func() int
+	Hold        Hold
 
 	LiveWidthFile string
 }
@@ -38,6 +39,7 @@ const (
 	PoolResupplied PoolTransitionKind = "resupplied"
 	PoolIdle       PoolTransitionKind = "idle"
 	PoolHeld       PoolTransitionKind = "held"
+	PoolFloorHold  PoolTransitionKind = "floor_hold"
 )
 
 type PoolTransition struct {
@@ -48,6 +50,7 @@ type PoolTransition struct {
 	Pending int
 	Capped  bool
 	Stopped bool
+	Held    bool
 }
 
 type pool struct {
@@ -65,6 +68,8 @@ type pool struct {
 	launches     int
 	completions  chan completion
 	lastHeld     [2]int
+	floorHeld    bool
+	blocked      bool
 }
 
 type completion struct {
@@ -79,12 +84,21 @@ func RunPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchF
 	p := newPool(ctx, cfg, backlog, launch, onTransition)
 	_, refused := p.fill(PoolLaunched, true)
 	p.held(refused)
-	kick := cfg.Kick
-	for len(p.running) > 0 {
+	kick, cancelled, wake := cfg.Kick, ctx.Done(), p.holdWake()
+	p.syncFloorHold()
+	for len(p.running) > 0 || p.waitingOnHold() {
 		select {
 		case done := <-p.completions:
 			p.results[done.idx] = done.result
 			p.settle(done.idx)
+		case <-cancelled:
+			cancelled = nil
+		case _, open := <-wake:
+			if !open {
+				wake = nil
+				continue
+			}
+			p.wakeFill()
 		case _, open := <-kick:
 			if !open {
 				kick = nil
@@ -95,6 +109,37 @@ func RunPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchF
 		}
 	}
 	return p.results
+}
+
+func (p *pool) holdWake() <-chan struct{} {
+	if p.cfg.Hold == nil {
+		return nil
+	}
+	return p.cfg.Hold.Wake()
+}
+
+func (p *pool) holding() bool {
+	return p.cfg.Hold != nil && p.cfg.Hold.Held()
+}
+
+func (p *pool) waitingOnHold() bool {
+	return p.blocked && !p.capped() && !p.stopped() && p.ctx.Err() == nil
+}
+
+func (p *pool) syncFloorHold() {
+	if now := p.holding(); now != p.floorHeld {
+		p.floorHeld = now
+		p.emit(PoolFloorHold, "")
+	}
+}
+
+func (p *pool) wakeFill() {
+	p.syncFloorHold()
+	full, refused := p.fill(PoolBackfilled, false)
+	if !full && p.resupply() {
+		_, refused = p.fill(PoolBackfilled, false)
+	}
+	p.held(refused)
 }
 
 func newPool(ctx context.Context, cfg PoolConfig, backlog []Todo, launch LaunchFn, onTransition func(PoolTransition)) *pool {
@@ -151,7 +196,7 @@ func (p *pool) live(id string) bool {
 
 func (p *pool) emit(kind PoolTransitionKind, todo string) {
 	if p.onTransition != nil {
-		p.onTransition(PoolTransition{Kind: kind, Todo: todo, Live: len(p.running), Target: p.cfg.Target, Pending: len(p.pending), Capped: p.capped(), Stopped: p.stopped()})
+		p.onTransition(PoolTransition{Kind: kind, Todo: todo, Live: len(p.running), Target: p.cfg.Target, Pending: len(p.pending), Capped: p.capped(), Stopped: p.stopped(), Held: p.holding()})
 	}
 }
 
@@ -161,6 +206,7 @@ func (p *pool) settle(idx int) {
 	}
 	delete(p.running, idx)
 	p.publishWidth()
+	p.syncFloorHold()
 	p.emit(PoolExited, p.backlog[idx].ID)
 	if full, _ := p.fill(PoolBackfilled, false); full {
 		return
@@ -200,6 +246,7 @@ func (p *pool) fill(kind PoolTransitionKind, initial bool) (full, refused bool) 
 		p.pending = append(p.pending[:at:at], p.pending[at+1:]...)
 		p.dispatch(idx, kind)
 	}
+	p.blocked = p.holding() && (len(p.pending) > 0 || p.cfg.Resupply != nil)
 	return len(p.running) >= width, refused
 }
 
@@ -221,7 +268,7 @@ func (p *pool) stopped() bool {
 }
 
 func (p *pool) open() bool {
-	return !p.capped() && !p.stopped()
+	return !p.capped() && !p.stopped() && !p.holding()
 }
 
 func (p *pool) next(initial bool) int {

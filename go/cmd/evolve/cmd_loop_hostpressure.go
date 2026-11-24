@@ -106,11 +106,14 @@ func hostSamplesPath(cfg loopConfig) string {
 }
 
 func hostSamplesFilePath(evolveDir, logPath string) string {
-	dir := filepath.Join(evolveDir, "logs")
-	if logPath != "" {
-		dir = filepath.Dir(logPath)
+	return filepath.Join(hostLogDir(loopConfig{EvolveDir: evolveDir, LogPath: logPath}), "host-pressure.ndjson")
+}
+
+func hostLogDir(cfg loopConfig) string {
+	if cfg.LogPath != "" {
+		return filepath.Dir(cfg.LogPath)
 	}
-	return filepath.Join(dir, "host-pressure.ndjson")
+	return filepath.Join(cfg.EvolveDir, "logs")
 }
 
 func appendLine(path string) func([]byte) error {
