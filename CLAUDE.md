@@ -12,6 +12,8 @@
 - The four reviewers of the pre-commit review fleet are also Claude Code subagents in `.claude/agents/`. `evolve skills generate` renders the body of each subagent from its neutral persona `agents/evolve-diff-<name>.md`. Only the frontmatter (the tool list and the model) is Claude Code data. Change the persona, not the rendered body.
 - The repository documents use the Claude Code tool names (`Read`, `Grep`, `Glob`, `Bash`, `Edit`, `Write`).
 - Run `/clear` before a new evolve-loop batch.
+- The skills at `skills/<name>/SKILL.md` are the only slash-command surface ([ADR-0040](docs/architecture/adr/0040-skill-naming-and-single-source-projection.md)). They carry `argument-hint`. The plugin manifest at `.claude-plugin/plugin.json` declares only `agents` and `skills`.
+- Boot stalls, model checks and quota pauses of a Claude seat: [Claude Code host facts](skills/loop/reference/claude-runtime.md#claude-code-host-facts).
 
 <!-- GENERATED:instructions BEGIN from AGENTS.md by `evolve skills generate`; edit the source, not this region -->
 ## Digest (each CLI loads this part)

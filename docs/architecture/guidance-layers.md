@@ -109,7 +109,7 @@ No one edits a generated block by hand. A rule changes in its registry file, and
 
 A phase agent no longer reads the console role. Today `runtime/CLAUDE.md` gives it the merge fleet and the status format (research F2.6). After the change, `CLAUDE.md` holds only L0 and the map, and the console role loads through the hook.
 
-Caveat: the CLIs `codex` and `agy` read only `AGENTS.md`. Path rules, hooks and `SessionStart` reach Claude Code only (F2.12). On a non-claude CLI, a phase agent gets L1 and L2 only through its persona and its overlays.
+Caveat: a CLI loads only the file that its bridge manifest names (the field `instruction_file`), or gets the injected L0. Path rules, hooks and `SessionStart` reach Claude Code only (F2.12). On a non-claude CLI, a phase agent gets L1 and L2 only through its persona and its overlays.
 
 ## 6. The situation skills
 
@@ -199,7 +199,7 @@ flowchart LR
     B --> A["AGENTS.md digest:<br/>GENERATED:guidance-l0 region"]
     A --> S["evolve skills generate (X10)"]
     S --> C["CLAUDE.md, GEMINI.md"]
-    A --> X["codex, agy read AGENTS.md"]
+    A --> X["each manifest names its file"]
     A --> O["the bridge injects it<br/>for a family with no file"]
     I --> V["evolve guidance index<br/>--audience --phase --cli --json"]
 ```
@@ -208,9 +208,9 @@ The order of the generators is fixed: `evolve guidance build`, then `evolve skil
 
 | Carrier | Family | What it holds | Who writes it |
 |---|---|---|---|
-| `AGENTS.md`, the `GENERATED:guidance-l0` region inside the digest | codex, agy, and each CLI that reads `AGENTS.md` | the L0 statements and the pointer line | `evolve guidance build` |
-| `CLAUDE.md`, `GEMINI.md` | Claude Code; Gemini CLI and legacy agy | a copy of the digest, so the same region | `evolve skills generate` (X10) |
-| the `## Rules` prefix of the prompt | a family with no file, such as Ollama | the same region (G9) | the bridge |
+| `AGENTS.md`, the `GENERATED:guidance-l0` region inside the digest | each CLI whose manifest names `AGENTS.md` | the L0 statements and the pointer line | `evolve guidance build` |
+| `CLAUDE.md`, `GEMINI.md` | each CLI whose manifest names the file | a copy of the digest, so the same region | `evolve skills generate` (X10) |
+| the `## Rules` prefix of the prompt | each CLI whose manifest names `inject` | the same region (G9) | the bridge |
 | `guidance/index.md` | each family, on demand | one row for each active rule | `evolve guidance build` |
 | `guidance/index.json` | each tool, and the context index of a cell (§10.6) | the same rows as data | `evolve guidance build` |
 | `guidance/rules/<id>.md` | each family, on demand | the body: the why, the evidence | a person, through a reviewed PR |
