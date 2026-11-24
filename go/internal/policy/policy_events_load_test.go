@@ -327,10 +327,12 @@ func TestEventsErrors_KeepTheirCauseAndNameTheirPath(t *testing.T) {
 	t.Parallel()
 	cause := errors.New("cause")
 
-	if err := error(&ValueError{Path: "events.x", Err: cause}); !errors.Is(err, cause) || fmt.Sprint(err) == "" {
+	value := &ValueError{Path: "events.x", Err: cause}
+	if err := error(value); !errors.Is(err, cause) || value.Unwrap() != cause || fmt.Sprint(err) == "" {
 		t.Errorf("ValueError = %q, want it to wrap its cause and print a message", err)
 	}
-	if err := error(&RouteError{Channel: "ship", Err: cause}); !errors.Is(err, cause) {
+	route := &RouteError{Channel: "ship", Err: cause}
+	if err := error(route); !errors.Is(err, cause) || route.Unwrap() != cause {
 		t.Errorf("RouteError = %v, want it to wrap the parse error", err)
 	}
 }

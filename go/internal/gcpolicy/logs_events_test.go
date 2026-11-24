@@ -39,8 +39,9 @@ func TestChannelCategories_ANoChannelListGivesNoCategory(t *testing.T) {
 
 func TestLogCatalog_TheCompiledCategoriesKeepTheCurrentOrLivePinAndNoPrefix(t *testing.T) {
 	t.Parallel()
+	var zeroPin gcpolicy.PinRule = gcpolicy.PinCurrentOrLive
 	for _, c := range (gcpolicy.Policy{}).LogCatalog() {
-		if c.Pin != gcpolicy.PinCurrentOrLive || c.RulePrefix != "" {
+		if c.Pin != zeroPin || c.RulePrefix != "" {
 			t.Errorf("category %q pin %d prefix %q, want the zero values", c.Name, c.Pin, c.RulePrefix)
 		}
 	}
