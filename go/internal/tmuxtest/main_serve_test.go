@@ -17,6 +17,17 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 )
 
+func TestMain_ASocketDirThatCannotBeRegisteredStillRunsTheTests(t *testing.T) {
+	unregistrableSocketDir(t)
+	ran := false
+
+	code := Main(runFunc(func() int { ran = true; return 0 }))
+
+	if code != 0 || !ran {
+		t.Fatalf("Main = %d, ran = %v; a failed registration must not stop the run", code, ran)
+	}
+}
+
 func TestMain_RunsTheTestsOnAFreshServerOwnedByThisProcess(t *testing.T) {
 	socketDir := privateSocketDir(t)
 	own := bridge.DeriveTestSocket(os.Getpid())
