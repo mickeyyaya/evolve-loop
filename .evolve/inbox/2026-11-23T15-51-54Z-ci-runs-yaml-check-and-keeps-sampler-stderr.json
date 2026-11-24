@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "required.yml runs the yaml floor tier as one step in the STE-lint job on the evolve binary that job already builds, and floorCIParity gains the matching yaml row in the same change.",
+    "go.yml keeps the host sampler stderr in a log file that the job uploads beside runner-samples.ndjson, in the linux and darwin jobs.",
+    "The macOS spawn shim (C13 part B) is NOT part of this change: the operator did not approve it."
+  ],
+  "created_at": "2026-11-23T15:51:54Z",
+  "files": [
+    ".github/workflows/required.yml",
+    ".github/workflows/go.yml",
+    "go/cmd/evolve/cmd_floor.go"
+  ],
+  "fix": "After PR #1729 (evolve yaml check) lands, add the approved workflow edits A and C in one console PR.",
+  "id": "ci-runs-yaml-check-and-keeps-sampler-stderr",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "operator decision 2026-11-23 (scored CI edits: A approved, C approved, B not approved)",
+  "summary": "The operator approved two CI workflow edits: run the yaml floor tier in required CI (about 1 s on the already-built binary) and keep the host sampler stderr as a CI log so the dead-iostat diagnostic is visible. They wait for PR #1729 to land, because the step calls evolve yaml check.",
+  "title": "Required CI runs the yaml check and keeps the host sampler stderr",
+  "weight": 0.7
+}

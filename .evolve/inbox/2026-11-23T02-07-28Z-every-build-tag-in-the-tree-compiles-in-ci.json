@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "go vet -tags spike ./cmd/evolve/ passes on main.",
+    "A CI step vets every build tag set found in the module's test files, and a test proves that a new tag-gated file with a compile error makes that step fail.",
+    "The list of tags is derived from the source files, not written by hand."
+  ],
+  "created_at": "2026-11-23T02:07:28Z",
+  "files": [
+    "go/cmd/evolve/spike_advisor_live_test.go",
+    ".github/workflows/go.yml",
+    "go/Makefile"
+  ],
+  "fix": "Add a CI-parity check that lists every //go:build tag used by a test file in the module and runs go vet once per tag set, so each tag-gated file compiles on every change. Then fix spike_advisor_live_test.go for the current config.Load signature, or archive the spike file if the spike is finished.",
+  "id": "every-build-tag-in-the-tree-compiles-in-ci",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "console 2026-11-23: found by the c6 builder; confirmed on origin/main eaa0cf56a",
+  "summary": "go vet -tags spike ./cmd/evolve/ fails on main: cmd/evolve/spike_advisor_live_test.go:27:34 too many arguments in call to config.Load (have (string, map[string]string)). No CI job and no Makefile target builds the spike tag, so the file stopped compiling when config.Load changed and nothing noticed. Any other tag that no job builds can rot the same way.",
+  "title": "CI vets every build tag the tree uses, so a tag-gated test file cannot rot",
+  "weight": 0.45
+}

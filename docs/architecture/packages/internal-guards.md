@@ -11,6 +11,15 @@ The hooks are defence in depth, because they fire only in Claude Code panes. The
 ## Design
 
 - **One decision per process.** `internal/cli/guardcmd` builds one guard (`buildGuard`) and reads the PreToolUse JSON from stdin. It calls `Decide` once and appends to `.evolve/guards.log`. It writes an `Alarm` decision to `.evolve/integrity-alarm.jsonl`, and exits 2 on deny. `.claude/settings.json` wires `ship`, `phase`, `role` and `docdelete`. `chain` is run by hand (`evolve guard chain`, the same check as `evolve ledger verify`).
+- **A denial emits a signal.**
+  - After `Decide` returns a deny, `guardcmd` calls `EmitDenial`. The event `ISOLATION_GUARD_DENIED` goes to `<evolve-dir>/signals.ndjson`. The write ends before the process exits 2.
+  - The fields are `guard`, `path` (the file, else the command), `cwd`, `neutral` and `reason`. The hook reads no run id and no cycle state, because the hook cannot know which run it serves. The bridge matches the event by the pane directory and by the offset of the stream (see [internal-bridge.md](internal-bridge.md)).
+  - `FamilyNeutral` is the data table of the guards whose decision every family meets the same way. It holds `ship` only, because the `ship` hook mirrors the CLI-neutral gate of `evolve ship`. `role`, `phase` and `docdelete` run as hooks in Claude Code panes only, so another family can pass the same call. They emit `neutral=false`, and the bridge ignores those events.
+  - A later guard joins the table when its CLI-neutral layer calls `EmitDenial`. The sandbox deny report, the worktree fence and the `evolve ship` gate do not call it yet.
+  - `guardcmd.Run(centerFor)` takes the Center factory, so a test never writes a real channel.
+  - The registry passes `guardDenialCenter` of `cmd/evolve`. It is a signal root with the role `guard`, because only the roots build a Center (`TestRootSignalCenter_EveryRootSubscribesThePublisher`).
+  - The project stream takes the event through the filter `guardDenied`. The factory runs only when a guard denies a call.
+  - No allow or deny decision changes.
 - **The guards.**
 
 | Guard | Tool | Rule | Off switch |

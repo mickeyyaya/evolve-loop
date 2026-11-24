@@ -1,0 +1,31 @@
+{
+  "acceptance": [
+    "No function named in the summary takes a bool flag argument.",
+    "No function named in the summary takes more than three parameters.",
+    "The hostsentinel, fleet and cmd/evolve sentinel tests pass with no change in what they assert."
+  ],
+  "created_at": "2026-11-23T04:20:47Z",
+  "evidence_verified": false,
+  "files": [
+    "go/cmd/evolve/cmd_loop_sentinel.go",
+    "go/cmd/evolve/cmd_gc.go",
+    "go/cmd/evolve/cmd_loop_pool.go",
+    "go/internal/hostsentinel/signals.go",
+    "go/internal/hostsentinel/decide.go"
+  ],
+  "fix": "Replace each flag argument with two named operations or a small strategy value, and group the long parameter lists into parameter objects. Keep behaviour identical; the existing sentinel, decide and pool tests stay green unchanged in intent.",
+  "id": "host-sentinel-functions-take-parameter-objects",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "route": "console-manual",
+  "routed_at": "2026-11-23T16:37:01Z",
+  "routed_by": "loop",
+  "routed_cycle": 2618,
+  "routed_reason": "lane triage (cycle 2618) dropped: stale: no hostsentinel/hostSentinel symbol under go/ at HEAD; go/internal/hostsentinel and cmd_loop_sentinel.go absent",
+  "source": "console 2026-11-23: round-3 architecture review of the host sentinel rebuild (#1699-r5), finding H1, deferred so the review converges",
+  "stale_drop_count": 1,
+  "summary": "Several functions of the in-loop host sentinel break the clean-code function rules (three parameters at most; no flag arguments). Flag arguments: hostSentinel.observe(ctx, full, prime bool) in cmd_loop_sentinel.go, the sentinelPorts.read(ctx, full bool) port, and the field gcRun.cancellable (cmd_gc.go:151) that step and stopped branch on. More than three parameters: Publish.emit(code, kind, sev, reason, fields) in hostsentinel/signals.go; State.due, decideHold and decideRelease (4 each) in hostsentinel/decide.go; rollingPool(fc, launch, widthFile, ctl) in cmd_loop_pool.go:46.",
+  "title": "The host sentinel functions take parameter objects, not flag arguments",
+  "weight": 0.3
+}

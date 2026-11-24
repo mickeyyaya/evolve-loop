@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "The build floor computes the worktree change set against its base once per floor run, and comment_floor and the history floor both read that one value.",
+    "A test shows git is asked for the diff once when both floors run."
+  ],
+  "created_at": "2026-11-23T15:43:29Z",
+  "files": [
+    "go/internal/core/comment_floor.go",
+    "go/internal/core/history_floor.go",
+    "go/internal/core/build_floor_reviewer.go"
+  ],
+  "fix": "Compute the diff-based change set once per build-floor run and share it between the diff-based floors.",
+  "id": "build-floor-diff-computed-once",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "performance",
+  "source": "rank-12 design review r2 (LOW 4), 2026-11-23",
+  "summary": "With the comment-history floor added, commentFloorFailures and historyFloorFailures each walk the worktree diff against its base once per build-floor run. A third diff-based floor would add a third walk.",
+  "title": "The build floor computes its diff change set once for all diff-based floors",
+  "weight": 0.3
+}

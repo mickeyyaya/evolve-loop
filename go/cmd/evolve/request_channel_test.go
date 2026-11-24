@@ -128,6 +128,9 @@ func TestAgentRequest_AFailedSeatIsAnError(t *testing.T) {
 	}{
 		{"the judge prints no envelope", func([]string) (int, agentcmd.Envelope) { return -1, agentcmd.Envelope{} }, "no JSON envelope"},
 		{"the judge exits non-zero", func([]string) (int, agentcmd.Envelope) { return 2, agentcmd.Envelope{Error: "refused"} }, "exit 2: refused"},
+		{"the judge is refused by a guard", func([]string) (int, agentcmd.Envelope) {
+			return 81, agentcmd.Envelope{Error: "guard ship denied git push", CauseCode: core.CauseGuardRefused}
+		}, "guard_refused: guard ship denied git push"},
 		{"the role run fails", func(args []string) (int, agentcmd.Envelope) {
 			if args[1] == orchestratorProfile {
 				return 0, agentcmd.Envelope{Report: `{"schema":"evolve.diagnosis/1","incident_id":"dispatch-1","hypothesis":"h","evidence":["q1"],` +
@@ -187,5 +190,21 @@ func TestWireOrchestratorDeps_RequestChannelWired(t *testing.T) {
 	}
 	if d.Orchestrator == nil || !d.Orchestrator.RequestHandoffWired() {
 		t.Fatal("the production composition root must give the orchestrator the request channel (llm-isolation.md §7.2.1)")
+	}
+}
+
+func TestRunAgentSeat_AGuardRefusalIsATypedErrorAndAnyOtherFailureIsPlain(t *testing.T) {
+	t.Parallel()
+	_, err := runAgentSeat(scriptedAgent(guardRefusedEnvelope, 21), []string{"evolve-x"}, "in", io.Discard)
+	var refused GuardRefusedError
+	if !errors.As(err, &refused) || refused.Profile != "evolve-x" || refused.Reason != "bridge: launch exit=81: guard ship denied git push origin main before the launch stalled" {
+		t.Fatalf("a refusal is typed and keeps the profile and the reason of the run: %+v", refused)
+	}
+	_, err = runAgentSeat(scriptedAgent(`{"error":"bridge down","cause_code":"artifact_timeout"}`, 21), []string{"evolve-x"}, "in", io.Discard)
+	if err == nil || errors.As(err, &refused) {
+		t.Fatalf("another cause stays a plain error: %v", err)
+	}
+	if _, err = runAgentSeat(scriptedAgent(`{"cause_code":"guard_refused"}`, 0), []string{"evolve-x"}, "in", io.Discard); err != nil {
+		t.Fatalf("a cause on a run that exited 0 is no error: %v", err)
 	}
 }

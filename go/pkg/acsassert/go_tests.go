@@ -34,16 +34,16 @@ func GoTests(tb TB, spec GoTestSpec) bool {
 		return false
 	}
 	args := append(append([]string{"test", "-json", "-count=1", "-v"}, buildFlags(spec)...), "-run", spec.Pattern, spec.Package)
-	ctx, cancel := callerDeadline(tb)
+	ctx, cancel := boundContext(callerDeadline(tb)...)
 	defer cancel()
 	importPath, err := resolveImportPath(ctx, spec)
 	if err != nil {
-		tb.Errorf("%v", err)
+		tb.Errorf("%v%s", err, boundNote(ctx))
 		return false
 	}
 	out, stderr, code, err := sysexec.Capture(ctx, goTestRunner(), spec.Dir, "go", args...)
 	if err != nil || code != 0 {
-		tb.Errorf("go %v exited %d (err=%v)\nstdout:\n%s\nstderr:\n%s", args, code, err, out, stderr)
+		tb.Errorf("go %v exited %d (err=%v)\nstdout:\n%s\nstderr:\n%s%s", args, code, err, out, stderr, boundNote(ctx))
 		return false
 	}
 	if err := validateGoTests(out, importPath, spec.Names); err != nil {
@@ -53,13 +53,13 @@ func GoTests(tb TB, spec GoTestSpec) bool {
 	return true
 }
 
-func callerDeadline(tb TB) (context.Context, context.CancelFunc) {
+func callerDeadline(tb TB) []time.Time {
 	if caller, ok := tb.(interface{ Deadline() (time.Time, bool) }); ok {
 		if deadline, set := caller.Deadline(); set {
-			return context.WithDeadline(context.Background(), deadline)
+			return []time.Time{deadline}
 		}
 	}
-	return context.WithCancel(context.Background())
+	return nil
 }
 
 func goTestRunner() sysexec.RunFunc {

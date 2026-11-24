@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "cmd_stage.go and cmd_stage_chain.go read the decision version from one function, so the two verbs cannot derive it differently.",
+    "computeRecordHash hashes an explicit hashedRecord type, and a test fails when a Record field is added without a decision on whether it is hashed."
+  ],
+  "created_at": "2026-11-23T13:25:25Z",
+  "files": [
+    "go/cmd/evolve/cmd_stage.go",
+    "go/cmd/evolve/cmd_stage_chain.go",
+    "go/internal/stageevidence/score.go"
+  ],
+  "fix": "Give the DecisionVersion derivation of a registry entry one home in stageevidence, called by both verbs. Restore an explicit hashed-record schema for the evidence hash.",
+  "id": "stage-evidence-k2-review-followups",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "architecture review of the K2 rebuild (PR #1690 r3), 2026-11-23",
+  "summary": "The architecture seat on the K2 rebuild found two MEDIUM issues that do not block after round 2: cmd_stage.go:84 and cmd_stage_chain.go:67 both compute stageevidence.DecisionVersion with the same arguments, and score.go:168 now hashes the whole Record with Hash cleared, so any new Record field silently changes the hash schema.",
+  "title": "The stage-evidence decision version and hash schema each have one explicit home",
+  "weight": 0.5
+}

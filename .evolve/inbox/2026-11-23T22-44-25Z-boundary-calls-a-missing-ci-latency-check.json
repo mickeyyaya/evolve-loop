@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "The boundary step runs a verb that exists and reports its result",
+    "A test pins that each boundary step names a registered verb and subverb"
+  ],
+  "created_at": "2026-11-23T22:44:25Z",
+  "deps": [],
+  "files": [
+    "go/cmd/evolve/cmd_boundary.go"
+  ],
+  "fix": "Either build the latency check as `evolve ci latency check` (latency-gates T5), or point the boundary step at the existing `evolve wave latency --check`. Make an unknown subverb in a boundary step a failure of that step, not silent advice.",
+  "id": "boundary-calls-a-missing-ci-latency-check",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console",
+  "summary": "go/cmd/evolve/cmd_boundary.go:237 runs `ci latency check` as an advisory step, but `ci` has no `latency` subverb, so the step prints usage every boundary and checks nothing. Found by the CLI review of 2026-11-24 (docs/reference/evolve-commands.md section 4).",
+  "title": "The boundary calls evolve ci latency check, which does not exist",
+  "weight": 0.7
+}

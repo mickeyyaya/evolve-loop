@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "A guard test fails on a Setrlimit call in a test body that is not a child-process helper",
+    "No test in the tree lowers a process-wide rlimit"
+  ],
+  "created_at": "2026-11-23T23:32:48Z",
+  "deps": [],
+  "files": [
+    "go/internal/guards/",
+    "go/internal/cli/opscmd/fsize_unix_backfill_f2_test.go",
+    "go/internal/commentaudit/fsfull_backfill_f2_test.go"
+  ],
+  "fix": "Add a tree guard test that refuses syscall.Setrlimit in _test.go files except inside a named child-process helper, so the class cannot return.",
+  "id": "tests-never-lower-a-process-wide-rlimit",
+  "kind": "test",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "console",
+  "summary": "2026-11-24: the rank-38 commit gate failed with 'testing: can't write testlog.txt: file too large' although every test passed. Root cause: opscmd/fsize_unix_backfill_f2_test.go (#866) sets RLIMIT_FSIZE=0 for the whole test process, so any write in that window fails with EFBIG, including the go test testlog flush; new file opens elsewhere moved a flush into the window. commentaudit/fsfull_backfill_f2_test.go has the same pattern. The two tests are being fixed in the rank-38 PR (child-process helper).",
+  "title": "A test never lowers a process-wide rlimit; a guard refuses Setrlimit in tests outside a child-process helper",
+  "weight": 0.6
+}

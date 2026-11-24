@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Both acsassert go test runners use one bound policy, and a test proves a hung run of each ends at the same bound.",
+    "A test fails if subprocessCap is not smaller than the lane budget it must fit in.",
+    "A go test output that contains 'panic: test timed out' with no bound reached is not reported as a bound hit, and a test proves it.",
+    "The inboxtest package doc and docs/architecture/packages/internal-inboxtest.md say the same thing."
+  ],
+  "created_at": "2026-11-23T01:46:49Z",
+  "files": [
+    "go/pkg/acsassert/go_tests.go",
+    "go/pkg/acsassert/assertions.go",
+    "go/pkg/acsassert/subprocess_bound.go",
+    "go/internal/inboxtest/inboxtest.go",
+    "go/internal/evalgate/flakyshape_test.go",
+    "go/internal/acsverdict/acsverdict_test.go"
+  ],
+  "fix": "Give the two acsassert go test runners one timeout policy. Pin the cap and lane-budget inequality in a test, not only in prose. Make boundHit judge the bound from the context, not from output text alone. Align the inboxtest package doc with its note. Name the arithmetic of the flakyshape expectation. Move the acsverdict test helper so the lower package does not import the higher one.",
+  "id": "acs-subprocess-bound-review-followups",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "source": "console 2026-11-23: round-2 review of PR #1709 (failure-class-c0e86bae6916), non-blocking notes",
+  "summary": "PR #1709 bounds every ACS predicate subprocess. Its round-2 review passed with notes that do not block: the inboxtest package doc and its design note disagree; the two go test runners in pkg/acsassert (go_tests.go:36, assertions.go:156-158) have different timeout policies; the inequality between subprocessCap and the lane budget is stated only in prose; flakyshape_test.go:222 hides its arithmetic; acsverdict_test.go:10 imports the higher pkg/acsassert; boundHit (subprocess_bound.go:40) treats any 'panic: test timed out' output as a bound hit.",
+  "title": "Close the round-2 review notes of the ACS subprocess bound (PR 1709)",
+  "weight": 0.35
+}

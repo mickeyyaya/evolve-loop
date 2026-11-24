@@ -21,6 +21,7 @@ const (
 	ProposalProposed = "proposed"
 	ProposalRefused  = "refused"
 	ProposalFailed   = "failed"
+	ProposalSkipped  = "skipped"
 	proposalsDirName = "proposals"
 )
 
@@ -72,8 +73,17 @@ func (p Proposal) Failed(err error) Proposal {
 	return p
 }
 
+func (p Proposal) Skipped(reason string) Proposal {
+	p.State, p.Error = ProposalSkipped, reason
+	return p
+}
+
+func (p Proposal) NeverDiagnosed() bool {
+	return p.State == ProposalFailed || p.State == ProposalSkipped
+}
+
 func (p Proposal) current(inc Incident, retryAt time.Time) bool {
-	if p.State == ProposalFailed {
+	if p.NeverDiagnosed() {
 		return p.CreatedAt.After(retryAt)
 	}
 	return p.IncidentRecurrence == inc.Recurrence && p.IncidentLastSeenAt.Equal(inc.LastSeenAt)

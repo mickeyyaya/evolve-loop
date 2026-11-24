@@ -4,7 +4,6 @@ package cycle49
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -31,8 +30,8 @@ func TestC49_002_FingerprintDeterminism(t *testing.T) {
 	}
 	run := func(args ...string) string {
 		fullArgs := append([]string{script}, args...)
-		out, _ := exec.Command("bash", fullArgs...).Output()
-		return string(out)
+		out, _, _, _ := acsassert.SubprocessOutput("bash", fullArgs...)
+		return out
 	}
 	fp1 := run("--action", "Fix X", "--criteria", "Tests pass", "--files", "a.sh b.sh")
 	fp2 := run("--action", "Fix  X", "--criteria", "Tests  pass", "--files", "b.sh  a.sh")

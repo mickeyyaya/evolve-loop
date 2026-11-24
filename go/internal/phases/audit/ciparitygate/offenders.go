@@ -5,7 +5,10 @@ import (
 	"strings"
 )
 
-var goCompilerDiagRe = regexp.MustCompile(`^\S+\.go:\d+(:\d+)?:`)
+var (
+	goCompilerDiagRe = regexp.MustCompile(`^\S+\.go:\d+(:\d+)?:`)
+	passingPackageRe = regexp.MustCompile(`^(ok|\?)\s`)
+)
 
 const (
 	goBuildFailurePackageHeader    = "# "
@@ -16,6 +19,7 @@ const (
 const (
 	markerlessFallbackTailLines = 6
 	maxOffenderLines            = 12
+	noFailureMarkerLine         = "no failure marker in the output; the command exited non-zero"
 )
 
 func offenderMarkerLine(ln string) bool {
@@ -56,10 +60,13 @@ func offenderLines(out string) []string {
 			start = 0
 		}
 		for _, ln := range all[start:] {
-			if ln = strings.TrimSpace(ln); ln != "" {
+			if ln = strings.TrimSpace(ln); ln != "" && !passingPackageRe.MatchString(ln) {
 				keep = append(keep, ln)
 			}
 		}
+	}
+	if len(keep) == 0 {
+		return []string{noFailureMarkerLine}
 	}
 	if len(keep) > maxOffenderLines {
 		keep = keep[len(keep)-maxOffenderLines:]

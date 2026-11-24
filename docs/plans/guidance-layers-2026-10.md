@@ -295,7 +295,7 @@ The commit rules (`commit-gate-unpiped` and the staging rules) are L2 of `commit
 | G6 trigger evals | not started | No `skills/*/evals` folder found | none: draft `guidance-skill-trigger-evals` |
 | G7 with-and-without eval of L0 | not started | No change list found | none: draft `guidance-l0-with-without-eval` |
 | G8 cell index reads the guidance index | not started | Depends on the context-index builder | none: draft `guidance-cell-index-input` |
-| G9 driver instruction loader | not started | No manifest field found | `guidance-driver-instruction-loader` |
+| G9 driver instruction loader | built | The manifest field `instruction_file`; `ComposePrompt` injects L0 for `inject` | `guidance-driver-instruction-loader` |
 | G10 `AGENTS.md` byte budget | not started | `AGENTS.md` is 55196 bytes, above 32768 | none: draft `guidance-agents-md-byte-budget` |
 
 The registry, the generator, the check, the index verb and the overlay selector are on main. The forced loaders (G3a, G3), the migration after batch 1, the evals and the byte budget are not built. Eight of these have no open inbox item: the items of 2026-10-27 are in neither the inbox nor the consumed folder, so drafts are written. It is unverified if those items merged into others. The inbox item ids listed at the top of this plan for G3a, G3, G6, G7, G8 and G10 are stale.

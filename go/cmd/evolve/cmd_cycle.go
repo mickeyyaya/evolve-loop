@@ -379,6 +379,7 @@ const (
 	roleDispatch  = "dispatch"
 	roleAgent     = "agent"
 	roleSelfheal  = "selfheal"
+	roleGuard     = "guard"
 )
 
 func agentRunSignals(projectRoot string, console io.Writer) (*signalcenter.Center, func()) {
@@ -458,6 +459,7 @@ func newRootSignalCenter(projectRoot, evolveDir string, console io.Writer, opts 
 	signals.Subscribe(listenWhen(pairProjectRecord, projectStream))
 	signals.Subscribe(listenWhen(laneResumed, projectStream))
 	signals.Subscribe(listenWhen(shipWindowBroken, projectStream))
+	signals.Subscribe(listenWhen(guardDenied, projectStream))
 	signals.Subscribe(signalcenter.ConsoleSink(console))
 	return signals
 }
@@ -473,6 +475,8 @@ func listenWhen(keep func(signalcenter.Event) bool, l signalcenter.Listener) sig
 func cycleStamped(e signalcenter.Event) bool { return e.Cycle != 0 }
 
 func laneResumed(e signalcenter.Event) bool { return e.Code == core.CodeLaneResumed }
+
+func guardDenied(e signalcenter.Event) bool { return e.Code == core.CodeGuardDenied }
 
 func shipWindowBroken(e signalcenter.Event) bool {
 	return e.Code == core.CodeShipWindowLeaseBroken || e.Code == ship.CodeShipWindowLeaseBroken

@@ -19,7 +19,7 @@ func TestRunGuard_EachNamedGuardDispatchesAndAnUnknownNameListsThemAll(t *testin
 			t.Parallel()
 			var out, errb bytes.Buffer
 
-			RunGuard([]string{"--evolve-dir", dir, name}, strings.NewReader(`{}`), &out, &errb)
+			runVerb([]string{"--evolve-dir", dir, name}, strings.NewReader(`{}`), &out, &errb)
 
 			if strings.Contains(errb.String(), "unknown guard") {
 				t.Fatalf("guard %q is listed in Names but the dispatcher does not know it: %s", name, errb.String())
@@ -28,7 +28,7 @@ func TestRunGuard_EachNamedGuardDispatchesAndAnUnknownNameListsThemAll(t *testin
 	}
 	var out, errb bytes.Buffer
 
-	rc := RunGuard([]string{"--evolve-dir", dir, "quota"}, strings.NewReader(`{}`), &out, &errb)
+	rc := runVerb([]string{"--evolve-dir", dir, "quota"}, strings.NewReader(`{}`), &out, &errb)
 
 	if want := "(known: " + strings.Join(Names, " ") + ")"; rc != 10 || !strings.Contains(errb.String(), want) {
 		t.Fatalf("rc=%d stderr=%q, want rc 10 and %q", rc, errb.String(), want)
@@ -43,7 +43,7 @@ func TestRunGuard_DocDeleteWithAnUnreadablePolicyIsAUsageErrorThatNamesThePolicy
 	}
 	var out, errb bytes.Buffer
 
-	rc := RunGuard([]string{"--evolve-dir", dir, "docdelete"}, strings.NewReader(`{}`), &out, &errb)
+	rc := runVerb([]string{"--evolve-dir", dir, "docdelete"}, strings.NewReader(`{}`), &out, &errb)
 
 	if rc != 10 || !strings.Contains(errb.String(), "policy") {
 		t.Fatalf("rc=%d stderr=%q, want rc 10 and an error that names the policy", rc, errb.String())

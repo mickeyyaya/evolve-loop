@@ -935,4 +935,29 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [plans/gc-salvage-scope-2026-11.md](plans/gc-salvage-scope-2026-11.md) | Plan for `evolve gc --only salvage`. A survey shows 144 full-history bundles that hold 150.7 GiB. The plan scores three designs and builds the K6 migration of the recycle plan. It also closes the last full-history writer. |
 
+## 2026-11-23 — qmd and the knowledge base: adopt, borrow or change nothing
+
+| Document | What it records |
+|---|---|
+| [research/qmd-knowledge-base-2026-11.md](research/qmd-knowledge-base-2026-11.md) | Research dossier. It reads the qmd search tool live and maps where our knowledge base needs retrieval. It scores five approaches against the bridge, isolation and CLI-only rules. It recommends a native Go BM25 and RRF ranker in shadow behind `research.KB`, a measured gold set first, and qmd only as a later comparator. |
+
+## 2026-11-23 — Code-intelligence tools: which one fits evolve-loop
+
+| Document | What it records |
+|---|---|
+| [research/code-intelligence-tools-2026-11.md](research/code-intelligence-tools-2026-11.md) | Research dossier. It compares trail-code, graphify and 30 other code-index, search and memory tools against our constraints and our measured bench. It scores six code-navigation strategies and five knowledge-base strategies. It recommends gotypes for callers and api, and trail for find and map. A gold query set comes before any native find. The knowledge base takes the native ranker of the qmd study. |
+
+## 2026-11-24 — file grain of `cmd/evolve` already meets the item
+
+| Document | What it records |
+|---|---|
+| [research/admission-cell-grain-2026-11.md](research/admission-cell-grain-2026-11.md) | Dossier that compares the package, file set and verb-family grains on the live inbox: 0, 1016 and 954 of 1770 pairs. It finds that K1 already satisfies the item, that 14 of 60 items declare the whole directory, and that no signal records a file-grain pair. It retires branch 2385 and files two follow-up items. |
+
+## 2026-11-24 — CLI interface design: research and the policy for `evolve`
+
+| Document | What it records |
+|---|---|
+| [research/cli-interface-design-2026-11.md](research/cli-interface-design-2026-11.md) | Research of 22 source entries on CLI design, applied to the measured facts of the 127 verbs of `evolve`. It scores four command structures and recommends noun-verb groups with one release of aliases. |
+| [conventions/cli-design.md](conventions/cli-design.md) | The policy of the command line: rules for shape, names, flags, help, output, exit codes, destructive actions, agents and renames. It lists the current deviations and proposes `evolve cli lint`. |
+
 <!-- GENERATED:research-index END -->

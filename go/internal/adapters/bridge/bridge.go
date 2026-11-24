@@ -5,6 +5,7 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/guidance"
 	"github.com/mickeyyaya/evolve-loop/go/internal/log"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -182,7 +184,11 @@ func (a *Adapter) ComposePrompt(req core.BridgeRequest) (core.BridgeRequest, err
 	}
 	body := a.injectContract(req.Prompt, contractID, req.ArtifactPath, req.Workspace)
 	withPolicy := injectPolicyPrefix(body, resolvePolicy(req.ProjectRoot, req.Agent, req.InteractivePolicy))
-	withRules := injectRulesPrefix(withPolicy, req.SystemPrompt)
+	rules, err := rulesFor(req)
+	if err != nil {
+		return core.BridgeRequest{}, err
+	}
+	withRules := injectRulesPrefix(withPolicy, rules)
 	withSkills := injectSkillOverlays(withRules, req)
 	withDirectives := injectOperatorDirectives(withSkills, req.OperatorDirectives)
 	inproc.Prompt = injectCorrectionPrefix(withDirectives, req.CorrectionDirective)
@@ -254,6 +260,29 @@ func (a *Adapter) injectContract(prompt, contractID, artifactPath, workspace str
 	}
 	includePhaseIO := a.phaseIO >= config.StageAdvisory
 	return phasecontract.RenderContractBlockStage(c, includePhaseIO) + prompt + phasecontract.RenderContractTail(c, artifactPath, workspace)
+}
+
+var ErrNoProjectRoot = errors.New("an inject seat needs a ProjectRoot to read the L0 rules")
+
+func rulesFor(req core.BridgeRequest) (string, error) {
+	file, err := gobridge.InstructionFile(req.CLI)
+	if err != nil {
+		return "", err
+	}
+	if file != gobridge.InstructionInject {
+		return req.SystemPrompt, nil
+	}
+	if req.ProjectRoot == "" {
+		return "", fmt.Errorf("bridge: cli=%s has instruction_file %q: %w", req.CLI, file, ErrNoProjectRoot)
+	}
+	l0, err := guidance.L0Region(req.ProjectRoot)
+	if err != nil {
+		return "", fmt.Errorf("bridge: inject L0 for cli=%s: %w", req.CLI, err)
+	}
+	if req.SystemPrompt == "" {
+		return l0, nil
+	}
+	return l0 + "\n\n" + req.SystemPrompt, nil
 }
 
 func injectRulesPrefix(prompt, rules string) string {

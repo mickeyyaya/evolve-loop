@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "The K5 preflight reports the clean-boundary count for boundary.ratchet_merge.stage",
+    "A refusal resets the count (test)"
+  ],
+  "created_at": "2026-11-24T00:38:09Z",
+  "deps": [
+    "arch-decisions-ad4-4-the-ratchet-step-merges-its-own-pr",
+    "shadow-contract-k5-stage-flip"
+  ],
+  "files": [
+    "go/internal/stageevidence/"
+  ],
+  "fix": "Add a scorer adapter for boundary.ratchet_merge.stage that counts clean boundaries (decision would_record or none, no refusal) from the signal center, and register it with the K5 flip path.",
+  "id": "stage-evidence-scorer-reads-the-ratchet-record-signal",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "console",
+  "summary": "AD4-4 (boundary.ratchet_merge.stage, shadow by default) records one CLI_RATCHET_MERGE_DECISION signal per boundary as its shadow evidence, but stageevidence.DefaultScorer does not read signals.ndjson, so the K5 flip after 3 clean boundaries has no scorer for this key.",
+  "title": "The stage-evidence scorer reads CLI_RATCHET_MERGE_DECISION, so the ratchet record stage can flip on 3 clean boundaries",
+  "weight": 0.5
+}

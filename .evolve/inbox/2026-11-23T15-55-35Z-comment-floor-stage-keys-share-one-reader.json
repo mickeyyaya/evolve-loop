@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "floorStage and historyFloorStage share one projection helper, or comment_floor.stage moves to config.GateStageSetting so both keys read the same way.",
+    "The AGENTS.md caveat that a bad history_stage word fails closed while a bad comment_floor.stage word turns the floor off is removed once both keys behave the same."
+  ],
+  "created_at": "2026-11-23T15:55:35Z",
+  "files": [
+    "go/internal/core/comment_floor.go",
+    "go/internal/core/history_floor.go",
+    "go/internal/policy/core.go",
+    "AGENTS.md"
+  ],
+  "fix": "Give the two comment-floor stage keys one reading path.",
+  "id": "comment-floor-stage-keys-share-one-reader",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "source": "rank-12 code review r1 (MEDIUM), 2026-11-23",
+  "summary": "After the comment-history floor, floorStage and historyFloorStage repeat the same projection skeleton, and the two keys differ on a bad word: comment_floor.history_stage fails the policy closed to enforce while comment_floor.stage turns the floor off. AGENTS.md documents the difference as a caveat.",
+  "title": "The two comment-floor stage keys share one reader",
+  "weight": 0.4
+}

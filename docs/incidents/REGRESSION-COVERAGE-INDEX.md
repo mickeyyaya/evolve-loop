@@ -17,9 +17,9 @@
 
 | | Count |
 |---|---|
-| Incidents mapped | 82 |
-| Distinct failure modes (coverage-map rows) | 135 |
-| ✅ covered (a test fails if the bug comes back) | 89 |
+| Incidents mapped | 83 |
+| Distinct failure modes (coverage-map rows) | 136 |
+| ✅ covered (a test fails if the bug comes back) | 90 |
 | 🟡 partial (related test, doesn't pin the exact mode) | 11 |
 | ❌ none (no regression test) | 35 |
 | ⛔ untestable (external infra / live CLI) | 0 |
@@ -38,6 +38,8 @@ Recounted on 2026-11-16: the record of the test leak under `go/` adds two rows. 
 Recounted on 2026-11-21: the 11 records of wave 183 add 11 incidents and 13 rows. Three rows are covered and 10 rows have no test yet. The covered rows are the cycle-2558 ratchet row, the cycle-2558 build-floor row and the TDD-floor row. PR #1597 and PR #1601 landed through batch PR #1604.
 
 The record of cycle 2583 (2026-11-21) adds 1 incident and 2 rows, both with no test yet.
+
+Recounted on 2026-11-22: the record of a Build floor finding in a TDD file adds one incident and one covered row.
 
 The map now holds 81 incidents and 130 rows. Of these, 89 are covered, 11 are partial and 30 have no test. Before these rows, main held 69 incidents and 115 rows. Of these, 86 were covered, 11 partial and 18 with no test. PR #1597 had flipped two of them to covered.
 
@@ -185,11 +187,13 @@ not the coverage map, which is the hand-maintained per-incident record.
 | 2026-11-21 cycle 2583 parallel guard after the last correction | the floor text keeps only `--- FAIL:` and `FAIL` lines inside 400 bytes, so the line that names the failed test is dropped | `core/build_floor_retake.go`, `core/build_floor_reviewer.go` | ❌ | proposal: the same inbox item |
 | [2026-11-20 — inbox withdraw refused items that carry lifecycle stamps](2026-11-20-inbox-withdraw-refused-items-that-carry-lifecycle-stamps.md) | the boundary runbook chose `withdraw` for items that carry lifecycle stamps, and the verb refused 5 of them | console runbook, `inboxmover/lifecycle/withdraw.go` (`refuseLifecycleStamps`) | ❌ | none: the refusal is by design; the runbook check is the control |
 | [2026-11-20 — a parked lane never resumed after the main-red stop released](2026-11-20-a-parked-lane-never-resumed-after-the-main-red-stop-released.md) | `pool.resupply` skips an id that is in `known`, and `pool.settle` never clears it, so the lead todo of a paused scope is dropped | `fleet/pool.go` (`add`, `resupply`, `settle`) | ❌ | proposal: inbox item `pool-relaunches-a-parked-lane-after-the-main-red-stop-releases` (`TestPoolResupply_RelaunchesAParkedLeadAfterItsLaneExited`) |
+| [2026-11-22 — the TDD floor did not run the test-audit ratchet](2026-11-22-the-tdd-floor-did-not-run-the-test-audit-ratchet.md) | the TDD handoff floor checked only helper copies. A predicate with a skip that hides an error passed TDD. It failed at Build, where no phase can edit it. Confirmed in cycles 2599 and 2606 | `core/tdd_predicate_floor.go`, `core/build_testaudit_check.go` (`packageAuditFailures`), `cli/phasecmd/phase_verify.go` | ✅ | `core/tdd_predicate_floor_test.go::TestTddPredicateFloor_RefusesAPredicateThatSkipsToHideAnError` + `cli/phasecmd/phase_verify_tddcomment_test.go::TestPhaseVerifyTDD_PredicateThatSkipsToHideAnError_Exit1` |
 | [2026-11-21 — wave 185 stalled on the host verification lock](2026-11-21-wave-185-verification-lock-stall.md) | the lock holder gets `max(1, hostCPUs/width)` processors, so 1 at width 8. Other lanes wait 15 minutes each (75 timeouts) | `lanebudget/lanebudget.go`, `verifylock/verifylock.go` | ❌ | proposal: item `verify-lock-holder-gets-the-host-budget` |
 | [2026-11-21 — wave 185 stalled on the host verification lock](2026-11-21-wave-185-verification-lock-stall.md) | no breaker reads a stall: zero ships with live lanes, lane stall signals and a repeated abnormal event did not engage the brake | `cmd/evolve/cmd_loop_window.go`, `cmd_loop_orchestrator.go` | ❌ | proposal: item `in-wave-brake-trips-on-a-shared-fault` |
 | [2026-11-21 — wave 185 stalled on the host verification lock](2026-11-21-wave-185-verification-lock-stall.md) | the audit integration tier ran `-p 1 -parallel 1` behind its own lock and timed out at 10 minutes in four cycles | `phases/audit/ciparitygate/tier.go`, `ciparity/tierscope.go` | ❌ | proposal: part of item `verify-lock-holder-gets-the-host-budget` (plan component C1) |
 | [2026-11-21 — wave 185 stalled on the host verification lock](2026-11-21-wave-185-verification-lock-stall.md) | the console watches wake on failure codes and not on a stall | console watch, `cmd/evolve/cmd_wave_watch_events.go` | ❌ | proposal: draft item `wave-watch-wakes-on-a-stall` (not filed yet) |
 | [2026-11-21 — wave 185 stalled on the host verification lock](2026-11-21-wave-185-verification-lock-stall.md) | a fleet width increase has no verification capacity check | `policy/fleet_orchestrator.go`, `hostpressure/decide.go` | ❌ | proposal: draft item `fleet-width-increase-needs-a-capacity-check` (not filed yet) |
+| [2026-11-22 — a Build floor finding in a TDD file had no route to TDD](2026-11-22-build-floor-finding-in-a-tdd-file-had-no-route-to-tdd.md) | the predicate reroute knew only a repeated unit-test failure, so a test-audit finding in `go/acs/cycle<N>/` was corrected at Build, which cannot edit it | `core/predicate_reroute.go` (`tddOwnedFailures`, `tddReroute`), `testaudit/ratchet.go` (`MissingRowPackage`) | ✅ | `core/predicate_reroute_audit_test.go::TestBuildFloor_ATestAuditFindingInACyclePredicateFileRerunsTDDWithTheFindingAtOnce` |
 
 ## Prioritized gap backlog (13-agent sweep; agent confidence in parens)
 

@@ -15,6 +15,11 @@
   "kind": "feature",
   "origin": "console",
   "priority_class": "maintainability",
+  "route": "console-manual",
+  "routed_at": "2026-11-23T13:07:32Z",
+  "routed_by": "loop",
+  "routed_cycle": 2612,
+  "routed_reason": "lane triage (cycle 2612) dropped: protected-surface: .github/workflows/required.yml",
   "summary": "The console check-in SOP (docs/operations/console-checkin-sop.md, step B3) gives each change type a fixed check list. The repo has no lint for a change under .github/workflows/ or another YAML file: none in the Makefiles, the workflows or runtime-reference.md (checked 2026-11-21). So B3 marks that row as GAP B3 yaml with the outcome OK, and a broken workflow is found only when CI runs it.",
   "title": "A workflow or YAML change gets a lint check in the console landing and in CI",
   "weight": 0.4

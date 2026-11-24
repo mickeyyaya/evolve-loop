@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "The loop composition root (cmd_loop_driver.go) constructs the integration EnforceActor with its production Merger and ports, selected by fleet.integration.stage, which stays at shadow by default.",
+    "At enforce, a delivered lane record reaches main through the actor: a test drives the production driver from a delivered record to a merged member (red first, per plan section 11).",
+    "The I11 rows hold through the driver: the plane main equals origin/main after a merge, the window takes its conflict feed from SHIP_INTEGRATION_EJECTED cause=conflict, and the ship counters count merged deliverables."
+  ],
+  "created_at": "2026-11-23T16:19:40Z",
+  "files": [
+    "go/cmd/evolve/cmd_loop_driver.go",
+    "go/internal/integration",
+    "go/internal/orchestrator",
+    "go/internal/wave"
+  ],
+  "fix": "Wire the integration driver (I14) at the production composition root, absorbing I11 per decision D34, with every stage key at shadow.",
+  "id": "wave-integration-i14-production-driver",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "plan docs/plans/wave-integration-2026-10.md I14 and D34; console verification of I11 on 2026-11-24",
+  "summary": "The plan lists I14 (the integration driver of lanes) as partial, with no open inbox item. A verification on 2026-11-24 found that no production code constructs EnforceActor: cmd_loop_driver.go:117 builds StageActors(actor, nil). Every enforce path of wave integration is therefore dead outside hand-built tests, so the I9 and I14 switches can never work and I11 (absorbed by I14 per D34) has no input.",
+  "title": "The integration driver (I14) is wired at the production composition root, absorbing I11",
+  "weight": 0.8
+}

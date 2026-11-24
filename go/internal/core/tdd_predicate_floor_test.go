@@ -8,6 +8,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -417,5 +418,82 @@ func TestTddPredicateFloor_AKitFunctionThatTheCopyCannotCallIsNeverNamed(t *test
 				t.Fatalf("Review = %+v, want reject with %q and no kit function named", res, want)
 			}
 		})
+	}
+}
+
+const tddSkipHidesErrorPredicate = "package cycle9\n\nimport \"testing\"\n\nfunc spared() (bool, error) { return true, nil }\n\nfunc TestC9_010_SparesAnExecutableDir(t *testing.T) {\n\tok, err := spared()\n\tif err != nil {\n\t\tt.Skip(\"not available\")\n\t}\n\tif !ok {\n\t\tt.Fatal(\"not spared\")\n\t}\n}\n"
+
+func TestTddPredicateFloor_RefusesAPredicateThatSkipsToHideAnError(t *testing.T) {
+	t.Parallel()
+	var stderr bytes.Buffer
+	wt := tddFloorWorktree(t, tddFloorOtherHelper)
+	seedTestAuditConfig(t, wt)
+	writeFileAt(t, filepath.Join(wt, "go", "go.mod"), auditBaseModule)
+	writeFileAt(t, filepath.Join(wt, "go", "acs", "cycle9", "predicates_test.go"), tddSkipHidesErrorPredicate)
+
+	res := NewOrchestrator(nil, nil, nil).performEffectsAndReview(context.Background(), tddFloorInput(wt, &stderr))
+
+	if res.Approve || !res.Retry {
+		t.Fatalf("Review = %+v: the build floor refuses this predicate and only TDD can edit it, so the TDD floor must send it back", res)
+	}
+	for _, want := range []string{testAuditFloorPrefix, "skip-hides-error", "TestC9_010_SparesAnExecutableDir"} {
+		if !strings.Contains(res.Reason, want) {
+			t.Errorf("Reason omits %q: %q", want, res.Reason)
+		}
+	}
+	if len(res.Failures) != 1 {
+		t.Errorf("Failures = %q, want one test-audit line", res.Failures)
+	}
+}
+
+func TestTddPredicateFloor_ReportsATestAuditFindingAndAHelperCopyTogether(t *testing.T) {
+	t.Parallel()
+	var stderr bytes.Buffer
+	wt := tddFloorWorktree(t, tddFloorExistsHelper)
+	seedTestAuditConfig(t, wt)
+	writeFileAt(t, filepath.Join(wt, "go", "acs", "cycle9", "skip_test.go"), tddSkipHidesErrorPredicate)
+
+	res := (tddPredicateFloor{}).Review(context.Background(), tddFloorInput(wt, &stderr))
+
+	if res.Approve || len(res.Failures) != 2 {
+		t.Fatalf("Review = %+v, want reject with one test-audit failure and one helper-copy failure", res)
+	}
+}
+
+func TestTddPredicateFloor_ApprovesAPredicateWithNoTestAuditFinding(t *testing.T) {
+	t.Parallel()
+	var stderr bytes.Buffer
+	wt := tddFloorWorktree(t, tddFloorOtherHelper)
+	seedTestAuditConfig(t, wt)
+	writeFileAt(t, filepath.Join(wt, "go", "acs", "cycle9", "clean_test.go"), "package cycle9\n\nimport \"testing\"\n\nfunc TestC9_011_Clean(t *testing.T) {\n\tif 1+1 != 2 {\n\t\tt.Fatal(\"arithmetic\")\n\t}\n}\n")
+
+	if res := (tddPredicateFloor{}).Review(context.Background(), tddFloorInput(wt, &stderr)); !res.Approve {
+		t.Fatalf("Review = %+v, want approve", res)
+	}
+}
+
+func TestTddPredicateFloor_AuditsEveryPackageTddChangedNotOnlyThePredicateDirectory(t *testing.T) {
+	t.Parallel()
+	repo, base := auditRepo(t, nil)
+	writeFileAt(t, filepath.Join(repo.Dir, "go", "acs", "cycle9", "predicates_test.go"), tddSkipHidesErrorPredicate)
+	writeFileAt(t, filepath.Join(repo.Dir, "go", "q", "q_test.go"), auditTextTest)
+	var stderr bytes.Buffer
+	in := ReviewInput{Phase: string(PhaseTDD), Cycle: 9, Worktree: repo.Dir, WorktreeBaseSHA: base, Stderr: &stderr}
+
+	res := (tddPredicateFloor{}).Review(context.Background(), in)
+
+	if res.Approve || len(res.Failures) != 2 {
+		t.Fatalf("Review = %+v, want reject with one finding in acs/cycle9 and one in q: the build floor audits each package that TDD changed", res)
+	}
+	want := testAuditFailures(context.Background(), ReviewInput{Phase: string(PhaseBuild), Worktree: repo.Dir, WorktreeBaseSHA: base})
+	if !slices.Equal(res.Failures, want) {
+		t.Errorf("Failures = %q, want the very lines of the build floor %q", res.Failures, want)
+	}
+}
+
+func TestTddTestAuditFailures_NoWorktreeAuditsNothing(t *testing.T) {
+	t.Parallel()
+	if got := TddTestAuditFailures(context.Background(), "", "HEAD", 9); got != nil {
+		t.Fatalf("TddTestAuditFailures = %q, want none without a worktree", got)
 	}
 }

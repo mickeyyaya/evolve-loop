@@ -38,7 +38,7 @@ func abortedCycleFixture(t *testing.T) (evolveDir, workspace string) {
 func runRoleWrite(evolveDir, path string) int {
 	input := `{"tool_name":"Write","tool_input":{"file_path":"` + path + `"}}`
 	var stdout, stderr bytes.Buffer
-	return RunGuard([]string{"--evolve-dir", evolveDir, "role"}, strings.NewReader(input), &stdout, &stderr)
+	return runVerb([]string{"--evolve-dir", evolveDir, "role"}, strings.NewReader(input), &stdout, &stderr)
 }
 
 func TestRunGuard_Role_AbortedCycleWithNoLeaseLetsTheBoundarySelfHealWrite(t *testing.T) {

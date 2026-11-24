@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "The cache-stable-prefix guard of acs/cycle534 runs under the default go test ./... or under ./acs/regression/..., so a later cycle that breaks it fails CI.",
+    "acs/cycle534 keeps at most a thin call to the same assertion as its cycle evidence."
+  ],
+  "created_at": "2026-11-23T13:51:20Z",
+  "files": [
+    "go/acs/cycle534"
+  ],
+  "fix": "Move the cycle534 prefix assertions into a package that CI runs every time (an external test package or acs/regression), keeping one home for the assertion.",
+  "id": "cycle534-prefix-guard-runs-every-time",
+  "kind": "test",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "design review r2 of tokenopt-cache-discipline-audit, 2026-11-23",
+  "summary": "acs/cycle<N> packages build only under -tags acs, CI runs only ./acs/regression/... (ci.yml:69), and the audit lane runs only the current cycle package (acssuite.go:305-306). So the acs/cycle534 cache-stable-prefix guard ran once, in cycle 534, and never again: a later change that puts dynamic bytes above the boundary in a phase it covers fails nothing.",
+  "title": "The cycle534 cache-stable-prefix guard runs in every CI run",
+  "weight": 0.6
+}

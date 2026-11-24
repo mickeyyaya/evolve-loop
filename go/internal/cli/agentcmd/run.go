@@ -64,6 +64,7 @@ type Envelope struct {
 	Workspace    string                   `json:"workspace,omitempty"`
 	Cloud        *cloudlaunch.Session     `json:"cloud,omitempty"`
 	SeatLogin    string                   `json:"seat_login,omitempty"`
+	CauseCode    string                   `json:"cause_code,omitempty"`
 	Error        string                   `json:"error,omitempty"`
 }
 
@@ -107,6 +108,7 @@ type launchOutcome struct {
 	writer     bool
 	cloudSeat  bool
 	seatLogin  string
+	causeCode  string
 	treeBefore string
 	treeAfter  string
 }
@@ -119,6 +121,7 @@ type launchSpy struct {
 
 	seatTokenFile string
 	seatLogin     string
+	causeCode     string
 }
 
 func (s *launchSpy) Launch(ctx context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
@@ -126,6 +129,7 @@ func (s *launchSpy) Launch(ctx context.Context, req core.BridgeRequest) (core.Br
 	req.SeatTokenFile = s.seatTokenFile
 	resp, err := s.Bridge.Launch(ctx, req)
 	s.seatLogin = resp.SeatLogin
+	s.causeCode = resp.CauseCode
 	return resp, err
 }
 
@@ -286,6 +290,7 @@ func (c command) launch(ctx context.Context, r standaloneRun, signals *signalcen
 	out.report, out.hasReport = readReport(r)
 	out.cli, out.model, out.family = spy.cli, spy.model, llmroute.Family(spy.cli)
 	out.seatLogin = spy.seatLogin
+	out.causeCode = spy.causeCode
 	out.writer = len(r.writable) > 0 || len(r.writableDirs) > 0
 	out.cloudSeat = c.deps.CloudSeat(out.cli)
 	switch {
@@ -451,7 +456,7 @@ func emit(o runOptions, r standaloneRun, out launchOutcome, recordPath string, f
 		Profile: r.spec.Name, RunLabel: r.label, Verdict: resp.Verdict, Findings: out.findings, Report: out.report,
 		Model: out.launchedModel(), ModelSource: resp.ModelSource, CostUSD: resp.CostUSD, Tokens: resp.Tokens,
 		DurationMS: resp.DurationMS, Diagnostics: resp.Diagnostics,
-		CLI: out.cli, Family: out.family, LaunchRecord: recordPath, Worktree: r.worktree, Cloud: out.cloudSession(), SeatLogin: out.seatLogin,
+		CLI: out.cli, Family: out.family, LaunchRecord: recordPath, Worktree: r.worktree, Cloud: out.cloudSession(), SeatLogin: out.seatLogin, CauseCode: out.causeCode,
 	}
 	if o.keep {
 		env.Workspace = r.workspace

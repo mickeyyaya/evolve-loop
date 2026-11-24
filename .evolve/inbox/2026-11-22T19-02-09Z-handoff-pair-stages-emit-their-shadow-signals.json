@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "Each of the five handoff-pair stage keys emits a shadow signal with its would-fields at the site that makes the decision.",
+    "The five no-signal rows are gone from stage_violations.json, and baselineCeiling is back to 82.",
+    "The conformance test over policy.StageKeys() passes with no new row."
+  ],
+  "created_at": "2026-11-22T19:02:09Z",
+  "deps": [],
+  "files": [
+    "go/internal/gateregistry/testdata/stage_violations.json"
+  ],
+  "fix": "Give each handoff-pair stage key a signal emitter at its decision site, with the would-fields the shadow contract needs. Then remove the 5 no-signal rows and lower baselineCeiling back to 82.",
+  "id": "handoff-pair-stages-emit-their-shadow-signals",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "shadow-contract K4a (PR #1693); operator approval 2026-11-22 of the 5 baseline rows with this fix item",
+  "summary": "K4a made the stage-key list complete. Five handoff-pair stage keys (handoff.build-audit.stage, handoff.intent-scout.stage, handoff.scout-triage.stage and two more) have no signal emitter, so they can never collect shadow evidence, and K5 can never switch them on. K4a recorded them as 5 no-signal rows in go/internal/gateregistry/testdata/stage_violations.json and raised baselineCeiling from 82 to 87.",
+  "title": "The five handoff-pair stage keys emit their shadow signals",
+  "weight": 0.6
+}

@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "The summary table of docs/incidents/REGRESSION-COVERAGE-INDEX.md (incidents, rows, covered, partial, none, untestable) is generated from the coverage-map rows, and a check verb exits 1 when it is stale.",
+    "Two PRs that each add one coverage-map row at different places in the table merge with no conflict, and the regenerated summary counts both rows.",
+    "The hand-written 'Recounted on' and 'The map now holds' prose lines are removed or generated."
+  ],
+  "created_at": "2026-11-23T13:05:33Z",
+  "files": [
+    "docs/incidents/REGRESSION-COVERAGE-INDEX.md"
+  ],
+  "fix": "Treat the coverage-map rows as the single source. Render the summary counts from them with a generate/check verb on the existing derived-docs sync pattern, and drop the hand-kept count prose.",
+  "id": "regression-coverage-index-summary-is-generated",
+  "kind": "techdebt",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "boundary 187 to 188, 2026-11-23: rebuilds of PR #1713 and #1716",
+  "summary": "PRs #1713 and #1716 each added one coverage-map row and each hand-edited the same summary counts (82/135/89 to 83/136/90) plus a 'Recounted' line. The boundary batch ejected both for a conflict in docs/incidents/REGRESSION-COVERAGE-INDEX.md, and the rebuild had to move one row and drop one summary edit. The prose count line on main was already stale. No Go code reads the summary.",
+  "title": "The regression coverage index summary is generated from its rows",
+  "weight": 0.5
+}

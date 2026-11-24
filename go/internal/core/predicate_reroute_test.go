@@ -2,11 +2,13 @@ package core
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/testaudit"
 )
 
 const cycle1761Failure = "./acs/cycle10 (-tags acs): unit tests FAIL\n" +
@@ -260,5 +262,49 @@ func TestAcsPredicateFailures_OnlyThePredicatesOfThisCycle(t *testing.T) {
 	got := acsPredicateFailures([]string{cycle1761Failure, other, "gofmt: 1 file(s) unformatted"}, 10)
 	if len(got) != 1 || got[0] != cycle1761Failure {
 		t.Errorf("acsPredicateFailures = %q, want only cycle 10's predicate failure", got)
+	}
+}
+
+func auditFinding(kind testaudit.RowKind, pkg string) string {
+	return testAuditLine(&testaudit.RowError{Kind: kind, Finding: testaudit.Finding{Package: pkg, Test: "TestX", Rule: "error-text-match"}})
+}
+
+func TestTestAuditLinePackage_RoundTripsTheRenderedFloorLine(t *testing.T) {
+	t.Parallel()
+	if got, ok := testAuditLinePackage(auditFinding(testaudit.RowMissing, "acs/cycle10")); !ok || got != "acs/cycle10" {
+		t.Errorf("testAuditLinePackage(rendered missing row) = %q, %t; want acs/cycle10, true", got, ok)
+	}
+	for name, line := range map[string]string{
+		"a stale row":        auditFinding(testaudit.RowStale, "acs/cycle10"),
+		"a non-row error":    testAuditLine(errors.New("config load failed")),
+		"a line with no tag": strings.TrimPrefix(auditFinding(testaudit.RowMissing, "acs/cycle10"), testAuditFloorPrefix),
+	} {
+		if got, ok := testAuditLinePackage(line); ok || got != "" {
+			t.Errorf("%s: testAuditLinePackage = %q, %t; want no package", name, got, ok)
+		}
+	}
+}
+
+func TestTddOwnedFailures_OnlyThisCyclesPredicatePackage(t *testing.T) {
+	t.Parallel()
+	own := auditFinding(testaudit.RowMissing, "acs/cycle10")
+	notOwn := []string{
+		auditFinding(testaudit.RowMissing, "acs/cycle9"),
+		auditFinding(testaudit.RowMissing, "acs/cycle100"),
+		auditFinding(testaudit.RowMissing, "internal/foo"),
+		auditFinding(testaudit.RowStale, "acs/cycle10"),
+		"gofmt: 1 file(s) unformatted",
+	}
+
+	got := tddOwnedFailures(append([]string{own, cycle1761Failure}, notOwn...), 10)
+
+	if len(got.Audit) != 1 || got.Audit[0] != own {
+		t.Errorf("Audit = %q, want only %q", got.Audit, own)
+	}
+	if len(got.Predicates) != 1 || got.Predicates[0] != cycle1761Failure {
+		t.Errorf("Predicates = %q, want only the unit-test failure of cycle 10", got.Predicates)
+	}
+	if none := tddOwnedFailures(notOwn, 10); len(none.Audit) != 0 || len(none.Predicates) != 0 {
+		t.Errorf("tddOwnedFailures(not owned) = %+v, want nothing", none)
 	}
 }

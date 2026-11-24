@@ -3,6 +3,7 @@ package repocontract
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -77,5 +78,43 @@ func TestGateOn_OnlyUnsetAndOffAreOff(t *testing.T) {
 func TestModuleDir_IsTheTreesGoDir(t *testing.T) {
 	if got := ModuleDir("/lane"); got != filepath.Join("/lane", "go") {
 		t.Fatalf("ModuleDir(/lane) = %q", got)
+	}
+}
+
+func ratchetPackages(t *testing.T, internalDir string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(internalDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found []string
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		_, ratchetFile := os.Stat(filepath.Join(internalDir, entry.Name(), "ratchet_tree_test.go"))
+		if strings.HasSuffix(entry.Name(), "ratchet") || ratchetFile == nil {
+			found = append(found, "./internal/"+entry.Name()+"/...")
+		}
+	}
+	return found
+}
+
+func TestShipGate_ReachesEveryWholeTreeRatchetPackage(t *testing.T) {
+	ratchets := ratchetPackages(t, "..")
+	for _, want := range []string{"./internal/rawgitratchet/...", "./internal/sizeratchet/...", "./internal/testaudit/..."} {
+		if !slices.Contains(ratchets, want) {
+			t.Fatalf("the ratchet finder must see %s; it saw %v", want, ratchets)
+		}
+	}
+	selected := map[string]bool{}
+	for _, selection := range TreeReadingTests() {
+		selected[strings.TrimPrefix(selection.Package, "./")] = len(selection.Tests) > 0
+	}
+	for _, ratchet := range ratchets {
+		dir := strings.TrimPrefix(strings.TrimSuffix(ratchet, "/..."), "./")
+		if !slices.Contains(Packages(), ratchet) && !selected[dir] {
+			t.Errorf("the ship gate reaches the ratchet package %s through neither Packages() nor TreeReadingTests()", ratchet)
+		}
 	}
 }

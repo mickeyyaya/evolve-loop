@@ -90,3 +90,9 @@ The dispatcher is mandatory for `/evo:loop` invocations. The only documented exc
 - SKILL.md STRICT MODE section
 - [reference/claude-tools.md](claude-tools.md) — tool names this runtime expects
 - [docs/guides/publishing-releases.md](../../../docs/guides/publishing-releases.md) — the publish vs push vs ship distinction
+
+## Claude Code host facts
+
+- A Claude Code update can add a bypass-permissions confirmation dialog. The dialog blocks a seat that has no operator. When a Claude seat stops at boot, read the text of its final pane first.
+- Claude Code versions differ between hosts and seats. To find which model answered, read the `message.model` field of the response. Do not use the model name that you requested.
+- A quota pause with low measured usage usually means that the CLI is logged out, and not that the quota is used up. Run `evolve clihealth usage claude` first. Then check the login.

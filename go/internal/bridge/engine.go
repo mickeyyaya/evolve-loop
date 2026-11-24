@@ -350,13 +350,17 @@ func (e *Engine) launchModel(ctx context.Context, req core.BridgeRequest) (core.
 	}
 	model := resolvedModel(req.Model)
 	args := launchArgs(req, in.promptFile, in.stdoutLog, in.stderrLog, e.deps)
+	window := openDenialWindow(resolveWorkingDir(req.Worktree))
 	run := e.runAttempt(ctx, req, args)
+	refusal := window.refusal(run.code)
+	attempt := launchoutcome.Attempt{Code: run.code, CtxErr: ctx.Err(), Stderr: run.stderr, Refusal: refusal}
+	causeCode := attempt.CauseCode()
 	resp := core.BridgeResponse{
 		ExitCode: run.code, Stderr: run.stderr, BootMS: run.bootMS,
 		DispatchID: run.dispatchID, SeatLogin: run.seatLogin, PaneCapture: run.paneCapture, SessionRecoverable: e.freshSessionAllowed(ctx, run),
 	}
 	marks := append(sessionMarks(req.FreshSession, resp.SessionRecoverable), markBootLoss(run), markTry(run, req.Ladder), markSeatLogin(run))
-	c := e.recordModelAttempt(req, model, run.code, run.start, run.end, run.dispatched, run.stderr, &resp, marks...)
+	c := e.recordModelAttempt(req, model, run.code, run.start, run.end, run.dispatched, causeCode, &resp, marks...)
 	e.reportFreshSession(c, req)
 	e.clearBootStrike(c, req.CLI, run.code)
 	if run.code == ExitOK {
@@ -365,7 +369,7 @@ func (e *Engine) launchModel(ctx context.Context, req core.BridgeRequest) (core.
 		return resp, nil
 	}
 	launchError := e.persistLaunchError(c, req.Workspace, in.agent, run.stderr)
-	out := launchoutcome.Classify(run.code, ctx.Err(), run.stderr)
+	out := attempt.Classify()
 	resp.CauseCode = launchoutcome.WithBootLoss(out.CauseCode, run.code, run.bootLoss)
 	e.recordBootStrike(c, req.CLI, run.code)
 	c.launchWarn("Engine.Launch", "classify", out.Signal, out.Err.Error(), launchFields(out, launchError))

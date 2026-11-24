@@ -104,11 +104,14 @@ type Manifest struct {
 	ContextWindow           int                      `json:"context_window,omitempty"`
 	CloudLaunch             *CloudLaunchSpec         `json:"cloud_launch,omitempty"`
 	SeatLogin               string                   `json:"seat_login,omitempty"`
+	InstructionFile         string                   `json:"instruction_file,omitempty"`
 }
 
 const (
 	SeatLoginIsolated = "isolated"
 	SeatLoginStored   = "stored"
+
+	InstructionInject = "inject"
 )
 
 type ControlSpec struct {
@@ -189,6 +192,9 @@ func parseManifestWithStderr(cli string, data []byte, stderr io.Writer) (Manifes
 	if err := validateEnvPassthrough(cli, m.EnvPassthrough); err != nil {
 		return Manifest{}, err
 	}
+	if err := validateInstructionFile(cli, m.InstructionFile); err != nil {
+		return Manifest{}, err
+	}
 	if err := errors.Join(validateMCPConfigFiles(cli, m.MCPConfigFiles), validateInstallRoots(cli, m.InstallRoots), validateCloudLaunch(cli, m.CloudLaunch)); err != nil {
 		return Manifest{}, err
 	}
@@ -243,6 +249,16 @@ func validateInstallRoots(cli string, roots []string) error {
 		if !strings.HasPrefix(root, "/") && !strings.HasPrefix(root, "~/") || slices.Contains(strings.Split(root, "/"), "..") || path.Clean(root) == "/" || path.Clean(root) == "~" {
 			return fmt.Errorf("bridge:manifest: install_roots entry %q for cli=%s must start with / or ~/, name a directory below it and carry no .. segment", root, cli)
 		}
+	}
+	return nil
+}
+
+func validateInstructionFile(cli, file string) error {
+	if file == "" || file == InstructionInject {
+		return nil
+	}
+	if strings.ContainsAny(file, `/\`) || !strings.HasSuffix(file, ".md") {
+		return fmt.Errorf("bridge:manifest: instruction_file %q for cli=%s is not %q or a bare .md file name", file, cli, InstructionInject)
 	}
 	return nil
 }

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/acsverdict"
+	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
 
 func TestFilename_IsTheArtifactEveryReaderOpens(t *testing.T) {
@@ -39,5 +40,11 @@ func TestPath_RefusesARelativeEvolveDirAndCreatesNothing(t *testing.T) {
 	}
 	if _, err := os.Stat(relative); !os.IsNotExist(err) {
 		t.Errorf("a refused path must create nothing (stat err=%v)", err)
+	}
+}
+
+func TestSubprocessBoundMarker_IsTheTextOfTheSubprocessBoundError(t *testing.T) {
+	if acsassert.ErrSubprocessBound.Error() != acsverdict.SubprocessBoundMarker {
+		t.Errorf("ErrSubprocessBound = %q, want the marker %q that the suite reads to refuse a retry", acsassert.ErrSubprocessBound, acsverdict.SubprocessBoundMarker)
 	}
 }

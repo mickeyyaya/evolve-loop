@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A test fails when a registered verb has no top-level help entry",
+    "Every verb exits 0 and prints its subverbs on --help (table test over the registry)"
+  ],
+  "created_at": "2026-11-23T22:44:30Z",
+  "deps": [],
+  "files": [
+    "go/cmd/evolve/registry.go",
+    "go/cmd/evolve/cmd_help.go"
+  ],
+  "fix": "Render top-level help from the registry, grouped by the command map of docs/reference/evolve-commands.md, so no verb can be absent. Make --help and -h print usage and exit 0 for every verb.",
+  "id": "evolve-help-lists-every-verb",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "source": "console",
+  "summary": "45 of 127 registered verbs have no entry in `evolve --help`, including agent, inbox, integration, events, signals, landing, auth, commit-gate, cli-routing, sync-main, tokens and stage. Six verbs answer --help with 'unknown subcommand', and 12 exit non-zero on --help. Policy rules CD-30 and related in docs/conventions/cli-design.md.",
+  "title": "evolve --help lists every registered verb, grouped, and every verb answers --help",
+  "weight": 0.6
+}

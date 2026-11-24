@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "The pack deadline constant is named for the pack (for example repoContractPackDeadline), since it bounds every stage, the commit gate included.",
+    "docs/architecture/packages/internal-commitgate.md names the deadline constant instead of the number 120 s."
+  ],
+  "created_at": "2026-11-23T13:25:26Z",
+  "files": [
+    "go/internal/core/repo_contract_floor.go",
+    "docs/architecture/packages/internal-commitgate.md"
+  ],
+  "fix": "Rename repoContractFloorDeadline and floorFailureDiagnostic to pack names, and replace the number in the package note with the constant name.",
+  "id": "repo-contract-pack-deadline-naming",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "architecture review of the ship-backstop rebuild (PR #1691 r2), 2026-11-23",
+  "summary": "The architecture seat on the ship-backstop rebuild found two MEDIUM issues that do not block after round 2: repoContractFloorDeadline is now the deadline of every repo-contract stage, so a maintainer tuning the build floor changes the commit gate unknowingly; and internal-commitgate.md:93 repeats the value 120 s, which goes stale if the constant changes.",
+  "title": "The repo-contract pack deadline has a pack name and one home",
+  "weight": 0.4
+}

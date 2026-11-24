@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "A checked-in gold query set holds at least 30 queries taken from past cycle plans, each with the knowledge-base entries a reviewer marked relevant.",
+    "A command scores any research.KB ranker on the set and prints recall@5 and MRR, and today's FileKB.Lookup has a recorded baseline score."
+  ],
+  "created_at": "2026-11-23T15:25:30Z",
+  "files": [
+    "go/internal/research"
+  ],
+  "fix": "Build the gold query set and a scoring command for the research knowledge-base ranker, so any ranker change is measured before it is enabled.",
+  "id": "kb-recall-gold-set-and-score",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "research dossier docs/research/qmd-knowledge-base-2026-11.md (approach D, step 1)",
+  "summary": "The free-text recall of the knowledge base (FileKB.Lookup from recallForPlan) counts shared tokens with no IDF or length normalization and keeps the top 5. No gold query set exists, so no ranker change can be measured. The qmd dossier recommends measuring first.",
+  "title": "The knowledge-base recall has a gold query set and a recall@5 and MRR score",
+  "weight": 0.6
+}

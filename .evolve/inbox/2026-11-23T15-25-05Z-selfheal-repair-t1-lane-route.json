@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "A stamped T1 item at enforce is offered by the lane menu and claimed by a lane (red: it stays console-routed today)",
+    "A T0 item (non-empty protected_files) stays console-routed at every stage, also with route lane",
+    "The two live route-lane pipeline-repair items stay lane-routable",
+    "The audit seat of a T1 cycle drops the builder family or the cycle is refused (ErrNoIndependentFamily)",
+    "Changed functions at 100% coverage"
+  ],
+  "created_at": "2026-11-23T15:25:05Z",
+  "deps": [
+    "selfheal-repair-cycle-path"
+  ],
+  "files": [
+    "go/internal/inboxbatch/",
+    "go/internal/core/",
+    "go/internal/inboxmover/lifecycle/",
+    "go/internal/policy/healing.go"
+  ],
+  "fix": "One typed route derivation in one home that reads the stage and the item RepairTier, with no flag argument on ConsoleRouted or PartitionConsole; or a stamp plus Mover.RouteLane admission. The lane cycle audit seat calls Decision.IndependentOf(builder family) from routing data. The policy loader accepts enforce for healing.repair_cycle.stage only after this ships.",
+  "id": "selfheal-repair-t1-lane-route",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "console, 2026-11-23, deferred from X16 (selfheal-repair-cycle-path), ADR-0155",
+  "summary": "X16 files every repair item console-routed in shadow. This item builds the enforce route. Observation from the X16 design: today an authored route lane on a pipeline-repair item that declares no protected file and has no injected_by is not console-routed (inboxbatch/consoleroute.go:38-47), so a T0 item that only mentions a protected path can reach a lane. The enforce route must keep T0 on the console at every stage. Two live items, boot-refresh-rearms-the-wave-handoff and core-tests-cut-git-starts, rely on the route lane opt-out and must keep working. The enforce refusal of healing.repair_cycle.stage names this item. A flip to enforce is blocked until it ships (enforce path built before a flip).",
+  "title": "Self-healing X16b: a stamped T1 repair item reaches a lane at enforce",
+  "weight": 0.32
+}

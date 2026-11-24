@@ -109,6 +109,22 @@ func TestMain_AtTheFloorFailsWhenTheStrayCheckCannotRun(t *testing.T) {
 	}
 }
 
+func TestMain_AtTheFloorASocketDirThatCannotBeRegisteredStillRunsTheTestsAndFailsClosed(t *testing.T) {
+	unregistrableSocketDir(t)
+	ran := false
+	var code int
+	stderr := captureStderr(t, func() {
+		code = Main(runFunc(func() int { ran = true; return 0 }))
+	})
+
+	if !ran || code != 1 {
+		t.Fatalf("Main = %d, ran = %v; want the tests run and the floor closed, because no stray check can read the socket dir", code, ran)
+	}
+	if !strings.Contains(stderr, "register the socket dir") || !strings.Contains(stderr, "check for a stray tmux server") {
+		t.Errorf("stderr = %q, want both the registration failure and the stray-check failure named", stderr)
+	}
+}
+
 func TestStrayServers_FindsTheOwnSocketAndItsSuffixedFamilyOnly(t *testing.T) {
 	_, socketDir := floorTmuxHome(t)
 	if got, err := strayServers("evolve-t1"); err != nil || got != nil {

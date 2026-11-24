@@ -283,6 +283,8 @@ The ratchet scans the runtime test files. Old cycle directories under `acs/` are
 
 The ratchet catches a copy in the predicate directory of a cycle at the TDD handoff, not at ship. No phase after TDD can change `go/acs/cycle<N>/`. The TDD handoff floor names each group of equal bodies with a site there. It sends the handoff back to TDD ([incident 2026-11-09](../incidents/2026-11-09-duplicate-ratchet-misses-staged-predicates.md)).
 
+The TDD handoff floor and `evolve phase verify tdd` also run the test-audit check over `go/acs/cycle<N>/`. They call `core.TddTestAuditFailures`. It audits the packages that the Build floor audits, with the same rules and configuration. A finding names the rule and the test. It goes back to TDD ([incident 2026-11-22](../incidents/2026-11-22-the-tdd-floor-did-not-run-the-test-audit-ratchet.md)).
+
 ### 6.5 Predicate helpers
 
 Each cycle wrote its own copy of the same predicate helpers: 597 copies (research F4.2). `pkg/acsassert` gets these helpers:
@@ -295,6 +297,8 @@ Each cycle wrote its own copy of the same predicate helpers: 597 copies (researc
 - a walk of the module.
 
 `go/acs/README.md` §Predicate kit lists the helpers. The persona text of the phases that write predicates links to that list. A structure test fails when the list omits an exported function of the kit.
+
+A test-audit finding in `go/acs/cycle<N>/` can first appear at the Build floor. Build may not edit that directory, so the finding goes back to TDD at once ([incident 2026-11-22](../incidents/2026-11-22-build-floor-finding-in-a-tdd-file-had-no-route-to-tdd.md)).
 
 The TDD handoff floor names the replacement of each copy. A test helper of another package cannot be imported. If the copy wraps `acsassert.ModuleDir`, the floor says to call `acsassert.GoModuleDir`. If the body of the copy equals the body of a kit function, the floor says to call that function (for example `acsassert.ExitedPID`).
 
@@ -389,6 +393,7 @@ The console merges the pull requests of a batch one at a time. After each merge,
 | A judge needs a green run | the rename of `coverage.partial.txt` | plan T2 |
 | A split test package keeps the coverage of its package | `TestEverySplitTestPackageHasItsCoverEntry` (§7.6) | in force |
 | No new raw `git init` fixture | `internal/rawgitratchet` | in force |
+| A test refuses error-text matching and sleep sync | `TestTreeRatchet` of `internal/testaudit`, run by the commit gate and the ship pack (`TreeReadingTests()`) | in force |
 | A test pins the environment of a driver | `TestRunTmuxREPL_ArtifactDebounceHermeticUnderAmbientFleetEnv` | in force |
 | No new duplicate helper | the duplicate ratchet (§6.4) | plan T5 |
 | A package stays inside its budget | the latency report (§7.2) | plan T4 |

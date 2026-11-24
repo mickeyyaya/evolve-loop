@@ -174,32 +174,11 @@ These are behavioral rules that every agent must follow, on every CLI. The kerne
 
 ## Per-CLI runtime details
 
-The `cli_routing` table in `.evolve/policy.json` decides which CLI runs each phase. `evolve cli-routing explain <agent>` prints the chain of an agent ([ADR-0119](docs/architecture/adr/0119-one-routing-table-one-resolver.md)).
+The `cli_routing` table in `.evolve/policy.json` decides which CLI runs each phase. `evolve cli-routing explain <agent>` prints the chain of an agent ([ADR-0119](docs/architecture/adr/0119-one-routing-table-one-resolver.md)). `evolve bridge probe` shows the capability tier of each bridge manifest.
 
-Each CLI reads its own instruction file. `CLAUDE.md` and `GEMINI.md` each have a short overlay for the CLI and a rendered copy of the digest of AGENTS.md. A CLI with no file of its own reads AGENTS.md. The notes for each CLI:
+Each CLI reads one instruction file. The field `instruction_file` of its bridge manifest (`go/internal/bridge/manifests/<cli>.json`) names the file: a bare file name, or `inject`. For `inject`, the bridge puts the L0 rules and the pointer line at the start of the prompt. A test checks that each named file holds the L0 region. A CLI with its own file has a short overlay for that CLI and a rendered copy of the digest of this file.
 
-- **Claude Code**: reads [CLAUDE.md](CLAUDE.md). Tier-1 production. The skills at `skills/<name>/SKILL.md` are the only invocation/slash-command surface (per ADR-0040). They carry `argument-hint`. The plugin manifest at `.claude-plugin/plugin.json` declares only `agents` and `skills` (no `commands[]` array). Kernel hooks fire as PreToolUse hooks, as `.claude/settings.json` specifies.
-
-- **Codex CLI**: Codex discovers skills automatically at `.agents/skills/<name>/SKILL.md`. (This directory has symlinks to `skills/<name>/`.) Codex reads this AGENTS.md as its canonical config. The native codex bridge drivers (`go/internal/bridge/driver_codex*.go`) drive Codex. No mode delegates to `claude`.
-
-  `evolve bridge probe` shows the capability tier of each manifest. The tier comes from `resolveTier` (`go/internal/bridge/probe.go:10-27`):
-  - `none` when the manifest binary is not on PATH;
-  - the manifest `default_tier` (`full` for `codex`, `hybrid` for `codex-tmux`) when each dependency of that tier is on PATH;
-  - `degraded` when a dependency is absent, for example `tmux` for `codex-tmux`.
-
-- **Gemini CLI**: Gemini discovers skills automatically at `.agents/skills/<name>/SKILL.md`. See [GEMINI.md](GEMINI.md) for Gemini-specific notes. `gemini` is a distinct CLI identity with its own adapter metadata (`adapters/gemini.capabilities.json`). There is **no** dedicated `driver_gemini*.go` bridge driver.
-
-  A Gemini *model* is also reachable natively through the Antigravity (agy) driver (`go/internal/bridge/driver_agy*.go`; the code documents it as "Gemini-backed"). But `gemini` and `agy`/`antigravity` are separate CLI identities. Only `antigravity → agy` has a name resolution (see the Antigravity bullet below).
-
-- **Antigravity CLI (agy)**: agy discovers skills automatically at `.agents/skills/<name>/SKILL.md`. The native agy bridge driver (`go/internal/bridge/driver_agy*.go`) drives it. Its capability tier follows the same `resolveTier` rule: `none` when `agy` is not on PATH, else the manifest `default_tier` (`full` for `agy`, `hybrid` for `agy-tmux`). `agy-tmux` is `degraded` when `tmux` is absent, and no mode delegates to `claude`. The cross-name resolver maps `antigravity → agy`. The legacy `adapters/agy.capabilities.json` sets `cost_blind: true` (deferred billing tap).
-
-  The `agy-claude-tmux` driver routes to the Claude models that the agy binary serves (routing family `agy-claude`). Before the prompt, it verifies that agy booted a Claude model. If not, it exits 87.
-
-  See [reference/agy-runtime.md](skills/loop/reference/agy-runtime.md). Capability tier: `evolve bridge probe`.
-
-- **Ollama (local models)**: the native ollama tmux-REPL bridge driver (`go/internal/bridge/driver_ollamatmux.go`) drives it. The driver launches `ollama run <model>` in a tmux pane. It reuses the shared REPL completion-detection machinery. Ollama is a routing target for local models, with no skill/plugin surface of its own. Research record: [docs/research/ollama-control-surface-2026.md](docs/research/ollama-control-surface-2026.md).
-
-- **Generic / unsupported CLI**: see [skills/loop/reference/generic-runtime.md](skills/loop/reference/generic-runtime.md). The tool name translation tables are at `skills/loop/reference/<platform>-tools.md`.
+The facts of each CLI are in one file for that CLI: [Claude Code](skills/loop/reference/claude-runtime.md), [Codex](skills/loop/reference/codex-runtime.md), [agy](skills/loop/reference/agy-runtime.md), [Gemini](skills/loop/reference/gemini-runtime.md) and [Ollama](skills/loop/reference/ollama-runtime.md). The tool names of each CLI are in `skills/loop/reference/<cli>-tools.md`. For another CLI, see [generic-runtime.md](skills/loop/reference/generic-runtime.md).
 
 ## Discovery contract for AI agents reading this file
 
@@ -231,10 +210,10 @@ These constraints apply to ALL agents in the pipeline. They make sure of cost ef
 
 ### 1. Tool Hygiene (P-NEW-9, P-NEW-21)
 These rules prevent context saturation from accumulated tool results:
-- **Summarize Reads**: After each `Read`, summarize the content in 2-3 lines. In later turns, refer to the summary.
-- **Discard Large Blobs**: After each `Bash` with a large output, extract the key lines. Discard the full output.
-- **Trajectory Compression**: When you read a file of >3000 tokens, extract 3–5 key facts. Then discard the full content from the working context immediately.
-- **No Speculative Loading**: Before a `Read`, use `Glob`+`Grep` to find the points of interest.
+- **Summarize file reads**: After you read a file, summarize it in 2-3 lines. In later turns, refer to the summary.
+- **Discard large blobs**: After a shell command with a large output, extract the key lines. Discard the full output.
+- **Trajectory compression**: When you read a file of >3000 tokens, extract 3–5 key facts. Then discard the full content from the working context immediately.
+- **No speculative loading**: Before you read a file, search by name and by text to find the points of interest.
 
 ### 2. Banned Patterns
 - **No Self-Reversion**: Do not revert your own changes. Exceptions: an explicit instruction, or an immediate environment failure that the changes cause.

@@ -33,14 +33,15 @@ func runGoTest(opts Options, share int, cfg policy.ACSConfig) []Result {
 	if noScope != "" {
 		return []Result{noPredicatesRed(noScope)}
 	}
+	lane.budget = newLaneBudget(goLaneTimeout(opts.GoTimeout, cfg))
+	defer lane.budget.cancel()
 	lane.env = predicateEnv(predicateExports{
 		stateRoot:    opts.stateRoot(),
 		sourceRoot:   opts.Root,
 		changedPkgs:  changedPackagesForCycle(opts.stateRoot(), opts.Cycle),
 		operatorKeys: cfg.PredicateEnv,
+		laneEnd:      lane.budget.end(),
 	})
-	lane.budget = newLaneBudget(goLaneTimeout(opts.GoTimeout, cfg))
-	defer lane.budget.cancel()
 
 	all := lane.runScopes()
 	if len(all) == 0 {
@@ -174,6 +175,11 @@ func newLaneBudget(timeout time.Duration) laneBudget {
 	return laneBudget{ctx: ctx, cancel: cancel, timeout: timeout}
 }
 
+func (b laneBudget) end() time.Time {
+	deadline, _ := b.ctx.Deadline()
+	return deadline
+}
+
 func (b laneBudget) spent() bool { return b.ctx.Err() != nil }
 
 func (b laneBudget) notStartedReason() string {
@@ -238,7 +244,7 @@ func isRetryable(results []Result) bool {
 		if r.ResultStr != "red" {
 			continue
 		}
-		if strings.HasPrefix(r.ACID, acsverdict.SyntheticRedPrefix) {
+		if strings.HasPrefix(r.ACID, acsverdict.SyntheticRedPrefix) || strings.Contains(r.fullEvidence, acsverdict.SubprocessBoundMarker) {
 			return false
 		}
 		hasTestRed = true
