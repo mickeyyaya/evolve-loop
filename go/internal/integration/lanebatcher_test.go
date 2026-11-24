@@ -390,3 +390,14 @@ func TestLaneBatcher_AConflictingMemberIsEjectedAndTheRestStayKept(t *testing.T)
 		t.Fatalf("composition = %+v, err = %v; want cycle 11 kept and cycle 12 ejected on a conflict", comp, err)
 	}
 }
+
+func TestPlaneSyncFunc_SyncCallsTheWrappedFunction(t *testing.T) {
+	t.Parallel()
+	var plane PlaneSync = PlaneSyncFunc(func(context.Context) (SyncOutcome, error) { return SyncAhead, nil })
+
+	out, err := plane.Sync(context.Background())
+
+	if out != SyncAhead || err != nil {
+		t.Fatalf("Sync = %v, %v; want the wrapped outcome", out, err)
+	}
+}

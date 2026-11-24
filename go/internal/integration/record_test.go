@@ -894,3 +894,14 @@ func TestJourney_ANewLeaseHolderTakesAnUnpublishedBatchAndTheOldHolderIsShutOut(
 		t.Errorf("the new holder cannot push: %v", err)
 	}
 }
+
+func TestCutFromOrigin_StampsTheBatchWithTheOriginMainBase(t *testing.T) {
+	t.Parallel()
+	f := newOriginFixture(t)
+
+	b, err := f.repo.CutFromOrigin(context.Background(), Batch{Wave: "135", Index: 3})
+
+	if err != nil || b.Base != f.base || b.Branch != "integration/w135-b3" {
+		t.Fatalf("CutFromOrigin = %+v, %v; want base %s on integration/w135-b3", b, err, f.base)
+	}
+}
