@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"slices"
 	"strings"
 	"testing"
@@ -89,5 +90,23 @@ func TestUsageResetFrom_AnUnknownFamilyIsSkipped(t *testing.T) {
 
 	if ok || !slices.Equal(asked, []string{"agy-tmux"}) {
 		t.Errorf("ok=%v asked=%v, want only the agy driver asked", ok, asked)
+	}
+}
+
+func TestPerCLIScratchLister_AnUnknownFamilyIsAnErrorThroughTheModelRouter(t *testing.T) {
+	t.Parallel()
+	l := perCLIScratchLister{evolveDir: t.TempDir(), log: io.Discard}
+	if names, err := l.List(context.Background(), "nosuch"); err == nil || names != nil {
+		t.Fatalf("got %v, %v; want an error and no names", names, err)
+	}
+}
+
+func TestPerCLIScratchLister_ANoScratchWorkspaceIsAnErrorThatStartsNothing(t *testing.T) {
+	t.Parallel()
+	errDiskFull := errors.New("disk full")
+	refuse := func(string, string) (string, error) { return "", errDiskFull }
+	l := perCLIScratchLister{evolveDir: t.TempDir(), log: io.Discard, mkTemp: refuse}
+	if names, err := l.List(context.Background(), "agy"); !errors.Is(err, errDiskFull) || names != nil {
+		t.Fatalf("got %v, %v; want the scratch error", names, err)
 	}
 }

@@ -1,90 +1,9 @@
 package modelquery
 
 import (
-	"context"
-	"errors"
 	"strings"
 	"testing"
 )
-
-type stubRunner struct {
-	out       string
-	err       error
-	lastName  string
-	lastArgs  []string
-	lastStdin string
-}
-
-func (s *stubRunner) run(_ context.Context, name string, args []string, stdin string) (string, error) {
-	s.lastName, s.lastArgs, s.lastStdin = name, args, stdin
-	return s.out, s.err
-}
-
-func TestParseOllamaList(t *testing.T) {
-	out := "NAME                ID              SIZE      MODIFIED\n" +
-		"gemma4:latest       c6eb396dbd59    9.6 GB    3 days ago\n" +
-		"phi4:latest         ac896e5b8b34    9.1 GB    16 months ago\n" +
-		"\n"
-	got := parseOllamaList(out)
-	want := []string{"gemma4:latest", "phi4:latest"}
-	if len(got) != len(want) {
-		t.Fatalf("got %v, want %v", got, want)
-	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("got[%d]=%q, want %q", i, got[i], want[i])
-		}
-	}
-}
-
-func TestOllamaListerUsesRunner(t *testing.T) {
-	s := &stubRunner{out: "NAME\nllama3.3:latest  x  y  z\n"}
-	l := OllamaLister{Run: s.run}
-	ids, err := l.List(context.Background(), "ollama")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(ids) != 1 || ids[0] != "llama3.3:latest" {
-		t.Fatalf("ids = %v", ids)
-	}
-	if s.lastName != "ollama" || strings.Join(s.lastArgs, " ") != "list" {
-		t.Fatalf("invocation = %s %v", s.lastName, s.lastArgs)
-	}
-}
-
-func TestOllamaListerError(t *testing.T) {
-	s := &stubRunner{err: errors.New("not found")}
-	if _, err := (OllamaLister{Run: s.run}).List(context.Background(), "ollama"); err == nil {
-		t.Fatal("expected error")
-	}
-}
-
-func TestOllamaListerReachesNoModel(t *testing.T) {
-	s := &stubRunner{out: "NAME\nllama3.3:latest  x  y  z\n"}
-	if _, err := (OllamaLister{Run: s.run}).List(context.Background(), "ollama"); err != nil {
-		t.Fatal(err)
-	}
-	if len(s.lastArgs) != 1 || s.lastArgs[0] != "list" {
-		t.Fatalf("args = %v, want exactly [\"list\"] (no prompt argument)", s.lastArgs)
-	}
-	if s.lastStdin != "" {
-		t.Fatalf("stdin = %q, want empty (no prompt piped to ollama)", s.lastStdin)
-	}
-}
-
-func TestOllamaLister_FailureCarriesTheCommandOutput(t *testing.T) {
-	s := &stubRunner{out: "Error: could not connect to ollama app, is it running?\n", err: errors.New("exit status 1")}
-	ids, err := (OllamaLister{Run: s.run}).List(context.Background(), "ollama")
-	if err == nil {
-		t.Fatal("want an error from a failed ollama list")
-	}
-	if !strings.Contains(err.Error(), "could not connect to ollama app") {
-		t.Errorf("err = %v, want the command output that says why ollama list failed", err)
-	}
-	if ids != nil {
-		t.Errorf("ids must be nil on error, got %v", ids)
-	}
-}
 
 func TestJSONObjects(t *testing.T) {
 	tests := []struct {
@@ -143,12 +62,13 @@ func TestErrNoLister_Error(t *testing.T) {
 	}
 }
 
-func TestTruncate_LongStringTruncates(t *testing.T) {
+func TestClipOutput_TrimsAndClipsToTheNamedLimit(t *testing.T) {
 	t.Parallel()
-	fiveTwoByteRunes := "ααααα"
-	got := truncate(fiveTwoByteRunes, 3)
-	want := "ααα" + "…"
-	if got != want {
-		t.Errorf("truncate = %q, want %q", got, want)
+	long := strings.Repeat("α", OutputClip+5)
+	if got, want := ClipOutput("  "+long+"\n"), strings.Repeat("α", OutputClip)+"…"; got != want {
+		t.Errorf("long output not clipped to %d runes: %d runes", OutputClip, len([]rune(got)))
+	}
+	if got := ClipOutput(" short \n"); got != "short" {
+		t.Errorf("short output = %q, want it trimmed and whole", got)
 	}
 }

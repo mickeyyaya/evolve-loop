@@ -135,7 +135,7 @@ Add each new duty as an optional interface. The bridge already does this once. `
 |---|---|---|---|
 | `CLIPreflight` | Prepare the CLI before a launch, best effort. | none | built |
 | `Probe` | Run the deep probe with the manifest's model and argv (D4, R2). | F2 | planned |
-| `ModelLister` | Return the model list of the family (D3). | F3 | planned |
+| `ModelLister` | Return the model list of the family (D3). | F3 | built: `bridge.NewModelLister` |
 | `Version` | Return the version of the binary, for every caller (D5, R4). | F4 | planned |
 
 The names `Probe`, `ModelLister` and `Version` are **planned**. The research fixes the duty of each name, not its signature. 
@@ -189,7 +189,7 @@ The model keys below are **planned**. The research names them and does not defin
 
 | Planned key | Replaces | Component |
 |---|---|---|
-| `controls.models` | The `agy models` and `ollama list` runs (B3). | F3 |
+| `parsers.models` | The `agy models` and `ollama list` runs (B3). A `models` id selects a command and its parse together. | F3, built |
 | `controls.effort` | The `<cli> --help` run and its Go parse (B4). | F5 |
 | `controls.model.parse` | The picker parser keyed on a CLI name (B2, B11). | F5 |
 

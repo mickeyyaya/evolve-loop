@@ -213,7 +213,7 @@ func liveRefresh(ctx context.Context, rep setup.DetectReport, projectRoot, evolv
 		return modelcatalog.Catalog{}, err
 	}
 	dispatcher := bridgePromptDispatcher{workspace: scratch, projectRoot: projectRoot}
-	lister := modelquery.DefaultRouter(bridgeModelCapturer{workspace: scratch})
+	lister := modelRouter(bridgeModelCapturer{workspace: scratch})
 	classifier := modelquery.ChainClassifier{CLIs: chain, Dispatcher: dispatcher, Log: log}
 	return modelquery.Refresh(ctx, liveRefreshDeps(liveRefreshInput{ProjectRoot: projectRoot, CLIs: readyCLIs, Fallback: fallback, Prior: prior, Lister: lister, Classifier: classifier, Log: log}))
 }
