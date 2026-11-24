@@ -948,7 +948,7 @@ The guard checks a closed marker table: `requireTmux`, `testhost.Tool` with `"tm
 
 ## Model lister (F3)
 
-- `NewModelLister(set, run)` returns a `modelquery.RoutedLister`. It resolves the family through `Resolve`, reads `parsers.models` of the manifest, and runs the binary of the manifest with the argv that the registered format owns. `agy-models-v1` owns `models` and `ollama-list-v1` owns `list`. A format id selects a command and its parse together, so the command and the output format cannot drift apart. Load rejects an unknown id.
+- `NewModelLister(set, run)` returns a `modelquery.RoutedLister`. It resolves the family through `Resolve` and reads `parsers.models` of the manifest. It then runs the binary of the manifest with the argv that the registered format owns. `agy-models-v1` owns `models` and `ollama-list-v1` owns `list`. A format id selects a command and its parse together, so the command and the output format cannot drift apart. Load rejects an unknown id.
 - `Families()` returns the families whose manifest declares a known `models` id. `cmd/evolve` (`modelRouter`) passes the adapter to `modelquery.DefaultRouter`, so a new family routes to the adapter by a manifest edit and a registered id.
 - The adapter keeps one listing per resolved (binary, argv) pair, so `agy` and `agy-claude` share one run and a failed listing fails both. A family with no models id and an unknown family return an error before any process starts.
 - `bridge` imports `modelquery`; `modelquery` never imports `bridge`.

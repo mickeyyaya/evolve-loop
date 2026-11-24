@@ -32,6 +32,7 @@ var protectedGateFiles = []struct {
 	{"go/internal/bridge/integration_wait_guard_test.go", GuardGuarantee},
 	{"go/internal/sysexec/command_guard_test.go", GuardGuarantee},
 	{"go/internal/sysexec/llm_launch_guard_test.go", GuardGuarantee},
+	{"go/internal/sysexec/llm_runner_guard_test.go", GuardGuarantee},
 	{"go/internal/orchestrator/guard_test.go", GuardGuarantee},
 	{"go/test/structure/nopoll_guard_test.go", GuardGuarantee},
 	{"go/internal/core/disposition_gate.go", GateGuarantee},
