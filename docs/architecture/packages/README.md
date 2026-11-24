@@ -110,6 +110,7 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/deliverable` | the ADR-0100 declared-deliverables gate: verify, salvage and host effects | [internal-deliverable.md](internal-deliverable.md) |
 | `internal/core/advisor` | the routing advisor that plans and re-plans a cycle's phases | [internal-core-advisor.md](internal-core-advisor.md) |
 | `internal/core/defectledger` | the audit phase's anti-laundering defect ledger and the continuation disposition gate (unit 09, ADR-0103) | [internal-core-defectledger.md](internal-core-defectledger.md) |
+| `internal/core/auditfacts` | the gate and floor facts block and the final-diff rubric of the audit prompt (ADR-0158 decisions 20 and 21) | [internal-core-auditfacts.md](internal-core-auditfacts.md) |
 | `internal/phases/runner/verdict` | the judge: classifies one try of a phase from its artifact, pane and snapshots | [internal-phases-runner-verdict.md](internal-phases-runner-verdict.md) |
 | `internal/core` | the cycle orchestrator: phase sequencing, gates, recovery and ship (filled by file group) | [internal-core.md](internal-core.md) |
 | `cmd/evolve` | the composition root and CLI of the `evolve` binary (filled by file group) | [cmd-evolve.md](cmd-evolve.md) |

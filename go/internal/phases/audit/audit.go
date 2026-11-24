@@ -75,6 +75,7 @@ func (h hooks) ComposePrompt(body string, req core.PhaseRequest) string {
 	if contract := req.Context[core.CtxKeyTaskContract]; contract != "" {
 		fmt.Fprintf(&b, "\n\n## Task Contract\n%s", contract)
 	}
+	b.WriteString(req.Context[core.CtxKeyAuditFacts])
 	b.WriteString(inheritedDefectsPromptBlockVia(h.defectLedger(), req))
 	b.WriteString(chainExamplePromptBlock())
 	b.WriteString(auditRulesPromptBlock(req))
