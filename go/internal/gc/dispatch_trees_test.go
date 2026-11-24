@@ -44,3 +44,16 @@ func TestStaleTreeFiles_AppliesTheLivenessRule(t *testing.T) {
 		t.Errorf("two dead files: %d stale, want 2", len(two))
 	}
 }
+
+func TestRuleStaleTree_NamesTheTreeSweepAndNoOtherRule(t *testing.T) {
+	t.Parallel()
+	if RuleStaleTree != "stale-tree" {
+		t.Errorf("RuleStaleTree = %q, want %q", RuleStaleTree, "stale-tree")
+	}
+	others := []string{RuleStaleDispatch, RuleLogTail, RuleShared, RuleNotKillable}
+	for _, other := range others {
+		if other == RuleStaleTree {
+			t.Errorf("RuleStaleTree collides with rule %q", other)
+		}
+	}
+}
