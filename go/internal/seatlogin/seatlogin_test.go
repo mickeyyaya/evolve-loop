@@ -128,6 +128,22 @@ func TestResolve_NoRefusalHoldsTheToken(t *testing.T) {
 	}
 }
 
+func TestResolve_NoRefusalHoldsATokenWithoutThePrefixOrOverTheCap(t *testing.T) {
+	t.Parallel()
+	for name, body := range map[string]string{
+		"no prefix": "CANARY-0123456789-no-prefix",
+		"overlong":  canary + strings.Repeat("x", MaxTokenBytes),
+	} {
+		got := Resolve(plant(t, 0o600, body), "", OS())
+		if got.Refusal == "" || got.SeatToken != "" {
+			t.Fatalf("%s: got %+v", name, got)
+		}
+		if strings.Contains(got.Refusal, "CANARY") {
+			t.Errorf("%s: the refusal holds the token: %q", name, got.Refusal)
+		}
+	}
+}
+
 func TestResolve_Mode0400Refuses(t *testing.T) {
 	t.Parallel()
 	got := Resolve(plant(t, 0o400, canary), "", OS())
