@@ -111,6 +111,18 @@ func (c *compiler) checkAgents(t Table) {
 	c.checkCrossFamily(t, primaries)
 }
 
+func (c *compiler) checkHeldAuditKey(t Table) {
+	if _, keyed := c.agentKeys[HeldAuditKey]; !keyed {
+		return
+	}
+	prof := &profiles.Profile{ModelTierDefault: policy.DeepTier}
+	view := agentView{name: HeldAuditKey, prof: prof, allowed: t.allowed(HeldAuditKey, prof)}
+	for _, sel := range selectionsOf(t.roles[HeldAuditKey]) {
+		c.checkSelection(t, view, sel)
+	}
+	c.checkFloorTiers(t, HeldAuditKey, *prof)
+}
+
 func (c *compiler) checkModelMismatchTrigger(name string, prof profiles.Profile) {
 	if len(prof.CLIFallbackOnExit) == 0 || slices.Contains(prof.CLIFallbackOnExit, llmroute.ExitModelMismatch) {
 		return

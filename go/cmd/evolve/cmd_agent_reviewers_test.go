@@ -76,6 +76,7 @@ func isClaudeFamilyDriver(cli string) bool {
 func TestAgentRun_EachDiffReviewerRunsOnANonClaudeFamily(t *testing.T) {
 	orig := runner.DefaultRouter
 	t.Cleanup(func() { runner.DefaultRouter = orig })
+	t.Run("the held audit seat", checkTheHeldAuditSeatRunsAdversarialReviewOnTheHeldRoute)
 	for name, report := range diffReviewerReports {
 		t.Run(name, func(t *testing.T) {
 			root := diffReviewerProject(t, name)

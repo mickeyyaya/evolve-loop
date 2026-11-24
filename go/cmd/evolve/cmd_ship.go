@@ -83,9 +83,9 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		ProjectRoot:      projectRoot,
 		PluginRoot:       pluginRoot,
 		Stdin:            stdin,
-		Stdout:           stdout,
-		Stderr:           stderr,
-		Signals:          signals,
+		Stdout:           stdout, Stderr: stderr,
+		Signals:   signals,
+		HeldAudit: heldAuditPort(projectRoot, stderr), HeldAuditPlan: heldAuditPlanPort(projectRoot, stderr),
 	}
 
 	res, err := shipRunFn(ship.WithPaths(context.Background(), splitShipPaths(*pathsFlag)), opts)

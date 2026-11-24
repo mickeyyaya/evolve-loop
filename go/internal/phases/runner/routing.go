@@ -34,6 +34,9 @@ func (b *BaseRunner) resolveDispatchPlan(req core.PhaseRequest, prep phasePrepar
 	if err != nil {
 		return phaseDispatchPlan{}, routingFailure(req, prep, err), fmt.Errorf("%s: %w", prep.phase, err)
 	}
+	if req.Admit != nil {
+		d.Plan.Admit = req.Admit
+	}
 	resolved := phaseDispatchPlan{plan: d.Plan, overlayPolicy: overlayPolicy, modelSource: modelSourceOf(req, d)}
 	b.logDecision(req, prep, d, overlayPolicy)
 	resolved.permissionMode = req.PermissionMode
@@ -88,8 +91,12 @@ func (b *BaseRunner) routeRequest(req core.PhaseRequest, prep phasePreparation, 
 	if resolve == nil {
 		resolve = router.ResolveRole
 	}
+	agent, phase := prep.profileName, prep.phase
+	if req.RouteAgent != "" {
+		agent, phase = req.RouteAgent, ""
+	}
 	return cliroute.Request{
-		Agent: prep.profileName, Phase: prep.phase, ProjectRoot: req.ProjectRoot, DefaultModel: b.hooks.DefaultModel(),
+		Agent: agent, Phase: phase, ProjectRoot: req.ProjectRoot, DefaultModel: b.hooks.DefaultModel(),
 		Env: req.Env, Overlay: llmroute.Overlay{CLI: req.Driver.String(), Tier: req.Assignment.Tier, LadderTier: req.Ladder.LadderTier(), Effort: req.Assignment.Effort},
 		Expand: autoExpander(resolve), BypassPolicy: req.BypassPolicy, NeedsTools: req.Worktree != "", Cycle: req.Cycle,
 	}
