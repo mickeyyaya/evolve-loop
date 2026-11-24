@@ -253,6 +253,41 @@ var agentContract = []contractRow{
 		script: func(h contractHost) string { return "cat " + paths.SeatTokenPath(h.home) }},
 	{action: "isolation N8: read ~/.ssh", want: contractDeny, isolation: "N8",
 		script: func(contractHost) string { return `cat "$HOME/.ssh/id_fixture"` }},
+	{action: "wider secret list: read ~/.config/gcloud", want: contractDeny,
+		script: func(contractHost) string { return `cat "$HOME/.config/gcloud/creds.fixture"` }},
+	{action: "wider secret list: read ~/.azure", want: contractDeny,
+		script: func(contractHost) string { return `cat "$HOME/.azure/token.fixture"` }},
+	{action: "wider secret list: read ~/.npmrc", want: contractDeny,
+		script: func(contractHost) string { return `cat "$HOME/.npmrc"` }},
+	{action: "wider secret list: read ~/.pypirc", want: contractDeny,
+		script: func(contractHost) string { return `cat "$HOME/.pypirc"` }},
+	{action: "wider secret list: read ~/.cargo/credentials.toml", want: contractDeny,
+		script: func(contractHost) string { return `cat "$HOME/.cargo/credentials.toml"` }},
+	{action: "wider secret list: read ~/.cargo/credentials", want: contractDeny,
+		script: func(contractHost) string { return `cat "$HOME/.cargo/credentials"` }},
+	{action: "wider secret list: read ~/.git-credentials", want: contractDeny,
+		script: func(contractHost) string { return `cat "$HOME/.git-credentials"` }},
+	{action: "wider secret list: a claude cell reads ~/.codex/auth.json", want: contractDeny,
+		script: func(contractHost) string { return `cat "$HOME/.codex/auth.json"` }},
+	{action: "wider secret list: a claude cell reads ~/.gemini/oauth_creds.json", want: contractDeny,
+		script: func(contractHost) string { return `cat "$HOME/.gemini/oauth_creds.json"` }},
+	{action: "wider secret list: a claude cell reads ~/.gemini/google_accounts.json", want: contractDeny,
+		script: func(contractHost) string { return `cat "$HOME/.gemini/google_accounts.json"` }},
+	{action: "wider secret list: read ~/.npmrc through a symlink of the home", want: contractDeny,
+		script: func(contractHost) string { return `cat "$HOME/link-npmrc"` }},
+	{action: "wider secret list: read ~/.NPMRC in upper case", want: contractDeny,
+		script: func(contractHost) string { return `cat "$HOME/.NPMRC"` }},
+	{action: "wider secret list: write ~/.npmrc", want: contractDeny,
+		script: func(contractHost) string { return `echo x > "$HOME/.npmrc"` }},
+	{action: "wider secret list: write ~/.codex/auth.json of another family", want: contractDeny,
+		script: func(contractHost) string { return `echo x > "$HOME/.codex/auth.json"` }},
+	{action: "wider secret list: a non-secret sibling of a login file stays readable", want: contractAllow,
+		script: func(contractHost) string { return `cat "$HOME/.codex/config.toml"` },
+		check: func(t *testing.T, _ contractHost, out string) {
+			if out != "fixture config" {
+				t.Fatalf("the sibling must read back, got %q", out)
+			}
+		}},
 	{action: "the Claude OAuth login reads its Keychain item through the security service", want: contractAllow,
 		script: func(h contractHost) string {
 			return `security find-generic-password -s "Claude Code-credentials" -w "` + h.keychain + `"`
@@ -327,6 +362,7 @@ func TestAgentSandboxContract(t *testing.T) {
 			}
 		})
 	}
+	ownFamilyLoginRows(t, h)
 }
 
 func TestAgentSandboxContract_TheLauncherStillStartsTheCLIThatTheCellCannotExec(t *testing.T) {
@@ -501,6 +537,17 @@ func (h *contractHost) withIsolationFixtures(t *testing.T) {
 		filepath.Join(h.run, "lane-scope.json"):                   `{"todo_ids":["item-a"]}`,
 		filepath.Join(h.home, ".ssh", "id_fixture"):               "fixture secret of the cell home\n",
 		paths.SeatTokenPath(h.home):                               "fixture-seat-token\n",
+		filepath.Join(h.home, ".config/gcloud/creds.fixture"):     "fixture secret\n",
+		filepath.Join(h.home, ".azure/token.fixture"):             "fixture secret\n",
+		filepath.Join(h.home, ".npmrc"):                           "fixture secret\n",
+		filepath.Join(h.home, ".pypirc"):                          "fixture secret\n",
+		filepath.Join(h.home, ".cargo/credentials.toml"):          "fixture secret\n",
+		filepath.Join(h.home, ".cargo/credentials"):               "fixture secret\n",
+		filepath.Join(h.home, ".git-credentials"):                 "fixture secret\n",
+		filepath.Join(h.home, ".codex/auth.json"):                 "fixture secret\n",
+		filepath.Join(h.home, ".gemini/oauth_creds.json"):         "fixture secret\n",
+		filepath.Join(h.home, ".gemini/google_accounts.json"):     "fixture secret\n",
+		filepath.Join(h.home, ".codex", "config.toml"):            "fixture config",
 	} {
 		if err := os.MkdirAll(filepath.Dir(rel), 0o755); err != nil {
 			t.Fatal(err)
@@ -513,6 +560,9 @@ func (h *contractHost) withIsolationFixtures(t *testing.T) {
 		if err := inputindex.WriteRecord(h.root, inputindex.Record{Cycle: cycle, ItemIDs: []string{item}}); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if err := os.Symlink(filepath.Join(h.home, ".npmrc"), filepath.Join(h.home, "link-npmrc")); err != nil {
+		t.Fatal(err)
 	}
 	h.reindex(t)
 	h.withKeychain(t)
@@ -769,6 +819,30 @@ func TestAgentSandboxContract_TheSelfhealOrchestratorSeatHoldsN3AndN4(t *testing
 			out, err := h.agent(t, row)
 			if failure := contractFailure(row.want, out, err); failure != nil {
 				t.Fatal(failure)
+			}
+		})
+	}
+}
+
+func ownFamilyLoginRows(t *testing.T, h contractHost) {
+	t.Helper()
+	cases := []struct {
+		cli, own, other string
+	}{
+		{"codex-tmux", ".codex/auth.json", ".gemini/oauth_creds.json"},
+		{"agy-tmux", ".gemini/oauth_creds.json", ".codex/auth.json"},
+	}
+	for _, c := range cases {
+		t.Run("a "+c.cli+" cell keeps its own login only", func(t *testing.T) {
+			own := h
+			own.prefix = cellPrefix(t, requireNativeSandbox(t), h, "enforce", c.cli)
+			out, err := own.agent(t, contractRow{script: func(contractHost) string { return `cat "$HOME/` + c.own + `"` }})
+			if err != nil || out != "fixture secret" {
+				t.Fatalf("a %s cell must read its own login %s: err=%v out=%q", c.cli, c.own, err, out)
+			}
+			out, err = own.agent(t, contractRow{script: func(contractHost) string { return `cat "$HOME/` + c.other + `"` }})
+			if failure := contractFailure(contractDeny, out, err); failure != nil {
+				t.Fatalf("a %s cell must not read %s: %v", c.cli, c.other, failure)
 			}
 		})
 	}
