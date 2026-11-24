@@ -13,6 +13,9 @@
 - **The record.** `WriteRecord` writes `.evolve/landing/held/cycle-<N>.json`. The status is `would-hold` at `shadow` and `held-for-operator` at `enforce`. The record names the commit, the tree digest, the reasons and the two requirements: the operator approval and the adversarial audit.
 - **The approval.** `WriteApproval` writes `.evolve/landing/approvals/cycle-<N>.json` with the cycle, the tree, the decision and the audit report. `Judge` approves only an `approve` decision of the same tree. Another tree or another decision word is `Pending`.
 - **The terminal status.** The verb sets the record to `approved` or `rejected` (`StatusAfter`), so `evolve wave status` stops the listing and a second decision is refused. The ship accepts an approval only when a record of the same tree is `held-for-operator` or carries the matching terminal status.
+- **The audit input.** At `enforce` the hold also writes `cycle-<N>.audit.diff` (the diff from the resolved base sha to the commit) and stores `Base`, `DiffSHA256` and `BuilderFamilies` in the record.
+- **The audit report.** `cycle-<N>.audit.json` (`AuditReport`) and `cycle-<N>.audit.md` (the body) sit beside the record. The verdict is `PASS`, `FAIL` or `WAIT`. A `WAIT` report carries a typed reason (`floor_excludes_other_families`, `no_independent_route`, `builder_unattributed`, `seat_failed`, `port_not_wired`, `diff_missing`, `diff_mismatch`). `VerifyAudit` is the one check, and both `evolve landing approve` and the ship call it. A family is a model family (`bridge.ModelFamily`), not a CLI name: `claude` and `agy-claude` are one family.
+- **The audit dispatch.** `internal/heldaudit` runs after the ship returns `HELD_FOR_OPERATOR`, after the ship window and `ship.lock` are closed (`shipVerified`, so both `ship.Run` and `ship.Phase.Run` reach it). It resolves the route key `held-proposal-audit` (`cli_routing.agents`), keeps only the candidates of another model family at the deep tier, and runs the `adversarial-review` persona on that route through `agentcmd.NewRouted`. The admission is a typed `Admit` on the plan, so a first candidate of the builder family is skipped and the walk goes on. If no candidate is left, the report is `WAIT`, and nothing starts. The dispatch is idempotent per tree.
 - **The home.** Both directories are under `.evolve/landing/`, which is on the fence. The role guard denies a write there during a cycle, and a cell has a read-only repository.
 
 The ship check runs in `worktreeShip.checkLanding`, after the committed-document and foreign-predicate checks and before any change to `main`:
@@ -27,7 +30,8 @@ The policy key is `held_proposals.stage` (`off`, `shadow` or `enforce`; default 
 The operator verbs:
 
 - `evolve landing list` prints each record.
-- `evolve landing approve --cycle N --tree SHA --audit-report P --operator` approves a held tree. It refuses in a process that does not hold the dispatch credential, whatever the credential stage. It also refuses with no `--operator`, no audit report file, no `held-for-operator` record or a different tree.
+- `evolve landing approve --cycle N --tree SHA [--audit-report P] --operator` approves a held tree. It refuses in a process that does not hold the dispatch credential, whatever the credential stage. It also refuses with no `--operator`, no `held-for-operator` record or a different tree. It reads the audit report of the hold and calls `VerifyAudit`: it refuses when the report is absent, is not PASS, names a model family of the builder, names another tree or diff, did not run at the deep tier, or has a body that differs from its digest. `--audit-report` is optional; if it is given, it must name the report file of the hold.
+- `evolve landing audit --cycle N` runs the audit dispatch of a held cycle again (the same function that the ship calls). It needs the dispatch credential.
 - `evolve landing reject --cycle N --tree SHA --operator` rejects it.
 - `evolve wave status` prints a `held:` line for each `held-for-operator` record, and its JSON has the `held` list.
 
@@ -42,7 +46,8 @@ The operator verbs:
 
 ## Limits
 
-- The package records the adversarial-audit requirement, and the verb asks for the report path. It does not dispatch the audit or check the family of its author. The inbox item `held-proposal-adversarial-audit-dispatch` builds that.
+- The audit seat has its own route key and no floor. The `adversarial-review` seat keeps the Claude floor (`cli_routing.floors.claude`). The route entry `cli_routing.agents."held-proposal-audit"` is a console step with operator approval.
+- At `shadow` the ship does not dispatch an audit; the dispatch runs only for a `held-for-operator` hold.
 - A lane still cannot claim a protected or `pipeline-*` item. The inbox item `held-proposal-lane-admission` builds the admission at `enforce`.
 - The resume of a prepared landing intent runs no gate. An intent that was prepared at `shadow` lands after a flip to `enforce`. Flip the stage only at a wave boundary with no prepared intent.
 - A manual ship (`--class manual`) skips the check. It is the console path, and it needs the commit-gate attestation of the tree.

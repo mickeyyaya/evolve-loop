@@ -105,9 +105,14 @@ type Options struct {
 
 	shipLock func(path string) (release func(), err error)
 
+	landWindow func(ctx context.Context, opts *Options, res *RunResult) (RunResult, bool, error)
+
 	baseRun baseattr.Runner
 
 	Signals *signalcenter.Center
+
+	HeldAudit     HeldAuditPort
+	HeldAuditPlan HeldAuditPlanPort
 
 	land *landing.Landing
 
@@ -198,6 +203,9 @@ func (o *Options) applyDefaults() {
 	if o.NowFn == nil {
 		o.NowFn = defaultNow
 	}
+	if o.landWindow == nil {
+		o.landWindow = verifyAndLandInShipWindow
+	}
 }
 
 func (o *Options) evolveDir() string {
@@ -248,8 +256,9 @@ func reportPostPush(ctx context.Context, opts *Options, res *RunResult, commitSH
 }
 
 func shipVerified(ctx context.Context, opts *Options, res *RunResult) (RunResult, error) {
-	out, landed, err := verifyAndLandInShipWindow(ctx, opts, res)
+	out, landed, err := opts.landWindow(ctx, opts, res)
 	if !landed {
+		dispatchHeldAudit(ctx, opts, &out, err)
 		return out, err
 	}
 	if err := postShip(ctx, opts, res); err != nil {

@@ -281,7 +281,9 @@ func importLLMCalls(r standaloneRun) (llmcalls.ImportResult, error) {
 func (c command) launch(ctx context.Context, r standaloneRun, signals *signalcenter.Center, stderr io.Writer) launchOutcome {
 	spy := &launchSpy{Bridge: c.deps.Bridge(r.root, signals), signals: signals, seatTokenFile: r.seatTokenFile}
 	out := launchOutcome{treeBefore: c.treeState(ctx, r.treeDir(), stderr)}
-	out.resp, out.runErr = phasecmd.NewSpecRunner(r.spec, r.root, spy).Run(ctx, r.request())
+	req := r.request()
+	req.RouteAgent, req.Admit = c.route.Agent, c.route.Admit
+	out.resp, out.runErr = phasecmd.NewSpecRunner(r.spec, r.root, spy).Run(ctx, req)
 	out.treeAfter = c.treeState(context.WithoutCancel(ctx), r.treeDir(), stderr)
 	out.report, out.hasReport = readReport(r)
 	out.cli, out.model, out.family = spy.cli, spy.model, llmroute.Family(spy.cli)

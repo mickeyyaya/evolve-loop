@@ -537,7 +537,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_GIT_STAGE_FAILED` | atomic-ship: staging failed (transient) |
 | `SHIP_HELD_FOR_OPERATOR` | atomic-ship: at held_proposals.stage enforce, a lane change touching the fence or pipeline item waits for evolve landing approve. Main did not move (ADR-0157) |
 | `SHIP_HELD_PROPOSAL_REJECTED` | atomic-ship: the operator rejected this tree of a held proposal with evolve landing reject; main did not move (ADR-0157) |
-| `SHIP_HOLD_SHADOW` | at held_proposals.stage shadow, a lane landing that touches the fence or works a pipeline-kind item lands, and the ship records that enforce would hold it for the operator (ADR-0157); fields.cycle, tree, reasons |
+| `SHIP_HOLD_SHADOW` | at held_proposals.stage shadow, a lane landing that touches the fence or works a pipeline-kind item lands, and the ship records that enforce would hold it for the operator (ADR-0157); fields.cycle, tree, reasons, record_error, audit_plan (the route that enforce would audit on, as family/cli/tier) and audit_wait (the typed reason that no audit could start); the plan is computed with no launch |
 | `SHIP_INTEGRATION_COMPOSED` | a deliverable composed onto the integration branch and passed its L1 gates; fields.wave, fields.cycle and fields.batch name it |
 | `SHIP_INTEGRATION_DELIVERED` | a fleet lane delivered its record to the wave integration (kind ship.delivered). At enforce, lane ship stopped before main. Fields: fields.wave, fields.cycle, fields.commits, fields.record |
 | `SHIP_INTEGRATION_DRIVER_FAILED` | the integration driver failed a step. fields.step names the step and fields.error the error; failure writes to the wave record too, so lost signals cannot hide it |
