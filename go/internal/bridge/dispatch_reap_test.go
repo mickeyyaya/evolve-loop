@@ -65,6 +65,7 @@ func hostProc(pid, ppid int, tag string) proctree.Process {
 	p := proctree.Process{Pid: pid, Ppid: ppid, Pgid: pid, Started: reapT0, Comm: "x", Env: map[string]string{}}
 	if tag != "" {
 		p.Env[ipcenv.DispatchIDKey] = tag
+		p.Comm = "node"
 	}
 	return p
 }
