@@ -63,6 +63,7 @@ func init() {
 	RegisterCode(ModuleCI, CodeCIRunRed, "a watched CI run completed with a conclusion other than success; fields.sha, workflow, conclusion, run_id and run_url name the run")
 	RegisterCode(ModuleAudit, CodeAuditCascadeShadow, "at audit_cascade.stage shadow, the audit records if enforce escalates this cycle's audit. fields.would_escalate (true or false) and fields.changed_files (changed file count)")
 	RegisterCode(ModuleParallelEval, CodeParallelEvaluateShadow, "at parallel_evaluate.stage shadow, the orchestrator computed the parallel evaluate batch of enforce and dispatched it serially. fields.batch lists the phases in batch order")
+	RegisterCode(ModuleCLI, CodeCLIRatchetMergeDecision, "at boundary.ratchet_merge.stage shadow or enforce, the boundary step ratchet-tighten decided whether to record its pull request for the next integration batch. fields.stage, pr, head, decision (would_record, recorded, already_recorded, no_record or none), reason (a typed refusal such as scan_size_red, head_moved or stale_open_pr), head_gate, content_gate, scans, skipped_push (true when the push of an unchanged tip was skipped) and candidate give the decision and each gate")
 }
 
 func RegisterCode(m Module, c Code, doc string) { codes.register(m, c, doc) }

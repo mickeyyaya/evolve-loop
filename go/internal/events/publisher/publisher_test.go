@@ -207,7 +207,7 @@ func TestNew_BuildsAPublisherOverTheChannelLogs(t *testing.T) {
 
 func TestRoles_IsTheClosedSetOfTheSpecRoots(t *testing.T) {
 	t.Parallel()
-	want := []string{"cycle", "loop", "loop-chain", "ship", "subagent", "simulate", "phase-observer", "wave", "inbox", "ci", "subscriber", "quality", "dispatch", "agent", "selfheal", "integration", "auth", "queue", "latency", "retire"}
+	want := []string{"cycle", "loop", "loop-chain", "ship", "subagent", "simulate", "phase-observer", "wave", "inbox", "ci", "subscriber", "quality", "dispatch", "agent", "selfheal", "integration", "auth", "queue", "latency", "retire", "ratchet"}
 
 	got := Roles()
 	got[0] = "changed"
@@ -226,34 +226,33 @@ func TestRoles_IsTheClosedSetOfTheSpecRoots(t *testing.T) {
 	}
 }
 
-func specRolesBullet(t *testing.T) string {
+func specRoles(t *testing.T) []string {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "docs", "architecture", "event-channels.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, afterLead, found := strings.Cut(string(raw), "names the root:")
+	_, afterLead, found := strings.Cut(string(raw), "- **Roles.**")
 	if !found {
-		t.Fatal("event-channels.md has no roles bullet that starts with `names the root:`")
+		t.Fatal("event-channels.md has no roles bullet that starts with `- **Roles.**`")
 	}
-	roleList, _, found := strings.Cut(afterLead, "`. ")
-	if !found {
-		t.Fatal("the roles bullet of event-channels.md does not end its role list with a backticked name and a full stop")
+	var roles []string
+	for _, line := range strings.Split(afterLead, "\n")[1:] {
+		role, ok := strings.CutPrefix(line, "  - `")
+		if !ok {
+			break
+		}
+		roles = append(roles, strings.TrimSuffix(role, "`"))
 	}
-	return roleList + "`"
+	return roles
 }
 
 func TestRoles_AreTheRolesTheEventChannelsSpecLists(t *testing.T) {
 	t.Parallel()
-	var documented []string
-	for i, part := range strings.Split(specRolesBullet(t), "`") {
-		if i%2 == 1 {
-			documented = append(documented, part)
-		}
-	}
+	documented := specRoles(t)
 
 	if got := Roles(); !reflect.DeepEqual(documented, got) {
-		t.Fatalf("event-channels.md §1 lists the roles %q, want the %d roles of Roles() %q in the same order", documented, len(got), got)
+		t.Fatalf("event-channels.md section 1 lists the roles %q, want the %d roles of Roles() %q in the same order", documented, len(got), got)
 	}
 }
 

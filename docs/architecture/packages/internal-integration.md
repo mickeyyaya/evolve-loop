@@ -171,6 +171,13 @@ The review binding of a console PR covers the change of the PR. Train.Record giv
 
 The commit gate writes the review record, and it holds a copy of each launch record that it names. A review record of a docs-only change needs a run of the docs review, and the plain name does not satisfy the check. The class `docs-review` checks only the paths, and it proves no run. The caller owns the record schema and the closed list of classes, because this package cannot import the commit gate. That package imports this one through core.
 
+The constant `RatchetListsClass` names the class of the PR that the boundary step `ratchet-tighten` opens.
+
+- A record with this class sets `Deliverable.Tail`. `compareDeliverables` puts a Tail record after every other record. So a ratchet PR composes last, and a semantic clash ejects it and keeps the lane PRs.
+- A caller in `cmd/evolve` makes the binding with `ClassBinding`. The class is not in the list of the `--class` flag.
+- `Composer.message` writes `Closes-Inbox: none` on the composed commit of a console PR when the PR names no inbox id and its commits declare a trailer. This keeps the CI trailer check green for a batch PR with one ratchet PR.
+- Pinned by `TestOrderDeliverablesComposesTheRatchetListsPRLast` and `TestConsoleComposeMessageSaysNoneWhenThePRDeclaresNoIDs`.
+
 Train plans and lands the ready PRs. Plan does three things and pushes nothing:
 
 - It refuses a PR whose head is not the last recorded commit.

@@ -59,6 +59,7 @@ var effectiveStageDefaults = map[string]string{
 	"healing.validator.stage":                    "shadow",
 	"healing.live_reaction.stage":                "shadow",
 	"gates.scan_cache_gate":                      "shadow",
+	"boundary.ratchet_merge.stage":               "shadow",
 	"handoff.build-audit.stage":                  "shadow",
 	"handoff.intent-scout.stage":                 "shadow",
 	"handoff.scout-triage.stage":                 "shadow",

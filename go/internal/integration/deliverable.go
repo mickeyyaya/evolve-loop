@@ -170,6 +170,7 @@ func (r DeliverableRecord) Deliverable() Deliverable {
 		Risky:       r.Risk == riskHigh,
 		InboxRank:   r.InboxRank,
 		Deps:        slices.Clone(r.Deps),
+		Tail:        r.Audit.Class == RatchetListsClass,
 	}
 }
 

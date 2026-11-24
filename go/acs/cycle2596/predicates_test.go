@@ -138,8 +138,8 @@ func TestC2596_002_RolesIsTheClosedSetOfTheSpecRootsAndNamesTheFiveRefusedRoles(
 		Names:   []string{"TestRoles_IsTheClosedSetOfTheSpecRoots"},
 	})
 	got := publisher.Roles()
-	if len(got) != 20 {
-		t.Errorf("publisher.Roles() lists %d roles %v, want 20", len(got), got)
+	if len(got) != 21 {
+		t.Errorf("publisher.Roles() lists %d roles %v, want 21", len(got), got)
 	}
 	for _, role := range unregisteredRoles {
 		if !slices.Contains(got, role) {
