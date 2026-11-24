@@ -221,7 +221,7 @@ Component M7 wires the service. The seams:
 | `RunCycleFromPhase` (`go/internal/core/resume.go:248`) | start the service on a resume; the store keeps the messages |
 | the bridge boot (`go/internal/bridge/dispatch_reap.go:44`) | export `EVOLVE_MSG_TOKEN` beside `EVOLVE_DISPATCH_ID`; add the key to `ipcenv.ProtocolKeys()` |
 | the runner (`go/internal/phases/runner/runner.go:260`) | render the prompt section after `cycleContextBoundary` |
-| the sandbox (`go/internal/bridge/sandbox_wrap.go:185`) | allow writes to the own outbox; deny the mailboxes of others and the store (M6) |
+| the sandbox (`go/internal/bridge/sandbox_wrap.go`, `defaultSandboxWrapWithProbe` and `osSandboxPrefix`; the generator is `GenerateSBPL` and `BwrapPrefix` in `go/internal/adapters/sandbox/sandbox.go`) | allow writes to the own outbox; deny the mailboxes of others and the store (M6) |
 | `policy.json` `messaging` | `internal/policy` decodes it strictly and calls `agentmsg.Config.Resolve` |
 | the Signal Center | the `Notifier` adapter emits `msg.sent`, `msg.denied` and `msg.dead` |
 | the protected surface (`go/internal/guards/integrity_surface.go:18`) | add `/.evolve/msg/` |
@@ -365,7 +365,7 @@ The limits of record are in the spec: [agent-messaging.md](../architecture/agent
 | M3 | ☑ `internal/agentmsg/outbox` (the watcher and the location identity) and `internal/agentmsg/boot` (the token mint), with `ipcenv.MsgTokenKey`. Built, unwired, at 100% coverage, and in both gate files. The six red tests of §11 pass. Merged in PR #974. |
 | M4 | ☑ built in commit 7635ab3bb (`go/cmd/evolve/cmd_msg.go`). Inbox item: `agent-messaging-m4-msg-cli`. |
 | M5 | ☐ not started. Inbox item: `agent-messaging-m5-deliverers`. |
-| M6 | ☐ not started. The fix `sandbox-cross-cycle-run-dir-write` that M6 waits for is consumed. Inbox item: `agent-messaging-m6-sandbox-rules`. |
+| M6 | ☑ built, unwired: `sandbox.MessagingScope`, `outbox.Layout.TreeDir` and `DispatchDir`, `channelstore.Channels`, `bridge.MessagingIdentity` (nil until M7). The three red tests of §11 pass, and the real-process rows run on darwin as subtests of `TestAgentSandboxContract`. The fix `sandbox-cross-cycle-run-dir-write` is consumed. Inbox item: `agent-messaging-m6-sandbox-rules`. |
 | M7 | ☐ not started. M7 waits for M6. Inbox item: `agent-messaging-m7-cycle-wiring`. |
 | M8 | ☐ not started. M8 waits for M7. Inbox item: `agent-messaging-m8-live-wave-check`. |
 
@@ -379,7 +379,7 @@ The limits of record are in the spec: [agent-messaging.md](../architecture/agent
 | M3 outbox watcher, token mint | done, unwired | [#974](https://github.com/mickeyyaya/evolve-loop/pull/974), [`81780ee`](https://github.com/mickeyyaya/evolve-loop/commit/81780ee09) | none |
 | M4 `evolve msg` CLI | done | cycle 2058, [`7635ab3`](https://github.com/mickeyyaya/evolve-loop/commit/7635ab3bb) (`go/cmd/evolve/cmd_msg.go`) | none (item consumed) |
 | M5 deliverers | not started | none | `agent-messaging-m5-deliverers` |
-| M6 sandbox rules | not started | none | `agent-messaging-m6-sandbox-rules` |
+| M6 sandbox rules | built, unwired | pending console ship | `agent-messaging-m6-sandbox-rules` |
 | M7 cycle wiring | not started | none | `agent-messaging-m7-cycle-wiring` |
 | M8 live wave check | not started | none | none |
 

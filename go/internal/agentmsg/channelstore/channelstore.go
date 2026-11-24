@@ -77,9 +77,13 @@ func (s *Store) Read(ctx context.Context, cycle int, from int64) (broker.Batch, 
 	return toBatch(in), nil
 }
 
-func cycleChannel(cycle int) string { return "msg." + strconv.Itoa(cycle) }
+const ChannelPrefix = sourceMsg + "."
 
-func deadChannel(cycle int) string { return "msg.dead." + strconv.Itoa(cycle) }
+func cycleChannel(cycle int) string { return ChannelPrefix + strconv.Itoa(cycle) }
+
+func deadChannel(cycle int) string { return ChannelPrefix + "dead." + strconv.Itoa(cycle) }
+
+func Channels(cycle int) []string { return []string{cycleChannel(cycle), deadChannel(cycle)} }
 
 func (s *Store) write(ctx context.Context, name, dispatch string, payload any) (int64, error) {
 	if err := ctx.Err(); err != nil {
