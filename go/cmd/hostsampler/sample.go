@@ -11,6 +11,8 @@ const (
 
 type Counters struct {
 	At          time.Time
+	HasCPUPct   bool
+	CPUPct      float64
 	HasCPU      bool
 	CPUBusy     uint64
 	CPUTotal    uint64
@@ -66,6 +68,9 @@ func present(has bool, v float64) *float64 {
 }
 
 func cpuBusyPct(prev, cur Counters) *float64 {
+	if cur.HasCPUPct {
+		return present(true, cur.CPUPct)
+	}
 	if !prev.HasCPU || !cur.HasCPU {
 		return nil
 	}
