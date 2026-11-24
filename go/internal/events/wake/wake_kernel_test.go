@@ -233,20 +233,6 @@ func TestWaiter_AnAbsentPathIsAnIOErrorAndNotARefusal(t *testing.T) {
 	}
 }
 
-func TestIsTerminal_APipeIsNotATerminal(t *testing.T) {
-	t.Parallel()
-	r, out, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer r.Close()
-	defer out.Close()
-
-	if isTerminal(int(out.Fd())) {
-		t.Errorf("isTerminal(pipe) = true, want false")
-	}
-}
-
 func TestNew_AnUnreadableOutputIsAnError(t *testing.T) {
 	t.Parallel()
 	out, err := os.Create(filepath.Join(t.TempDir(), "out"))

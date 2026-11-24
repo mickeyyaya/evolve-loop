@@ -216,3 +216,77 @@ func TestEnsureSeatHolder_AHomeWithoutASymlinkYieldsOneSpelling(t *testing.T) {
 		t.Fatalf("ensureSeatHolder = (%v, %v), want exactly [%s]", got, err, paths.SeatHolderDir(home))
 	}
 }
+
+func symlinkedHome(t *testing.T) (link, real string) {
+	t.Helper()
+	base, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	real = filepath.Join(base, "real")
+	link = filepath.Join(base, "link")
+	if err := os.MkdirAll(filepath.Join(real, ".claude"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(real, ".claude.json"), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(real, link); err != nil {
+		t.Fatal(err)
+	}
+	return link, real
+}
+
+func TestStoredLoginDeny_ASymlinkedHomeDeniesBothSpellings(t *testing.T) {
+	t.Parallel()
+	link, real := symlinkedHome(t)
+	want := []string{filepath.Join(link, ".claude"), filepath.Join(real, ".claude")}
+	if got := storedLoginDeny(link); !slices.Equal(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestStoredLoginDeny_AHomeWithoutASymlinkYieldsOneSpelling(t *testing.T) {
+	t.Parallel()
+	_, real := symlinkedHome(t)
+	if got := storedLoginDeny(real); !slices.Equal(got, []string{filepath.Join(real, ".claude")}) {
+		t.Fatalf("got %v", got)
+	}
+	if got := storedLoginDeny(filepath.Join(real, "none")); got != nil {
+		t.Fatalf("a home with no .claude gave %v", got)
+	}
+}
+
+func TestStoredLoginMask_ASymlinkedHomeMasksBothSpellings(t *testing.T) {
+	t.Parallel()
+	link, real := symlinkedHome(t)
+	want := []string{filepath.Join(link, ".claude.json"), filepath.Join(real, ".claude.json")}
+	if got := storedLoginMask(link); !slices.Equal(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	if got := storedLoginMask(filepath.Join(real, "none")); got != nil {
+		t.Fatalf("a home with no .claude.json gave %v", got)
+	}
+}
+
+func TestPathSpellings_NamesTheRawPathThenItsCanonicalPath(t *testing.T) {
+	t.Parallel()
+	link, real := symlinkedHome(t)
+	if got := pathSpellings(link); !slices.Equal(got, []string{link, real}) {
+		t.Fatalf("got %v", got)
+	}
+	if got := pathSpellings(real); !slices.Equal(got, []string{real}) {
+		t.Fatalf("got %v", got)
+	}
+}
+
+func TestWithStoredLoginDeny_DeniesTheWriteOfBothSpellingsOfClaudeJSON(t *testing.T) {
+	t.Parallel()
+	link, real := symlinkedHome(t)
+	got := withStoredLoginDeny(sandbox.Config{}, link)
+	for _, f := range []string{filepath.Join(link, ".claude.json"), filepath.Join(real, ".claude.json")} {
+		if !slices.Contains(got.DenyWritePaths, f) {
+			t.Fatalf("DenyWritePaths %v lacks %s", got.DenyWritePaths, f)
+		}
+	}
+}
