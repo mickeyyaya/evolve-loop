@@ -157,6 +157,7 @@
     "runs": {
       "delete_after_days": 14
     },
+    "salvage_ttl_days": 90,
     "temp_ttl_hours": 24,
     "worktrees": {
       "salvage_after_hours": 24
