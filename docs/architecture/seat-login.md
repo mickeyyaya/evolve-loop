@@ -353,7 +353,7 @@ Rows for the cases of this design:
 - **A lost holder** puts each later seat on the stored login. The design cannot tell a lost holder from a rollback. The record (section 8) and the warning of `doctor` make the change visible. They do not prevent it.
 - **The token is a credential in the cell.** The operator accepted this exception on 2026-11-05. The token can only make model requests, so it is narrower than the stored login.
 - **The token has no claude.ai connectors and no Remote Control** (research F7.2). A seat that needs them runs on the stored login by manifest.
-- **The token lasts one year.** The runbook states the renewal date, one year from the mint. The seat does not renew the token.
+- **The token lasts one year.** The [runbook](../operations/seat-token-runbook.md) says that `evolve doctor seat` warns before the end of the year, and `seatlogin.TokenWarnAgeDays` holds the age of that warning. The seat does not renew the token.
 - **The gap F7.8 stays open.** No page names a loop of one user's own seats as allowed or refused. Only Anthropic can close this gap. An API key is the one path with no doubt in the terms (research F7.6).
 - **The gate of the verbs sees loop lanes only.** It does not see a console run, and it does not see a cycle that is between two lanes.
 - **A parameter seat from a console** where the sandbox cannot apply refuses at the first step of L2. The runbook says so.

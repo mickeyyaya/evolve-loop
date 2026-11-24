@@ -65,8 +65,7 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			OmitStoredLogin: req.HostIsolated,
 		}
 		if req.HostIsolated {
-			cfg.DenyReadPaths = append(cfg.DenyReadPaths, storedLoginDeny(home)...)
-			cfg.MaskFiles = existingFiles(filepath.Join(home, storedLoginJSON))
+			cfg = withStoredLoginDeny(cfg, home)
 		}
 		cred := deps.dispatchCredentialDeny(deps.execStage())
 		deps.warnCredentialCoversCell(cred.write, req)
@@ -301,10 +300,14 @@ func storedLoginDeny(home string) []string {
 	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
 		return nil
 	}
-	return []string{dir}
+	return pathSpellings(dir)
 }
 
 const storedLoginJSON = ".claude.json"
+
+func storedLoginMask(home string) []string {
+	return existingFiles(pathSpellings(filepath.Join(home, storedLoginJSON))...)
+}
 
 func seatFrozenFiles(seatRoot string) []string {
 	return []string{filepath.Join(seatRoot, storedLoginJSON), filepath.Join(seatRoot, seatSettingsName)}
@@ -318,4 +321,12 @@ func existingFiles(candidates ...string) []string {
 		}
 	}
 	return out
+}
+
+func withStoredLoginDeny(cfg sandbox.Config, home string) sandbox.Config {
+	dir, files := storedLoginDeny(home), storedLoginMask(home)
+	cfg.DenyReadPaths = append(slices.Clone(cfg.DenyReadPaths), dir...)
+	cfg.MaskFiles = files
+	cfg.DenyWritePaths = append(slices.Clone(cfg.DenyWritePaths), append(slices.Clone(dir), files...)...)
+	return cfg
 }

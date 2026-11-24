@@ -5,6 +5,7 @@ package wake
 import (
 	"errors"
 	"fmt"
+	"github.com/mickeyyaya/evolve-loop/go/internal/term"
 	"os"
 	"path/filepath"
 	"slices"
@@ -13,11 +14,10 @@ import (
 )
 
 const (
-	termiosRequest = syscall.TCGETS
-	sysPidfdOpen   = 434
-	dirMask        = syscall.IN_MODIFY | syscall.IN_CREATE | syscall.IN_DELETE | syscall.IN_MOVED_FROM | syscall.IN_MOVED_TO | syscall.IN_DELETE_SELF | syscall.IN_MOVE_SELF
-	hangupEvents   = syscall.EPOLLHUP | syscall.EPOLLERR
-	maxDrainReads  = 16
+	sysPidfdOpen  = 434
+	dirMask       = syscall.IN_MODIFY | syscall.IN_CREATE | syscall.IN_DELETE | syscall.IN_MOVED_FROM | syscall.IN_MOVED_TO | syscall.IN_DELETE_SELF | syscall.IN_MOVE_SELF
+	hangupEvents  = syscall.EPOLLHUP | syscall.EPOLLERR
+	maxDrainReads = 16
 )
 
 var localFilesystems = map[int64]string{
@@ -45,7 +45,7 @@ type inotifyPort struct {
 
 var hostInotify = inotifyPort{
 	syscall.InotifyInit1, syscall.InotifyAddWatch, syscall.EpollCreate1, syscall.EpollCtl, syscall.EpollWait,
-	syscall.Pipe2, pidfdOpen, syscall.Read, syscall.Write, syscall.Statfs, syscall.Close, isTerminal,
+	syscall.Pipe2, pidfdOpen, syscall.Read, syscall.Write, syscall.Statfs, syscall.Close, term.IsFD,
 }
 
 func pidfdOpen(pid int) (int, error) {
