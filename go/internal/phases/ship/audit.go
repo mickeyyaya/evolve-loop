@@ -16,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/auditledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/treefence"
@@ -25,7 +26,7 @@ import (
 type auditEntry = auditledger.Entry
 
 func verifyAuditBinding(ctx context.Context, opts *Options, res *RunResult) error {
-	ledgerPath := filepath.Join(opts.ProjectRoot, ".evolve", "ledger.jsonl")
+	ledgerPath := paths.LedgerFileOf(opts.ProjectRoot)
 	entry, err := findLatestAudit(ledgerPath, opts.RunID)
 	if err != nil {
 		return err
@@ -145,7 +146,7 @@ func verifyExecutionTree(ctx context.Context, opts *Options, res *RunResult, tes
 }
 
 func latestRunAudit(opts *Options, runID string) (*auditEntry, error) {
-	return findLatestAudit(filepath.Join(opts.ProjectRoot, ".evolve", "ledger.jsonl"), runID)
+	return findLatestAudit(paths.LedgerFileOf(opts.ProjectRoot), runID)
 }
 
 func auditPassed(opts *Options, entry *auditEntry) bool {
@@ -171,7 +172,7 @@ func boundAuditView(opts *Options, tree, artifactSHA string) *Options {
 }
 
 func resumedAuditView(opts *Options, auditTree string) *Options {
-	entry, err := findLatestAudit(filepath.Join(opts.ProjectRoot, ".evolve", "ledger.jsonl"), opts.RunID)
+	entry, err := findLatestAudit(paths.LedgerFileOf(opts.ProjectRoot), opts.RunID)
 	if err != nil || entry.WorktreeTreeSHA != auditTree {
 		return boundAuditView(opts, auditTree, "")
 	}
@@ -263,7 +264,7 @@ func readAuditArtifact(entry *auditEntry) ([]byte, error) {
 }
 
 func verifyPostPushPredicateEvidence(ctx context.Context, opts *Options, res *RunResult, commit string) error {
-	entry, err := findLatestAudit(filepath.Join(opts.ProjectRoot, ".evolve", "ledger.jsonl"), opts.RunID)
+	entry, err := findLatestAudit(paths.LedgerFileOf(opts.ProjectRoot), opts.RunID)
 	if err != nil {
 		return err
 	}

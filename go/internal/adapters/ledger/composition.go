@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerartifacts"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ledgerscan"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
@@ -291,27 +292,38 @@ type CompositionVerdict struct {
 }
 
 func LatestCompositionVerdict(ledgerPath, method, laneAuditRef string) (CompositionVerdict, bool, error) {
-	body, err := os.ReadFile(ledgerPath)
-	if os.IsNotExist(err) {
-		return CompositionVerdict{}, false, nil
-	}
-	if err != nil {
-		return CompositionVerdict{}, false, err
-	}
+	spec := compositionSpec{method: method, laneAuditRef: laneAuditRef}
 	var latest CompositionVerdict
 	found := false
-	for _, line := range bytes.Split(body, []byte("\n")) {
-		if len(bytes.TrimSpace(line)) == 0 {
-			continue
-		}
+	err := ledgerscan.Reverse(ledgerPath, spec.filter(), func(line []byte) (bool, error) {
 		var rec compositionRecord
-		if json.Unmarshal(line, &rec) != nil || rec.Kind != CompositionVerdictKind || rec.Method != method || rec.LaneAuditRef != laneAuditRef {
-			continue
+		if len(bytes.TrimSpace(line)) == 0 || json.Unmarshal(line, &rec) != nil || !spec.match(rec) {
+			return false, nil
 		}
 		latest = CompositionVerdict{Cycle: rec.Cycle, Method: rec.Method, LaneAuditRef: rec.LaneAuditRef, PatchID: rec.PatchID,
 			AuditedBase: rec.AuditedBase, GitHead: rec.GitHead, TreeStateSHA: rec.TreeStateSHA, AuditedTreeSHA: rec.AuditedTreeSHA,
 			GateResults: rec.GateResults, AuditedDiffPath: rec.AuditedDiffPath, ComposedDiffPath: rec.ComposedDiffPath}
 		found = true
+		return true, nil
+	})
+	if os.IsNotExist(err) {
+		return CompositionVerdict{}, false, nil
 	}
-	return latest, found, nil
+	return latest, found, err
+}
+
+type compositionSpec struct{ method, laneAuditRef string }
+
+func (s compositionSpec) match(rec compositionRecord) bool {
+	return rec.Kind == CompositionVerdictKind && rec.Method == s.method && rec.LaneAuditRef == s.laneAuditRef
+}
+
+func (s compositionSpec) filter() ledgerscan.Filter {
+	var needles [][]byte
+	for _, v := range []string{CompositionVerdictKind, s.method, s.laneAuditRef} {
+		if n := ledgerscan.ContainsValue(v); n != nil {
+			needles = append(needles, n)
+		}
+	}
+	return ledgerscan.Filter{Needles: needles}
 }

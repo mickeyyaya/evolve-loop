@@ -903,3 +903,5 @@
 ./internal/mainsync
 ./internal/docstests
 ./internal/gitstarts
+# ledgerscan — one chunked, newest-first reader of ledger.jsonl with a raw-byte prefilter and early exit (ADR-0123 decision 5, plan C8).
+./internal/ledgerscan
