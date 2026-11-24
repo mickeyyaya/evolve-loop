@@ -27,6 +27,16 @@ func TestRepairTier_DerivesT0FromTheProtectedFilesAndReadsTheStampOtherwise(t *t
 	}
 }
 
+func TestRouteConsoleAutoValue_IsTheConsoleRouteOfTheRouteField(t *testing.T) {
+	t.Parallel()
+	if RouteField != "route" || RouteConsoleAutoValue != "console" {
+		t.Errorf("%s=%s, want route=console", RouteField, RouteConsoleAutoValue)
+	}
+	if got := RoleOf(RouteField); got.Owner != LoopStampOwned {
+		t.Errorf("RoleOf(%q) = %+v, want a loop stamp", RouteField, got)
+	}
+}
+
 func TestRoleOf_TierIsStampedByTheLoopNeverAuthored(t *testing.T) {
 	t.Parallel()
 	if got := RoleOf(TierField); got.Owner != LoopStampOwned || !got.IsStamp() {

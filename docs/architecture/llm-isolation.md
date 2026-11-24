@@ -1757,8 +1757,8 @@ A T0 flag in a loop cycle refuses the ship with `HEALING_I10_VIOLATION`. The rep
 - `evolve selfheal propose` files one `pipeline-repair` item for each accepted `open-repair-item` proposal (`selfheal.OpenRepairItem`). The Mover verb `FileRepair` writes it, with `route: console`, a `tier` stamp of T1 or T2, and `protected_files` for a T0 repair.
 - `tier` is a loop stamp: an author cannot write it. T0 is not stamped. `inboxbatch.Item.RepairTier` derives T0 from a non-empty `protected_files`, so one function holds the belief.
 - The policy key `healing.repair_cycle.stage` is `shadow` by default. `off` files nothing. `enforce` is refused until the item `selfheal-repair-t1-lane-route` ships.
-- The event `HEALING_REPAIR_ROUTED` records the stage, the tier, `would_route` (lane for T1, console for T0 and T2) and `would_refuse_audit` (`IndependentOf` on the routing table finds no family other than the builder). The console does the repair.
-- Deferred as items: the lane route at `enforce`, the T2 stage, the red-reproduction gate, the mutation gate, the close on ship, the rank input and the flip-rate verb.
+- The event `HEALING_REPAIR_ROUTED` records the stage, the tier, `would_route` and `would_refuse_audit`. The value of `would_route` is lane for T1, and console for T0 and T2. The value of `would_refuse_audit` is true when `IndependentOf` on the routing table finds no family other than the builder. The console does the repair.
+- Deferred as items: the lane route at `enforce`, the T2 stage and the red-reproduction gate. The mutation gate, the close on ship, the rank input and the flip-rate verb are also deferred.
 
 ## 21. No agent writes its own oracle (I-11)
 

@@ -111,4 +111,4 @@
 
 ## FileRepair (X16)
 
-`Mover.FileRepair(raw, RepairStamp)` and `Mover.File` share one private `file` path, so a check added to one reaches the other. `FileRepair` runs the author check first (an authored `tier`, `protected_files` or lane route is refused), then writes the stamps: `route: console`, `tier` (T1 or T2, never T0) and `protected_files`. T0 is derived on read by `inboxbatch.Item.RepairTier`.
+`Mover.FileRepair(raw, RepairStamp)` and `Mover.File` share one private `file` path, so a check added to one reaches the other. `FileRepair` runs the author check first. It refuses an authored `tier`, `protected_files` or lane route. Then it writes the stamps: `route: console`, `tier` (T1 or T2, never T0) and `protected_files`. T0 is derived on read by `inboxbatch.Item.RepairTier`.
