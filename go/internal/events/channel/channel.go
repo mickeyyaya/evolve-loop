@@ -38,8 +38,10 @@ type Log struct {
 
 var channelName = regexp.MustCompile(`^[a-z0-9_-]+(\.[a-z0-9_-]+)*$`)
 
+func ValidName(name string) bool { return channelName.MatchString(name) }
+
 func New(root, name string, cfg Config) (*Log, error) {
-	if !channelName.MatchString(name) {
+	if !ValidName(name) {
 		return nil, fmt.Errorf("channel: name %q is not dot-separated tokens of [a-z0-9_-]", name)
 	}
 	return &Log{

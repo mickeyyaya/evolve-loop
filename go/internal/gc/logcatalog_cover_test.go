@@ -28,7 +28,7 @@ func TestCollect_AnUnglobbableHomeIsSkipped(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := logPlanner{}.collect(evolveDir, []gcpolicy.LogHome{{Dir: "dispatch-logs", Glob: "*.log"}}, "")
+	got := logPlanner{}.collect(evolveDir, []gcpolicy.LogHome{{Dir: "dispatch-logs", Glob: "*.log"}})
 
 	if got != nil {
 		t.Errorf("collect = %+v, want nothing from a home whose pattern does not parse", got)

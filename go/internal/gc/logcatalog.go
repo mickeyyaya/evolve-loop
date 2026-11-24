@@ -17,6 +17,7 @@ import (
 
 type logEntry struct {
 	path   string
+	isDir  bool
 	newest time.Time
 	size   int64
 	pinned bool
@@ -27,13 +28,29 @@ type logPlanner struct {
 	now  time.Time
 	add  func(string, Action, string)
 	warn func(string)
+	pins map[gcpolicy.PinRule]pinStrategy
 }
 
 func (lp logPlanner) planCatalog(evolveDir string, cats []gcpolicy.LogCategory) {
 	current := currentLogRunDir(evolveDir)
 	for _, cat := range cats {
-		lp.planCategory(cat, lp.collect(evolveDir, cat.Homes, current))
+		entries := lp.collect(evolveDir, cat.Homes)
+		lp.planCategory(cat, markPinned(entries, lp.strategyFor(cat.Pin)(pinInput{entries: entries, current: current})))
 	}
+}
+
+func markPinned(entries []logEntry, pinned map[string]bool) []logEntry {
+	for i := range entries {
+		entries[i].pinned = pinned[entries[i].path]
+	}
+	return entries
+}
+
+func categoryRulePrefix(cat gcpolicy.LogCategory) string {
+	if cat.RulePrefix != "" {
+		return cat.RulePrefix
+	}
+	return "logs." + cat.Name
 }
 
 func (lp logPlanner) planCategory(cat gcpolicy.LogCategory, entries []logEntry) {
@@ -45,7 +62,8 @@ func (lp logPlanner) planCategory(cat gcpolicy.LogCategory, entries []logEntry) 
 			pinned += e.size
 		}
 	}
-	capRule := "logs." + cat.Name + ".max_total_mb"
+	prefix := categoryRulePrefix(cat)
+	capRule := prefix + ".max_total_mb"
 	drop := func(e logEntry, rule string) {
 		lp.add(e.path, ActionDelete, rule)
 		if e.marker != "" {
@@ -56,7 +74,7 @@ func (lp logPlanner) planCategory(cat gcpolicy.LogCategory, entries []logEntry) 
 		switch {
 		case e.pinned:
 		case ageDays(lp.now, e.newest) > float64(cat.TTLDays):
-			drop(e, "logs."+cat.Name+".ttl_days")
+			drop(e, prefix+".ttl_days")
 		case total+e.size > cat.MaxTotalBytes:
 			drop(e, capRule)
 		default:
@@ -64,11 +82,11 @@ func (lp logPlanner) planCategory(cat gcpolicy.LogCategory, entries []logEntry) 
 		}
 	}
 	if total > cat.MaxTotalBytes {
-		lp.warn(fmt.Sprintf("%s: %d bytes stay over the cap of %d bytes; the current or live logs hold %d bytes and are never deleted", capRule, total, cat.MaxTotalBytes, pinned))
+		lp.warn(fmt.Sprintf("%s: %d bytes stay over the cap of %d bytes; the pinned logs hold %d bytes and are never deleted", capRule, total, cat.MaxTotalBytes, pinned))
 	}
 }
 
-func (lp logPlanner) collect(evolveDir string, homes []gcpolicy.LogHome, current string) []logEntry {
+func (lp logPlanner) collect(evolveDir string, homes []gcpolicy.LogHome) []logEntry {
 	var out []logEntry
 	for _, h := range homes {
 		matches, err := filepath.Glob(filepath.Join(evolveDir, h.Dir, h.Glob))
@@ -77,7 +95,6 @@ func (lp logPlanner) collect(evolveDir string, homes []gcpolicy.LogHome, current
 		}
 		for _, p := range matches {
 			if e, ok := logEntryAt(p, h.IsDir); ok {
-				e.pinned = p == current || logWriterLive(p, h.IsDir)
 				e.marker = fileMarker(p, h.IsDir)
 				out = append(out, e)
 			}
@@ -120,7 +137,7 @@ func logEntryAt(path string, isDir bool) (logEntry, bool) {
 	switch {
 	case isDir && info.IsDir():
 		newest, size := treeNewestAndSize(path, info.ModTime())
-		return logEntry{path: path, newest: newest, size: size}, true
+		return logEntry{path: path, isDir: true, newest: newest, size: size}, true
 	case !isDir && info.Mode().IsRegular():
 		return logEntry{path: path, newest: info.ModTime(), size: info.Size()}, true
 	}

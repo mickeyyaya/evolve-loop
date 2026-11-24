@@ -380,6 +380,20 @@ The block sets how long a continuation binding lives (2026-10-27). `evolve gc` r
 
 Why: on 2026-10-27 the registry held 101 bindings, and 89 of them came from cycles before 1900 (the oldest from cycle 1127). Each kept its worktree out of `evolve worktree cleanup --stale`.
 
+## Event channels (`events`)
+
+The block sets the event channels ([event-channels.md](event-channels.md) section 2). The file lays its keys over `EventsDefaults()`, by channel name. A new name adds a channel. An unknown key, or a value out of range, fails the load of the whole file. A refused route does not. `evolve events channels` and `evolve gc` print one line for it.
+
+| Key | Meaning | Default | Refused |
+|---|---|---|---|
+| `segment_mb`, `lock_deadline_ms`, `queue_events`, `queue_bytes` | the size of a segment, the lock wait, and the Publisher queue limits | 16, 250, 1024, 4 MiB | below 1 |
+| `enqueue_deadline_ms` | the wait for queue space; 0 never waits | 0 | below 0 |
+| `channels.<name>.route` | a filter expression | the compiled route; empty for a new channel | a route that the grammar refuses (the load goes on) |
+| `channels.<name>.qos` | `lossless` or `best_effort` | the compiled value; `best_effort` for a new channel | any other value |
+| `channels.<name>.ttl_days` | the retention age | `gc.logs_ttl_days` | below 1 |
+| `channels.<name>.max_total_mb` | the retention size cap | 128; 512 for `ledger` and `signals` | below 1 |
+| `channels.<name>.segment_mb` | the size at which this segment rotates | the global `segment_mb` | below 1 |
+
 ## Wave health check (`wave.checkin`)
 
 `evolve wave checkin` compares the records of the running wave with these numbers. The numbers are in `policy.WaveCheckinConfig`. The loader refuses an unknown key. A key that is 0 or less keeps its default.

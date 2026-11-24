@@ -354,3 +354,81 @@ func TestConfigOf_MapsThePolicyToThePublisherConfig(t *testing.T) {
 		t.Errorf("channels = %+v, want a channel to inherit the default size or override it", cfg.Channels)
 	}
 }
+
+func writePolicy(t *testing.T, evolveDir, raw string) {
+	t.Helper()
+	if err := os.WriteFile(paths.PolicyPath(evolveDir), []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAttach_ReadsTheEventsBlockOfPolicyJSON(t *testing.T) {
+	t.Parallel()
+	evolveDir := t.TempDir()
+	writePolicy(t, evolveDir, `{"events":{"channels":{"custom":{"route":"module=loop","qos":"lossless"},"loop":{"route":"module=inbox"}}}}`)
+	c := newCenter()
+	closeRoot := Attach(c, "loop", evolveDir, &bytes.Buffer{})
+
+	c.Emit(info(signalcenter.ModuleLoop, signalcenter.KindLoopStarted, 0))
+	closeRoot()
+
+	if got := kindsIn(t, evolveDir, "custom"); !reflect.DeepEqual(got, []string{"loop.started"}) {
+		t.Errorf("custom channel holds %v, want loop.started from the policy.json route", got)
+	}
+	if got := kindsIn(t, evolveDir, "loop"); got != nil {
+		t.Errorf("loop channel holds %v, want nothing because policy.json moved its route to module=inbox", got)
+	}
+}
+
+func TestConfigOf_MapsTheSegmentMBOfAConfiguredChannelToSegmentBytes(t *testing.T) {
+	t.Parallel()
+	pol, err := policy.Parse([]byte(`{"events":{"channels":{"ship":{"segment_mb":4}}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := configOf("loop", t.TempDir(), "", pol.EventsConfig())
+
+	for _, ch := range cfg.Channels {
+		want := int64(0)
+		if ch.Name == "ship" {
+			want = 4 << 20
+		}
+		if ch.SegmentBytes != want {
+			t.Errorf("channel %s SegmentBytes = %d, want %d", ch.Name, ch.SegmentBytes, want)
+		}
+	}
+}
+
+func TestAttach_AFailedPolicyLoadPublishesTheDefaultsAndPrintsOneLine(t *testing.T) {
+	t.Parallel()
+	evolveDir := t.TempDir()
+	writePolicy(t, evolveDir, `{"events":{"queue_event":1}}`)
+	var stderr bytes.Buffer
+	c := newCenter()
+	closeRoot := Attach(c, "loop", evolveDir, &stderr)
+
+	c.Emit(info(signalcenter.ModuleLoop, signalcenter.KindLoopStarted, 0))
+	closeRoot()
+
+	if got := kindsIn(t, evolveDir, "loop"); !reflect.DeepEqual(got, []string{"loop.started"}) {
+		t.Errorf("loop channel holds %v, want the compiled defaults to publish", got)
+	}
+	if lines := strings.Count(stderr.String(), "\n"); lines != 1 || !strings.Contains(stderr.String(), "compiled defaults apply") {
+		t.Errorf("stderr = %q, want one line that says the compiled defaults apply", stderr.String())
+	}
+}
+
+func TestAttach_NeverPrintsTheRouteDiagnostics(t *testing.T) {
+	t.Parallel()
+	evolveDir := t.TempDir()
+	writePolicy(t, evolveDir, `{"events":{"channels":{"ship":{"route":"kind=no.such.kind"},"cycle":{"route":"code=NO_SUCH_CODE_Y"}}}}`)
+	var stderr bytes.Buffer
+	closeRoot := Attach(newCenter(), "loop", evolveDir, &stderr)
+
+	closeRoot()
+
+	if stderr.Len() != 0 {
+		t.Errorf("stderr = %q, want nothing: the printer owns the route diagnostics", stderr.String())
+	}
+}

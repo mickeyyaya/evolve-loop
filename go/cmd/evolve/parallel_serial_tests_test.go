@@ -340,6 +340,7 @@ var serialTests = map[string]string{
 	"main.TestGCGoCacheDir_ACancelledContextIsAnError":                                                                "sets env through a helper",
 	"main.TestGCGoCacheDir_ResolvesOrRefusesTheCache":                                                                 "sets env through a helper",
 	"main.TestGCGoCache_ARemoveFailureIsReportedAndFailsTheStep":                                                      "sets env through a helper",
+	"main.TestGCProject_PrintsTheEventsRouteDiagnosticsOnce":                                                          "sets env through a helper",
 	"main.TestGCProject_AnUnparseablePolicyWarnsAndSweepsWithTheZeroPolicy":                                           "sets env through a helper",
 	"main.TestGCProject_RefusesAnUnresolvedRootAndWarnsOnABadPolicy":                                                  "sets env through a helper",
 	"main.TestGCRunDevWorktrees_APlanFailureAndAnUnjudgedTreeAreFailures":                                             "sets env through a helper",

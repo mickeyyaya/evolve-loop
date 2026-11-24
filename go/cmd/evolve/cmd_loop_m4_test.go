@@ -17,7 +17,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/explanationdocs"
-	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
@@ -81,7 +80,7 @@ func initLoopContractRepo(t *testing.T, projectRoot string) {
 	prevGCHook := gcHookFn
 	if reflect.ValueOf(gcHookFn).Pointer() == reflect.ValueOf(runGCHook).Pointer() {
 		gcHookFn = func(cfg loopConfig, workspace string, stderr io.Writer) {
-			runRunDirGC(cfg, workspace, "shadow", gc.Policy{}, stderr)
+			runRunDirGC(cfg, workspace, "shadow", gcPlanInputs{}, stderr)
 		}
 	}
 	t.Cleanup(func() {
@@ -115,7 +114,7 @@ func installStubDeps(t *testing.T, storage core.Storage, ledger rootLedger) func
 	prevGCHook := gcHookFn
 	if reflect.ValueOf(gcHookFn).Pointer() == reflect.ValueOf(runGCHook).Pointer() {
 		gcHookFn = func(cfg loopConfig, workspace string, stderr io.Writer) {
-			runRunDirGC(cfg, workspace, "shadow", gc.Policy{}, stderr)
+			runRunDirGC(cfg, workspace, "shadow", gcPlanInputs{}, stderr)
 		}
 	}
 	prev := wireOrchestratorDepsFn

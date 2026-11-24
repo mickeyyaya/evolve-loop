@@ -74,8 +74,10 @@ func runEventsChannels(args []string, stdout, stderr io.Writer) int {
 		return cliExitIO
 	}
 	chRoot := paths.EventChannelsRoot(paths.EvolveDirOf(root))
+	pol := policy.LoadForEvents(paths.PolicyPath(paths.EvolveDirOf(root)), stderr)
+	pol.PrintEventsDiagnostics(stderr)
 	rows := []eventChannelRow{}
-	for _, ch := range policy.EventsDefaults().Channels {
+	for _, ch := range pol.EventsConfig().Channels {
 		end, err := channelEnd(chRoot, ch.Name)
 		if err != nil {
 			fmt.Fprintf(stderr, "evolve events channels: %v\n", err)
