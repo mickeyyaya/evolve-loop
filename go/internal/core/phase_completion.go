@@ -29,6 +29,7 @@ func (r phaseCompletionRecord) persist() error {
 	r.orchestrator.recordFinalVerdict(r.result, r.phase, r.response.Verdict,
 		r.orchestrator.floorAlreadyCompleted(cs.CompletedPhases))
 	cs.FinalVerdict = r.result.FinalVerdict
+	cs.ReviewRepair = r.orchestrator.recordReviewRound(*cs, r.phase, r.response.Verdict)
 	if err := r.orchestrator.storage.WriteCycleState(r.ctx, *cs); err != nil {
 		writeErr := fmt.Errorf("write cycle-state post-%s: %w", r.phase, err)
 		r.recordOutcome(writeErr.Error())
@@ -49,7 +50,6 @@ func (r phaseCompletionRecord) persist() error {
 			r.result.FailReasons = append(r.result.FailReasons, cs.AuditFailReasons...)
 		}
 	}
-	r.orchestrator.recordReviewFindings(*cs, r.phase, r.response.Verdict)
 	r.recordOutcome("")
 	return nil
 }
