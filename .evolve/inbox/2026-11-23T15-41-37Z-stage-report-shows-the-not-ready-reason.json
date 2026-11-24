@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "evolve stage report and evolve stage verify print the typed NotReady reason (for example conflicts_unmeasured) in their text and JSON output.",
+    "Which stage keys depend on the conflict class is stated once (a shared predicate or a Scorer.Requires method), not inferred per record."
+  ],
+  "created_at": "2026-11-23T15:41:37Z",
+  "files": [
+    "go/cmd/evolve/cmd_stage.go",
+    "go/internal/stageevidence/score.go"
+  ],
+  "fix": "Project the NotReady reason into the stage verbs and give the conflict-class dependency of a stage key one home.",
+  "id": "stage-report-shows-the-not-ready-reason",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "source": "#1690 delta review (MEDIUMs M3 and M4), 2026-11-23",
+  "summary": "#1690 adds a typed NotReady reason (conflicts_unmeasured) to the stage-evidence score, but evolve stage report and stage verify do not print it, so an operator sees not ready with no cause. Which keys depend on the conflict class is also inferred from would_hold records rather than stated once.",
+  "title": "Stage report and verify show the typed not-ready reason",
+  "weight": 0.5
+}

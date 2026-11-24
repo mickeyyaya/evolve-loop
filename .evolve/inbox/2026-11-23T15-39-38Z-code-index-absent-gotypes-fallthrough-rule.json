@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Policy data states what evolve code does when the gotypes index is absent or stale for a callers or api query: refuse with a typed reason, or route to the next backend, as one rule with one home.",
+    "The spec (no failover) and the plan (fall to trail) agree after the change, and a test pins the chosen rule."
+  ],
+  "created_at": "2026-11-23T15:39:38Z",
+  "files": [
+    "go/internal/codeindex",
+    "docs/architecture/code-index-cli.md"
+  ],
+  "fix": "Decide and encode the fallthrough rule for an absent gotypes index as routing data, and reconcile the spec and the plan.",
+  "id": "code-index-absent-gotypes-fallthrough-rule",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "research dossier docs/research/code-intelligence-tools-2026-11.md (D1, open question 6)",
+  "summary": "Making gotypes the default for callers and api (item G4) needs a rule for an absent or stale gotypes index. The code-index spec says no failover, while the plan says fall to trail. The dossier marks the default switch as depending on this decision.",
+  "title": "Routing data decides what callers and api do when the gotypes index is absent",
+  "weight": 0.6
+}

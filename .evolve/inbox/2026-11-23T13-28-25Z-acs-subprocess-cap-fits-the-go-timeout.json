@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "A test loads the checked-in .evolve/policy.json and fails when subprocessCap plus the largest ACS lane sum exceeds acs.go_timeout_s.",
+    "The bound message names the caller deadline when that is the earlier bound (subprocess_bound.go:53)."
+  ],
+  "created_at": "2026-11-23T13:28:25Z",
+  "files": [
+    "go/pkg/acsassert/subprocess_bound.go"
+  ],
+  "fix": "Give the relation subprocessCap + largest lane sum <= acs.go_timeout_s an executable home: a test over the real policy file. Name the caller deadline in the bound message.",
+  "id": "acs-subprocess-cap-fits-the-go-timeout",
+  "kind": "test",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "architecture review of the #1709 rebuild, 2026-11-23",
+  "summary": "The ACS subprocess bound (subprocessCap 300 s in go/pkg/acsassert/subprocess_bound.go:16) only works while 300 s plus the largest lane sum (187 s) stays under acs.go_timeout_s (600 s in .evolve/policy.json). The relation is stated in the plan and pkg-acsassert.md but no test relates the Go constant to the policy value, so lowering go_timeout_s below about 487 s silently brings back the one-hang-spends-the-lane defect.",
+  "title": "A test pins that the ACS subprocess cap fits inside the ACS Go timeout",
+  "weight": 0.5
+}

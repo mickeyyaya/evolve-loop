@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "A repair ship with a lived mutant in a changed function is refused (red first)",
+    "All mutants killed lets the ship pass",
+    "Not-viable and not-covered statuses follow the panel rules",
+    "Changed functions at 100% coverage"
+  ],
+  "created_at": "2026-11-23T15:24:53Z",
+  "deps": [
+    "selfheal-repair-cycle-path"
+  ],
+  "files": [
+    "go/internal/qualitypanel/",
+    "go/internal/core/"
+  ],
+  "fix": "A ship precondition for a repair cycle: the planned mutants of the changed functions are killed, or the ship is refused.",
+  "id": "selfheal-repair-mutation-gate",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "console, 2026-11-23, deferred from X16 (selfheal-repair-cycle-path), ADR-0155",
+  "summary": "Spec section 20.1: T1 review includes a mutation gate on changed functions. qualitypanel/mutation_plan.go plans targets and reports, but it blocks nothing.",
+  "title": "Self-healing X16e: a mutation gate on the changed functions of a T1 repair",
+  "weight": 0.3
+}

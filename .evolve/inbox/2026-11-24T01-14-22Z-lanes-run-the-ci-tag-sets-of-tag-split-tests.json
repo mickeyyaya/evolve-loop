@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "The build floor runs the notmux tag set for a lane that touches internal/tmuxtest (test)",
+    "The tag sets come from the CI parity table, not a second list"
+  ],
+  "created_at": "2026-11-24T01:14:22Z",
+  "deps": [],
+  "files": [
+    "go/internal/core/",
+    "go/internal/ciparity/"
+  ],
+  "fix": "Make the build floor (and selfcheck) run every tag set that CI runs for a touched package whose tests are split by build tags (for example integration,notmux for internal/tmuxtest and internal/bridge), using the one CI tag table (ciparity), so a lane cannot ship a test that is red under a CI tag set.",
+  "id": "lanes-run-the-ci-tag-sets-of-tag-split-tests",
+  "kind": "pipeline-integrity",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console",
+  "summary": "2026-11-24: main went red on make test-notmux at 7a939f2fb and 536930c8d. Cycle 2625 (recycle-x8, commit 637f5a445) added TestMain_ASocketDirThatCannotBeRegisteredStillRunsTheTests to an untagged file of internal/tmuxtest, asserting exit 0. Under the notmux tag (serve_floor.go) the stray check fails closed on an unusable socket dir, so Main exits 1. The lane's floor ran only the default tags, so the red reached main. Fixed by moving the assertion into the per-tag files (console PR).",
+  "title": "A lane that changes a package with tag-split tests runs each CI tag set before it ships",
+  "weight": 0.7
+}

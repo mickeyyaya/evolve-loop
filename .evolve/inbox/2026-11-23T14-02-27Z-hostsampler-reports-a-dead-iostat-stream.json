@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "When the iostat child of the macOS host sampler exits or its stream ends, the sampler writes one diagnostic line naming the cause, once, and records keep omitting cpu_busy_pct.",
+    "A test drives a stream that ends and asserts the diagnostic."
+  ],
+  "created_at": "2026-11-23T14:02:27Z",
+  "files": [
+    "go/cmd/hostsampler/iostat.go",
+    "go/cmd/hostsampler/source_darwin.go"
+  ],
+  "fix": "Thread an error sink through startCPUFeed and newSource so a dead iostat stream is reported, not silent.",
+  "id": "hostsampler-reports-a-dead-iostat-stream",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "code review r2 of ci-wall-time C13 part A, 2026-11-23",
+  "summary": "The macOS host sampler reads CPU busy from one long-lived iostat child. When that child dies or its stream ends, records silently stop carrying cpu_busy_pct and nothing says why, so a CI run with no CPU data cannot be told apart from a host where iostat never started.",
+  "title": "The host sampler reports a dead iostat stream",
+  "weight": 0.4
+}

@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "The cli-routing help names which subverbs write policy.json",
+    "No registry summary claims read-only for a verb with a writing subverb (test)"
+  ],
+  "created_at": "2026-11-23T22:44:28Z",
+  "deps": [],
+  "files": [
+    "go/cmd/evolve/registry.go"
+  ],
+  "fix": "Correct the summary and the per-verb help so each writing subverb is marked, following docs/conventions/cli-design.md (effects named in help). Add a help test that pins it.",
+  "id": "cli-routing-help-claims-read-only",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console",
+  "summary": "The registry summary of `cli-routing` says read-only, but `init`, `set`, `unset` and `migrate` write .evolve/policy.json. An operator or agent who trusts the help can change routing without knowing it. Found by the CLI review of 2026-11-24.",
+  "title": "cli-routing says it is read-only, but four of its subverbs write policy.json",
+  "weight": 0.6
+}

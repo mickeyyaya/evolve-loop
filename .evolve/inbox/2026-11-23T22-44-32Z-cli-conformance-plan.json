@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "The plan maps every deviation count in the policy to a component",
+    "Each component has an inbox item"
+  ],
+  "created_at": "2026-11-23T22:44:32Z",
+  "deps": [],
+  "files": [
+    "docs/plans/"
+  ],
+  "fix": "Write docs/plans/cli-conformance-2026-11.md with the docs-write skill: components for `evolve cli lint` (registry-backed, shrink-only baseline, reference drift check), the rename batches with one-release aliases, the exit-code unification, the inspect verbs, and the retirement review of dead verbs; one inbox item per component.",
+  "id": "cli-conformance-plan",
+  "kind": "docs",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "source": "console",
+  "summary": "docs/conventions/cli-design.md (70 rules) and docs/reference/evolve-commands.md measure the gaps: 38 hyphenated names, three exit-code schemes, single-dash flags, 14 possible dead verbs, and loop-only gaps with no inspect verb (admission cell holds, host-pressure ceiling, running one gate alone, base-red attribution replay, effective policy values, msg read). Open operator questions O1 (NO_COLOR) and O2 (bare release).",
+  "title": "Plan the move of evolve to the CLI design policy: renames with aliases, exit codes, flags, inspect verbs, cli lint",
+  "weight": 0.5
+}

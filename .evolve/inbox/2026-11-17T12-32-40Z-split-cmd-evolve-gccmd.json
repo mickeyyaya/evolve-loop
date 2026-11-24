@@ -2,10 +2,19 @@
   "acceptance": [
     "TestGcCmdRun in internal/cli/gccmd (fails to compile before the move); only the shim remains in cmd_gc*"
   ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2628",
+    "branch": "cycle-cd3ae73e-2628",
+    "snapshot_sha": "25d220d4c80994721a02aa031279c75c5700bc05",
+    "base_sha": "d75f22677c85029f9455f2f430843a2d915c0890",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2628/audit-fail-reason.json",
+    "cycle": 2628
+  },
   "created_at": "2026-11-17T12:32:40Z",
   "deps": [
     "split-cmd-evolve-landcmd-pr-ci"
   ],
+  "failure_count": 1,
   "files": [
     "go/cmd/evolve/",
     "go/internal/cli/gccmd/"
@@ -13,8 +22,15 @@
   "fix": "Step 3 of docs/plans/split-cmd-evolve-2026-11.md (parent plan concurrent-edit-layout-2026-11, C6/D5). Run at a wave boundary with no open lane in the group's files (evolve wave supply). Red test: TestGcCmdRun in internal/cli/gccmd (fails to compile before the move); only the shim remains in cmd_gc*.go. dependsOn: split-cmd-evolve-landcmd-pr-ci. Note split (C7) follows the same group.",
   "id": "split-cmd-evolve-gccmd",
   "kind": "refactor",
+  "last_failure_class": "unknown",
+  "last_failure_cycle": 2628,
+  "last_failure_findings": "review gate: phase \"build\" deliverable rejected after 1 correction(s): build handoff floor: 3 deterministic check failure(s) — fix these exactly before handoff:\n  the tests of the changed packages fail under -tags integration, so no changed function is proven:\n    --- FAIL: TestInboxWriters_EveryAutofiledItemCarriesAKnownClass (4.27s)\n--- FAIL: TestInboxWriters_EveryAutofiledItemCarriesAKnownClass/every_production_write_into_the_inbox_is_enrolled (4.22s)\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/cmd/evolve\t320.228s\n…ccmd\t19.348s\tcoverage: 99.9% of statements\nok  \tgithub.com/mickeyyaya/evolve-loop/go/internal/gctest\t0.706s\tcoverage: 100.0% of statements\nFAIL\n\n  ./cmd/evolve: unit tests FAIL\n--- FAIL: TestInboxWriters_EveryAutofiledItemCarriesAKnownClass (4.08s)\n--- FAIL: TestInboxWriters_EveryAutofiledItemCarriesAKnownClass/every_production_write_into_the_inbox_is_enrolled (3.67s)\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/cmd/evolve\t282.745s\n…over] claimed: 2026-11-02T00-00-00Z-item-a.json → processing/cycle-8/\nFAIL\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/cmd/evolve\t282.745s\nFAIL\n\n  repo-contract scanner pack RED: github.com/mickeyyaya/evolve-loop/go/internal/guards.TestFlowCodeNamesNoFamily — ship runs these repo-wide suites before it pushes and refuses a red one. Reproduce each from go/ with `go test -count=1 <package>` (for a named test add `-run '^<Test>$'`) and fix the change before handoff:\n=== RUN   TestFlowCodeNamesNoFamily\n    flow_family_names_test.go:53: internal/gctest/gctest.go:125 \"claude\" names a CLI family in flow code: move the value into the routing data (policy routing_defaults.json or cli_routing) and read it from there (I-6, ADR-0154)\n--- FAIL: TestFlowCodeNamesNoFamily (0.25s)\n",
+  "last_failure_fingerprint": "text:7ab99291ed70",
+  "last_failure_reason": "cycle-failure-release",
+  "last_failure_rung": "R2",
   "origin": "console",
   "priority_class": "performance",
+  "retry_plan": "fresh-deep-plan",
   "summary": "Step 3 of docs/plans/split-cmd-evolve-2026-11.md. Filed by the console from the refused request inbox-add-3 of cycle 2460: the request channel runs only dispatch requests, so the pipeline never filed it.",
   "title": "Move the gc verb group (10 files, 13 outbound symbols, 9 inbound functions) to go/internal/cli/gccmd behind a shim and a Deps value",
   "weight": 0.6

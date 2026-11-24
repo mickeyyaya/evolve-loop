@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "On a scratch host outside the repo, runtime and cycle cells, pinned versions of qmd, CodeGraph and graphify run with telemetry off against the same gold query sets and the code-index truth sets.",
+    "A table of recall@5, MRR (knowledge base) and precision, recall, top-1 and p50/p95 latency (code) for each tool beside our own rankers is added to the two research dossiers.",
+    "No route, policy or dependency of the pipeline changes; adoption stays a separate operator decision."
+  ],
+  "created_at": "2026-11-23T15:51:55Z",
+  "deps": [
+    "kb-recall-gold-set-and-score",
+    "code-index-second-independent-truth-set"
+  ],
+  "files": [
+    "docs/research/qmd-knowledge-base-2026-11.md",
+    "docs/research/code-intelligence-tools-2026-11.md"
+  ],
+  "fix": "Run the external comparators on a scratch host only and record the measured numbers in the dossiers.",
+  "id": "scratch-host-comparator-bench",
+  "kind": "research",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "operator decision 2026-11-23 (comparator runs allowed on a scratch host only)",
+  "summary": "The qmd and code-intelligence dossiers rest on vendor numbers for qmd, CodeGraph and graphify. The operator allowed benchmark-only runs of those tools on a scratch host, so their claims can be measured against our gold sets and truth sets.",
+  "title": "External code and knowledge tools are measured on a scratch host against our gold sets",
+  "weight": 0.4
+}

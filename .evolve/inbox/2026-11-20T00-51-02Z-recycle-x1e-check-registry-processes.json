@@ -3,10 +3,19 @@
     "Red first: the report of a fixture process list names each orphan with its rule",
     "Each kill goes through an injected sender, and no test signals a real process"
   ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2617",
+    "branch": "cycle-cd3ae73e-2617",
+    "snapshot_sha": "8762588bf02ee985baf503011c0cc4784f3f355d",
+    "base_sha": "9bb753968ac3c0fa526d75903eea28fcd33ebf75",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2617/audit-fail-reason.json",
+    "cycle": 2617
+  },
   "created_at": "2026-11-20T00:51:02Z",
   "deps": [
     "recycle-x1a-check-registry-worktrees"
   ],
+  "failure_count": 1,
   "files": [
     "go/internal/gc/processes.go",
     "go/internal/gc/dispatch_processes.go",
@@ -15,8 +24,15 @@
   "fix": "Port ReapFinishedCycleOrphans and the dispatch process plan as checks with no change of rule. The report lists each process with its pid, its cwd and the rule.",
   "id": "recycle-x1e-check-registry-processes",
   "kind": "feature",
+  "last_failure_class": "capability",
+  "last_failure_cycle": 2617,
+  "last_failure_findings": "review gate: phase \"build\" deliverable rejected after 1 correction(s): build handoff floor: 1 deterministic check failure(s) — fix these exactly before handoff:\n  test-audit ratchet: testaudit: acs/cycle2617 TestC2617_008_OrphanApplyReportsAFailedSignalAndStillSignalsTheRest error-text-match has no baseline row — remove the weak pattern (for error text: a sentinel error and errors.Is); Rebaseline refuses new rows",
+  "last_failure_fingerprint": "text:491a31e03388",
+  "last_failure_reason": "cycle-failure-release",
+  "last_failure_rung": "R2",
   "origin": "console",
   "priority_class": "maintainability",
+  "retry_plan": "fresh-deep-plan",
   "summary": "Plan PR #1585, decision D10, component X1e. Never mutate or run a live kill guard; inject the signal sender.",
   "title": "The gc check registry covers the process reaps",
   "weight": 0.5

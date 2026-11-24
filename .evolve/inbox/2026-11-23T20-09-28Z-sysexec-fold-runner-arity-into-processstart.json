@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "One scan and one scope: llm_runner_guard_test.go is deleted",
+    "The self-test fixtures of the second scan (literal, const, taint, non-LLM) run in the single scan",
+    "TestOnlyTheBridgeStartsAnLLMBinary stays green"
+  ],
+  "created_at": "2026-11-23T20:09:28Z",
+  "deps": [
+    "bridge-factory-f3-model-lister-in-bridge"
+  ],
+  "files": [
+    "go/internal/sysexec/llm_launch_guard_test.go",
+    "go/internal/sysexec/llm_runner_guard_test.go",
+    "go/internal/bridge/model_lister.go"
+  ],
+  "fix": "Fold the Runner-arity rule of internal/sysexec/llm_runner_guard_test.go into the processStart switch of llm_launch_guard_test.go (console edit of the protected file), so one scan with one exemption scope (the named bridge launch functions plus the model lister adapter) remains; then delete the second file.",
+  "id": "sysexec-fold-runner-arity-into-processstart",
+  "kind": "techdebt",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "source": "console, bridge-factory F3 design review r2",
+  "summary": "F3 added internal/sysexec/llm_runner_guard_test.go as a second scan beside llm_launch_guard_test.go, because the lane could not edit the protected file. It has a wider exemption scope: the whole bridge/model_lister.go is exempt, since the adapter passes Manifest.Binary. Fold the arity rule into the closed processStart switch. Add model_lister.go:<adapter func> to bridgeDriverLaunchFuncs, or route the adapter default through ModelQueryRunner only. Then delete the second file so one scan with one scope remains.",
+  "title": "Fold the Runner-arity LLM rule into the processStart switch of the sysexec launch guard",
+  "weight": 0.5
+}

@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "No ModeCharDevice terminal predicate remains outside internal/term (guard test)",
+    "The two named tests pass using a real pty or an injected seam, not /dev/null"
+  ],
+  "created_at": "2026-11-23T23:22:33Z",
+  "deps": [],
+  "files": [
+    "go/internal/cli/agentcmd/input.go",
+    "go/internal/phases/ship/verify.go",
+    "go/internal/cli/phasecmd/phase_cycle.go",
+    "go/internal/term/"
+  ],
+  "fix": "Add a small pty test helper (or a terminal seam in each caller's deps), switch the three callers to term.IsTerminal, and rewrite the two tests to use the helper instead of /dev/null. Decide and document the /dev/null meaning once.",
+  "id": "one-terminal-predicate",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "source": "console",
+  "summary": "Rank 38 added internal/term (ioctl IsTerminal, where /dev/null is not a terminal) and moved wake and evolve auth to it. Three older ModeCharDevice predicates remain, and they report /dev/null as a terminal: agentcmd/input.go:19, ship/verify.go:237 and phasecmd/phase_cycle.go:77. Moving them broke TestAgentRun_InputErrors and TestVerifyManualConfirmCoverfix_ConfirmationFollowsWhatTheOperatorTypes, which use /dev/null as a stand-in terminal. The phasecmd terminal-true branch needs a pty to cover.",
+  "title": "One terminal predicate: agentcmd, ship and phasecmd use internal/term",
+  "weight": 0.5
+}

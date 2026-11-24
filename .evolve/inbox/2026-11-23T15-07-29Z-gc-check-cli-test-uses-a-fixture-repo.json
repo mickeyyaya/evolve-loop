@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "TestRunGCCheck_CLIModesAndErrors builds its own repository with internal/gittest and never reads the refs of the real checkout.",
+    "The test passes while a concurrent wave creates and deletes cycle branches in the real repository."
+  ],
+  "created_at": "2026-11-23T15:07:29Z",
+  "files": [
+    "go/cmd/evolve/cmd_gc_check_test.go"
+  ],
+  "fix": "Point the gc check CLI test at a gittest fixture repo, so it does not depend on the live branch set of the host checkout.",
+  "id": "gc-check-cli-test-uses-a-fixture-repo",
+  "kind": "test",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "console build of #1690 r3, 2026-11-23",
+  "summary": "TestRunGCCheck_CLIModesAndErrors failed once with: evolve gc check: gc: git rev-parse refs/heads/cycle-cd3ae73e-2611: exit 128. It passed on main and on the same tree a few minutes later. The test reads the branch refs of the real checkout, and wave 188 deleted that cycle branch while the test ran, so the result depends on the live loop.",
+  "title": "The gc check CLI test uses a fixture repository, not the live checkout",
+  "weight": 0.5
+}

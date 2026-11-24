@@ -1,0 +1,36 @@
+{
+  "acceptance": [
+    "evolve checkpoint save --all with one dev worktree that has unmerged index entries saves every other worktree and exits 0.",
+    "The output names the skipped worktree and the reason, and a signal records the skip.",
+    "A test makes a worktree with an unmerged entry through internal/gittest, runs save --all, and asserts the other worktrees are saved and the skip is reported."
+  ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2614",
+    "branch": "cycle-cd3ae73e-2614",
+    "snapshot_sha": "73c8ba6417a058c9635330ce48a9127caba127a2",
+    "base_sha": "a099157d14664c4483d0db2009b6551b6ded79d6",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2614/audit-fail-reason.json",
+    "cycle": 2614
+  },
+  "created_at": "2026-11-23T12:54:04Z",
+  "failure_count": 1,
+  "files": [
+    "go/internal/checkpoint"
+  ],
+  "fix": "checkpoint save --all treats a dev worktree with unmerged index entries as in progress: it skips that worktree, reports it, and saves the others, so one builder mid-merge never stops the wave boundary.",
+  "id": "checkpoint-save-all-skips-a-worktree-mid-merge",
+  "kind": "bug",
+  "last_failure_class": "capability",
+  "last_failure_cycle": 2614,
+  "last_failure_findings": "review gate: phase \"build\" deliverable rejected after 2 correction(s): build handoff floor: 1 deterministic check failure(s) — fix these exactly before handoff:\n  ./acs/cycle2614 (-tags acs): unit tests FAIL\n--- FAIL: TestC2614_004_JSONOutputStillParsesAndExitsZeroWithTheSkip (0.75s)\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/acs/cycle2614\t5.621s\n…T/TestC2614_004_JSONOutputStillParsesAndExitsZeroWithTheSkip4027727716/001/repo/dev/merging\",\"status\":\"skipped\",\"reason\":\"mid-merge: unmerged index entries\"}],\"error\":null,\"warnings\":[]}\nFAIL\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/acs/cycle2614\t5.621s\nFAIL\n",
+  "last_failure_fingerprint": "text:68a625168901",
+  "last_failure_reason": "cycle-failure-release",
+  "last_failure_rung": "R3",
+  "origin": "console",
+  "priority_class": "stability",
+  "retry_plan": "fresh-deep-plan",
+  "source": "boundary 187 to 188, 2026-11-23: wave next step 1",
+  "summary": "evolve wave next stopped at step 1/19 (checkpoint save --all, rc 1, fatal: git-write-tree: error building trees) because one dev worktree (a console rebuild of PR #1709) had unmerged index entries while its builder resolved conflicts. The brake stayed engaged and wave 188 did not launch.",
+  "title": "evolve checkpoint save --all skips a dev worktree that is mid-merge instead of failing the boundary",
+  "weight": 0.7
+}

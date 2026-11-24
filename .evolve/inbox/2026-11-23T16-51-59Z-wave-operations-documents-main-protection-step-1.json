@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "docs/operations/wave-operations.md (STE) states the live protection of main: step 1 applied 2026-11-24 (allow_force_pushes=false, allow_deletions=false, no required checks, no required reviews, enforce_admins=false), how to read it back (gh api .../branches/main/protection), and that step 2 (one required check) waits for I9.",
+    "The doc names the enforce_admins=false consequence: the rules do not bind admin identities, which the console, lanes and train use."
+  ],
+  "created_at": "2026-11-23T16:51:59Z",
+  "files": [
+    "docs/operations/wave-operations.md"
+  ],
+  "fix": "Document main branch protection step 1 as applied, with its read-back and the step-2 condition.",
+  "id": "wave-operations-documents-main-protection-step-1",
+  "kind": "docs",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "operator decision 2026-11-24 (main protection step 1 applied by gh api)",
+  "summary": "Main branch protection step 1 (refuse force-push and branch delete) was applied on 2026-11-24 by the console through gh api and verified by read-back. The item main-branch-protection-in-two-steps asks for the steps to be documented in docs/operations/wave-operations.md in STE.",
+  "title": "wave-operations.md documents main branch protection step 1 as applied",
+  "weight": 0.4
+}

@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "A reader can map a log run dir to its run lease RunID or RunIDs",
+    "The loop process receives the log run id through a named carrier, and a test covers the launch step to the lease file",
+    "The reader has a production caller in the same change (H3 or H4)"
+  ],
+  "created_at": "2026-11-23T15:38:29Z",
+  "files": [
+    "go/internal/runlease/runlease.go",
+    "go/internal/core/runlease_hook.go",
+    "go/cmd/evolve/cmd_loop.go",
+    "go/cmd/evolve/cmd_boundary.go",
+    "go/internal/gcpolicy/logs.go"
+  ],
+  "fix": "Pick the carrier in the H3 design: a CLI parameter that the launcher passes to evolve loop (never an env read), or derive the id from the loop log path with a gcpolicy helper. Write the id into the lease (a LogRunID field) or into the log dir. Add the reader (for example runlease.RunsForLog) and its first production caller in the same change, with a wiring test from the launch step to the lease file on disk.",
+  "id": "log-run-id-links-to-run-leases-with-h3",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "summary": "Arch 6 of the H1 review, split from log-retention-followups. The log run id (logs/<run-id>) is made once per launch in cmd_boundary.go:120 and cmd_wave_compose.go:111. The run lease RunID (runlease.Lease, written by core.startRunLease at runlease_hook.go:14) is made once per cycle workspace. One log dir maps to many leases. The loop process has no log run id today, and no code reads the link. H3 and H4 need it to select a log by run. Build the link only together with its reader, so no field is written without a caller. Matching by writer pid was rejected: it breaks on pid reuse.",
+  "title": "Link a log run dir to its run lease RunID, wired with its reader in H3 and H4",
+  "weight": 0.5
+}

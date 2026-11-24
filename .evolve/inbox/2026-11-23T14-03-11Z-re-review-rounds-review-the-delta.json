@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A re-review round (round 2 or later) of the same change reviews the delta since the last reviewed tree plus the open findings of the earlier rounds, not the whole diff afresh.",
+    "A finding on a line that an earlier round reviewed and did not flag is reported as a late finding: it is filed as an item and does not block, unless it is CRITICAL.",
+    "A test drives three rounds over a fixture change and asserts the round-3 input is the delta and that a late HIGH does not block."
+  ],
+  "created_at": "2026-11-23T14:03:11Z",
+  "files": [
+    "go/internal/cli/agentcmd",
+    "go/internal/commitgate"
+  ],
+  "fix": "Give the review seats a round-aware input: the delta since the last reviewed tree and the prior findings. Classify late findings on already-reviewed lines as items, not blockers, so the convergence rule (no round 4) can converge.",
+  "id": "re-review-rounds-review-the-delta",
+  "kind": "pipeline-integrity",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "console builds of 2026-11-23: #1690, #1691, the YAML floor check and C13",
+  "summary": "On 2026-11-23 a fresh architecture seat run on the whole diff at each round found new HIGH findings in code that earlier rounds had passed, on four changes (#1690 r4: 4 HIGH, #1691, the YAML check r3: 3 HIGH after an r2 PASS, rank-5 design r3 reversing an r2 instruction). Each round re-reads the whole diff, so the finding set does not shrink and the no-round-4 rule forces an escalation or an ad hoc delta review every time.",
+  "title": "Re-review rounds review the delta and the open findings, so reviews converge",
+  "weight": 0.8
+}

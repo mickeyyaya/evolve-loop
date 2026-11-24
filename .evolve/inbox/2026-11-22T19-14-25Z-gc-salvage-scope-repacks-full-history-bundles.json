@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "evolve gc --only salvage --dry-run lists each salvage dir with its action (repack, drop-redundant, keep) and the bytes it frees, and changes nothing.",
+    "A non-dry run re-packs each full-history bundle against origin/main. The new bundle has the same heads, passes git bundle verify, and replaces the old one atomically.",
+    "A bundle whose heads are all reachable from origin/main is removed. A bundle whose head cannot be verified is kept and reported.",
+    "The scope never touches the salvage of a running cycle, and it writes one audit row per action.",
+    "The salvage writer creates incremental bundles, so a new salvage of one cycle costs megabytes, not a gigabyte.",
+    "Red-first tests drive the scope and the writer through the real verbs."
+  ],
+  "created_at": "2026-11-22T19:14:25Z",
+  "files": [
+    "go/cmd/evolve/cmd_gc.go"
+  ],
+  "fix": "Add the gc scope salvage: for each salvage bundle of a finished cycle, re-pack it against origin/main (heads verified one for one, git bundle verify passes, atomic replace), and remove a bundle whose heads are all reachable from origin/main. Write each action to an audit record. Make the salvage writer create incremental bundles against origin/main.",
+  "id": "gc-salvage-scope-repacks-full-history-bundles",
+  "intake_override": {
+    "reason": "operator decision 2026-11-22: the console builds it now at the boundary, before wave 188",
+    "console_route": true
+  },
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "source": "operator decision 2026-11-22 (New gc verb, lossless); wave 187 disk starvation",
+  "summary": "runtime/.evolve/operator-salvage holds 151 GB in 269 salvage dirs. Each dir is HEAD plus refs.bundle, and each bundle packs the full repository history (cycle 2532: 1,092 MiB for one head) instead of only the cycle's commits. No gc scope touches salvage. In wave 187 the disk guard paused dispatch at 3% free, and 3 of 5 lanes exited without a cycle.",
+  "title": "evolve gc --only salvage re-packs full-history salvage bundles, and new salvage bundles are incremental",
+  "weight": 0.97
+}

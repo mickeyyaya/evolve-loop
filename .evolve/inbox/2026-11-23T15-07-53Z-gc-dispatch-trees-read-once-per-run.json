@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "evolve gc reads .evolve/dispatch-trees once per run and shares the result between the process pass and the tree pass.",
+    "The only-the-tag-proof-applies WARN prints once per tagged process per run, not once per pass."
+  ],
+  "created_at": "2026-11-23T15:07:53Z",
+  "files": [
+    "go/internal/gc/dispatch_processes.go",
+    "go/internal/gc/dispatch_trees.go"
+  ],
+  "fix": "Load the dispatch tree records once into a run-scoped cache that both gc passes read.",
+  "id": "gc-dispatch-trees-read-once-per-run",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "code review r1 of dispatch-hygiene-followups, 2026-11-23",
+  "summary": "After the dispatch-hygiene follow-ups, evolve gc reads the dispatch tree directory twice per run (process pass and tree pass) and repeats the only-the-tag-proof-applies WARN for each tagged process on each pass, which doubles the I/O and the log noise.",
+  "title": "gc reads the dispatch tree records once per run",
+  "weight": 0.3
+}

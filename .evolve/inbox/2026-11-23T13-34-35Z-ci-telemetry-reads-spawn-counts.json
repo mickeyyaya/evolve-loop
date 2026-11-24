@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "evolve ci telemetry reads spawns.ndjson from a CI run and reports pkg.spawns.git and pkg.spawns.go per package.",
+    "A package with no spawn lines reports 0, and a run with no spawns.ndjson reports the fields as absent, not 0."
+  ],
+  "created_at": "2026-11-23T13:34:35Z",
+  "files": [
+    "go/cmd/evolve"
+  ],
+  "fix": "Add the spawn-count reader to the CI telemetry report, next to the rusage and sampler readers, keyed by TESTRUSAGE_PKG.",
+  "id": "ci-telemetry-reads-spawn-counts",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "design review of ci-wall-time C13, 2026-11-23",
+  "summary": "ci-wall-time C13 adds a git/go spawn shim that writes one line per spawn to spawns.ndjson, keyed by package. The design review found no reader: the evolve ci telemetry report has no pkg.spawns fields, so the counts are collected and never read.",
+  "title": "The CI telemetry report reads the per-package git and go spawn counts",
+  "weight": 0.5
+}

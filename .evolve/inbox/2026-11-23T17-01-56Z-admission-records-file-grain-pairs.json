@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Each lane admission granted by file grain (not by package grain) records a signal with the pair, the cells and the later outcome, as the optimistic admission already does for reach-disjoint pairs.",
+    "evolve wave status (or a report verb) shows the fail rate of file-grain admitted pairs per wave."
+  ],
+  "created_at": "2026-11-23T17:01:56Z",
+  "files": [
+    "go/internal/admission/admission.go"
+  ],
+  "fix": "Record file-grain admissions and their outcomes so a fail rate exists before any finer grain is enabled.",
+  "id": "admission-records-file-grain-pairs",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "source": "admission cell-grain study 2026-11-24 (rank 25)",
+  "summary": "recordOptimistic fires only for pairs the reach rule holds (admission.go:133-143), so no signal records a file-grain admission and its fail rate is unmeasured. The reach-disjoint reference is 20.4% (43 of 211, 11-03 to 11-22).",
+  "title": "Admission records file-grain pairs and their outcomes",
+  "weight": 0.4
+}

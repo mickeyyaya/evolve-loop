@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "A held record with a ship_window_held WAIT gets a real audit report by the next boundary without an operator step",
+    "The retry runs only when no ship window or ship.lock is held (test)"
+  ],
+  "created_at": "2026-11-23T23:27:03Z",
+  "deps": [
+    "held-proposal-adversarial-audit-dispatch"
+  ],
+  "files": [
+    "go/internal/heldaudit/",
+    "go/cmd/evolve/"
+  ],
+  "fix": "At the boundary (or the wave-end step), list held records whose audit report is WAIT ship_window_held or port_not_wired and run the same dispatch through `landing audit`, idempotent per tree.",
+  "id": "held-audit-retries-after-a-window-wait",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "console",
+  "summary": "H4 (held-proposal-adversarial-audit-dispatch) records WAIT ship_window_held when the orchestrator still holds the ship window after a fleet-rebase recovery, and launches nothing. Nothing drives the retry: it rides the next ship try of that cycle or a manual `evolve landing audit --cycle N`.",
+  "title": "A held audit that waited on a held ship window is retried by the pipeline",
+  "weight": 0.5
+}

@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "go test -tags acs -run TestC2501 ./acs/cycle2501 passes on main",
+    "The predicate names a test that exists, or the row is retired with the commit that removed the test cited"
+  ],
+  "created_at": "2026-11-23T20:10:00Z",
+  "deps": [],
+  "files": [
+    "acs/cycle2501/",
+    "go/internal/phases/audit/shadow_wiring_seam_test.go"
+  ],
+  "fix": "Find the test's new name or its removal commit (git log -S on main). Repoint the cycle-2501 predicate to the current test, or retire the predicate row with the evidence, so TestC2501 passes on main.",
+  "id": "acs-cycle2501-predicate-names-a-renamed-test",
+  "kind": "test",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console",
+  "summary": "go test -tags acs -run TestC2501 ./acs/cycle2501 fails on origin/main f652fc150. Its predicate expects internal/phases/audit TestProductionPath_BothShadowSignalsReachTheCenter (rule asserts-own-setup, shadow_wiring_seam_test.go), but that test is absent on main after evolve-pr 1595 integrate. Found during the T6d console build (rank 40), which does not touch that package.",
+  "title": "The cycle-2501 acs predicate names a test that no longer exists",
+  "weight": 0.5
+}

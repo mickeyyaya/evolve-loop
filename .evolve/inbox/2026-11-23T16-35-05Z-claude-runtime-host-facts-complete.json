@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "skills/loop/reference/claude-runtime.md, Claude Code host facts, holds the four facts the guidance plan names: parallel shell calls share one working directory; a monitored pipeline needs line buffering; the skill tool is system level; a commit hook can flag a -n option as a false positive.",
+    "Each fact is written once, in STE, with its evidence; ste-lint --strict reports 0."
+  ],
+  "created_at": "2026-11-23T16:35:05Z",
+  "files": [
+    "skills/loop/reference/claude-runtime.md"
+  ],
+  "fix": "Write the four remaining Claude Code host facts that guidance G9 moved out of the console memory.",
+  "id": "claude-runtime-host-facts-complete",
+  "kind": "docs",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "source": "guidance G9 build, 2026-11-24",
+  "summary": "Guidance G9 moved the Claude Code host facts into skills/loop/reference/claude-runtime.md, but only three were written. The plan names four more (parallel shell calls share one working directory, monitored pipelines need line buffering, the skill tool is system level, a commit hook can flag -n as a false positive), which so far live only in the console memory.",
+  "title": "claude-runtime.md holds every Claude Code host fact the guidance plan names",
+  "weight": 0.3
+}
