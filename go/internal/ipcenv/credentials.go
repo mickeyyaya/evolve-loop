@@ -6,6 +6,10 @@ import (
 	"strings"
 )
 
+const sshBinary = "ssh"
+
+const GitSSHCommand = sshBinary + " -F /dev/null -o BatchMode=yes -o IdentitiesOnly=yes -o IdentityAgent=none -o IdentityFile=/dev/null"
+
 type CredentialSet struct {
 	Set   map[string]string
 	Unset []string
@@ -17,7 +21,7 @@ func CredentialIsolation(ghConfigDir, gitConfigGlobal string) CredentialSet {
 			"GIT_CONFIG_GLOBAL":   gitConfigGlobal,
 			"GIT_CONFIG_NOSYSTEM": "1",
 			"GIT_TERMINAL_PROMPT": "0",
-			"GIT_SSH_COMMAND":     "ssh -o BatchMode=yes",
+			"GIT_SSH_COMMAND":     GitSSHCommand,
 			"GH_CONFIG_DIR":       ghConfigDir,
 		},
 		Unset: []string{"GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"},
