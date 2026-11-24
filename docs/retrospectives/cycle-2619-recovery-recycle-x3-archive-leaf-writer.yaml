@@ -1,0 +1,11 @@
+- id: "cycle-2619-recovery-recycle-x3-archive-leaf-writer"
+  pattern: "recovery of recycle-x3-archive-leaf-writer"
+  description: "The item `recycle-x3-archive-leaf-writer` failed in 3 tries with the classes `verdict-fail` and `unknown`. Cycle 2619 shipped it. Before a new try of a similar item, read the difference above."
+  source: "docs/retrospectives/cycle-2619-recovery-recycle-x3-archive-leaf-writer.md"
+  type: "recovery"
+  category: "retrospective"
+  preventiveAction: "Before a new try of a similar item, read the retrospective cycle-2619-recovery-recycle-x3-archive-leaf-writer in docs/retrospectives"
+  confidence: 0.8
+  failureContext:
+    failedStep: ""
+    errorCategory: "verdict-fail unknown"
