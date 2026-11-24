@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -27,7 +28,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
-var homeSecrets = []string{".ssh", ".aws", ".gnupg", ".netrc", ".config/gh", ".docker/config.json", ".kube", ".git-credentials", ".config/git/credentials"}
+var loginSecrets = []string{".codex/auth.json", ".gemini/oauth_creds.json", ".gemini/google_accounts.json"}
 
 const (
 	logShowPath    = "/usr/bin/log"
@@ -61,7 +62,7 @@ func (deps Deps) readIsolation(req SandboxWrapRequest, home string) sandbox.Read
 	}
 	ri.Grants, ri.ReportOnly = deps.indexGrants(req, ri.RunsDir)
 	ri.RawFiles = rawFilesOf(ri.Workspace)
-	ri.SecretDirs, ri.SecretFiles = secretsOf(home)
+	ri.SecretDirs, ri.SecretFiles = secretsOf(home, homeReadsOf(req.CLI))
 	ri.PinnedFiles = []string{filepath.Join(ri.Workspace, committedset.LanePinFile)}
 	return ri
 }
@@ -117,11 +118,29 @@ func rawFilesOf(workspace string) []string {
 	return out
 }
 
-func secretsOf(home string) (dirs, files []string) {
+func homeReadsOf(cli string) []string {
+	m, err := loadManifestRaw(cli)
+	if err != nil {
+		return nil
+	}
+	return m.HomeReads
+}
+
+func ownsLogin(reads []string, rel string) bool {
+	return slices.ContainsFunc(reads, func(entry string) bool {
+		below, ok := homeReadRel(entry)
+		return ok && pathCovers(below, rel)
+	})
+}
+
+func secretsOf(home string, reads []string) (dirs, files []string) {
 	if home == "" {
 		return nil, nil
 	}
-	for _, rel := range homeSecrets {
+	for _, rel := range sandbox.HomeSecrets {
+		if ownsLogin(reads, rel) {
+			continue
+		}
 		path := canonicalOrSelf(filepath.Join(home, rel))
 		info, err := os.Stat(path)
 		switch {

@@ -19,6 +19,12 @@ const (
 	CellMessagePrefix     = "evolve-cell="
 )
 
+var HomeSecrets = []string{
+	".ssh", ".aws", ".gnupg", ".netrc", ".config/gh", ".docker/config.json", ".kube", ".git-credentials", ".config/git/credentials",
+	".config/gcloud", ".azure", ".npmrc", ".pypirc", ".cargo/credentials.toml", ".cargo/credentials",
+	".codex/auth.json", ".gemini/oauth_creds.json", ".gemini/google_accounts.json",
+}
+
 type ReadIsolation struct {
 	Enforce     bool
 	Tag         string
@@ -45,6 +51,7 @@ func (ri ReadIsolation) secretsDenied() bool {
 func (ri ReadIsolation) guardSecret(b *strings.Builder, filter string) {
 	message := fmt.Sprintf("%s%s rule=%s inv=I5", CellMessagePrefix, ri.Tag, RuleHomeSecret)
 	fmt.Fprintf(b, "(deny file-read-data %s (with message %q))\n", filter, message)
+	fmt.Fprintf(b, "(deny file-write* %s (with message %q))\n", filter, message)
 }
 
 func (ri ReadIsolation) guard(b *strings.Builder, op, filter, rule, invariant string) {

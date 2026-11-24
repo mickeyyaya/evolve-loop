@@ -415,12 +415,12 @@ func TestSecretsOf_ListsTheGitCredentialFilesThatExist(t *testing.T) {
 	}
 	writeFixtureFile(t, filepath.Join(home, ".git-credentials"), "https://u:p@github.com")
 	writeFixtureFile(t, filepath.Join(home, ".config", "git", "credentials"), "https://u:p@github.com")
-	dirs, files := secretsOf(home)
+	dirs, files := secretsOf(home, homeReadsOf("claude-tmux"))
 	want := []string{canonicalOrSelf(filepath.Join(home, ".git-credentials")), canonicalOrSelf(filepath.Join(home, ".config", "git", "credentials"))}
 	if len(dirs) != 0 || !slices.Equal(files, want) {
 		t.Fatalf("dirs %v files %v, want the two git credential files %v", dirs, files, want)
 	}
-	if dirs, files := secretsOf(t.TempDir()); len(dirs)+len(files) != 0 {
+	if dirs, files := secretsOf(t.TempDir(), homeReadsOf("claude-tmux")); len(dirs)+len(files) != 0 {
 		t.Fatalf("an absent entry is not listed: %v %v", dirs, files)
 	}
 }
