@@ -14,19 +14,16 @@ func removalFixture(t *testing.T, report string, present []string) ReviewInput {
 	t.Helper()
 	root := t.TempDir()
 	ws := filepath.Join(root, "workspace")
-	wt := filepath.Join(root, "worktree")
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatalf("mkdir %s: %v", ws, err)
 	}
-	if err := os.MkdirAll(wt, 0o755); err != nil {
-		t.Fatalf("mkdir %s: %v", wt, err)
-	}
-	repo := gittest.At(t, wt)
-	if err := os.WriteFile(filepath.Join(wt, "README"), []byte("base\n"), 0o644); err != nil {
-		t.Fatalf("write README: %v", err)
-	}
-	repo.Git("add", "-A")
-	repo.Git("commit", "-q", "-m", "base")
+	repo := gittest.FromTemplate(t, "core-removal-check-base", func(r *gittest.Repo) error {
+		r.Write("README", "base\n")
+		r.Git("add", "-A")
+		r.Git("commit", "-q", "-m", "base")
+		return nil
+	})
+	wt := repo.Dir
 	if report != "" {
 		if err := os.WriteFile(filepath.Join(ws, "build-report.md"), []byte(report), 0o644); err != nil {
 			t.Fatalf("write build-report.md: %v", err)

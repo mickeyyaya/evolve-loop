@@ -40,6 +40,7 @@ func StaticBuildFloorChecks(ctx context.Context, in ReviewInput) []string {
 	out = append(out, testAuditFailures(ctx, in)...)
 	out = append(out, docsFloorChecks(ctx, in, paths)...)
 	out = append(out, commentFloorFailures(ctx, in)...)
+	out = append(out, historyFloorFailures(ctx, in)...)
 	out = append(out, sizeFloorFailures(ctx, in)...)
 	return append(out, floorListRegressions(ctx, in)...)
 }

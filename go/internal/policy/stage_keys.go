@@ -183,6 +183,7 @@ var stageReaders = map[string]stageReader{
 	"docs_floor.stage":                           plainStage(func(p Policy) string { return p.DocsFloorConfig().Stage }),
 	"docs_floor.ste_stage":                       plainStage(func(p Policy) string { return p.DocsFloorConfig().SteStage }),
 	"comment_floor.stage":                        plainStage(func(p Policy) string { return p.CommentFloorConfig().Stage }),
+	"comment_floor.history_stage":                plainStage(func(p Policy) string { return string(p.CommentFloorConfig().HistoryStage) }),
 	"held_proposals.stage":                       plainStage(func(p Policy) string { return p.HeldProposalsStage().String() }),
 	"cover_changed.stage":                        plainStage(func(p Policy) string { return p.CoverChangedConfig().Stage }),
 	"retrospectives.stage":                       plainStage(func(p Policy) string { return p.RetrospectivesConfig().Stage }),
