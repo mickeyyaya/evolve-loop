@@ -49,6 +49,7 @@ type contractHost struct {
 	evolveBin                   string
 	dispatch                    dispatchcred.Store
 	keychain                    string
+	messaging                   *MessagingIdentity
 }
 
 type contractRow struct {
@@ -327,6 +328,7 @@ func TestAgentSandboxContract(t *testing.T) {
 			}
 		})
 	}
+	runMessagingContract(t, h)
 }
 
 func TestAgentSandboxContract_TheLauncherStillStartsTheCLIThatTheCellCannotExec(t *testing.T) {
@@ -632,7 +634,7 @@ func seatPrefix(t *testing.T, probe sandbox.ProbeResult, h contractHost, execSta
 		t.Fatalf("the %s profile must declare an enabled sandbox: %v", seat, err)
 	}
 	cfg := &Config{CLI: cli, Agent: seat, ProjectRoot: h.root, Worktree: h.worktree, Workspace: h.run,
-		RequireSandbox: true, SandboxWriteSubpaths: prof.Sandbox.WriteSubpaths}
+		RequireSandbox: true, SandboxWriteSubpaths: prof.Sandbox.WriteSubpaths, Messaging: h.messaging}
 	if cfg.DenyPaths, err = resolveSandboxDenials(prof.Sandbox.DenySubpaths, h.root, h.worktree, true); err != nil {
 		t.Fatal(err)
 	}

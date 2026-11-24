@@ -476,3 +476,14 @@ func TestNew_RefusesAnIncompleteConfig(t *testing.T) {
 		t.Fatalf("New with a full config = %v, %v", s, err)
 	}
 }
+
+func TestChannels_NamesTheCycleChannelAndTheDeadLetterChannelUnderOnePrefix(t *testing.T) {
+	t.Parallel()
+	got := Channels(7)
+	if want := []string{ChannelPrefix + "7", ChannelPrefix + "dead.7"}; !slices.Equal(got, want) {
+		t.Fatalf("got %q want %q", got, want)
+	}
+	if ChannelPrefix != "msg." {
+		t.Fatalf("prefix: %q", ChannelPrefix)
+	}
+}
