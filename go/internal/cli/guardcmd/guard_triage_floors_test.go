@@ -44,7 +44,7 @@ func TestGuardTriageFloors_CleanWorkspaceExitsZero(t *testing.T) {
 	ws := triageFloorsFixture(t, cleanReport,
 		`{"cycle":305,"committed_floors":["core"],"deferred_floors":["bridge"]}`)
 	var stdout, stderr bytes.Buffer
-	rc := RunGuard([]string{"triage-floors", ws}, nil, &stdout, &stderr)
+	rc := runVerb([]string{"triage-floors", ws}, nil, &stdout, &stderr)
 	if rc != 0 {
 		t.Fatalf("clean workspace (declarations match prose) must exit 0; rc=%d stdout=%s stderr=%s",
 			rc, stdout.String(), stderr.String())
@@ -55,7 +55,7 @@ func TestGuardTriageFloors_DivergenceExitsNonZero(t *testing.T) {
 	ws := triageFloorsFixture(t, cleanReport,
 		`{"cycle":305,"committed_floors":["core"],"deferred_floors":["core"]}`)
 	var stdout, stderr bytes.Buffer
-	rc := RunGuard([]string{"triage-floors", ws}, nil, &stdout, &stderr)
+	rc := runVerb([]string{"triage-floors", ws}, nil, &stdout, &stderr)
 	if rc == 0 {
 		t.Fatalf("declaration/prose divergence must exit non-zero; rc=0 stdout=%s", stdout.String())
 	}
@@ -63,7 +63,7 @@ func TestGuardTriageFloors_DivergenceExitsNonZero(t *testing.T) {
 
 func TestGuardTriageFloors_HelpIsInformative(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	rc := RunGuard([]string{"triage-floors", "--help"}, nil, &stdout, &stderr)
+	rc := runVerb([]string{"triage-floors", "--help"}, nil, &stdout, &stderr)
 	out := stdout.String() + stderr.String()
 	if rc != 0 {
 		t.Fatalf("triage-floors --help must exit 0; rc=%d out=%s", rc, out)

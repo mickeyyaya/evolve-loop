@@ -159,3 +159,22 @@ func TestProposals_Faults(t *testing.T) {
 		}
 	})
 }
+
+func TestProposal_ASkippedIncidentRetriesLikeAFailedOneAndHoldsNoDiagnosis(t *testing.T) {
+	t.Parallel()
+	inc := liveIncident(t, stallIncident)
+	skipped := NewProposal(inc, "shadow", "", t0).Skipped("guard_refused: the pass stopped")
+	if skipped.State != ProposalSkipped || skipped.Error != "guard_refused: the pass stopped" || skipped.Action != nil || skipped.Diagnosis != nil || !skipped.NeverDiagnosed() {
+		t.Fatalf("skipped %+v", skipped)
+	}
+	if !NewProposal(inc, "shadow", "", t0).Failed(errors.New("x")).NeverDiagnosed() || NewProposal(inc, "shadow", "", t0).Refused(errors.New("x")).NeverDiagnosed() {
+		t.Error("a failed run was never diagnosed; a refused diagnosis was")
+	}
+	done := map[string]Proposal{inc.ID: skipped}
+	if got := Pending([]Incident{inc}, done, PassLimits{Max: 8, RetryAt: t0.Add(-time.Hour)}); len(got) != 0 {
+		t.Errorf("within its backoff a skipped incident waits, got %v", ids(got))
+	}
+	if got := Pending([]Incident{inc}, done, PassLimits{Max: 8, RetryAt: t0}); len(got) != 1 {
+		t.Errorf("after its backoff a skipped incident is proposed again, got %v", ids(got))
+	}
+}

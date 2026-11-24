@@ -59,6 +59,7 @@
 - **Capabilities** (`capabilities.go`, X17e, [cli-contract.md](../cli-contract.md) §4.2). The verb prints `agentclass.Surface` with no cell. With `--json` the document is the `data` of the envelope `evolve.agent.capabilities/1`. The text form has one line for each verb and ends with `default D`. `caps.dispatch` is the block `isolation.dispatch_requests` of the policy of `--project-root`, with its defaults ([llm-isolation.md](../llm-isolation.md) §7.2.1). A stray word or an unknown flag is exit 10.
   - `--project-root` is accepted for the contract of §5, and the table is the same for each root.
   - Pinned by `TestAgentCapabilities_JSONListsEachVerbOfTheTableWithDefaultClassD` and `TestAgentCapabilities_TextNamesEachClassAndAStrayWordIsUsage`.
+- **The envelope carries the cause.** `Envelope.CauseCode` is the `CauseCode` of the last bridge response of the run (`launchSpy`), and the field `cause_code` is empty on success. A caller reads it as a typed fact. `evolve selfheal propose` stops its pass on `guard_refused`.
 
 ## Invariants
 

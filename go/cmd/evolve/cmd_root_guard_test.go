@@ -86,6 +86,7 @@ func TestRootSignalCenter_EveryRootSubscribesThePublisher(t *testing.T) {
 			"cmd/evolve/cmd_cycle.go:wireOrchestratorDeps",
 			"cmd/evolve/cmd_cycle_retire.go:runCycleRetire",
 			"cmd/evolve/cmd_cycle_simulate.go:wireSimulateOrchestrator",
+			"cmd/evolve/cmd_guard_signals.go:guardDenialCenter",
 			"cmd/evolve/cmd_logs.go:readLogs",
 			"cmd/evolve/cmd_loop_chain.go:maybeRefreshChainBoundary",
 			"cmd/evolve/cmd_loop_chain.go:runLoopChain",

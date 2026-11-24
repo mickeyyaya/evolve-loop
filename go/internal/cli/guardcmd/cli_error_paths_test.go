@@ -359,9 +359,9 @@ func TestRunGuard_BuildGuardBranches(t *testing.T) {
 	dir := t.TempDir()
 	for _, name := range []string{"phase", "role", "chain", "docdelete"} {
 		var out, errb bytes.Buffer
-		rc := RunGuard([]string{"--evolve-dir", dir, name}, strings.NewReader(""), &out, &errb)
+		rc := runVerb([]string{"--evolve-dir", dir, name}, strings.NewReader(""), &out, &errb)
 		if rc != 0 && rc != 2 {
-			t.Fatalf("RunGuard(%s) rc = %d, want 0 (allow) or 2 (deny)\nstderr=%s", name, rc, errb.String())
+			t.Fatalf("runVerb(%s) rc = %d, want 0 (allow) or 2 (deny)\nstderr=%s", name, rc, errb.String())
 		}
 	}
 
@@ -384,9 +384,9 @@ func TestRunGuard_BuildGuardBranches(t *testing.T) {
 			if tc.stdin != "" || tc.args != nil {
 				stdin = strings.NewReader(tc.stdin)
 			}
-			rc := RunGuard(tc.args, stdin, &out, &errb)
+			rc := runVerb(tc.args, stdin, &out, &errb)
 			if rc != tc.want {
-				t.Fatalf("RunGuard(%v) rc = %d, want %d\nstderr=%s", tc.args, rc, tc.want, errb.String())
+				t.Fatalf("runVerb(%v) rc = %d, want %d\nstderr=%s", tc.args, rc, tc.want, errb.String())
 			}
 		})
 	}

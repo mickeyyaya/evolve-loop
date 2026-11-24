@@ -17,6 +17,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/failureadapter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/guards"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
@@ -82,7 +83,23 @@ func appendIntegrityAlarm(alarmPath, guardName string, in core.GuardInput, reaso
 	_, _ = f.Write(append(buf, '\n'))
 }
 
-func RunGuard(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+type CenterFor func(evolveDir string) (*signalcenter.Center, func())
+
+func denialPath(in core.GuardInput) string {
+	if path, _ := in.ToolInput["file_path"].(string); path != "" {
+		return path
+	}
+	command, _ := in.ToolInput["command"].(string)
+	return command
+}
+
+func Run(centerFor CenterFor) func(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	return func(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+		return runGuard(centerFor, args, stdin, stdout, stderr)
+	}
+}
+
+func runGuard(centerFor CenterFor, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("evolve guard", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var evolveDir string
@@ -130,13 +147,29 @@ func RunGuard(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if dec.Alarm {
 		appendIntegrityAlarm(filepath.Join(evolveDir, "integrity-alarm.jsonl"), name, in, dec.Reason)
 	}
-	payload := map[string]any{"guard": name, "allow": dec.Allow, "reason": dec.Reason}
+	return guardInvocation{name: name, in: in, evolveDir: evolveDir, centerFor: centerFor, stdout: stdout, stderr: stderr}.report(dec)
+}
+
+type guardInvocation struct {
+	name      string
+	in        core.GuardInput
+	evolveDir string
+	centerFor CenterFor
+	stdout    io.Writer
+	stderr    io.Writer
+}
+
+func (g guardInvocation) report(dec core.GuardDecision) int {
+	payload := map[string]any{"guard": g.name, "allow": dec.Allow, "reason": dec.Reason}
 	if buf, mErr := json.Marshal(payload); mErr == nil {
-		fmt.Fprintf(stdout, "%s\n", buf)
+		fmt.Fprintf(g.stdout, "%s\n", buf)
 	}
 	if !dec.Allow {
+		center, closeCenter := g.centerFor(g.evolveDir)
+		guards.EmitDenial(center, guards.Denial{Guard: g.name, Path: denialPath(g.in), Reason: dec.Reason, CWD: g.in.CWD})
+		closeCenter()
 		if dec.Reason != "" {
-			fmt.Fprintf(stderr, "[guard:%s] DENY: %s\n", name, dec.Reason)
+			fmt.Fprintf(g.stderr, "[guard:%s] DENY: %s\n", g.name, dec.Reason)
 		}
 		return 2
 	}

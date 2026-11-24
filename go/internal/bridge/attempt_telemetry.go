@@ -76,7 +76,7 @@ func (e *Engine) recordModelAttempt(
 	code int,
 	start, end time.Time,
 	dispatched modelDispatch,
-	launchStderr string,
+	causeCode string,
 	resp *core.BridgeResponse,
 	marks ...func(*llmcalls.Record),
 ) attemptLogContext {
@@ -121,7 +121,7 @@ func (e *Engine) recordModelAttempt(
 		ExitCode:        &exitCode,
 		Tripwire:        tripwire,
 		FillPct:         result.FillPct,
-		CauseCode:       launchoutcome.CauseCode(code, launchStderr),
+		CauseCode:       causeCode,
 		ServedModel:     result.ServedModel,
 	}
 	attributeToRequest(&rec, req, attempt)
@@ -285,7 +285,7 @@ func isTelemetryTripwire(cli string, code int, start, end time.Time, source toke
 }
 
 func (e *Engine) recordTokenUsage(req core.BridgeRequest, model string, code int, start time.Time, resp *core.BridgeResponse) {
-	e.recordModelAttempt(req, model, code, start, e.deps.Now(), modelDispatch{}, "", resp)
+	e.recordModelAttempt(req, model, code, start, e.deps.Now(), modelDispatch{}, launchoutcome.CauseCode(code, ""), resp)
 }
 
 func markTry(run launchRun, try *retryladder.Try) func(*llmcalls.Record) {

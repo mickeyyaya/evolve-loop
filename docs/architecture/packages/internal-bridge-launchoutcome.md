@@ -21,6 +21,12 @@
   - Only exit 81 has this rule. No other cause changes.
 - **The marker.** `ArtifactTimeoutMarker` prefixes the one self-describing summary line. It is hyphenated and followed by colon-space. It can then never collide with the `artifact_timeout` stop-kind string. The classifier takes the last `[bridge]`-prefixed candidate. Earlier free-form diagnostics are sanitized, and closeout writes the authoritative marker last.
 - **The typed sub-cause never comes from prose.** `timeoutCauseCode` reads only the `cause=` value. It accepts the value only if `Known()` says so. On exit 81 the cause code of the ledger is that sub-cause, else the code of the row.
+- **A guard refusal (`guard_refused`).**
+  - `GuardRefusal(events, cell)` is pure. It returns the first event with the code `ISOLATION_GUARD_DENIED`, `neutral=true` and a `cwd` that is the cell or a path under it. A sibling directory with the same prefix does not match.
+  - `Attempt` (code, context error, stderr and `Refusal`) is the one input of the classifier. Its methods `Classify` and `CauseCode` hold the logic. `causeCodeOf` holds the one precedence rule. On exit 81 the cause is `guard_refused` only when the timeout cause is empty or `incomplete`. A typed infrastructure cause (`pane_lost`, `transient_upstream`, `context_cancelled`, `submit_wedged`, `completion_detector_error`, `review_stop`, `review_pause`) keeps its code and its chain. Every other exit ignores the refusal.
+  - The error text names the guard and the path (`Refusal.Text`), and does not name quota. It still wraps `core.ErrArtifactTimeout`.
+  - The package functions `Classify` and `CauseCode` stay as the no-refusal calls.
+  - Limit: the pane can append a `neutral=true` line to its own stream. The effect is a shorter chain, never a passed phase.
 - **Exit 85 (unknown prompt).** The report line is the escalation line of the auto-responder, else the corroborated quota wall, else nothing. The ledger sub-cause is the pattern that the responder matched. A corroborated wall gives `rate_limit`. A prompt that nobody recognised gives an empty sub-cause.
 - **Bounds.** The cause line and the summary are cut at a rune boundary, never inside a UTF-8 sequence. `maxCauseRunes` bounds the cause line. The larger `maxSummaryRunes` bounds the summary. A cut ends in an ellipsis.
 

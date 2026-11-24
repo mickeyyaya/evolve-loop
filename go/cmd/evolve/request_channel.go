@@ -17,6 +17,15 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
+type GuardRefusedError struct {
+	Profile string
+	Reason  string
+}
+
+func (e GuardRefusedError) Error() string {
+	return fmt.Sprintf("evolve agent run %s: %s: %s", e.Profile, core.CauseGuardRefused, e.Reason)
+}
+
 type agentSeat func(args []string, stdin io.Reader, stdout, stderr io.Writer) int
 
 func runAgentSeat(agent agentSeat, args []string, input string, stderr io.Writer) (agentcmd.Envelope, error) {
@@ -25,6 +34,9 @@ func runAgentSeat(agent agentSeat, args []string, input string, stderr io.Writer
 	var run agentcmd.Envelope
 	if err := json.Unmarshal(stdout.Bytes(), &run); err != nil {
 		return run, fmt.Errorf("evolve agent run %s: exit %d with no JSON envelope: %w", args[0], rc, err)
+	}
+	if rc != 0 && run.CauseCode == core.CauseGuardRefused {
+		return run, GuardRefusedError{Profile: args[0], Reason: run.Error}
 	}
 	if rc != 0 {
 		return run, fmt.Errorf("evolve agent run %s: exit %d: %s", args[0], rc, run.Error)
