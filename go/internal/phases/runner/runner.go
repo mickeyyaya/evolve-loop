@@ -47,6 +47,10 @@ type Skipper interface {
 	ShouldSkip(req core.PhaseRequest) (skipped bool, verdict, nextPhase string, diags []core.Diagnostic)
 }
 
+type ContextSeeder interface {
+	SeedContext(req core.PhaseRequest) core.PhaseRequest
+}
+
 type SecondaryArtifactsProvider interface {
 	SecondaryArtifacts(req core.PhaseRequest) []string
 }
@@ -286,6 +290,13 @@ func StaticPrefix(prompt string) string {
 func FormatDigestShadowLog(phase string, record digest.ShadowRecord) string {
 	return fmt.Sprintf("[runner] phase=%s digest-shadow outcome=%s full_bytes=%d digest_bytes=%d parity=%t",
 		phase, record.Outcome, record.FullBytes, record.DigestBytes, record.Parity)
+}
+
+func (b *BaseRunner) SeedContext(req core.PhaseRequest) core.PhaseRequest {
+	if seeder, ok := b.hooks.(ContextSeeder); ok {
+		return seeder.SeedContext(req)
+	}
+	return req
 }
 
 func (b *BaseRunner) ComposePrompt(body string, req core.PhaseRequest) string {

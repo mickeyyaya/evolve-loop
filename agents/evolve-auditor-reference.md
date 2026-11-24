@@ -237,6 +237,12 @@ HIGH	<issue>	<file>	<line>
 
 ---
 
+## Section: final-diff-review
+
+Follow the `## Final Diff Review Sections (mandatory)` block that the host renders into Cycle Context for every audit round (ADR-0158 decisions 20 and 21). The block holds the section formats. The facts in `## Gate and Floor Facts` are fixed: do not argue them, re-run them or spend a finding on them.
+
+---
+
 ## Section: warn-elevation
 
 `legacy/scripts/verification/verdict-elevation.sh` automatically elevates `PASS @ confidence < 0.85` to `WARN`. Include a literal `**Confidence:** N.NN` line near your verdict where N.NN ∈ [0.0, 1.0]. Confidence ≥ 0.85 means: "I have positive evidence per criterion via P1 artifact citation, POSTHOC values match Builder's narrative, no P-violations remain."
