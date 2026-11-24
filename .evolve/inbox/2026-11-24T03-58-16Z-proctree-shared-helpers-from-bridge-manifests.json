@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "A dispatch-tagged ollama serve process is in the shared class and is never reaped by the tag proof, gc or the cwd proof",
+    "A dispatch-tagged ollama run process and a stray process with an unrelated serve argument stay killable",
+    "The shared-helper set comes from the bridge manifests by injection: go/internal/proctree holds no CLI family name and TestFlowCodeNamesNoFamily passes",
+    "The set that bridge returns is non-empty, and a test fails when a manifest declares a helper that proctree does not receive",
+    "Coverage of the new code is 100 percent, and the apicover and protected-surface gates stay green"
+  ],
+  "created_at": "2026-11-24T03:58:16Z",
+  "files": [
+    "go/internal/proctree/shared.go",
+    "go/internal/proctree/dispatch_owned_test.go",
+    "go/internal/bridge/families.go",
+    "go/internal/bridge/dispatch_reap.go",
+    "go/internal/gc/dispatch_processes.go",
+    "go/cmd/evolve/cmd_gc_dispatch.go",
+    "docs/architecture/packages/internal-proctree.md",
+    "docs/operations/runtime-reference.md",
+    "docs/plans/dispatch-process-hygiene-2026-10.md"
+  ],
+  "fix": "Add a field to the bridge manifest in which a family declares its long-lived helper subcommands (a program name plus the argument that makes it a shared server, for example the ollama manifest declares serve). Add a function in internal/bridge that collects these declarations from the manifests, as FamilyBinaries does for the binaries. Change proctree.Dispatch (and the gc and cwd callers of SharedHelper and NotShared) to take the shared-helper set as an injected value, so proctree holds no family name and no generic argument rule. Wire bridge.TagKillable, dispatch_reap.go and cmd_gc_dispatch.go to pass the set. Restore the docs lines about ollama serve in internal-proctree.md, runtime-reference.md and dispatch-process-hygiene-2026-10.md.",
+  "id": "proctree-shared-helpers-from-bridge-manifests",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "The dispatch reaper treats a long-lived helper that other sessions use (for example the ollama server started with the serve subcommand) as a shared helper and never stops it. PR 1733 first coded that rule in internal/proctree/shared.go with the literal family name ollama. TestFlowCodeNamesNoFamily (I-6, ADR-0154) refuses a CLI family name in flow code, so the rule was dropped from the PR. A generic rule on the serve argument was rejected: it would exempt every stray process that has a serve argument from the reaper. Result: on main and in PR 1733 a dispatch-tagged ollama serve process is killable by the tag proof alone.",
+  "title": "Data-driven shared-helper list: bridge manifests declare long-lived helper subcommands and proctree receives the set by injection",
+  "weight": 0.5
+}

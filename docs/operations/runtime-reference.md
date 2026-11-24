@@ -547,7 +547,7 @@ Every phase without write permission (registry `writes_source=false`: audit, adv
 >      - **Stale tree files.** A file in `.evolve/dispatch-trees/` is stale when the bridge pid of its dispatch is dead. Also, no member is a live process that gc can stop. `--dry-run` prints `WOULD-REMOVE-TREE <path> dispatch=<id> rule=stale-tree`. A real run reads the process table again and checks each file again. It prints `REMOVE-TREE` for each file it removes.
 >      - **Tree file faults.** A file that gc cannot remove is an error line and exit 1. A file that gc cannot read gets a `WARN` line and stays.
 >      - **Spared processes (report only).** gc prints `REPORT-ONLY pid=<pid> rule=<shared|not-killable> comm=<name> dispatch=<id>` for each process that gc spares and that has a valid tag, this project root and a dead bridge. It sends no signal and does not change the exit code.
->      - **The report rules.** `rule=shared` means a shared helper with no live pane (tmux, a Claude Code daemon, Chrome, `ollama serve`). `rule=not-killable` means a program that is not on the allow list (for example `gopls`, `ssh-agent`, Firefox).
+>      - **The report rules.** `rule=shared` means a shared helper with no live pane (tmux, a Claude Code daemon, Chrome). `rule=not-killable` means a program that is not on the allow list (for example `gopls`, `ssh-agent`, Firefox).
 >      - **Operator check for a spared process.** A crashed bridge can leave such a process with no persisted tree. Do this check by hand.
 >        1. Read the `REPORT-ONLY` lines from `evolve gc --dry-run`.
 >        2. Run `ps -o pid=,ppid=,etime=,command= -p <pid>` and decide if another session uses the process.
