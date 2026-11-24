@@ -907,3 +907,5 @@
 # hostsentinel — the pure decision core, signal codes and publisher of the loop host sentinel (plan host-sentinel-inside-the-loop-2026-11).
 ./internal/hostsentinel
 ./internal/promptboundary
+# ledgerscan — one chunked, newest-first reader of ledger.jsonl with a raw-byte prefilter and early exit (ADR-0123 decision 5, plan C8).
+./internal/ledgerscan
