@@ -73,9 +73,21 @@ func defaultTreeState(ctx context.Context, dir string) (string, error) {
 	return treestate.SHA(ctx, sysexec.DefaultRunner, dir, nil)
 }
 
-type command struct{ deps Deps }
+type Route struct {
+	Agent string
+	Admit func(cli, tier string) bool
+}
+
+type command struct {
+	deps  Deps
+	route Route
+}
 
 func New(d Deps) func(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	return NewRouted(d, Route{})
+}
+
+func NewRouted(d Deps, route Route) func(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if d.Abs == nil {
 		d.Abs = filepath.Abs
 	}
@@ -103,7 +115,7 @@ func New(d Deps) func(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	if d.VerbSchema == nil {
 		d.VerbSchema = func(string) string { return "" }
 	}
-	return command{deps: d}.dispatch
+	return command{deps: d, route: route}.dispatch
 }
 
 func (c command) dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) int {

@@ -102,10 +102,12 @@ type PhaseRequest struct {
 
 	UpstreamSignals map[string]any `json:"upstream_signals,omitempty"`
 
-	Assignment  TaskAssignment   `json:"assignment"`
-	Driver      llmroute.Binding `json:"-"`
-	BudgetScale float64          `json:"budget_scale,omitempty"`
-	Attempt     int              `json:"attempt,omitempty"`
+	Assignment  TaskAssignment              `json:"assignment"`
+	Driver      llmroute.Binding            `json:"-"`
+	RouteAgent  string                      `json:"-"`
+	Admit       func(cli, tier string) bool `json:"-"`
+	BudgetScale float64                     `json:"budget_scale,omitempty"`
+	Attempt     int                         `json:"attempt,omitempty"`
 
 	Ladder      *retryladder.Try `json:"-"`
 	BeforeClose CloseCheck       `json:"-"`

@@ -21,6 +21,32 @@ func TestHeldApproval_OnlyTheOperatorVerbWritesAnApproval(t *testing.T) {
 	}
 }
 
+var heldAuditReportWriters = []string{"internal/heldaudit/heldaudit.go"}
+
+func TestHeldAudit_OnlyTheAuditDispatchWritesAnAuditReport(t *testing.T) {
+	t.Parallel()
+	writers, err := filesCalling(filepath.Join("..", ".."), "heldproposal.WriteAuditReport(")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(writers, heldAuditReportWriters) {
+		t.Errorf("writers of heldproposal.WriteAuditReport = %v, want only %v: an audit report is written by the pipeline dispatch alone (ADR-0157)", writers, heldAuditReportWriters)
+	}
+}
+
+var heldAuditDiffWriters = []string{"internal/phases/ship/held_proposal_gate.go"}
+
+func TestHeldAudit_OnlyTheHoldWritesTheAuditDiff(t *testing.T) {
+	t.Parallel()
+	writers, err := filesCalling(filepath.Join("..", ".."), "heldproposal.WriteAuditDiff(")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(writers, heldAuditDiffWriters) {
+		t.Errorf("writers of heldproposal.WriteAuditDiff = %v, want only %v: the diff is the input that the audit digest binds (ADR-0157)", writers, heldAuditDiffWriters)
+	}
+}
+
 func TestFilesCalling_FindsACallerAndSkipsTests(t *testing.T) {
 	root := t.TempDir()
 	for rel, body := range map[string]string{
