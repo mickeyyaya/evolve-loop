@@ -135,7 +135,7 @@ func LoadOrDefaults(path string, warn io.Writer) Policy {
 func failClosed() Policy {
 	return Policy{
 		DocsFloor:    &DocsFloorPolicy{Stage: failClosedStage, SteStage: failClosedStage},
-		CommentFloor: &CommentFloorPolicy{Stage: failClosedStage},
+		CommentFloor: &CommentFloorPolicy{Stage: failClosedStage, HistoryStage: failClosedStage},
 		CoverChanged: &CoverChangedPolicy{Stage: failClosedStage},
 	}
 }

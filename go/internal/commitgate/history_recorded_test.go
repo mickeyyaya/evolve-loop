@@ -176,3 +176,18 @@ func (g stagedGit) Show(base, path string) ([]byte, error) {
 }
 
 func (g stagedGit) Root() (string, error) { return g.dir, nil }
+
+func TestRun_TheRefusalNamesTheExactHeadBasedRecordCommand(t *testing.T) {
+	t.Parallel()
+	res := runWaiverCase(t, waiverCase{
+		files:   "x.go\n",
+		atHead:  map[string]string{"x.go": historyAtHead},
+		onDisk:  map[string]string{"x.go": plainTrimmed},
+		wantRun: ExitFail,
+	})
+
+	want := "run `cd go && go run ./cmd/commentaudit history -base HEAD -label \"<this change>\" -out docs/history/code-comments` and stage the pages it writes"
+	if !strings.Contains(strings.Join(res.Logs, "\n"), want) {
+		t.Errorf("the refusal text changed: %v", res.Logs)
+	}
+}
