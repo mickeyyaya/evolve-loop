@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/incidentkb"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
@@ -217,8 +218,8 @@ func TestC2530_001_IssueCheckPassesOnTheCurrentTreeAndReportsLegacyFiles(t *test
 
 func TestC2530_002_IssueCheckRefusesANewIncidentFileWithNoFrontmatter(t *testing.T) {
 	control := oneRecord(goodRecord(t))
-	control["2026-08-09-old-incident.md"] = "# an old incident\n\nNo frontmatter, dated before 2026-11-19.\n"
-	newName := "2026-11-19-new-incident-without-frontmatter"
+	control["2026-08-09-old-incident.md"] = "# an old incident\n\nNo frontmatter, dated before the cutoff.\n"
+	newName := incidentkb.LegacyCutoff + "-new-incident-without-frontmatter"
 	broken := map[string]string{newName + ".md": "# a new incident\n\nNo frontmatter.\n"}
 	for name, body := range control {
 		broken[name] = body
@@ -284,15 +285,24 @@ func TestC2530_008_ABadFrontmatterFieldFailsNamingTheField(t *testing.T) {
 	}
 }
 
+func dayBeforeTheCutoff(t *testing.T) string {
+	t.Helper()
+	cutoff, err := time.Parse("2006-01-02", incidentkb.LegacyCutoff)
+	if err != nil {
+		t.Fatalf("LegacyCutoff %q is not a date: %v", incidentkb.LegacyCutoff, err)
+	}
+	return cutoff.AddDate(0, 0, -1).Format("2006-01-02")
+}
+
 func TestC2530_009_TheLegacyRuleAndTheNameSkips(t *testing.T) {
 	skipped := map[string]string{
-		"2026-08-09-old-incident.md":            "# old\n",
-		"cycle-102-111.md":                      "# an old record with no date prefix\n",
-		"REGRESSION-COVERAGE-INDEX.md":          "# the index, not a record\n",
-		"2026-11-20-session-log.md":             "# a session log, not a record\n",
-		"2026-11-18-the-day-before-the-rule.md": "# dated before the first day of the rule\n",
+		"2026-08-09-old-incident.md":                          "# old\n",
+		"cycle-102-111.md":                                    "# an old record with no date prefix\n",
+		"REGRESSION-COVERAGE-INDEX.md":                        "# the index, not a record\n",
+		"2026-11-20-session-log.md":                           "# a session log, not a record\n",
+		dayBeforeTheCutoff(t) + "-the-day-before-the-rule.md": "# dated before the first day of the rule\n",
 	}
-	firstDay := "2026-11-19-first-day-of-the-rule"
+	firstDay := incidentkb.LegacyCutoff + "-first-day-of-the-rule"
 	broken := map[string]string{firstDay + ".md": "# a new record with no frontmatter\n"}
 	for name, body := range skipped {
 		broken[name] = body
