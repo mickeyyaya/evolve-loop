@@ -62,6 +62,13 @@ var stageSeeds = []stageSeed{
 	{key: "docs_floor.ste_stage"},
 	{key: "comment_floor.stage"},
 	{
+		key:     "comment_floor.history_stage",
+		signal:  core.CodeCommentHistoryShadow,
+		site:    gatecontract.EmitSite{Path: "internal/core/history_floor.go", Func: "emitHistoryShadow", Ref: "CodeCommentHistoryShadow"},
+		fields:  []string{"cycle", "count", "entries"},
+		closure: []string{"internal/commentaudit"},
+	},
+	{
 		key:     "held_proposals.stage",
 		signal:  ship.CodeHoldShadow,
 		site:    gatecontract.EmitSite{Path: "internal/phases/ship/held_proposal_gate.go", Func: "emitShadow", Ref: "CodeHoldShadow"},

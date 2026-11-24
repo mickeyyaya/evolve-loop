@@ -39,6 +39,7 @@ var effectiveStageDefaults = map[string]string{
 	"docs_floor.stage":                           "enforce",
 	"docs_floor.ste_stage":                       "shadow",
 	"comment_floor.stage":                        "shadow",
+	"comment_floor.history_stage":                "shadow",
 	"held_proposals.stage":                       "shadow",
 	"cover_changed.stage":                        "enforce",
 	"retrospectives.stage":                       "shadow",

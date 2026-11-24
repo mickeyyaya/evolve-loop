@@ -6,8 +6,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/commentaudit"
 )
 
-const recordHistoryCommand = "cd go && go run ./cmd/commentaudit history -base HEAD -label \"<this change>\" -out " + commentaudit.HistoryArchiveDir
-
 type changeSides struct {
 	paths         []string
 	before, after func(string) ([]byte, error)
@@ -31,7 +29,7 @@ func (o Options) refuseUnrecordedHistory(ctx context.Context, files []string, re
 		res.log("REJECTED: %s:%d removes a comment that carries history, and no page under %s records it", e.File, e.Line, commentaudit.HistoryArchiveDir)
 	}
 	if len(unrecorded) > 0 {
-		res.log("the history a comment carried is kept, not deleted: run `%s` and stage the pages it writes (docs/conventions/code-comments.md)", recordHistoryCommand)
+		res.log("the history a comment carried is kept, not deleted: run `%s` and stage the pages it writes (docs/conventions/code-comments.md)", commentaudit.RecordHistoryCommand("HEAD"))
 		return ExitFail
 	}
 	return ExitPass
@@ -42,11 +40,7 @@ func (o Options) unrecordedHistory(ctx context.Context, files []string) ([]comme
 	if err != nil {
 		return nil, err
 	}
-	removed, err := commentaudit.RemovedHistoryAcrossDiff(change.paths, change.before, change.after)
-	if err != nil {
-		return nil, err
-	}
-	return commentaudit.UnrecordedHistory(removed, change.before, change.after)
+	return commentaudit.UnrecordedRemovals(change.paths, change.before, change.after)
 }
 
 func historyCheckFault(err error) int {
