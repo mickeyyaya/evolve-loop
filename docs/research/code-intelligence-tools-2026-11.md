@@ -301,7 +301,7 @@ K2 and K5 tie, and the peer study broke the tie on evidence. K2 turns a guess in
 
 | Id | Decision | Because (findings) | Rejected options and why |
 |---|---|---|---|
-| D1 | For code navigation, take S2. Route `callers` and `api` to `gotypes`, keep trail for `find` and `map`. S2 depends on the answer to open question 6: the spec says "no failover", and S2 needs a fall to trail. The follow-up item "Fallthrough rule for an absent gotypes index" proposes a policy-data rule. | F3.4: 1.00 / 1.00 against 0.11 / 0.32. F3.3: the backend is built and idle. F4.4: no other compiler-accurate tool fits C3 and C5 at zero cost. | S1: leaves a known 89% error rate. S3, S4: a new runtime for a lower or unmeasured accuracy (F3.4, F4.3). |
+| D1 | For code navigation, take S2. Route `callers` and `api` to `gotypes`, keep trail for `find` and `map`. The operator answered open question 6. On a missing or stale gotypes index, the query falls through to trail and logs the backend that answered. Item: `code-index-absent-gotypes-fallthrough-rule`. A rule in policy data must reconcile this with the spec text "no failover". | F3.4: 1.00 / 1.00 against 0.11 / 0.32. F3.3: the backend is built and idle. F4.4: no other compiler-accurate tool fits C3 and C5 at zero cost. | S1: leaves a known 89% error rate. S3, S4: a new runtime for a lower or unmeasured accuracy (F3.4, F4.3). |
 | D2 | Do not adopt graphify, CodeGraph, codebase-memory-mcp, GitNexus, Potpie or CodeGraphContext in the route now. Keep them as bench-only comparators. | F4.1, F4.2: a new runtime and an agent-config wall for each. F4.3: no independent number. The GitNexus license is non-commercial. | S3, S4: see section 6.2. |
 | D3 | Do not replace `find` and `map` yet. Measure first, with a gold query set. | F3.4: trail `find` is 19/40 top-1, which is weak. But F5.1 to F5.4 show no clear gain for an index over agent grep, and F3.6 shows that agents barely call the index. | S5 now: it builds on a guess. |
 | D4 | For the knowledge base, take the peer recommendation (K2): a native BM25 and RRF ranker in shadow behind `research.KB`. Use qmd or Bleve only as a measured comparator. | F4.7: graph RAG breaks C2. F5.2, F5.5: BM25 and grep are competitive with dense retrieval, and no graph approach dominates. Peer study section 7. | K1, K3: break the bridge and isolation rules. K4 now: a library before a gold set. |
@@ -367,6 +367,16 @@ Each stage can stop. A stage starts when the earlier stage has its proof.
 5. Who writes the gold query sets: you, or a bridge seat with you checking a sample?
 6. How must the route fall through when the gotypes index is absent or stale (exit 2 or 21)? The plan says "fall to trail". The spec says "no failover". The two must be reconciled by a rule in policy data.
 
+Operator answers (2026-11-23):
+
+- **Question 1: accepted.** The switch criteria of section 7.3 are accepted as proposed.
+- **Question 2: allowed.** Scratch-host runs of CodeGraph and graphify are allowed. They are benchmark only.
+- **Question 3: still open.** The operator has not answered if `gopls` is a stage 0 checker.
+- **Question 4: answered.** A native `find` and `map` is built only if the gold set shows a gap.
+- **Question 5: answered.** A bridge seat labels the gold sets. No human checks them. Consequence: the measurement rests on the seat's judgement.
+- **Question 6: answered.** On a missing or stale gotypes index, the query falls through to trail and logs the backend that answered. Item: `code-index-absent-gotypes-fallthrough-rule`. D1 now states this rule.
+- **Embeddings:** an embedding model is an LLM query under the bridge rule. Recall stays lexical.
+
 ### 7.6 Follow-up items
 
 | Title | Acceptance |
@@ -375,7 +385,7 @@ Each stage can stop. A stage starts when the earlier stage has its proof.
 | Second truth set for the code index | A data file with 40 symbols, interface and qualified-call cases, and the gotypes score. |
 | Gold query set for `find` and `map` | 40 `find` and 15 `map` queries with wanted files, stored as data. |
 | Bench comparators for CodeGraph and graphify `query` | `evolve code bench` prints their rows, run on a scratch host. No adapter lands. |
-| Fallthrough rule for an absent gotypes index | A conformance test shows that `callers` falls to trail, with a visible warning. |
+| Fallthrough rule for an absent gotypes index (`code-index-absent-gotypes-fallthrough-rule`) | A conformance test shows that `callers` falls to trail on a missing or stale index, and logs the backend that answered. |
 | Persona text for the code commands (K4a) | Scout, builder and debugger texts name the verbs. The usage log shows phase calls. |
 | Native `find` and `map` decision record | A dated record that cites the stage 2 table and chooses build or stop. |
 | Knowledge-base shadow ranker | The stages of the peer study 0 and 1 are done. |
