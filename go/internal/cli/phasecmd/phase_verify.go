@@ -124,7 +124,23 @@ func verifyDeliverable(phase string, roots phasecontract.Roots, resolver phaseco
 	if err != nil || phase != "tdd" || roots.Worktree == "" {
 		return res, err
 	}
-	return withTddCommentViolations(withFrozenPinViolations(res, roots.Worktree), roots.Worktree), nil
+	return withTddTestAuditViolations(withTddCommentViolations(withFrozenPinViolations(res, roots.Worktree), roots.Worktree), roots), nil
+}
+
+const codeTddTestAuditFloor = "tdd_test_audit_floor"
+
+func withTddTestAuditViolations(res deliverable.Result, roots phasecontract.Roots) deliverable.Result {
+	state, _ := core.ReadRunCycleState(roots.Workspace, roots.EvolveDir)
+	lines := core.TddTestAuditFailures(context.Background(), roots.Worktree, "HEAD", state.CycleID)
+	if len(lines) == 0 {
+		return res
+	}
+	res.Violations = append(res.Violations, deliverable.Violation{
+		Code:    codeTddTestAuditFloor,
+		Message: fmt.Sprintf("the TDD files break %d test-audit rule(s); the build floor refuses them and no later phase can edit them:\n    %s", len(lines), strings.Join(lines, "\n    ")),
+	})
+	res.OK = false
+	return res
 }
 
 const codeTddCommentFloor = "tdd_comment_floor"
