@@ -76,6 +76,7 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/adapters/ledger` | the hash-chained append-only ledger, its seals and anchors | [internal-adapters-ledger.md](internal-adapters-ledger.md) |
 | `internal/ledgerartifacts` | the ledger's write-once, content-addressed evidence store (`.evolve/ledger-artifacts/sha256/<2>/<62>`) | [internal-ledgerartifacts.md](internal-ledgerartifacts.md) |
 | `internal/attemptpostmortem` | records how a phase dispatch ended: the cause, the last commands, the suspect command and the pane tail. It renders the record into the next prompt (ADR-0130, R2) | [internal-attemptpostmortem.md](internal-attemptpostmortem.md) |
+| `internal/promptboundary` | the one line that splits a composed prompt into a byte-stable cacheable prefix and a per-cycle suffix; `Place` puts a per-try block below it | [internal-promptboundary.md](internal-promptboundary.md) |
 | `internal/atomicwrite` | the one crash-safe write-then-rename implementation: plain `Bytes`/`JSON` and the fsyncing `Durable` | [internal-atomicwrite.md](internal-atomicwrite.md) |
 | `internal/changedpkgs` | maps a change to its packages, covering tests and importers | [internal-changedpkgs.md](internal-changedpkgs.md) |
 | `internal/cyclestate` | the per-cycle state, verdicts and outcome record every phase shares | [internal-cyclestate.md](internal-cyclestate.md) |

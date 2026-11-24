@@ -5,15 +5,16 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/promptboundary"
 )
 
 func TestStaticPrefix_RoundTripsBaseCycleContext(t *testing.T) {
 	body := "PERSONA\n\nrules body"
 	req := core.PhaseRequest{Cycle: 42, GoalHash: "abc123", ProjectRoot: "/proj", Workspace: "/ws"}
 
-	got := StaticPrefix(BaseCycleContext(body, req))
+	got := promptboundary.StaticPrefix(BaseCycleContext(body, req))
 	if got != body {
-		t.Errorf("StaticPrefix(BaseCycleContext(...)) = %q, want the untouched body %q", got, body)
+		t.Errorf("promptboundary.StaticPrefix(BaseCycleContext(...)) = %q, want the untouched body %q", got, body)
 	}
 	for _, dyn := range []string{"42", "abc123", "/proj", "/ws"} {
 		if strings.Contains(got, dyn) {
@@ -24,8 +25,8 @@ func TestStaticPrefix_RoundTripsBaseCycleContext(t *testing.T) {
 
 func TestStaticPrefix_NoBoundaryIsWholePrompt(t *testing.T) {
 	prompt := "free-form prompt with no cycle context block"
-	if got := StaticPrefix(prompt); got != prompt {
-		t.Errorf("StaticPrefix(%q) = %q, want the whole prompt back", prompt, got)
+	if got := promptboundary.StaticPrefix(prompt); got != prompt {
+		t.Errorf("promptboundary.StaticPrefix(%q) = %q, want the whole prompt back", prompt, got)
 	}
 }
 

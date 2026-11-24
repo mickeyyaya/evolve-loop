@@ -23,6 +23,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/runner/verdict"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasestream"
+	"github.com/mickeyyaya/evolve-loop/go/internal/promptboundary"
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
 	"github.com/mickeyyaya/evolve-loop/go/internal/resolvellm"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -239,12 +240,10 @@ func requiresExplanationSandbox(phase string, req core.PhaseRequest) bool {
 	return phase == string(core.PhaseBuild) && req.ExplanationDocumentationVersion != 0
 }
 
-const cycleContextBoundary = "\n\n## Cycle Context\n"
-
 func BaseCycleContext(body string, req core.PhaseRequest) string {
 	var b strings.Builder
 	b.WriteString(body)
-	b.WriteString(cycleContextBoundary)
+	b.WriteString(promptboundary.Boundary)
 	fmt.Fprintf(&b, "- cycle: %d\n", req.Cycle)
 	fmt.Fprintf(&b, "- goal_hash: %s\n", req.GoalHash)
 	fmt.Fprintf(&b, "- project_root: %s\n", req.ProjectRoot)
@@ -274,13 +273,6 @@ func AppendExplanationContext(b *strings.Builder, req core.PhaseRequest) {
 			fmt.Fprintf(b, "- explanation_handoff_untrusted_json: %s\n", encoded)
 		}
 	}
-}
-
-func StaticPrefix(prompt string) string {
-	if i := strings.Index(prompt, cycleContextBoundary); i >= 0 {
-		return prompt[:i]
-	}
-	return prompt
 }
 
 func FormatDigestShadowLog(phase string, record digest.ShadowRecord) string {
