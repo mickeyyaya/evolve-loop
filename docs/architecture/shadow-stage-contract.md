@@ -247,11 +247,11 @@ The `parallel_evaluate` decider moves out of the unexported method `core.cycleRu
 
 ### 4.4 The typed key list and the effective stage
 
-The registry covers each stage key through one typed list. The list is `policy.StageKeys()` in `go/internal/policy/stage_keys.go`. It has 48 keys:
+The registry covers each stage key through one typed list. The list is `policy.StageKeys()` in `go/internal/policy/stage_keys.go`. It has 49 keys:
 
 | Part | Keys | Source |
 |---|---|---|
-| The schema walk | 42 | `policy.StageFields()` walks the type `policy.Policy`. It lists each field whose JSON name ends in `stage`. |
+| The schema walk | 43 | `policy.StageFields()` walks the type `policy.Policy`. It lists each field whose JSON name ends in `stage`. |
 | The scan cache gate | 1 | `gates.scan_cache_gate`. The name ends in `_gate`, so the walk does not find it. |
 | The handoff pairs | 5 | `handoff.<pair>.stage` for each pair in `knownHandoffPairs`. The type `HandoffPolicy` keeps its pairs in an unexported map, so the walk does not find them. |
 

@@ -60,6 +60,7 @@ type Policy struct {
 	DocsFloor          *DocsFloorPolicy          `json:"docs_floor,omitempty"`
 	CommentFloor       *CommentFloorPolicy       `json:"comment_floor,omitempty"`
 	HeldProposals      *HeldProposalsPolicy      `json:"held_proposals,omitempty"`
+	Boundary           *BoundaryPolicy           `json:"boundary,omitempty"`
 	CoverChanged       *CoverChangedPolicy       `json:"cover_changed,omitempty"`
 	Retrospectives     *RetrospectivesPolicy     `json:"retrospectives,omitempty"`
 	ACS                *ACSConfig                `json:"acs,omitempty"`
