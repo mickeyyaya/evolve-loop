@@ -405,3 +405,15 @@ func isHistoryPage(file string) bool {
 func IsUnparsable(err error) bool {
 	return errors.As(err, new(scanner.ErrorList))
 }
+
+func UnrecordedRemovals(files []string, before, after func(string) ([]byte, error)) ([]HistoryEntry, error) {
+	removed, err := RemovedHistoryAcrossDiff(files, before, after)
+	if err != nil {
+		return nil, err
+	}
+	return UnrecordedHistory(removed, before, after)
+}
+
+func RecordHistoryCommand(base string) string {
+	return "cd go && go run ./cmd/commentaudit history -base " + base + " -label \"<this change>\" -out " + HistoryArchiveDir
+}
