@@ -41,3 +41,19 @@ func TestDefaultRouter_ANilRoutedListerRoutesNothing(t *testing.T) {
 		t.Fatalf("ByCLI = %v, Default = %v; want only the picker", r.ByCLI, r.Default)
 	}
 }
+
+func TestRoutedLister_ServesOnlyTheFamiliesItNames(t *testing.T) {
+	var routed RoutedLister = &fakeRouted{families: []string{"agy"}}
+	fake := routed.(*fakeRouted)
+	r := DefaultRouter(nil, routed)
+
+	if got, err := r.List(context.Background(), "agy"); err != nil || !slices.Equal(got, []string{"m-agy"}) {
+		t.Fatalf("agy: got %q, %v; want the routed lister's answer", got, err)
+	}
+	if _, err := r.List(context.Background(), "claude"); err == nil {
+		t.Error("claude: the picker default has no capturer and must fail, not reach the routed lister")
+	}
+	if !slices.Equal(fake.listed, []string{"agy"}) {
+		t.Errorf("routed lister was asked for %q, want only [agy]", fake.listed)
+	}
+}
