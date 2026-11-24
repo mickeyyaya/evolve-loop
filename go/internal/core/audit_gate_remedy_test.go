@@ -472,3 +472,28 @@ func TestResumePath_GateForcedAuditFailRepairsAtBuildWithinTheBudget(t *testing.
 		t.Errorf("phases=%v: a resumed gate-forced FAIL must re-enter build exactly %d time(s) and never tdd", res.PhasesRun, budget)
 	}
 }
+
+func TestAuditGateNames_ListsEveryRemedyRowInOrder(t *testing.T) {
+	t.Parallel()
+	got := AuditGateNames()
+	if len(got) != len(auditGateRemedies) {
+		t.Fatalf("AuditGateNames() = %v, want one name for each of the %d remedy rows", got, len(auditGateRemedies))
+	}
+	for i, row := range auditGateRemedies {
+		if got[i] != row.gate {
+			t.Errorf("AuditGateNames()[%d] = %q, want %q", i, got[i], row.gate)
+		}
+	}
+	got[0] = "mutated"
+	if AuditGateNames()[0] == "mutated" {
+		t.Error("AuditGateNames() must return a fresh slice")
+	}
+}
+
+func TestCtxKeyAuditFacts_IsDistinctFromEveryOtherSeededContextKey(t *testing.T) {
+	t.Parallel()
+	others := []string{CtxKeyTaskContract, CtxKeyRecallMemory, CtxKeyAuditRepairFindings, CtxKeyStandingAuditFindings, CtxKeyPredicateRepair, CtxKeyExplanationCorrection}
+	if slices.Contains(others, CtxKeyAuditFacts) {
+		t.Errorf("CtxKeyAuditFacts %q collides with another seeded context key %v", CtxKeyAuditFacts, others)
+	}
+}

@@ -144,6 +144,7 @@ func TestWireOrchestrator_TheCycleRootSendsTheRoutingFallbackToItsSignalCenter(t
 	}
 	d := wireOrchestratorDeps(root, evolveDir, io.Discard, routingRun{})
 	defer d.CloseSignals()
+	assertAuditRunnerSeedsGateFactsAndRubric(t, d, root)
 	composer, ok := d.Runners[core.PhaseTriage].(interface {
 		ComposePrompt(string, core.PhaseRequest) string
 	})
@@ -163,5 +164,24 @@ func TestWireOrchestrator_TheCycleRootSendsTheRoutingFallbackToItsSignalCenter(t
 	}
 	if found != 1 {
 		t.Fatalf("a root with no builder profile must send INBOX_ROUTING_FALLBACK into the cycle's Signal Center once across two prompts, got %d in %+v", found, d.Signals.Recent())
+	}
+}
+
+func assertAuditRunnerSeedsGateFactsAndRubric(t *testing.T, d orchDeps, root string) {
+	t.Helper()
+	audit, ok := d.Runners[core.PhaseAudit].(interface {
+		SeedContext(core.PhaseRequest) core.PhaseRequest
+		ComposePrompt(string, core.PhaseRequest) string
+	})
+	if !ok {
+		t.Fatal("the cycle root's audit runner must seed its context and compose its prompt")
+	}
+
+	prompt := audit.ComposePrompt("BODY", audit.SeedContext(core.PhaseRequest{ProjectRoot: root, Workspace: filepath.Join(root, ".evolve", "runs", "cycle-1")}))
+
+	for _, want := range []string{"## Gate and Floor Facts", "## Final Diff Regression Review", "## Guard Honesty Check", "gofmt"} {
+		if !strings.Contains(prompt, want) {
+			t.Errorf("the audit prompt of the cycle root lacks %q:\n%s", want, prompt)
+		}
 	}
 }

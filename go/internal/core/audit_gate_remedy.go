@@ -39,6 +39,14 @@ var auditGateRemedies = []auditGateRemedy{
 		remediation: "turn every red ACS predicate green"},
 }
 
+func AuditGateNames() []string {
+	names := make([]string, len(auditGateRemedies))
+	for i, row := range auditGateRemedies {
+		names[i] = row.gate
+	}
+	return names
+}
+
 func auditGateRemedyFor(reason string) (auditGateRemedy, bool) {
 	if strings.Contains(reason, HarnessRedClauseMarker) {
 		return auditGateRemedy{}, false
