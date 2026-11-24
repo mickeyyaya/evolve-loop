@@ -31,8 +31,8 @@ Cache file: `.evolve/model-catalog.json`. The write is atomic (temp+rename, `sto
 
 ### Discovery (per-CLI listers)
 
-- **ollama**: parse `ollama list` stdout table (`go/internal/modelquery/ollama.go`).
-- **agy**: parse `agy models` (`AgyLister`, `agy.go`) and take the display-name column (`Gemini 3.8 Flash (Low)`). The picker of agy shows the family and the effort as two separate controls, and a pane capture yields names that agy does not accept. One listing feeds two catalog entries, `agy` and `agy-claude`. `DefaultRouter` gives both keys one `onceLister`, so a refresh runs `agy models` once (see [Provider-aware entries](#provider-aware-entries-agy-claude-2026-10-06)).
+- **ollama**: parse `ollama list` stdout table (the bridge lister, format `ollama-list-v1`, `go/internal/bridge/model_formats.go`).
+- **agy**: parse `agy models` (the bridge lister, format `agy-models-v1`) and take the display-name column (`Gemini 3.8 Flash (Low)`). The picker of agy shows the family and the effort as two separate controls, and a pane capture yields names that agy does not accept. One listing feeds two catalog entries, `agy` and `agy-claude`. The bridge lister caches one listing per (binary, argv) pair, so a refresh runs `agy models` once (see [Provider-aware entries](#provider-aware-entries-agy-claude-2026-10-06)).
 - **codex / claude**: `RecipeLister` (`recipe.go`) drives the `/model` picker with `ModelCapturer.CaptureModelPicker` (tmux pane capture, ADR-0031). Then per-CLI parsers (`picker.go`) run: codex numbered rows → first token; claude rows → family (`opus|sonnet|haiku`). `DefaultRouter` (`exec.go`) is the one registry of which CLI is listed how.
 
 ### Tier classification (LLM, validated)
@@ -181,7 +181,7 @@ A source-hash ratchet enforces the `decisionVersion` bump discipline (`decisionv
 1. **Detect.** `setup.Detect` reports an `agy-claude` row from the `agy-claude-tmux` row of the doctor. The row has the same binary, auth and verdict as agy.
 
    Its detect fallback is the tier map of `agy-claude-tmux` (`llmroute.DefaultDriverForFamily("agy-claude")`). Its capability manifest is the one of agy (`antigravity`), because the driver of the family runs the agy binary.
-2. **List.** `Router.List("agy-claude")` reads the listing `agy` already read (`onceLister`): one `agy models` run serves both keys.
+2. **List.** `Router.List("agy-claude")` reads the listing `agy` already read (the bridge lister cache): one `agy models` run serves both keys.
 3. **Filter.** `catalog.allowed_families` filters each key to its model family: `agy` to `gemini` and `agy-claude` to `claude`, in the checked-in `.evolve/policy.json`.
 
    `TestTheCheckedInCatalogFiltersEachTargetToItsModelFamily` (cmd/evolve) pins the filter of every target to `bridge.ModelFamily` of that target. One listing can therefore never put a Gemini model in the Claude entry or the reverse.
@@ -189,7 +189,7 @@ A source-hash ratchet enforces the `decisionVersion` bump discipline (`decisionv
 
    `PromoteLatest` moves a classified Claude pick to the newest version in its own lineage, so `Claude Opus 4.6 (High)` becomes `Claude Opus 5.5 (High)` when both are listed. `(High)` and `(Low)` are different lineages, and the system never substitutes one for the other.
 
-Pinned by `TestRefresh_OneAgyListingYieldsAGeminiEntryAndAClaudeEntry`, which runs one fixture listing with Gemini, Claude and GPT-OSS rows. It checks that `agy models` runs once, that each classifier sees only its family, and that the result is two live entries with their tier maps. `TestDefaultRouter_AgyAndAgyClaudeShareOneLister`, `TestOnceLister_AFailedListingFailsEveryEntryThatSharesIt` and the setup tests `TestTierModelsFor_AgyClaudeReadsTheAgyClaudeTargetsTierMap` and `TestDetectCLIs_ReportsAgyClaudeBesideAgy` pin the rest.
+Pinned by `TestRefresh_OneRoutedListingSplitsIntoAGeminiEntryAndAClaudeEntry`, which runs one fixture listing with Gemini, Claude and GPT-OSS rows. It checks that `agy models` runs once, that each classifier sees only its family, and that the result is two live entries with their tier maps. `TestDefaultRouter_AgyAndAgyClaudeShareOneLister`, `TestOnceLister_AFailedListingFailsEveryEntryThatSharesIt` and the setup tests `TestTierModelsFor_AgyClaudeReadsTheAgyClaudeTargetsTierMap` and `TestDetectCLIs_ReportsAgyClaudeBesideAgy` pin the rest.
 
 **The baseline and the live pick.** The manifest's offline tier map is fast `Claude Sonnet 5.5 (Low)`, balanced `Claude Sonnet 5.5 (Medium)`, deep and top `Claude Opus 5.5 (Medium)`. Until 2026-10-08, balanced, deep and top were `(High)`. agy offers no Haiku-class Claude, so fast is Sonnet at its lowest effort. A live refresh classifies with an LLM, and its pick can choose another effort. The first live run (2026-10-06, a scratch copy of the plane's catalog and policy, classified by claude-p after codex failed) wrote:
 

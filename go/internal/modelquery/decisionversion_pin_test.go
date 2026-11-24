@@ -11,7 +11,7 @@ import (
 
 var decisionSurfaceFiles = []string{"classifier.go", "latest.go", "complete.go", "lineage.go", "newestwins.go"}
 
-const decisionSurfacePin = "9adc4ff63b3a5532443929c34dd9c3e322d036e62731fea270da7980df9fc8d0"
+const decisionSurfacePin = "b76c83fdf8f27330cb6a78fe12dfec044f7c19f61925646e0dad0340e3944bda"
 
 func TestDecisionVersion_PinnedToAlgorithmSurface(t *testing.T) {
 	t.Parallel()

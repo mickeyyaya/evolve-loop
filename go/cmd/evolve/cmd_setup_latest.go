@@ -79,10 +79,19 @@ func probeCLILatest(ctx context.Context, c setup.CLIStatus, catTiers map[string]
 type perCLIScratchLister struct {
 	evolveDir string
 	log       io.Writer
+	mkTemp    func(dir, pattern string) (string, error)
+}
+
+func (l perCLIScratchLister) tempDir(pattern string) (string, error) {
+	mkTemp := l.mkTemp
+	if mkTemp == nil {
+		mkTemp = os.MkdirTemp
+	}
+	return mkTemp("", pattern)
 }
 
 func (l perCLIScratchLister) List(ctx context.Context, cli string) ([]string, error) {
-	scratch, err := os.MkdirTemp("", "evolve-setup-latest-"+cli+"-*")
+	scratch, err := l.tempDir("evolve-setup-latest-" + cli + "-*")
 	if err != nil {
 		return nil, fmt.Errorf("scratch workspace: %w", err)
 	}
@@ -90,7 +99,7 @@ func (l perCLIScratchLister) List(ctx context.Context, cli string) ([]string, er
 		salvageProbeDiagnostics(scratch, l.evolveDir, cli, time.Now, l.log)
 		_ = os.RemoveAll(scratch)
 	}()
-	router := modelquery.DefaultRouter(bridgeModelCapturer{workspace: scratch})
+	router := modelRouter(bridgeModelCapturer{workspace: scratch})
 	return router.List(ctx, cli)
 }
 

@@ -954,3 +954,11 @@ The guard checks a closed marker table: `requireTmux`, `testhost.Tool` with `"tm
 - A wave stop or a deadline kill cancels all launches in flight. That is an operator action, not a host fault, so `cancelled` is INFO. `emitContext` takes a `contextSignal` value that holds the origin, the severity and the code.
 - The record of an unmeasured cell keeps `source: none`, so `inputindex.Stats` never counts it.
 - At shadow, a cell that opens no indexed path is normal. So a fence with no grant report is no host fault in production and has no code. Only row N16 knows that the open happened, and it reports a missing record (`openRecordFailure`).
+
+## Model lister (F3)
+
+- `NewModelLister(set, run)` returns a `modelquery.RoutedLister`. It resolves the family through `Resolve`, reads `parsers.models` of the manifest, and runs the binary of the manifest with the argv that the registered format owns. `agy-models-v1` owns `models` and `ollama-list-v1` owns `list`. A format id selects a command and its parse together, so the command and the output format cannot drift apart. Load rejects an unknown id.
+- `Families()` returns the families whose manifest declares a known `models` id. `cmd/evolve` (`modelRouter`) passes the adapter to `modelquery.DefaultRouter`, so a new family routes to the adapter by a manifest edit and a registered id.
+- The adapter keeps one listing per resolved (binary, argv) pair, so `agy` and `agy-claude` share one run and a failed listing fails both. A family with no models id and an unknown family return an error before any process starts.
+- `bridge` imports `modelquery`; `modelquery` never imports `bridge`.
+- Pinned by `model_lister_test.go` and `model_formats_test.go`. The fixtures are `testdata/agy_models.txt` and `testdata/ollama_list.txt`.

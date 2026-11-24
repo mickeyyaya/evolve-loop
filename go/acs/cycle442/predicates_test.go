@@ -72,14 +72,14 @@ func TestC442_006_NoRegressionAcrossTouchedPackages(t *testing.T) {
 }
 
 func TestC442_007_OllamaListReachesNoModelDocumented(t *testing.T) {
-	_, stderr, code := runGoTest(t, "TestOllamaListerReachesNoModel", false, modelqueryPkg)
+	_, stderr, code := runGoTest(t, "TestModelLister_OllamaFixtureGivesTheModelIDs", false, bridgePkg)
 	if code != 0 {
 		t.Errorf("C442_007: ollama-list-metadata-exception tests exit=%d\nstderr=%s", code, stderr)
 	}
 }
 
 func TestC442_008_OllamaRegressionPathsStayGreen(t *testing.T) {
-	_, stderr, code := runGoTest(t, "TestOllamaListerError|TestOllamaListerUsesRunner|TestParseOllamaList", false, modelqueryPkg)
+	_, stderr, code := runGoTest(t, "TestModelLister_AFailureCarriesTheFirst200CharactersOfOutput|TestModelLister_OllamaFixtureGivesTheModelIDs|TestModelLister_AnOllamaWithNoModelIsAnEmptyListNotAnError", false, bridgePkg)
 	if code != 0 {
 		t.Errorf("C442_008: ollama-regression-paths-stay-green tests exit=%d\nstderr=%s", code, stderr)
 	}

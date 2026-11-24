@@ -32,6 +32,7 @@
 - The shared-writer path has no data race. Pinned by `TestCombinedOutput_RealRunner_NoRace` under `-race`.
 - No package outside `sysexec` and its allowed list runs raw `os/exec`. Pinned by the guard test.
 - Only the bridge launch API starts an LLM binary. `TestOnlyTheBridgeStartsAnLLMBinary` (`llm_launch_guard_test.go`) parses the tree and reports each LLM spawn outside it. Row N2 of the isolation matrix runs the same scan. The rules are in [llm-isolation.md](../llm-isolation.md) §5.1.
+- A second scan, `TestOnlyTheBridgeCallsARunnerWithAnLLMBinary` (`llm_runner_guard_test.go`), reports a call shaped like `modelquery.Runner` whose program argument is an LLM binary, by literal, const or tainted variable. It builds on `llmSpawnScan`. Its exemption is wider than the first scan: it skips every file of `internal/bridge`, because the bridge model lister passes `Manifest.Binary` to a `Runner`. A `.Binary` field is not reported outside the bridge, to avoid false hits on `fmt.Sprintf`. The arity of `Runner` is read from `internal/modelquery/exec.go` with `go/parser` (`TestRunnerArity_IsTheParameterCountOfModelqueryRunner`). A follow-up item folds the rule into the first scan, so one scan with one scope remains.
 
 ## Findings
 
