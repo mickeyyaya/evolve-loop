@@ -1,9 +1,12 @@
 package testhost
 
 import (
+	"context"
 	"flag"
 	"os"
 	"os/exec"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const coverDirFlag = "test.gocoverdir"
@@ -13,7 +16,7 @@ func HelperArgs(run string) []string {
 }
 
 func Command(run string, env ...string) *exec.Cmd {
-	cmd := exec.Command(os.Args[0], HelperArgs(run)...)
+	cmd := sysexec.Command(context.Background(), os.Args[0], HelperArgs(run)...)
 	cmd.Env = append(os.Environ(), env...)
 	return cmd
 }
