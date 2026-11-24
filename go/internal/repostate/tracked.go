@@ -1,5 +1,5 @@
-// Package repostate lists the files that git tracks under a directory.
-// Repo-wide scanners bind to this set, not to every on-disk file.
+// Package repostate lists the files git tracks under a directory and the
+// files present in the working tree. Scanners bind to these sets.
 package repostate
 
 import (
@@ -37,13 +37,7 @@ func TrackedTree(root, relDir string) ([]string, error) {
 		}
 		return nil, fmt.Errorf("git ls-files %s in %s: %w", relDir, root, err)
 	}
-	var files []string
-	for _, rel := range strings.Split(string(out), "\x00") {
-		if rel != "" {
-			files = append(files, rel)
-		}
-	}
-	return files, nil
+	return splitNUL(string(out)), nil
 }
 
 func TrackedSet(root, relDir, ext string) (map[string]bool, error) {

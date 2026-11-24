@@ -912,3 +912,4 @@
 ./internal/term
 ./internal/heldaudit
 ./internal/emptytests
+./internal/workflowlint

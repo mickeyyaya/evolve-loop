@@ -199,7 +199,7 @@ Read the changed paths with `git -C W diff --cached --name-only`. Apply this rul
 | Code: any other path | the Go list below, in order, for each `.go` path. For another type, add the row below. |
 | Shell (`*.sh`) | `bash -n <file>` for each file. `git -C W diff --cached -U0 -- '*.sh'` must show no added line with `declare -A`, `mapfile`, `readarray`, `sed -i`, `date -d`, `${var^^}` or `${var,,}`. Each script keeps `set -uo pipefail` and no `set -e` ([runtime-reference.md](runtime-reference.md), "Shell & environment conventions"). |
 | JSON | `jq -e . <file>` for each file. |
-| Workflow or other YAML (`.github/`) | GAP (rule R8): the repository has no workflow lint. Needs item `console-checkin-workflow-lint`. Note "GAP B3 yaml". The change is a boundary PR: `E pr window <N>` gives `boundary` after B7. |
+| Workflow or other YAML (`.yml`, `.yaml`) | `E floor run --root W --tier yaml`. It runs `evolve yaml check` on the working tree of W. The change is a boundary PR when it touches `.github/`: `E pr window <N>` gives `boundary` after B7. |
 | Any other path (for example a template or a data file) | `E floor run --root W --tier fmt,vet` and the Go list for the packages that read the file. When no package reads it, note "no reader". |
 
 For Go code, run these commands from `W/go`, with `GOTOOLCHAIN=go1.23.12` for the Go 1.23 jobs of CI:
