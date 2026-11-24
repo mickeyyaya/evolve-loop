@@ -33,3 +33,5 @@
 ## The predicate repair brief
 
 The build floor can report the same failure of a cycle predicate before and after a Build correction. Then the cycle re-enters TDD with `predicate_repair_brief` in its context ([internal-core.md](internal-core.md), the predicate reroute). `ComposePrompt` adds a `## Predicate Repair` section with the failure fenced as data. It tells the agent to re-author a predicate whose premise is wrong. It also tells the agent never to delete a predicate or weaken a needed assertion (`TestComposePrompt_ThePredicateRepairBriefReachesTheAgentAsData`).
+
+The same section also covers a test-audit finding in a test file of `go/acs/cycle<N>/`. The agent rewrites the weak pattern and adds no baseline row (`TestComposePrompt_ThePredicateRepairNamesTheTestAuditCause`).

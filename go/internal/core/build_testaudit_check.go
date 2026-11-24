@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/testaudit"
@@ -82,4 +83,12 @@ func testAuditLine(problem error) string {
 		return fmt.Sprintf("%s%v — drop the stale row: run `evolve test audit --rebaseline %s` (or delete the row from the central baseline file when the package is gone)", testAuditFloorPrefix, problem, row.Finding.Package)
 	}
 	return fmt.Sprintf("%s%v — remove the weak pattern (for error text: a sentinel error and errors.Is); Rebaseline refuses new rows", testAuditFloorPrefix, problem)
+}
+
+func testAuditLinePackage(line string) (string, bool) {
+	body, ok := strings.CutPrefix(line, testAuditFloorPrefix)
+	if !ok {
+		return "", false
+	}
+	return testaudit.MissingRowPackage(body)
 }

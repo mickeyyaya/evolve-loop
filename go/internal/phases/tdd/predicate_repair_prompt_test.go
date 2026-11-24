@@ -19,3 +19,12 @@ func TestComposePrompt_ThePredicateRepairBriefReachesTheAgentAsData(t *testing.T
 		t.Error("a dispatch with no brief got the predicate repair section")
 	}
 }
+
+func TestComposePrompt_ThePredicateRepairNamesTheTestAuditCause(t *testing.T) {
+	failure := "test-audit ratchet: testaudit: acs/cycle10 TestX error-text-match has no baseline row"
+	out := hooks{}.ComposePrompt("BODY", core.PhaseRequest{Context: map[string]string{core.CtxKeyPredicateRepair: failure}})
+
+	if !strings.Contains(strings.Replace(out, failure, "", 1), "test-audit finding") || !strings.Contains(out, "````text\n"+failure+"\n````") {
+		t.Errorf("the repair section must name the test-audit cause and keep the data fence:\n%s", out)
+	}
+}
