@@ -393,6 +393,7 @@ The console merges the pull requests of a batch one at a time. After each merge,
 | A judge needs a green run | the rename of `coverage.partial.txt` | plan T2 |
 | A split test package keeps the coverage of its package | `TestEverySplitTestPackageHasItsCoverEntry` (§7.6) | in force |
 | No new raw `git init` fixture | `internal/rawgitratchet` | in force |
+| A test refuses error-text matching and sleep sync | `TestTreeRatchet` of `internal/testaudit`, run by the commit gate and the ship pack (`TreeReadingTests()`) | in force |
 | A test pins the environment of a driver | `TestRunTmuxREPL_ArtifactDebounceHermeticUnderAmbientFleetEnv` | in force |
 | No new duplicate helper | the duplicate ratchet (§6.4) | plan T5 |
 | A package stays inside its budget | the latency report (§7.2) | plan T4 |

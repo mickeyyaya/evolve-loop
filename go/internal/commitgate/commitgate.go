@@ -31,6 +31,8 @@ const FilesFormat = "whitespace-separated list of paths"
 
 type Runner = sysexec.RunFunc
 
+type RepoContractStep func(ctx context.Context, root string) (refusals []string, err error)
+
 type Options struct {
 	RepoRoot  string
 	Reviewers string
@@ -41,6 +43,8 @@ type Options struct {
 	Env       []string
 	Runner    Runner
 	Now       func() time.Time
+
+	RepoContract RepoContractStep
 
 	LintBudget time.Duration
 
