@@ -245,6 +245,7 @@ var ProtectedSurfaceManifest = []ProtectedSurfaceEntry{
 	{Fragment: "/go/internal/gateregistry/", Class: GateGuarantee, Rationale: "the gate registry and its debt set, and the tests that hold them: a lane that could edit them could move a gate to shadow or grow the debt set (ADR-0165)"},
 	{Fragment: "/go/internal/sizeratchet/", Class: GateGuarantee, Rationale: "the function-size ratchet and its offender list: a lane that could edit them could add its own allowance (ADR-0165)"},
 	{Fragment: "/go/internal/rawgitratchet/", Class: GateGuarantee, Rationale: "the raw git fixture ratchet and its baseline: a lane that could edit them could add its own allowance (ADR-0165)"},
+	{Fragment: "/go/internal/emptytests/", Class: GateGuarantee, Rationale: "the empty test body guard: a lane that could edit it could add a vacuous Go test that passes (ADR-0158 decision 19)"},
 	{Fragment: "/go/internal/baseattr/", Class: GateGuarantee, Rationale: "the base-red attribution: its parser, its detached-checkout rerun and its verdict decide whether a red test blames the lane (ADR-0165 G4)"},
 	{Fragment: "/go/internal/mainstop/", Class: GateGuarantee, Rationale: "the main-red stop: its record and its admission rule decide whether a landing may go onto a red main (ADR-0165 G4)"},
 	{Fragment: "/go/internal/core/base_red_floor.go", Class: GateGuarantee, Rationale: "the build floor's base-red judgment: it decides whether a red test blames the lane or its base, and whether the floor rejects (ADR-0165 G4)"},
