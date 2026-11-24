@@ -51,7 +51,7 @@ After each row, the host must still reach the run server with its sessions `agen
 | Write in another cycle's `.evolve/runs/cycle-M` | deny | The write gets `Operation not permitted`, and no file is made on the host. See "The run directory grant". |
 | With a messaging identity: write its own outbox, read its own mailbox | allow | The draft reads back. The profile is the base profile plus six rules, last in the file. |
 | With a messaging identity: write another outbox, its own mailbox or the message store | deny | `Operation not permitted`, and no file is made on the host. |
-| With a messaging identity: read another mailbox, the `.evolve/msg/` tree, or the message store | deny | `Operation not permitted`. On Linux the store mask covers the channels that exist at launch; a channel created later is not masked (see the limits of the messaging spec). Tries through `..`, a symlink, upper case, doubled slashes, a trailing slash and a hard link are denied too. |
+| With a messaging identity: read another mailbox, the `.evolve/msg/` tree, or the message store | deny | `Operation not permitted`. On Linux the store mask covers the channels that exist at launch. A channel created later is not masked (see the limits of the messaging spec). Tries through `..`, a symlink, upper case, doubled slashes, a trailing slash and a hard link are denied too. |
 | Write in the protected `.evolve/events/` | deny | The write gets `Operation not permitted`. |
 | Write the host resume witness in `.evolve/resume-witness/` | deny | The write gets `Operation not permitted`. A resume trusts this file ([ADR-0039 D4](adr/0039-failure-floor-and-failure-signal-contract.md)). |
 | Write to another pane's tty | deny | The open for write gets `Operation not permitted`. |
