@@ -941,4 +941,10 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/qmd-knowledge-base-2026-11.md](research/qmd-knowledge-base-2026-11.md) | Research dossier. It reads the qmd search tool live and maps where our knowledge base needs retrieval. It scores five approaches against the bridge, isolation and CLI-only rules. It recommends a native Go BM25 and RRF ranker in shadow behind `research.KB`, a measured gold set first, and qmd only as a later comparator. |
 
+## 2026-11-23 — Code-intelligence tools: which one fits evolve-loop
+
+| Document | What it records |
+|---|---|
+| [research/code-intelligence-tools-2026-11.md](research/code-intelligence-tools-2026-11.md) | Research dossier. It compares trail-code, graphify and 30 other code-index, search and memory tools against our constraints and our measured bench. It scores six code-navigation strategies and five knowledge-base strategies. It recommends gotypes for callers and api, and trail for find and map. A gold query set comes before any native find. The knowledge base takes the native ranker of the qmd study. |
+
 <!-- GENERATED:research-index END -->
