@@ -71,3 +71,27 @@ func TestOwnedByDispatch_ARecordedSharedHelperMustStillBeALiveDescendantOfThePan
 func owned(id string, tree, live []Identity) Proof {
 	return Dispatch{ID: id, Tree: tree, Live: live, Killable: ProgramIn(Launchers())}.Owned()
 }
+
+func TestNotShared_IsTheExactNegationOfSharedHelper(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		p    Process
+		want bool
+	}{
+		{"a tmux server", Process{Comm: "tmux", Args: []string{"tmux", "new-session"}}, false},
+		{"the Claude Code daemon", Process{Comm: "claude", Args: []string{"claude", "daemon", "run"}}, false},
+		{"Google Chrome", Process{Comm: "Google Chrome"}, false},
+		{"an MCP server", Process{Comm: "node", Args: []string{"node", "server.js"}}, true},
+		{"a zsh shell", Process{Comm: "/bin/zsh"}, true},
+		{"the zero process", Process{}, true},
+	}
+	for _, tc := range cases {
+		if got := NotShared(tc.p); got != tc.want {
+			t.Errorf("%s: NotShared=%v, want %v", tc.name, got, tc.want)
+		}
+		if NotShared(tc.p) == SharedHelper(tc.p) {
+			t.Errorf("%s: NotShared and SharedHelper agree", tc.name)
+		}
+	}
+}
