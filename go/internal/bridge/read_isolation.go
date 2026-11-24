@@ -243,13 +243,14 @@ func (deps Deps) cellReports(parent context.Context, tag string, since time.Time
 		return raw, readGap{cause: causeFenceWrite}, err
 	}
 	start, deadline := deps.Now(), cmp.Or(deps.ReportFenceDeadline, reportFenceDeadline)
+	var slept time.Duration
 	for {
 		raw, err := deps.SandboxReports(ctx, tag, since)
 		if err != nil || fenced(raw, tag) {
 			return raw, readGap{}, err
 		}
 		cancelled := parent.Err() != nil
-		if elapsed := deps.Now().Sub(start); elapsed >= deadline || cancelled {
+		if elapsed := max(deps.Now().Sub(start), slept); elapsed >= deadline || cancelled {
 			deps.warnReports("no fence of the cell after %s; its reads count as unmeasured", elapsed.Round(time.Second))
 			cause := causeFenceDeadline
 			if cancelled {
@@ -258,6 +259,7 @@ func (deps Deps) cellReports(parent context.Context, tag string, since time.Time
 			return raw, readGap{cause: cause, elapsed: elapsed}, nil
 		}
 		deps.Sleep(reportPollInterval)
+		slept += reportPollInterval
 	}
 }
 

@@ -133,6 +133,54 @@ func TestReportReadViolations_AFenceThatNeverArrivesIsLoudAndTheCellCountsAsUnme
 	}
 }
 
+func TestReportReadViolations_AFenceThatNeverArrivesEndsOnAFrozenClockToo(t *testing.T) {
+	t.Parallel()
+	c := newReadCell(t)
+	c.index(t)
+	tag := "run1/7/build/p12n6"
+	const sleepBudget = 1000
+	var stderr bytes.Buffer
+	var slept int
+	clock := &lagClock{now: time.Unix(1000, 0), reply: func(int) string { return "" }}
+	deps := clock.deps(&stderr)
+	deps.Sleep = func(time.Duration) {
+		if slept++; slept > sleepBudget {
+			panic("the fence poll never ends on a clock that does not advance")
+		}
+	}
+	deps.ReportFenceDeadline = 3 * time.Second
+	deps.reportReadViolations(context.Background(), &Config{Agent: "build", Cycle: 7, Workspace: c.ws, ProjectRoot: c.root, Worktree: "/wt", DispatchID: tag}, time.Unix(990, 0))
+	if slept > 3 {
+		t.Fatalf("slept %d polls, want at most 3: a 3s deadline at a 1s interval", slept)
+	}
+	if e := assertOneUnmeasured(t, deps.Signals, "fence-deadline", signalcenter.SeverityWarn); e.Fields["stage"] != "shadow" {
+		t.Fatalf("event = %+v", e)
+	}
+}
+
+func TestReportReadViolations_ASlowLogReadCountsTowardTheFenceDeadline(t *testing.T) {
+	t.Parallel()
+	c := newReadCell(t)
+	c.index(t)
+	tag := "run1/7/build/p12n7"
+	var stderr bytes.Buffer
+	clock := &lagClock{now: time.Unix(1000, 0)}
+	clock.reply = func(int) string {
+		clock.now = clock.now.Add(2 * time.Second)
+		return ""
+	}
+	deps := clock.deps(&stderr)
+	deps.Sleep = func(d time.Duration) { clock.slept = append(clock.slept, d) }
+	deps.ReportFenceDeadline = 3 * time.Second
+	deps.reportReadViolations(context.Background(), &Config{Agent: "build", Cycle: 7, Workspace: c.ws, ProjectRoot: c.root, Worktree: "/wt", DispatchID: tag}, time.Unix(990, 0))
+	if clock.reads != 2 || len(clock.slept) != 1 {
+		t.Fatalf("reads %d slept %v, want 2 reads and 1 poll: two 2s log reads pass a 3s deadline, whatever the polls slept", clock.reads, clock.slept)
+	}
+	if e := assertOneUnmeasured(t, deps.Signals, "fence-deadline", signalcenter.SeverityWarn); e.Fields["elapsed"] != "4s" {
+		t.Fatalf("event = %+v, want elapsed 4s", e)
+	}
+}
+
 func TestReportReadViolations_AFenceThatCannotBeWrittenFallsBackToOneUnmeasuredRead(t *testing.T) {
 	t.Parallel()
 	c := newReadCell(t)
