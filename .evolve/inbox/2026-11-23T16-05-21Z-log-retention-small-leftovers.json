@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "The log run-id shape in gcpolicy is derived from the Go time layout that LogRunID formats with, so the shape and the layout have one home.",
+    "The two sameFile helpers (internal/gc and cmd/evolve) share one home.",
+    "docs/architecture/packages/internal-gcpolicy.md describes LogsTTLDays as it is now (it prunes every log category, not only dispatch-logs)."
+  ],
+  "created_at": "2026-11-23T16:05:21Z",
+  "files": [
+    "go/internal/gcpolicy/logs.go",
+    "go/internal/gc/logcatalog.go",
+    "docs/architecture/packages/internal-gcpolicy.md"
+  ],
+  "fix": "Close the three small log-retention leftovers in one change.",
+  "id": "log-retention-small-leftovers",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "source": "rank-14 log-retention-followups build and design review r2, 2026-11-24",
+  "summary": "The log-retention follow-ups left three small items: the run-id shape is a separate string from the Go time layout (a round-trip test guards the drift), two sameFile helpers exist, and the gcpolicy package note still says LogsTTLDays prunes only dispatch-logs.",
+  "title": "The small log-retention leftovers: one run-id layout home, one sameFile, a current gcpolicy note",
+  "weight": 0.3
+}

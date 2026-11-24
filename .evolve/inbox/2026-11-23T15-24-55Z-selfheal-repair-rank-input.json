@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Two items of equal weight rank T1 repair above T2 (red first)",
+    "The factor appears in the score breakdown",
+    "Changed functions at 100% coverage"
+  ],
+  "created_at": "2026-11-23T15:24:55Z",
+  "deps": [
+    "selfheal-repair-cycle-path"
+  ],
+  "files": [
+    "go/internal/inboxrank/",
+    "go/internal/policy/"
+  ],
+  "fix": "Add one inboxrank factor that reads Item.RepairTier(), with a documented weight in policy.",
+  "id": "selfheal-repair-rank-input",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "console, 2026-11-23, deferred from X16 (selfheal-repair-cycle-path), ADR-0155",
+  "summary": "Spec section 20: a T1 repair should rank above a T2 item of equal weight. inboxrank has no tier input.",
+  "title": "Self-healing X16g: a repair-tier rank input for the inbox ranking",
+  "weight": 0.15
+}

@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "TestClockContract/system/stop_before_the_delay_prevents_the_run passes 200 runs in a row with -race under a CPU-loaded host (for example with GOMAXPROCS=2 and a busy loop beside it).",
+    "The fix keeps the contract the test states (a Stop before the delay prevents the run) and does not widen the delay so far that the case stops proving it.",
+    "A red-first reproduction shows the false return of Stop under load before the fix."
+  ],
+  "created_at": "2026-11-23T13:13:52Z",
+  "files": [
+    "go/internal/orchestrator/clock_contract_test.go"
+  ],
+  "fix": "Make the system-clock case of the clock contract deterministic under load: arm the timer with a delay the scheduler cannot reach before Stop, or assert the contract through the clock's own seam rather than wall time.",
+  "id": "clock-contract-stop-before-delay-is-flaky-under-load",
+  "kind": "test",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "CI run 45061778292 (PR #1691, Go 1.27 ubuntu job), 2026-11-23",
+  "summary": "TestClockContract/system/stop_before_the_delay_prevents_the_run failed once in the Go 1.27 ubuntu job of PR #1691 with clock_contract_test.go:173: Stop of a pending timer returned false. The same test passed in the same job of PR #1690 and passes locally on main and on both branches. PR #1691 does not touch internal/orchestrator. A flaky required test turns a correct PR red and costs a full CI rerun.",
+  "title": "The system-clock stop-before-delay case of the clock contract test is flaky under CI load",
+  "weight": 0.6
+}

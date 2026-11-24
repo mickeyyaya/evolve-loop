@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "Inbox intake warns (shadow) and later refuses (enforce, operator flip) an item that declares a whole hub directory (go/cmd/evolve, go/internal/core) in files when it could name the files it changes.",
+    "The warning names the hub and suggests the verb file family.",
+    "A test files an item with files [go/cmd/evolve] and sees the typed warning; one with named files sees none."
+  ],
+  "created_at": "2026-11-23T17:01:55Z",
+  "files": [
+    "go/internal/inboxmover",
+    "go/internal/admission"
+  ],
+  "fix": "Make hub items name their files at intake, so file-grain admission can run them in parallel.",
+  "id": "hub-items-name-their-files-at-intake",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "performance",
+  "source": "admission cell-grain study 2026-11-24 (rank 25)",
+  "summary": "File-grain admission for cmd/evolve is on (K1), but 14 of 60 lane-routable cmd/evolve items declare the whole directory, so they still hold the package cell and block parallel lanes. Measured would-admit pairs: package 0, declared file set 1016 of 1770.",
+  "title": "Items that touch a hub package name their files at intake",
+  "weight": 0.6
+}

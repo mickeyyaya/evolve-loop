@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Exactly one function in the tree decides whether a Go walk skips a directory, and each whole-tree walker calls it.",
+    "A table test pins the rule for testdata, vendor, a dot name, an underscore name and a normal name.",
+    "The whole-tree guards (rawgitratchet, sizeratchet, emptytests) give the same results before and after the change."
+  ],
+  "created_at": "2026-11-23T02:05:21Z",
+  "files": [
+    "go/internal/rawgitratchet",
+    "go/internal/sizeratchet",
+    "go/internal/coversplit",
+    "go/internal/emptytests",
+    "go/internal/envscope"
+  ],
+  "fix": "Give the rule one home, an exported predicate in a small package that every whole-tree walker imports. Replace the five copies with it in one refactor commit. Keep envscope.SkipDir separate only if its rule really differs, and name the difference in its package note.",
+  "id": "shared-go-skipdir-predicate",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "source": "console 2026-11-23: round-1 review of the empty-test guard (c13), MEDIUM M1, declined in that change as a separate refactor",
+  "summary": "The rule for which directories a Go source walk skips (testdata, vendor, and names that start with a dot or an underscore) has five private copies: rawgitratchet, sizeratchet, coversplit, emptytests, and a different rule in envscope.SkipDir. A change to the go tool's ignore rule must be made five times, and the copies can drift.",
+  "title": "One shared rule for the directories a Go tree walk skips",
+  "weight": 0.3
+}

@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "TestProductionEngineDeps_ResolverAppliesRealFixture (bridge) and the runner pane-lost transcript test pass with HOME pointed at an empty temp directory and inside a review-seat sandbox.",
+    "Each test reads its transcript fixture from a path the test creates (t.TempDir or testdata), never from the real HOME."
+  ],
+  "created_at": "2026-11-23T14:49:01Z",
+  "files": [
+    "go/internal/adapters/bridge",
+    "go/internal/phases/runner"
+  ],
+  "fix": "Make the transcript tests hermetic: inject the transcript root or set HOME to a t.TempDir seeded with the fixture, so the result does not depend on the host user files.",
+  "id": "transcript-tests-do-not-read-the-real-home",
+  "kind": "test",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "rank-8 code review r1 (architecture seat), 2026-11-23",
+  "summary": "Inside a review-seat sandbox, the bridge test TestProductionEngineDeps_ResolverAppliesRealFixture fails with Source = none, want transcript, and the runner TestDispatch_APaneLost test fails at line 216 because the transcript content is missing. Both pass outside the sandbox. The tests read transcripts through the real HOME, so their result depends on host files and on the sandbox, and seats report false failures.",
+  "title": "Transcript tests use a test-owned HOME, not the real one",
+  "weight": 0.5
+}

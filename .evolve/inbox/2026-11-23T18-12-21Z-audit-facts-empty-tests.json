@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "A fixture diff with an empty test body and a fake auditor gives an honesty section that names the empty test.",
+    "A report that leaves a host-listed empty test unnamed fails the audit-final-diff grammar at enforce.",
+    "No second empty-body predicate exists: auditfacts calls internal/emptytests."
+  ],
+  "created_at": "2026-11-23T18:12:21Z",
+  "deps": [
+    "audit-reviews-the-final-diff"
+  ],
+  "files": [
+    "go/internal/core/auditfacts/",
+    "go/internal/phases/audit/",
+    "agents/evolve-auditor-reference.md",
+    "go/internal/core/testdata/audit-honesty/empty-test.diff"
+  ],
+  "fix": "In internal/core/auditfacts, add an empty_test_bodies fact derived from emptytests over the changed *_test.go files (the one predicate; no second detector). Problems() requires the Guard Honesty Check section to name each empty test as honest or hollow. Add the fixture go/internal/core/testdata/audit-honesty/empty-test.diff and a fake-auditor test.",
+  "id": "audit-facts-empty-tests",
+  "kind": "feature",
+  "notes": "Blocked until PR #1723 (internal/emptytests) is on main. Decision 19 guard and this item share the predicate.",
+  "origin": "console",
+  "priority": "P2",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "summary": "audit-reviews-the-final-diff ships the facts block and the two report sections without empty tests, because internal/emptytests (PR #1723) was not on main. Add the empty-test fact once it is.",
+  "title": "The audit facts block lists the empty test bodies that internal/emptytests finds, and the audit report must name each one (ADR-0158 decisions 19 and 21)",
+  "weight": 0.5
+}

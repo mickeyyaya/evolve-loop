@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A resumed cycle whose Build floor reports a test-audit finding in this cycle's predicate package reruns TDD with the finding, at the first rejection.",
+    "The fresh loop and the resume loop call one reroute decision; no second copy of the rule exists.",
+    "The one-reroute-per-cycle cap holds across the resume."
+  ],
+  "created_at": "2026-11-23T02:55:40Z",
+  "files": [
+    "go/internal/core/resume.go",
+    "go/internal/core/predicate_reroute.go"
+  ],
+  "fix": "Route the resume path's correction through the same tddOwnedFailures and tddReroute decision as the fresh loop, so one rule decides for both.",
+  "id": "resumed-build-reroutes-a-tdd-owned-finding",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console 2026-11-23: accepted risk of item build-floor-finding-in-a-tdd-file-routes-to-tdd (design section 7)",
+  "summary": "The fix for build-floor-finding-in-a-tdd-file-routes-to-tdd reroutes a test-audit finding in this cycle's acs/cycle<N> package to TDD at the first rejection, but only in the fresh correction loop (cyclerun_correction.go). The resume path (resume.go:438-474) has no reroute, so a resumed Build that meets the same finding still gives the Builder a correction it may not apply, and the cycle fails as cycles 2599 and 2606 did.",
+  "title": "A resumed Build reroutes a TDD-owned floor finding to TDD, as a fresh Build does",
+  "weight": 0.5
+}

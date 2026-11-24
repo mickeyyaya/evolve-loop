@@ -5,8 +5,17 @@
     "Red first: setting two different values for the old and new keys is refused with an error that names both",
     "A guard test fails when a second reader of a disk floor appears outside the resolver"
   ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2609",
+    "branch": "cycle-cd3ae73e-2609",
+    "snapshot_sha": "c8e3e5067b919efe318ad769277de67707600003",
+    "base_sha": "a099157d14664c4483d0db2009b6551b6ded79d6",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2609/audit-fail-reason.json",
+    "cycle": 2609
+  },
   "created_at": "2026-11-22T10:01:50Z",
   "deps": [],
+  "failure_count": 1,
   "files": [
     "go/internal/gcpolicy/gcpolicy.go",
     "go/internal/policy/preflight_config.go",
@@ -18,8 +27,15 @@
   "fix": "Choose one policy key block for the disk floor (a warn level, a launch floor and a percent floor) with one resolver in a leaf package. gcpolicy, looppreflight and the review verb of X13 call that resolver. Keep the old keys as read-only aliases for one release with a WARN, then remove them. Update the policy docs.",
   "id": "disk-floor-one-home",
   "kind": "refactor",
+  "last_failure_class": "capability",
+  "last_failure_cycle": 2609,
+  "last_failure_findings": "review gate: phase \"build\" deliverable rejected after 2 correction(s): build handoff floor: 1 deterministic check failure(s) — fix these exactly before handoff:\n  repo-contract scanner pack RED: github.com/mickeyyaya/evolve-loop/go/internal/repocontract.TestPackages_HoldEveryTestThatReadsTheWholeTree — ship runs these repo-wide suites before it pushes and refuses a red one. Reproduce each from go/ with `go test -count=1 <package>` (for a named test add `-run '^<Test>$'`) and fix the change before handoff:\n=== RUN   TestPackages_HoldEveryTestThatReadsTheWholeTree\n    packages_test.go:25: internal/diskfloor.TestSingleReader_NoDiskFloorReaderLivesOutsideTheResolver reads the whole tree, so a lane that touches neither its package nor an importer can still break it; add it to TreeReadingTests() or put the package in Packages()\n--- FAIL: TestPackages_HoldEveryTestThatReadsTheWholeTree (2.68s)\n",
+  "last_failure_fingerprint": "text:1dfbbd6c208b",
+  "last_failure_reason": "cycle-failure-release",
+  "last_failure_rung": "R3",
   "origin": "console",
   "priority_class": "maintainability",
+  "retry_plan": "fresh-deep-plan",
   "summary": "Operator decision 2026-11-22 (plan section 13, D35). Three places hold a free-disk floor: gc.disk_floor_gb and gc.disk_warn_gb (go/internal/gcpolicy/gcpolicy.go:18-19, defaults 10 and 20 GB, read by diskSignal in go/cmd/evolve/cmd_gc_disk.go:23), preflight.min_free_gib (go/internal/policy/preflight_config.go:16, default 1 GiB, read at go/internal/looppreflight/diskspace.go:19), and the 5% guard (go/internal/looppreflight/disk_percent.go:10). Wave 186 paused cycle starts 20 times (HOST_DISK_LOW) while another floor showed no warning. The floors differ in units and levels. This item is not part of the gc flow build.",
   "title": "One policy home for the disk floor",
   "weight": 0.5

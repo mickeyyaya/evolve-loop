@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "The TDD floor runs the test-audit check of the Build floor over go/acs/cycle<N>/, through the same function, rules and configuration. There is no second rule list.",
+    "A TDD predicate that breaks a test-audit rule (the cycle 2606 shape: a skip that hides an error) is refused at the TDD handoff. The refusal names the rule and the test, and the correction goes to TDD.",
+    "evolve phase verify tdd reports the same finding.",
+    "A regression test replays the cycle 2606 predicate shape. It fails before the fix and passes after it.",
+    "An incident record gives the five occurrences, the root cause and the fix."
+  ],
+  "created_at": "2026-11-22T12:51:04Z",
+  "files": [
+    "go/internal/core/tdd_predicate_floor.go"
+  ],
+  "fix": "Make the TDD floor and evolve phase verify tdd run the same pure-AST test-audit check that the Build floor runs, with the same rules and configuration, over the cycle's predicate package. A refusal goes back to TDD, which owns the file.",
+  "id": "tdd-floor-runs-the-test-audit-ratchet",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "route": "console-manual",
+  "source": "cycle 2606 retrospective (D1, D2); lessons inst-L2606a and inst-L2599a",
+  "summary": "The Build floor runs the test-audit ratchet over go/acs/cycle<N>/, but the TDD floor (go/internal/core/tdd_predicate_floor.go) checks only the testdup helper copies. A predicate that breaks a test-audit rule passes the TDD handoff and fails at Build, where the Builder cannot edit the file. Cycle 2606 failed this way with a correct implementation (rule skip-hides-error). This is the 5th occurrence: cycles 1448, 1488, 2532, 2599 and 2606.",
+  "title": "The TDD floor runs the test-audit ratchet over the predicates that TDD writes",
+  "weight": 0.95
+}

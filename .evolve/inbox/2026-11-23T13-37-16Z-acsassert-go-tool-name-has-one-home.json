@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "The program name the subprocess bound manages is one named constant in acsassert, used at assertions.go:156, subprocess_bound.go:49 and subprocess_bound.go:60."
+  ],
+  "created_at": "2026-11-23T13:37:16Z",
+  "files": [
+    "go/pkg/acsassert/assertions.go",
+    "go/pkg/acsassert/subprocess_bound.go"
+  ],
+  "fix": "Name the go tool once (for example const goTool = \"go\") and use it at the three sites.",
+  "id": "acsassert-go-tool-name-has-one-home",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "architecture review of the #1709 rebuild (round 2), 2026-11-23",
+  "summary": "The ACS subprocess bound manages the Go test timeout of the go tool, but the program name \"go\" is a bare literal in three places of acsassert. A change to one site leaves the others inconsistent.",
+  "title": "acsassert names the go tool once",
+  "weight": 0.3
+}

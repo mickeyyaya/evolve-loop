@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "With an unreadable git state, the TDD check still audits acs/cycle<N> and records that its scope narrowed, with the git error.",
+    "With a readable git state, nothing new is recorded.",
+    "A test drives both cases through the real TDD floor."
+  ],
+  "created_at": "2026-11-22T13:37:31Z",
+  "deps": [
+    "tdd-floor-runs-the-test-audit-ratchet"
+  ],
+  "files": [
+    "go/internal/core/build_testaudit_check.go"
+  ],
+  "fix": "When the paths cannot be read, keep the acs/cycle<N> audit and record the narrowing: a signal or a refusal-note line that names the git error. Keep the TDD side fail-open.",
+  "id": "tdd-audit-scope-narrowing-leaves-a-trace",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "debuggability",
+  "source": "TDD-floor fix review, architecture-reviewer round 3 MEDIUM-1 (go/internal/core/build_testaudit_check.go:37)",
+  "summary": "core.TddTestAuditFailures ignores a git error from worktreePathsSince and audits only acs/cycle<N>. The check then covers fewer packages than the Build floor, and nothing records that. The Build floor still catches the missed findings, but the silent narrowing breaks the fail-loudly rule.",
+  "title": "The TDD test-audit check says when it narrows its scope because git cannot be read",
+  "weight": 0.4
+}

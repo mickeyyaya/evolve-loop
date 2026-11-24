@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "A second code-index truth set exists that does not come from go/types: hand-checked or gopls-derived callers, including interface-method calls and calls through function values.",
+    "evolve code bench scores every backend on both truth sets and prints precision, recall and p50/p95 per set."
+  ],
+  "created_at": "2026-11-23T15:39:35Z",
+  "files": [
+    "go/internal/codeindex"
+  ],
+  "fix": "Add an independent truth set with interface methods so the gotypes backend is not graded only by the checker it is built on.",
+  "id": "code-index-second-independent-truth-set",
+  "kind": "test",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "research dossier docs/research/code-intelligence-tools-2026-11.md (risk R1)",
+  "summary": "The 40-symbol code-index truth set comes from go/types, the same checker the gotypes backend uses, so its 1.00/1.00 callers score is circular. The dossier proposes a second, independent truth set that includes interface methods before gotypes becomes the default route.",
+  "title": "The code-index bench has a second truth set that go/types did not produce",
+  "weight": 0.6
+}

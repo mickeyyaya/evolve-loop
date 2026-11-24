@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "A test moves the worktree HEAD past WorktreeBaseSHA and asserts that the verb and the TDD floor audit the same package set.",
+    "A test makes the git path listing fail at TDD time and asserts the WARN line that names the shrunk scope, and that the frozen predicate directory is still audited.",
+    "The base revision rule exists in one function that both callers use."
+  ],
+  "created_at": "2026-11-23T08:43:17Z",
+  "files": [
+    "go/internal/cli/phasecmd/phase_verify.go",
+    "go/internal/core/tdd_predicate_floor.go",
+    "go/internal/core/build_testaudit_check.go"
+  ],
+  "fix": "Give the base revision one home: the verb reads WorktreeBaseSHA from the CycleState it already loads and calls the same floorBase rule. When worktreePathsSince fails at TDD time, keep the fail-soft scope but write a WARN line that names the shrunk scope, as the helper-copy skip in tdd_predicate_floor.go does.",
+  "id": "tdd-floor-and-verb-measure-scope-from-one-base-revision",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console 2026-11-23: architecture-reviewer MEDIUM findings on the #1692 rebuild (run agent-architecture-reviewer-20261123T083854Z-37d7)",
+  "summary": "go/internal/cli/phasecmd/phase_verify.go passes the literal \"HEAD\" as the base revision of the TDD test-audit scope, while go/internal/core/tdd_predicate_floor.go uses floorBase(in) (WorktreeBaseSHA, with HEAD as the fallback). When the worktree HEAD moves away from WorktreeBaseSHA (salvage or rebase commit), the verb and the floor audit different package sets, so the verb can approve what the handoff floor refuses. Also, TddTestAuditFailures in go/internal/core/build_testaudit_check.go drops the error of worktreePathsSince, so the TDD scope silently shrinks to acs/cycle<N> on a broken git state while the Build floor reports the same error.",
+  "title": "The TDD test-audit verb and the TDD handoff floor measure scope from one base revision, and a git read failure is reported",
+  "weight": 0.4
+}

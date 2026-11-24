@@ -1,0 +1,34 @@
+{
+  "acceptance": [
+    "evolve wave latency --check reports the newest wave ok or left out",
+    "The cause has a regression test that fails before the fix and passes after it"
+  ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2622",
+    "branch": "cycle-cd3ae73e-2622",
+    "snapshot_sha": "59387b90827abf5c665765feaa8dc024325e32ab",
+    "base_sha": "0d252b9ae2304d37b4396cf1ec4b4a0afde76b9a",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2622/audit-fail-reason.json",
+    "cycle": 2622
+  },
+  "created_at": "2026-11-22T12:15:47Z",
+  "failure_count": 1,
+  "files": [
+    "go/internal/lanetime/check.go",
+    "go/cmd/evolve/cmd_wave_latency_check.go"
+  ],
+  "fix": "Run evolve wave latency --wave 184, find where the live lanes or the host gate time went, and fix the cause at its source.",
+  "id": "latency-wave-breach-from-wave-161",
+  "kind": "fix",
+  "last_failure_class": "capability",
+  "last_failure_cycle": 2622,
+  "last_failure_reason": "cycle-failure-release",
+  "last_failure_rung": "R3",
+  "origin": "cycle",
+  "priority": "high",
+  "priority_class": "performance",
+  "source": "wave-latency-check",
+  "summary": "evolve wave latency --check found waves 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 181, 183, 184 in breach in a row: host gate share 53.4% (lock wait 0.0%), above the ceiling of 25.0%. A wave with a quota pause, a loop stop_reason or an operator brake does not count. The bounds are wave_latency.min_live_share and wave_latency.max_gate_share in policy.json.",
+  "title": "Wave latency budget exceeded in waves 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 181, 183, 184",
+  "weight": 0.7
+}

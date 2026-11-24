@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "A BM25 ranker over the knowledge-base corpus, fused with the kbgraph neighbour list by reciprocal rank fusion (k=60), sits behind research.KB, selected by configuration, at stage shadow.",
+    "In shadow, each plan recall runs both rankers and records both result lists; the plan uses the current ranker.",
+    "The switch to the new ranker is a data rule at a boundary: it beats the baseline on recall@5 and MRR on the gold set by a recorded margin."
+  ],
+  "created_at": "2026-11-23T15:25:34Z",
+  "deps": [
+    "kb-recall-gold-set-and-score"
+  ],
+  "files": [
+    "go/internal/research"
+  ],
+  "fix": "Implement a native Go BM25 plus RRF ranker behind research.KB, run it in shadow beside the current ranker, and flip it only on a measured gain.",
+  "id": "kb-recall-bm25-rrf-ranker-in-shadow",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "stability",
+  "source": "research dossier docs/research/qmd-knowledge-base-2026-11.md (approach D, steps 2-3)",
+  "summary": "The qmd dossier recommends taking the hybrid-retrieval ideas of tobi/qmd (BM25, reciprocal rank fusion of several ranked lists) natively in Go, without its LLM expansion and rerank models, which would be LLM calls outside the bridge, and without its 2 GB model download.",
+  "title": "A native BM25 plus RRF knowledge-base ranker runs in shadow beside the current one",
+  "weight": 0.5
+}

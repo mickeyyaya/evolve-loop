@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "One function runs the failing-end sequence, and both loops call it.",
+    "One function builds the failure-learning request, and both loops call it.",
+    "resumeExecution.run is under the function size cap, and the existing resume and dispatch tests pass unchanged."
+  ],
+  "created_at": "2026-11-23T02:34:33Z",
+  "files": [
+    "go/internal/core/resume_execution.go",
+    "go/internal/core/cyclerun_dispatch.go",
+    "go/internal/core/cyclerun.go"
+  ],
+  "fix": "Extract the failing-end sequence into one helper both loops call, and build the learning request in one place. Split resumeExecution.run under the cap while doing so.",
+  "id": "resume-loop-shares-the-failing-end-sequence",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "source": "console 2026-11-23: review of the #1627 rebuild (resumed cycle learns from every failing end)",
+  "summary": "After #1627, both loops end a failed phase with the same steps: diagnoseDispatchFailure, then failPhase (cyclerun_dispatch.go:157-159 and resume_execution.go:176-178). cycleRun.learning() and resumeExecution.learning() build the same failure-learning request, so the field list has two homes. resumeExecution.run (resume_execution.go:41) is over the function cap and was touched without shrinking.",
+  "title": "The resume loop and the fresh loop share one failing-end sequence and one learning request",
+  "weight": 0.35
+}

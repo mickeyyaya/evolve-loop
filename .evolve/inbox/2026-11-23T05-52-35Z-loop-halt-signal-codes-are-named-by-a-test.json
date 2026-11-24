@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "APICOVER_PKGS=./cmd/evolve make apicover-enforce exits 0.",
+    "A test asserts the emission of each of the two halt codes through the code path that emits it.",
+    "cmd/evolve is in go/.apicover-enforce, or the item records why it cannot be yet."
+  ],
+  "created_at": "2026-11-23T05:52:35Z",
+  "files": [
+    "go/cmd/evolve/signal_loop.go",
+    "go/.apicover-enforce"
+  ],
+  "fix": "Add a test that names both codes through the behaviour that emits them (the loop halt and the zero-ship halt), or unexport them if nothing outside the package reads them. Then check whether cmd/evolve has any other uncovered export; if it is clean, enrol it in go/.apicover-enforce so the gap cannot reopen.",
+  "id": "loop-halt-signal-codes-are-named-by-a-test",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "hygiene",
+  "source": "console 2026-11-23: seen by four separate builders (#1702, #1627 rebuild, #1699 rebuild, #1624 rebuild) whose scoped apicover runs included cmd/evolve",
+  "summary": "go/cmd/evolve/signal_loop.go exports CodeLoopHalt and CodeLoopZeroShipHalt, and no test names either. cmd/evolve is not in go/.apicover-enforce, so CI does not enforce it, but each builder that adds cmd/evolve to APICOVER_PKGS sees exit 2 and must work out that the gap is old. That cost time in four builds on 2026-11-23.",
+  "title": "Name CodeLoopHalt and CodeLoopZeroShipHalt in a test, and enrol cmd/evolve in the API-coverage gate when it is clean",
+  "weight": 0.3
+}
