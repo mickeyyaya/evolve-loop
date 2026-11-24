@@ -541,9 +541,19 @@ Every phase without write permission (registry `writes_source=false`: audit, adv
 >   2a. **Dispatch processes and orphan log tails (2026-10-08).** This step is the backstop for the sweep at dispatch end. The proofs are in [dispatch-process-hygiene-2026-10.md](../plans/dispatch-process-hygiene-2026-10.md).
 >      - **The tag.** Each dispatch sets `EVOLVE_DISPATCH_ID=<run>/<cycle>/<agent>/p<bridge-pid>n<nonce>` for the CLI it starts. Each descendant inherits the tag.
 >      - **Stale dispatch.** The tag parses and `EVOLVE_PROJECT_ROOT` equals the project root. Also, the bridge pid of the tag is dead. Or, the cycle of the tag is closed out and the process is an orphan.
+>      - **The allow list.** The tag alone does not stop a process. Its program must also be on the allow list. The list holds the shells and launchers of `proctree.Launchers()` and the binary of each CLI family manifest. A process in the persisted tree needs no entry.
 >      - **Orphan log tail.** An orphan `tail` whose file arguments are all absolute paths under `<root>/.evolve/`. Its age must be more than `gc.temp_ttl_hours`. On 2026-10-08, 48 old console monitors of this kind ran.
 >      - **The sequence.** SIGTERM, 2 s, SIGKILL for each process that still matches, and a last check. A survivor is an `ERROR` line and exit 1.
 >      - **The preview.** `--dry-run` prints `WOULD-STOP pid=<pid> rule=<stale-dispatch|log-tail> comm=<name> ...` and sends no signal.
+>      - **Stale tree files.** A file in `.evolve/dispatch-trees/` is stale when the bridge pid of its dispatch is dead. Also, no member is a live process that gc can stop. `--dry-run` prints `WOULD-REMOVE-TREE <path> dispatch=<id> rule=stale-tree`. A real run reads the process table again and checks each file again. It prints `REMOVE-TREE` for each file it removes.
+>      - **Tree file faults.** A file that gc cannot remove is an error line and exit 1. A file that gc cannot read gets a `WARN` line and stays.
+>      - **Spared processes (report only).** gc prints `REPORT-ONLY pid=<pid> rule=<shared|not-killable> comm=<name> dispatch=<id>` for each process that gc spares and that has a valid tag, this project root and a dead bridge. It sends no signal and does not change the exit code.
+>      - **The report rules.** `rule=shared` means a shared helper with no live pane (tmux, a Claude Code daemon, Chrome, `ollama serve`). `rule=not-killable` means a program that is not on the allow list (for example `gopls`, `ssh-agent`, Firefox).
+>      - **Operator check for a spared process.** A crashed bridge can leave such a process with no persisted tree. Do this check by hand.
+>        1. Read the `REPORT-ONLY` lines from `evolve gc --dry-run`.
+>        2. Run `ps -o pid=,ppid=,etime=,command= -p <pid>` and decide if another session uses the process.
+>        3. If no session uses it, send `kill -TERM <pid>`.
+>        4. Never stop a process that other sessions use, such as a shared `tmux` server or a Claude Code daemon.
 >      - **Never touched.** A process without the tag or the tail proof: Chrome, an interactive `claude` session, the Claude Code daemon, an operator shell.
 >   2b. **Old continuation bindings (2026-10-27).** This step releases the continuation bindings that are too old to resume.
 >      - **The age.** A binding is old when its cycle is more than `continuation.max_age_cycles` (default 100) before `lastCycleNumber` of `state.json`. A binding with no cycle has an unknown age and stays.

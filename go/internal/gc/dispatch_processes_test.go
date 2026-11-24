@@ -32,8 +32,9 @@ func staleOptions() DispatchProcessOptions {
 			}
 			return nil
 		},
-		Now:     gcNow,
-		TailTTL: 24 * time.Hour,
+		Killable: proctree.ProgramIn(proctree.Launchers()),
+		Now:      gcNow,
+		TailTTL:  24 * time.Hour,
 	}
 }
 
@@ -165,5 +166,47 @@ func TestStaleDispatch_ARelativeRootMatchesNothing(t *testing.T) {
 
 	if StaleDispatch(o)(gcProc(10, 1, "node", env)) {
 		t.Errorf("a relative project root matched: the root of the gc run must be absolute")
+	}
+}
+
+func TestStaleDispatch_AnUnlistedTaggedProgramOfADeadBridgeIsSpared(t *testing.T) {
+	t.Parallel()
+	dead := dispatchEnv("01R/1835/build/p999n1")
+	proof := StaleDispatch(staleOptions())
+	for _, p := range []proctree.Process{
+		gcProc(70, 1, "/usr/bin/ssh-agent", dead, "ssh-agent"),
+		gcProc(71, 1, "/Applications/Firefox.app/Contents/MacOS/firefox", dead, "firefox"),
+		gcProc(72, 1, "gpg-agent", dead, "gpg-agent", "--daemon"),
+	} {
+		if proof(p) {
+			t.Errorf("%s: a tagged program outside the allow list was selected", p.Comm)
+		}
+	}
+	o := staleOptions()
+	o.Killable = nil
+	if StaleDispatch(o)(gcProc(10, 1, "node", dead)) {
+		t.Errorf("a nil Killable selected a tagged node")
+	}
+}
+
+func TestUnreapedTagged_NamesTheReasonEachTaggedProcessIsSpared(t *testing.T) {
+	t.Parallel()
+	dead := dispatchEnv("01R/1835/build/p999n1")
+	alive := dispatchEnv("01R/1800/build/p4242n1")
+	table := []proctree.Process{
+		gcProc(10, 1, "node", dead, "node", "mcp.js"),
+		gcProc(60, 1, "claude", dead, "claude", "daemon", "run"),
+		gcProc(61, 1, "tmux", dead, "tmux", "new-session"),
+		gcProc(62, 1, "/go/bin/gopls", dead, "gopls"),
+		gcProc(63, 1, "node", alive, "node"),
+		gcProc(64, 1, "gopls", nil, "gopls"),
+		gcProc(65, 1, "gopls", map[string]string{ipcenv.DispatchIDKey: "01R/1835/build/p999n1", ProjectRootEnvKey: "/elsewhere"}, "gopls"),
+	}
+
+	got := UnreapedTagged(table, staleOptions())
+
+	want := []UnreapedItem{{table[1], RuleShared}, {table[2], RuleShared}, {table[3], RuleNotKillable}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("unreaped = %+v, want %+v", got, want)
 	}
 }

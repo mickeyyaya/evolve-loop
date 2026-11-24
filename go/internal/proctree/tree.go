@@ -98,6 +98,55 @@ func RemoveTree(dir, id string) error {
 	return nil
 }
 
+type TreeRecord struct {
+	File     string
+	Dispatch string
+	Members  []Identity
+}
+
+func ListTrees(dir string) ([]TreeRecord, []error, error) {
+	entries, err := os.ReadDir(dir)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil, nil
+	}
+	if err != nil {
+		return nil, nil, fmt.Errorf("list dispatch trees: %w", err)
+	}
+	var records []TreeRecord
+	var warns []error
+	for _, e := range entries {
+		if e.IsDir() || strings.HasPrefix(e.Name(), ".") || filepath.Ext(e.Name()) != ".json" {
+			continue
+		}
+		rec, err := readTreeRecord(filepath.Join(dir, e.Name()))
+		if err != nil {
+			warns = append(warns, err)
+			continue
+		}
+		records = append(records, rec)
+	}
+	return records, warns, nil
+}
+
+func readTreeRecord(file string) (TreeRecord, error) {
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return TreeRecord{}, fmt.Errorf("read dispatch tree %s: %w", file, err)
+	}
+	var f treeFile
+	if err := json.Unmarshal(data, &f); err != nil {
+		return TreeRecord{}, fmt.Errorf("decode dispatch tree %s: %w", file, err)
+	}
+	if TreeFile(filepath.Dir(file), f.Dispatch) != file {
+		return TreeRecord{}, fmt.Errorf("dispatch tree %s names dispatch %q", file, f.Dispatch)
+	}
+	members := make([]Identity, 0, len(f.Members))
+	for _, m := range f.Members {
+		members = append(members, Identity(m))
+	}
+	return TreeRecord{File: file, Dispatch: f.Dispatch, Members: members}, nil
+}
+
 const treeDirName = "dispatch-trees"
 
 func TreeDir(projectRoot string) string {

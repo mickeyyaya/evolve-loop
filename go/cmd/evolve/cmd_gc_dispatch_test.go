@@ -72,7 +72,7 @@ func TestGCDispatchProcesses_DryRunListsAndSignalsNothing(t *testing.T) {
 			t.Errorf("stdout lacks %q:\n%s", want, out)
 		}
 	}
-	for _, foreign := range []string{"pid=30470", "pid=901", "pid=902", "pid=903"} {
+	for _, foreign := range []string{"STOP pid=30470", "STOP pid=901", "STOP pid=902", "STOP pid=903"} {
 		if strings.Contains(out, foreign) {
 			t.Errorf("stdout names %s, a process without the proof:\n%s", foreign, out)
 		}
@@ -122,7 +122,7 @@ func TestGCDispatchProcesses_ReadsThePersistedTreeOfADeadDispatch(t *testing.T) 
 	if !strings.Contains(stdout.String(), "WOULD-STOP pid=904 rule=stale-dispatch") {
 		t.Errorf("stdout = %q, want the orphan in the persisted tree of the closed cycle", stdout.String())
 	}
-	if strings.Contains(stdout.String(), "pid=903") {
+	if strings.Contains(stdout.String(), "STOP pid=903") {
 		t.Errorf("stdout = %q: a shared helper is never stopped by persisted-tree membership alone", stdout.String())
 	}
 }

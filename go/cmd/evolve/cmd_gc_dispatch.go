@@ -1,12 +1,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"slices"
 	"syscall"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
@@ -36,6 +38,7 @@ func (r gcRun) dispatchOptions(host gcProcessHost, projectRoot string, tailTTL t
 	return gc.DispatchProcessOptions{ProjectRoot: projectRoot, PidAlive: host.alive, Now: time.Now(),
 		CycleClosed:  func(n int) bool { return dossier.ClosedOut(projectRoot, n) },
 		RecordedTree: r.recordedTree(proctree.TreeDir(projectRoot)),
+		Killable:     bridge.TagKillable(),
 		TailTTL:      tailTTL}
 }
 
@@ -68,10 +71,75 @@ func (r gcRun) dispatchProcesses(projectRoot string, tempTTLHours int) bool {
 	for _, it := range items {
 		fmt.Fprintf(r.stdout, "  %s pid=%d rule=%s comm=%q %s\n", verb, it.Process.Pid, it.Rule, it.Process.Comm, gcProcessDetail(it))
 	}
-	if r.dryRun || len(items) == 0 {
+	r.reportUnreaped(table, o)
+	failed := false
+	if !r.dryRun && len(items) > 0 {
+		failed = r.reportDispatchReap(host.reaper().Reap(r.ctx, proctree.AnyOf(gc.StaleDispatch(o), gc.OrphanLogTail(o))))
+	}
+	return r.treeFiles(host, o, dispatchSnapshot{table: table, planned: plannedProcesses(items)}) || failed
+}
+
+type dispatchSnapshot struct {
+	table   []proctree.Process
+	planned []proctree.Process
+}
+
+func plannedProcesses(items []gc.DispatchProcessItem) []proctree.Process {
+	var planned []proctree.Process
+	for _, it := range items {
+		planned = append(planned, it.Process)
+	}
+	return planned
+}
+
+func (r gcRun) reportUnreaped(table []proctree.Process, o gc.DispatchProcessOptions) {
+	for _, it := range gc.UnreapedTagged(table, o) {
+		fmt.Fprintf(r.stdout, "  REPORT-ONLY pid=%d rule=%s comm=%q dispatch=%q\n", it.Process.Pid, it.Rule, it.Process.Comm, it.Process.Env[ipcenv.DispatchIDKey])
+	}
+}
+
+func (r gcRun) treeFiles(host gcProcessHost, o gc.DispatchProcessOptions, snap dispatchSnapshot) bool {
+	trees, warns, err := proctree.ListTrees(proctree.TreeDir(o.ProjectRoot))
+	if err != nil {
+		fmt.Fprintf(r.stderr, "evolve gc: dispatch tree sweep skipped: %v\n", err)
+		return true
+	}
+	for _, w := range warns {
+		fmt.Fprintf(r.stderr, "evolve gc: WARN: %v; the file stays\n", w)
+	}
+	table, planned := snap.table, snap.planned
+	if !r.dryRun {
+		if table, err = host.list(r.ctx); err != nil {
+			fmt.Fprintf(r.stderr, "evolve gc: dispatch tree sweep skipped: %v\n", err)
+			return true
+		}
+		planned = nil
+	}
+	stale := gc.StaleTreeFiles(trees, table, o, planned)
+	if len(stale) == 0 {
 		return false
 	}
-	return r.reportDispatchReap(host.reaper().Reap(r.ctx, proctree.AnyOf(gc.StaleDispatch(o), gc.OrphanLogTail(o))))
+	r.summary("%d stale dispatch tree file(s) would be removed", "removing %d stale dispatch tree file(s)", len(stale))
+	return r.removeTrees(stale)
+}
+
+func (r gcRun) removeTrees(stale []proctree.TreeRecord) bool {
+	verb := "REMOVE-TREE"
+	if r.dryRun {
+		verb = "WOULD-REMOVE-TREE"
+	}
+	failed := false
+	for _, t := range stale {
+		fmt.Fprintf(r.stdout, "  %s %s dispatch=%q rule=%s\n", verb, t.File, t.Dispatch, gc.RuleStaleTree)
+		if r.dryRun {
+			continue
+		}
+		if err := r.remove(t.File); err != nil && !errors.Is(err, os.ErrNotExist) {
+			fmt.Fprintf(r.stderr, "evolve gc: dispatch tree %s: %v\n", t.File, err)
+			failed = true
+		}
+	}
+	return failed
 }
 
 func gcProcessDetail(it gc.DispatchProcessItem) string {
