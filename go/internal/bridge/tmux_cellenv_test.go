@@ -42,10 +42,14 @@ func TestNewSessionEnv_APaneThatNeverReadsItsFileFailsTheStartRemovesTheFileAndK
 	log := fakeTmuxOnPath(t, "$7\n", 0, false)
 	defer func(old time.Duration) { cellEnvConsumeTimeout = old }(cellEnvConsumeTimeout)
 	cellEnvConsumeTimeout = 20 * time.Millisecond
-	err := (execTmux{}).NewSessionEnv(context.Background(), "mine", 80, 24, "", []string{"PATH=/bin", "SECRET=fake"})
+	err := (execTmux{}).NewSessionEnv(context.Background(), "mine", 80, 24, "", []string{"PATH=/bin", "SECRET=fake", "CLAUDE_CODE_OAUTH_TOKEN=" + seatCanaryToken})
 	if err == nil || !strings.Contains(err.Error(), "did not read its cell env file") {
 		t.Fatalf("a pane that never reads its env file must fail the start; got %v", err)
 	}
+	if strings.Contains(err.Error(), seatCanaryToken) {
+		t.Fatalf("the start error holds the canary: %v", err)
+	}
+	assertNoCellEnvCanary(t)
 	if left := cellEnvLeftovers(t); len(left) != 0 {
 		t.Fatalf("the failed start left its env file: %v", left)
 	}
@@ -223,9 +227,10 @@ func TestNewSessionEnv_SweepsAStaleEnvDirBeforeItStarts(t *testing.T) {
 
 func TestNewSessionEnv_ReturnsOnlyAfterThePaneHasRemovedItsFile(t *testing.T) {
 	log := fakeTmuxOnPath(t, "$9\n", 0, true)
-	if err := (execTmux{}).NewSessionEnv(context.Background(), "ok", 80, 24, "", []string{"PATH=/bin", "SECRET=fake"}); err != nil {
+	if err := (execTmux{}).NewSessionEnv(context.Background(), "ok", 80, 24, "", []string{"PATH=/bin", "SECRET=fake", "CLAUDE_CODE_OAUTH_TOKEN=" + seatCanaryToken}); err != nil {
 		t.Fatalf("a pane that reads its file must start: %v", err)
 	}
+	assertNoCellEnvCanary(t)
 	if left := cellEnvLeftovers(t); len(left) != 0 {
 		t.Fatalf("a started session must have no env file left: %v", left)
 	}
@@ -242,5 +247,19 @@ func TestNewSessionEnv_AnUnwritableTempDirFailsBeforeTmuxRuns(t *testing.T) {
 	}
 	if _, err := os.Stat(log); !os.IsNotExist(err) {
 		t.Fatalf("tmux must not run without the env file; stat err = %v", err)
+	}
+}
+
+func assertNoCellEnvCanary(t *testing.T) {
+	t.Helper()
+	for _, dir := range cellEnvLeftovers(t) {
+		_ = filepath.WalkDir(dir, func(p string, e os.DirEntry, _ error) error {
+			if e != nil && !e.IsDir() {
+				if body, _ := os.ReadFile(p); strings.Contains(string(body), seatCanaryToken) {
+					t.Errorf("a cell env file %s holds the canary", p)
+				}
+			}
+			return nil
+		})
 	}
 }

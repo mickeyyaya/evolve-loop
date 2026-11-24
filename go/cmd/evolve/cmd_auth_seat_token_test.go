@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -556,5 +557,41 @@ func TestSeatTokenSet_TheHolderDirectoryIsPrivate(t *testing.T) {
 	info, err := os.Stat(filepath.Dir(r.tokenPath()))
 	if err != nil || info.Mode().Perm() != 0o700 {
 		t.Fatalf("mode=%v err=%v", info, err)
+	}
+}
+
+func TestSeatTokenSet_ATerminalOnStdinIsRefusedBeforeAnyRead(t *testing.T) {
+	t.Parallel()
+	rig := newSeatTokenRig(t, "")
+	rig.env.Stdin = explodingReader{t}
+	rig.env.IsTTY = func(io.Reader) bool { return true }
+	rc, out, errText := rig.run(t, "seat-token", "set", "--project-root", rig.root)
+	if rc != cliExitUsage {
+		t.Fatalf("rc=%d, want %d", rc, cliExitUsage)
+	}
+	if !strings.Contains(errText, "read -rs") || !strings.Contains(errText, "terminal") {
+		t.Fatalf("the refusal does not name the terminal and the next step: %q", errText)
+	}
+	if _, err := os.Stat(paths.SeatTokenPath(rig.home)); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("a refused set wrote a holder: %v", err)
+	}
+	if out != "" {
+		t.Fatalf("stdout: %q", out)
+	}
+}
+
+func TestSeatTokenSet_AnInputThatIsNotATerminalIsRead(t *testing.T) {
+	t.Parallel()
+	rig := newSeatTokenRig(t, seatCanary+"\n")
+	rig.env.IsTTY = func(io.Reader) bool { return false }
+	if rc, _, errText := rig.run(t, "seat-token", "set", "--project-root", rig.root); rc != cliExitOK {
+		t.Fatalf("rc=%d err=%q", rc, errText)
+	}
+}
+
+func TestProductionAuthEnv_WiresTheTerminalCheck(t *testing.T) {
+	t.Parallel()
+	if productionAuthEnv(t.TempDir()).IsTTY == nil {
+		t.Fatal("the production env has no terminal check")
 	}
 }

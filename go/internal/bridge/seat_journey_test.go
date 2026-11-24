@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
@@ -153,6 +154,14 @@ func assertNoCanary(t *testing.T, j seatJourney) {
 			t.Errorf("argv holds the canary: %v", call.args)
 		}
 	}
+	marshalled, err := json.Marshal(j.record(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(marshalled), seatCanaryToken) {
+		t.Errorf("the journey record holds the canary: %s", marshalled)
+	}
+	assertNoCellEnvCanary(t)
 	sawSandboxProfile := false
 	_ = filepath.WalkDir(j.ws, func(p string, e os.DirEntry, _ error) error {
 		if e == nil || e.IsDir() {

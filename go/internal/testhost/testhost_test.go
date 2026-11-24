@@ -2,8 +2,11 @@ package testhost
 
 import (
 	"errors"
+	"flag"
 	"fmt"
+	"os"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -112,5 +115,51 @@ func TestHost_ToolFailsOnAnyHostWhenTheJobDeclaresTheToolRequired(t *testing.T) 
 	r = &recorder{}
 	if got := hostRequiring("linux", "true", "tmux", "tmux").Tool(r, "tmux"); got != "/opt/bin/tmux" || r.skipped+r.failed != "" {
 		t.Fatalf("a declared tool that is installed returns its path: path=%q skipped=%q failed=%q", got, r.skipped, r.failed)
+	}
+}
+
+func TestHelperArgs_ForwardsTheCoverDirOnlyWhenTheHostHasOne(t *testing.T) {
+	t.Parallel()
+	with := func(value string) func(string) *flag.Flag {
+		return func(name string) *flag.Flag {
+			if name != "test.gocoverdir" {
+				t.Errorf("looked up %q", name)
+			}
+			fs := flag.NewFlagSet("x", flag.ContinueOnError)
+			fs.String(name, value, "")
+			return fs.Lookup(name)
+		}
+	}
+	none := func(string) *flag.Flag { return nil }
+	cases := []struct {
+		name   string
+		lookup func(string) *flag.Flag
+		want   []string
+	}{
+		{"no flag", none, []string{"-test.run=^TestX$"}},
+		{"an empty dir", with(""), []string{"-test.run=^TestX$"}},
+		{"a dir", with("/cov"), []string{"-test.run=^TestX$", "-test.gocoverdir=/cov"}},
+	}
+	for _, c := range cases {
+		if got := helperArgs("^TestX$", c.lookup); !slices.Equal(got, c.want) {
+			t.Errorf("%s: %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestCommand_RunsThisBinaryOnTheNamedTestWithTheGivenEnvAfterTheHostEnv(t *testing.T) {
+	t.Parallel()
+	cmd := Command("^TestX$", "A=1")
+	if cmd.Path == "" || cmd.Args[0] != os.Args[0] || cmd.Args[1] != "-test.run=^TestX$" {
+		t.Fatalf("args %v", cmd.Args)
+	}
+	if last := cmd.Env[len(cmd.Env)-1]; last != "A=1" {
+		t.Errorf("the given env must come last, got %q", last)
+	}
+	if len(cmd.Env) < len(os.Environ())+1 {
+		t.Error("the host env was dropped")
+	}
+	if got := HelperArgs("^TestX$"); got[0] != "-test.run=^TestX$" {
+		t.Errorf("HelperArgs %v", got)
 	}
 }

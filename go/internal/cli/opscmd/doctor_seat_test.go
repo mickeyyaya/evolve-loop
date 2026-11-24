@@ -19,6 +19,8 @@ func TestRunDoctor_SeatReportsEachStateAndExitsNonZeroOnlyForABadHolder(t *testi
 		{seatlogin.StateIsolated, 0, "OK", ""},
 		{seatlogin.StateOrphan, 0, "", "WARN"},
 		{seatlogin.StateFault, 0, "", "WARN"},
+		{seatlogin.StateExpiring, 0, "", "WARN"},
+		{seatlogin.State(99), 1, "", "unknown seat state"},
 		{seatlogin.StateBad, 1, "", "WARN"},
 	}
 	for _, c := range cases {
