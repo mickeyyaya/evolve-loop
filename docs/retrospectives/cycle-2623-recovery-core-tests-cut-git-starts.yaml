@@ -1,0 +1,11 @@
+- id: "cycle-2623-recovery-core-tests-cut-git-starts"
+  pattern: "recovery of core-tests-cut-git-starts"
+  description: "The item `core-tests-cut-git-starts` failed in 2 tries with the classes `gate-block`. Cycle 2623 shipped it. Before a new try of a similar item, read the difference above."
+  source: "docs/retrospectives/cycle-2623-recovery-core-tests-cut-git-starts.md"
+  type: "recovery"
+  category: "retrospective"
+  preventiveAction: "Before a new try of a similar item, read the retrospective cycle-2623-recovery-core-tests-cut-git-starts in docs/retrospectives"
+  confidence: 0.8
+  failureContext:
+    failedStep: ""
+    errorCategory: "gate-block"
