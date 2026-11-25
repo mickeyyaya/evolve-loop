@@ -6,6 +6,8 @@ import (
 	"maps"
 	"slices"
 	"sync"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
 const (
@@ -34,6 +36,15 @@ func (f Floors) FamilyOf(agent string) string {
 		}
 	}
 	return ""
+}
+
+func (f Floors) Clamp(agent string, p profiles.Profile) profiles.Profile {
+	family := f.FamilyOf(agent)
+	if family == "" || len(p.AllowedCLIs) > 0 {
+		return p
+	}
+	p.AllowedCLIs = []string{family}
+	return p
 }
 
 func (f Floors) clone() Floors {
