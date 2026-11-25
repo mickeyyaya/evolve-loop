@@ -188,3 +188,15 @@ func TestCloneBare_CarriesTheFixtureIdentityAndMaintenanceConfig(t *testing.T) {
 		t.Errorf("user.email = %q, want gittest@example.com", got)
 	}
 }
+
+func TestStartCosts_ReturnsACopyCallersCannotMutate(t *testing.T) {
+	first := StartCosts()
+	wantFixture := first["Fixture"]
+	if wantFixture == 0 {
+		t.Fatalf("StartCosts()[Fixture] = %d, want nonzero", wantFixture)
+	}
+	first["Fixture"] = 99
+	if second := StartCosts(); second["Fixture"] != wantFixture {
+		t.Errorf("StartCosts()[Fixture] = %d after mutating earlier map, want %d", second["Fixture"], wantFixture)
+	}
+}

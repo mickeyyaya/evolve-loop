@@ -25,4 +25,15 @@ func TestAPICover_NamesEveryExportedSymbol(t *testing.T) {
 	if err := Verify(dir, recorded); err != nil {
 		t.Fatalf("Verify: %v", err)
 	}
+	missingDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(missingDir, "helper.go"), []byte("package gittest\nfunc Helper() { r.Git(\"status\") }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	missing, err := MissingCosts(missingDir)
+	if err != nil {
+		t.Fatalf("MissingCosts: %v", err)
+	}
+	if len(missing) != 1 || missing[0] != "Helper" {
+		t.Fatalf("MissingCosts = %v, want [Helper]", missing)
+	}
 }

@@ -5,6 +5,11 @@
     "A guard test fails when a new exported gittest method that starts git has no cost entry",
     "The recorded ceilings stay at or below today values after the counter learns the helper costs, or each raise is a separate reviewed change"
   ],
+  "consumed": {
+    "at": "2026-11-25T07:15:28Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-11-24T08:45:00Z",
   "files": [
     "go/internal/gitstarts/gitstarts.go",
@@ -15,7 +20,7 @@
   "kind": "bug",
   "origin": "console",
   "priority_class": "correctness",
-  "summary": "On 2026-11-24 a CI fix for PR 1740 (core git starts 746 > recorded 730) added gittest.Repo.CommitAll (3 git processes) and Repo.Rename (1) and used them in core tests; those helpers arrive with PR 1740 and are not on main yet. gitstarts.Count (go/internal/gitstarts/gitstarts.go:41-66, callCost) is a static AST counter with a fixed switch: 5 for Fixture, Bare and At, 1 for Clone, 0 for FromTemplate and BareFromTemplate, 1 per .Git( selector, 1 for any call with a \"git\" string-literal argument, and 0 for every other method. The count fell to exactly 730 while 11 real per-test git starts still ran (honest count 741). The architecture review caught it as CRITICAL before ship. The gate stays open to the same evasion for any new helper that wraps git.",
+  "summary": "On 2026-11-24 a CI fix for PR 1740 (core git starts 746 \u003e recorded 730) added gittest.Repo.CommitAll (3 git processes) and Repo.Rename (1) and used them in core tests; those helpers arrive with PR 1740 and are not on main yet. gitstarts.Count (go/internal/gitstarts/gitstarts.go:41-66, callCost) is a static AST counter with a fixed switch: 5 for Fixture, Bare and At, 1 for Clone, 0 for FromTemplate and BareFromTemplate, 1 per .Git( selector, 1 for any call with a \"git\" string-literal argument, and 0 for every other method. The count fell to exactly 730 while 11 real per-test git starts still ran (honest count 741). The architecture review caught it as CRITICAL before ship. The gate stays open to the same evasion for any new helper that wraps git.",
   "title": "The git-starts ceiling charges 0 for a gittest helper that runs git, so a helper hides real starts",
   "weight": 0.7
 }

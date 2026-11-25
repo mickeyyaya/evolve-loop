@@ -25,6 +25,7 @@
 - `BareFromTemplate` copies a bare origin from a template that the test binary builds once. The copy carries the same config as `Bare`, and a later copy runs no git. A caller with many bare origins uses it to cut process starts. Its `TestMain` calls `RemoveTemplates`. Pinned by `TestBareFromTemplate_CopiesAnIndependentBareOriginBuiltOnce`.
 - `IsolateHostCredentials` projects `ipcenv.CredentialIsolation(dir, os.DevNull)` onto the process environment (`os.Setenv` for `Set`, `os.Unsetenv` for `Unset`), so a test and a cell share one set. A `Fixture` keeps its repo-local identity, because the set holds no identity variable. Pinned by `TestCredentialIsolation_IsTheOneSet` and `TestIsolateHostCredentials_AFixtureKeepsItsRepoLocalIdentity`.
 - `IsolateHostCredentials` sets `GH_CONFIG_DIR` to an empty directory and unsets the GitHub token variables. Pinned by `TestIsolateHostCredentials_ARealGhInATestSeesNoLogin`.
+- `StartCosts` returns a fresh clone of the package cost map (`Fixture`, `Bare`, `At` = 5; `Clone`, `Repo.CloneBare`, `BranchExists`, `Repo.Git` = 1; `FromTemplate`, `BareFromTemplate` = 0). `TestEveryGitMethodHasCost` calls `gitstarts.MissingCosts` so no exported git starter lacks a cost entry.
 - Test binaries that run `git` or `gh` follow [hermetic-driver-tests.md](../../conventions/hermetic-driver-tests.md).
 
 ## Findings
