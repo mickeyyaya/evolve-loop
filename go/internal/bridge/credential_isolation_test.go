@@ -106,7 +106,7 @@ func TestCellEnv_IsolatesHostCredentialsOnEachCarrier(t *testing.T) {
 	}
 	for _, want := range []string{
 		"export GIT_CONFIG_GLOBAL=" + shellQuotePOSIX(filepath.Join(paneCfg.Workspace, "gitconfig")), "export GIT_CONFIG_NOSYSTEM=1", "export GIT_TERMINAL_PROMPT=0",
-		"export GIT_SSH_COMMAND='ssh -o BatchMode=yes'", "export GH_CONFIG_DIR=" + shellQuotePOSIX(filepath.Join(paneCfg.Workspace, "gh-config")),
+		"export GIT_SSH_COMMAND=" + shellQuotePOSIX(ipcenv.GitSSHCommand), "export GH_CONFIG_DIR=" + shellQuotePOSIX(filepath.Join(paneCfg.Workspace, "gh-config")),
 		"unset GH_TOKEN", "unset GITHUB_TOKEN",
 	} {
 		if !slices.Contains(tm.sentKeys, want) {
@@ -373,5 +373,22 @@ func TestCredentialIsolation_IsTheOneSet(t *testing.T) {
 		if _, ok := os.LookupEnv(k); ok {
 			t.Errorf("gittest left %s set", k)
 		}
+	}
+}
+
+func TestCellEnv_AHostileIdentityCannotAddASectionOrAnInclude(t *testing.T) {
+	t.Parallel()
+	cfg := isolationConfig(t)
+	hostile := func(key string) string {
+		return "x\n[include]\n\tpath = /host/.gitconfig\n[credential]\n\thelper = gh"
+	}
+	Deps{EnvStage: "enforce", Stderr: io.Discard, HostGitConfig: hostile}.cellEnv(cfg)
+	body, err := os.ReadFile(filepath.Join(cfg.Workspace, "gitconfig"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSuffix(string(body), "\n"), "\n")
+	if len(lines) != 3 || lines[0] != "[user]" || !strings.HasPrefix(lines[1], "\tname = ") || !strings.HasPrefix(lines[2], "\temail = ") {
+		t.Errorf("gitconfig = %q, want only a [user] section with name and email", body)
 	}
 }
