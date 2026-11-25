@@ -3,12 +3,14 @@
 package cycle2478
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover/lifecycle"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/acsassert"
 )
@@ -22,6 +24,10 @@ const filedByInboxAdd = `{"id":"format-probe","kind":"feature","priority_class":
 
 var classOrder = []string{"correctness", "stability", "performance", "debuggability", "feature", "maintainability", "hygiene", "security"}
 
+type unrecordedLedger struct{}
+
+func (unrecordedLedger) AppendLifecycle(context.Context, ledger.LifecycleRecord) error { return nil }
+
 func fileThenEdit(t *testing.T, edits []lifecycle.FieldEdit) (before, after string) {
 	t.Helper()
 	inbox := filepath.Join(t.TempDir(), ".evolve", "inbox")
@@ -29,7 +35,7 @@ func fileThenEdit(t *testing.T, edits []lifecycle.FieldEdit) (before, after stri
 		t.Fatal(err)
 	}
 	filedAt := func() time.Time { return time.Date(2026, 11, 18, 9, 0, 0, 0, time.UTC) }
-	mover := lifecycle.New(inbox, nil, lifecycle.WithNow(filedAt), lifecycle.WithPriorityClasses(classOrder), lifecycle.WithOrigin("console"))
+	mover := lifecycle.New(inbox, unrecordedLedger{}, lifecycle.WithNow(filedAt), lifecycle.WithPriorityClasses(classOrder), lifecycle.WithOrigin("console"))
 	res, err := mover.File([]byte(filedByInboxAdd))
 	if err != nil {
 		t.Fatalf("evolve inbox add path (Mover.File): %v", err)
@@ -38,7 +44,7 @@ func fileThenEdit(t *testing.T, edits []lifecycle.FieldEdit) (before, after stri
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := mover.Edit("format-probe", edits); err != nil {
+	if _, err := mover.EditBecause("format-probe", "format probe", edits); err != nil {
 		t.Fatalf("evolve inbox edit path (Mover.Edit): %v", err)
 	}
 	edited, err := os.ReadFile(res.Path)

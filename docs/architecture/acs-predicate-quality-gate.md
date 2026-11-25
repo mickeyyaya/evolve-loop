@@ -298,6 +298,17 @@ A predicate is repointed when a successor test pins the same scenario. It is nar
 
 The same item changes one more predicate. `TestC1678_011` now parses the standard output alone. It used to append the standard error after the output, and a warning on the standard error made the JSON invalid.
 
+### Retired with the recurrence weight writer (2026-11-21)
+
+Plan P5 of [inbox prioritization](../plans/inbox-prioritization-2026-10.md) removed `ApplyOptions.Reweight` and `ApplyOptions.Policy`, and renamed `ApplyResult.Bumped` to `Escalated`. Cycle 2520 failed because a frozen predicate built the removed field. The console decided the fate of each predicate. The retired ones moved to [the archive](../private/research/archived-2026-11-21/superseded-predicates/README.md) with their package clause. The inbox item records this as the console decision that its `routed_reason` asked for.
+
+| Predicates | Action | Now |
+|---|---|---|
+| `TestC1932_001`, `002`, `003`, `005`, `006`, `007`, `008` | retired | `TestApplyEscalationBoundary_RecurrenceMovesRankAndLeavesWeight`, `TestApplyBoundary_AnEscalationWritesNothingIntoTheInbox` and `TestNoProductionCodeWritesAnItemWeightOutsideTheLifecycleWriter` pin the contract. `TestC1932_004` stays live. |
+| `TestC1062_005` | retired | `TestApplyBoundary_EscalatesThenIsIdempotent`. The weight bump it asserted is gone. |
+| `TestC1062_007` | amended | It reads `res.Escalated` where it read `res.Bumped`, and its options hold no `Policy`. Its intent is unchanged. |
+| `TestC2478_001`, `TestC2478_002` | amended | The weight cases need a reason now. The helper passes one through `EditBecause` and a ledger that records nothing. Its intent (a byte-for-byte rewrite) is unchanged. |
+
 ## Lifecycle
 
 ```

@@ -2,10 +2,8 @@ package recurrence
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -26,28 +24,7 @@ func openItemF4(t *testing.T, inbox, id string, weight float64) string {
 }
 
 func optionsF4(inbox string) ApplyOptions {
-	return ApplyOptions{InboxDir: inbox, Cycle: 5, Policy: DefaultEscalationPolicy(), Now: time.Date(2026, 7, 23, 0, 0, 0, 0, time.UTC)}
-}
-
-func TestApplyIntent_EscalationThatCannotBeWrittenIsAnErrorAndRecordsNoBump(t *testing.T) {
-	inbox := filepath.Join(t.TempDir(), "inbox")
-	path := openItemF4(t, inbox, "flaky", 0.1)
-	writeFault := errors.New("item write failed")
-	opts := optionsF4(inbox)
-	opts.Reweight = func(string, float64) error { return writeFault }
-	var res ApplyResult
-
-	consumed, err := applyIntent(opts, dispositionrouter.Intent{Action: dispositionrouter.ActionEscalate, ItemID: "flaky", Recurrence: 9, Weight: 1.0}, &res)
-
-	if !errors.Is(err, writeFault) || consumed {
-		t.Fatalf("consumed=%v err=%v", consumed, err)
-	}
-	if len(res.Bumped) != 0 {
-		t.Errorf("an unwritten bump must not be reported: %+v", res)
-	}
-	if raw, _ := os.ReadFile(path); !strings.Contains(string(raw), `"weight":0.1`) {
-		t.Errorf("the item must keep its weight: %s", raw)
-	}
+	return ApplyOptions{InboxDir: inbox, Cycle: 5, Now: time.Date(2026, 7, 23, 0, 0, 0, 0, time.UTC)}
 }
 
 func TestAutofileIntent_AFilingFaultThatIsNotAMissingClassIsAnErrorNotARefusal(t *testing.T) {

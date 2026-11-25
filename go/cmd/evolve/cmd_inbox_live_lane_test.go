@@ -22,7 +22,7 @@ func TestCmd_InboxCurationVerbs_RefuseWhileALoopLaneIsLive(t *testing.T) {
 	}
 	before, _ := os.ReadFile(path)
 	for _, args := range [][]string{
-		{"edit", "cli-inbox-show", "--set", "weight=0.4"},
+		{"edit", "cli-inbox-show", "--set", "weight=0.4", "--reason", "operator review"},
 		{"withdraw", "cli-inbox-show", "mistake"},
 		{"verify", "cli-inbox-show", "--evidence", "checked"},
 	} {
@@ -38,7 +38,7 @@ func TestCmd_InboxCurationVerbs_RefuseWhileALoopLaneIsLive(t *testing.T) {
 		t.Fatal(err)
 	}
 	var stdout, stderr bytes.Buffer
-	if rc := runInbox([]string{"edit", "cli-inbox-show", "--set", "weight=0.4"}, nil, &stdout, &stderr); rc != 0 {
+	if rc := runInbox([]string{"edit", "cli-inbox-show", "--set", "weight=0.4", "--reason", "operator review"}, nil, &stdout, &stderr); rc != 0 {
 		t.Errorf("a stale lease: rc = %d stderr = %q, want the edit written", rc, stderr.String())
 	}
 	var shown bytes.Buffer

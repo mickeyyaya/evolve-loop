@@ -60,6 +60,7 @@ func facadeCalls(opts Options) map[string]func() error {
 			return err
 		},
 		"Edit":          func() error { _, err := Edit(opts, "task-1", nil); return err },
+		"EditBecause":   func() error { _, err := EditBecause(opts, "task-1", "r", nil); return err },
 		"EditHeld":      func() error { _, err := EditHeld(opts, "task-1", 9, nil); return err },
 		"Withdraw":      func() error { _, err := Withdraw(opts, "task-1", "r"); return err },
 		"VerifyPremise": func() error { _, err := VerifyPremise(opts, "task-1", "e"); return err },

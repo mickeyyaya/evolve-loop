@@ -61,6 +61,16 @@ func TestRunLoop_EscalatesAtIterationBoundary(t *testing.T) {
 	if !strings.Contains(stderr.String(), "LOOP_ESCALATION_BOUNDARY") || strings.Contains(stderr.String(), "escalation boundary (cycle") {
 		t.Fatalf("the escalation boundary must be a rendered loop.escalation signal, not a hand-written line; stderr=%q", stderr.String())
 	}
+	report, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("read escalation apply report: %v", err)
+	}
+	var applied struct {
+		Escalated []string `json:"escalated"`
+	}
+	if err := json.Unmarshal(report, &applied); err != nil || len(applied.Escalated) != 1 || applied.Escalated[0] != "recurring-defect" {
+		t.Fatalf("report escalated = %v (err %v), want [recurring-defect] — the boundary applier did not run at the iteration boundary", applied.Escalated, err)
+	}
 	raw, err := os.ReadFile(itemPath)
 	if err != nil {
 		t.Fatalf("read inbox item: %v", err)
@@ -71,7 +81,7 @@ func TestRunLoop_EscalatesAtIterationBoundary(t *testing.T) {
 	if err := json.Unmarshal(raw, &item); err != nil {
 		t.Fatalf("parse inbox item: %v", err)
 	}
-	if item.Weight <= 0.80 {
-		t.Fatalf("inbox weight = %v, want the escalated 0.89 — the boundary applier did not run at the iteration boundary", item.Weight)
+	if item.Weight != 0.80 {
+		t.Fatalf("inbox weight = %v, want the weight as filed (0.80): a recurrence moves the rank, not the weight", item.Weight)
 	}
 }

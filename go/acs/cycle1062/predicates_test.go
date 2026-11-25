@@ -86,7 +86,6 @@ func applyOpts(root string, cycle int, shadow bool) recurrence.ApplyOptions {
 		ReportPath:      filepath.Join(root, "escalation-apply-report.json"),
 		Cycle:           cycle,
 		Shadow:          shadow,
-		Policy:          recurrence.DefaultEscalationPolicy(),
 		Now:             time.Date(2026, 7, 23, 0, 0, 0, 0, time.UTC),
 	}
 }
@@ -238,41 +237,6 @@ func TestC1062_004_StagedIntentNeverWritesInboxMidFlight(t *testing.T) {
 	}
 }
 
-func TestC1062_005_ApplyEscalationIdempotentPerCycleStamp(t *testing.T) {
-	root := t.TempDir()
-	inboxDir := filepath.Join(root, "inbox")
-	escDir := filepath.Join(root, "escalations")
-	writeInboxItem(t, inboxDir, "recurring-defect", "pattern:flaky-tier", 0.80)
-	stageEscalate(t, escDir, 1062, "pattern:flaky-tier", "recurring-defect", 4, 0.80)
-
-	first, err := recurrence.ApplyBoundary(applyOpts(root, 1062, false))
-	if err != nil {
-		t.Fatalf("ApplyBoundary (first): %v", err)
-	}
-	if len(first.Bumped) != 1 {
-		t.Fatalf("first apply Bumped = %v, want exactly 1 item", first.Bumped)
-	}
-	afterFirst, _, ok := itemWeight(t, inboxDir, "recurring-defect")
-	if !ok {
-		t.Fatalf("item vanished after first apply")
-	}
-	if want := recurrence.DefaultEscalationPolicy().Target(0.80, 4); afterFirst != want {
-		t.Errorf("weight after first apply = %v, want %v (min(cap, base+step*(count-1)))", afterFirst, want)
-	}
-
-	second, err := recurrence.ApplyBoundary(applyOpts(root, 1062, false))
-	if err != nil {
-		t.Fatalf("ApplyBoundary (second): %v", err)
-	}
-	if len(second.Bumped) != 0 {
-		t.Errorf("second apply in the SAME cycle bumped %v, want none (per-cycle stamp)", second.Bumped)
-	}
-	afterSecond, _, _ := itemWeight(t, inboxDir, "recurring-defect")
-	if afterSecond != afterFirst {
-		t.Errorf("weight drifted on re-apply: %v → %v, want stable", afterFirst, afterSecond)
-	}
-}
-
 func TestC1062_006_ApplyEscalationNeverLowersWeight(t *testing.T) {
 	root := t.TempDir()
 	inboxDir := filepath.Join(root, "inbox")
@@ -306,7 +270,7 @@ func TestC1062_007_PlanEscalationSkipsClaimedItems(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ApplyBoundary: %v", err)
 	}
-	for _, id := range res.Bumped {
+	for _, id := range res.Escalated {
 		if id == "claimed-item" {
 			t.Errorf("applier bumped a CLAIMED item (%s); claimed items are in flight and must be skipped", id)
 		}
