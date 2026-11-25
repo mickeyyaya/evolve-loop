@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 const (
@@ -181,35 +182,69 @@ func TestGhCIFindsNoRunIsAnError(t *testing.T) {
 
 func TestGhCIWaitsForTheRunToRegisterAndGivesUp(t *testing.T) {
 	t.Parallel()
+	step := 5 * time.Second
 	for _, c := range []struct {
-		name    string
-		empty   int
-		settle  func(*int) func(context.Context) error
-		wantErr bool
-		settles int
+		name      string
+		register  time.Duration
+		bound     time.Duration
+		never     bool
+		noSettle  bool
+		settleErr error
+		wantErr   bool
+		wantBound string
+		settles   int
 	}{
-		{"registers after two waits", 2, func(n *int) func(context.Context) error { return func(context.Context) error { *n++; return nil } }, false, 2},
-		{"never registers", 99, func(n *int) func(context.Context) error { return func(context.Context) error { *n++; return nil } }, true, registerTries - 1},
-		{"no settle", 1, func(*int) func(context.Context) error { return nil }, true, 0},
-		{"settle fails", 1, func(n *int) func(context.Context) error {
-			return func(context.Context) error { *n++; return errors.New("cancelled") }
-		}, true, 1},
+		{"registers after two waits", 10 * time.Second, 0, false, false, nil, false, "", 2},
+		{"registers after two minutes", 2 * time.Minute, 0, false, false, nil, false, "", 24},
+		{"never registers within explicit bound", 0, 3 * time.Minute, true, false, nil, true, "3m0s", 36},
+		{"never registers within default bound", 0, 0, true, false, nil, true, DefaultRegisterWithin.String(), int(DefaultRegisterWithin / step)},
+		{"no settle", 10 * time.Second, 0, false, true, nil, true, "", 0},
+		{"settle fails", 10 * time.Second, 0, false, false, errors.New("cancelled"), true, "", 1},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			settles, empty := 0, c.empty
+			now := time.Date(2026, 11, 23, 9, 0, 0, 0, time.UTC)
+			registerAt := now.Add(c.register)
+			settles := 0
 			s := &ghScript{reply: func(args []string) (string, int, error) {
-				if has(args, "run", "list") && empty > 0 {
-					empty--
+				if has(args, "run", "list") && (c.never || now.Before(registerAt)) {
 					return recordedRunListEmpty, 0, nil
 				}
 				return okReply("5")(args)
 			}}
 			ci := newGhCI(t, s)
-			ci.Settle = c.settle(&settles)
+			ci.Now = func() time.Time { return now }
+			ci.RegisterWithin = c.bound
+			if !c.noSettle {
+				ci.Settle = func(context.Context) error {
+					settles++
+					now = now.Add(step)
+					return c.settleErr
+				}
+			}
 			_, err := ci.Watch(context.Background(), PR{Tip: sha('a')})
 			if (err != nil) != c.wantErr || settles != c.settles {
 				t.Errorf("err %v settles %d, want fail=%v settles=%d", err, settles, c.wantErr, c.settles)
+			}
+			if c.wantErr && c.settleErr == nil {
+				if !errors.Is(err, ErrNoRun) {
+					t.Errorf("err %v does not wrap ErrNoRun", err)
+				}
+				var noRun *NoRunError
+				if !errors.As(err, &noRun) {
+					t.Fatalf("err %v is not *NoRunError", err)
+				}
+				if noRun.Unwrap() != ErrNoRun {
+					t.Errorf("NoRunError.Unwrap() = %v, want %v", noRun.Unwrap(), ErrNoRun)
+				}
+				msg := noRun.Error()
+				if c.wantBound != "" {
+					if noRun.Within.String() != c.wantBound || !strings.Contains(msg, c.wantBound) {
+						t.Errorf("err %q does not record bound %s", msg, c.wantBound)
+					}
+				} else if noRun.Within != 0 || !strings.Contains(msg, sha('a')) || strings.Contains(msg, "within") {
+					t.Errorf("err %q without bound should name tip without within", msg)
+				}
 			}
 		})
 	}

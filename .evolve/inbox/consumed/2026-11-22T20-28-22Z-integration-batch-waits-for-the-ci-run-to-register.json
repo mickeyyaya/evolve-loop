@@ -4,13 +4,18 @@
     "A batch whose run never registers inside the bound stops with a clear message that names the bound.",
     "A test drives both cases with an injected clock and a fake run lister."
   ],
+  "consumed": {
+    "at": "2026-11-25T04:52:07Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "continuation": {
-    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2615",
-    "branch": "cycle-cd3ae73e-2615",
-    "snapshot_sha": "949978a5ed9a6ab8d41c9747cbe290e661c82ee4",
     "base_sha": "2c8fc5fe94f930b3457ee2f38213adc5bc23897f",
+    "branch": "cycle-cd3ae73e-2615",
+    "cycle": 2615,
     "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2615/audit-fail-reason.json",
-    "cycle": 2615
+    "snapshot_sha": "949978a5ed9a6ab8d41c9747cbe290e661c82ee4",
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2615"
   },
   "created_at": "2026-11-22T20:28:22Z",
   "failure_count": 1,
@@ -28,6 +33,18 @@
   "last_failure_rung": "R2",
   "origin": "console",
   "priority_class": "stability",
+  "released_continuations": [
+    {
+      "base_sha": "2c8fc5fe94f930b3457ee2f38213adc5bc23897f",
+      "branch": "cycle-cd3ae73e-2615",
+      "cycle": 2615,
+      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2615/audit-fail-reason.json",
+      "reason": "ship-consume-",
+      "released_at": "2026-11-25T04:52:07Z",
+      "snapshot_sha": "949978a5ed9a6ab8d41c9747cbe290e661c82ee4",
+      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2615"
+    }
+  ],
   "retry_plan": "fresh-deep-plan",
   "source": "boundary 187 to 188, 2026-11-22: batch PR #1700 (main-red-fix of #1698)",
   "summary": "evolve integration batch opened batch PR #1700 at 20:25:45Z and, within about one minute, stopped with rc 2: no CI run of required.yml for the tip 02651fbc6. GitHub registered the run (45066534519) at about 20:27Z. The batch PR stayed open with nothing landed, and the red main stayed red.",

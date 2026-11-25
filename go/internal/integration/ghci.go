@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
@@ -21,14 +22,14 @@ const (
 	prTitleStem = "evolve: integrate "
 	redExitCode = 1
 
-	registerTries   = 5
-	runsOfASHA      = 20
-	watchTries      = 720
-	readyLimit      = 100
-	statusCompleted = "completed"
-	conclusionGreen = "success"
-	conclusionRed   = "failure"
-	batchHeadPrefix = "integration/"
+	DefaultRegisterWithin = 5 * time.Minute
+	runsOfASHA            = 20
+	watchTries            = 720
+	readyLimit            = 100
+	statusCompleted       = "completed"
+	conclusionGreen       = "success"
+	conclusionRed         = "failure"
+	batchHeadPrefix       = "integration/"
 )
 
 var (
@@ -39,6 +40,21 @@ var (
 	prURL             = regexp.MustCompile(`/pull/([0-9]+)\s*$`)
 )
 
+type NoRunError struct {
+	Workflow string
+	Tip      string
+	Within   time.Duration
+}
+
+func (e *NoRunError) Error() string {
+	if e.Within > 0 {
+		return fmt.Sprintf("%s of %s for the tip %s within %s", ErrNoRun, e.Workflow, e.Tip, e.Within)
+	}
+	return fmt.Sprintf("%s of %s for the tip %s", ErrNoRun, e.Workflow, e.Tip)
+}
+
+func (e *NoRunError) Unwrap() error { return ErrNoRun }
+
 func SysGh() GhFunc {
 	return func(ctx context.Context, dir string, args ...string) (string, int, error) {
 		var out strings.Builder
@@ -48,10 +64,26 @@ func SysGh() GhFunc {
 }
 
 type GhCI struct {
-	Repo   Repo
-	Gh     GhFunc
-	Settle func(ctx context.Context) error
-	Runs   *RunLog
+	Repo           Repo
+	Gh             GhFunc
+	Settle         func(ctx context.Context) error
+	Now            func() time.Time
+	RegisterWithin time.Duration
+	Runs           *RunLog
+}
+
+func (c GhCI) now() time.Time {
+	if c.Now != nil {
+		return c.Now()
+	}
+	return time.Now()
+}
+
+func (c GhCI) registerBound() time.Duration {
+	if c.RegisterWithin > 0 {
+		return c.RegisterWithin
+	}
+	return DefaultRegisterWithin
 }
 
 func (c GhCI) gh(ctx context.Context, args ...string) (string, error) {
@@ -114,7 +146,9 @@ func (c GhCI) create(ctx context.Context, b Batch) (PR, error) {
 }
 
 func (c GhCI) runIDs(ctx context.Context, tip string) ([]string, error) {
-	for attempt := 1; ; attempt++ {
+	bound := c.registerBound()
+	start := c.now()
+	for {
 		var runs []struct {
 			DatabaseID int `json:"databaseId"`
 		}
@@ -128,8 +162,11 @@ func (c GhCI) runIDs(ctx context.Context, tip string) ([]string, error) {
 			}
 			return ids, nil
 		}
-		if c.Settle == nil || attempt >= registerTries {
-			return nil, fmt.Errorf("%w of %s for the tip %s", ErrNoRun, ciparity.RequiredWorkflow, tip)
+		if c.Settle == nil {
+			return nil, &NoRunError{Workflow: ciparity.RequiredWorkflow, Tip: tip}
+		}
+		if c.now().Sub(start) >= bound {
+			return nil, &NoRunError{Workflow: ciparity.RequiredWorkflow, Tip: tip, Within: bound}
 		}
 		if err := c.Settle(ctx); err != nil {
 			return nil, err

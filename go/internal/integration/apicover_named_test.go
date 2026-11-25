@@ -107,6 +107,36 @@ func TestConsoleTrainExportsAreNamedByAnExecutedAssertion(t *testing.T) {
 	if ErrRunTimeout == nil || !strings.Contains(ErrRunTimeout.Error(), "timed out") {
 		t.Errorf("ErrRunTimeout = %v, want timed out", ErrRunTimeout)
 	}
+	if DefaultRegisterWithin <= 2*time.Minute {
+		t.Errorf("DefaultRegisterWithin = %v, want > 2m", DefaultRegisterWithin)
+	}
+	now := time.Date(2026, 11, 23, 9, 0, 0, 0, time.UTC)
+	boundCI := GhCI{
+		Gh: func(context.Context, string, ...string) (string, int, error) {
+			return "[]\n", 0, nil
+		},
+		Settle: func(context.Context) error {
+			now = now.Add(time.Minute)
+			return nil
+		},
+		Now:            func() time.Time { return now },
+		RegisterWithin: time.Minute,
+	}
+	var noRun *NoRunError
+	if _, err := boundCI.Watch(context.Background(), PR{Tip: sha('a')}); !errors.Is(err, ErrNoRun) || !errors.As(err, &noRun) || noRun.Workflow == "" || noRun.Tip != sha('a') || noRun.Within != time.Minute {
+		t.Errorf("Watch with RegisterWithin = %v, want ErrNoRun with bound 1m0s", err)
+	}
+	if noRun != nil {
+		if !errors.Is(noRun.Unwrap(), ErrNoRun) {
+			t.Errorf("NoRunError.Unwrap() = %v, want %v", noRun.Unwrap(), ErrNoRun)
+		}
+		if msg := noRun.Error(); !strings.Contains(msg, noRun.Within.String()) || !strings.Contains(msg, noRun.Tip) {
+			t.Errorf("NoRunError.Error() = %q, want bound %s and tip %s", msg, noRun.Within, noRun.Tip)
+		}
+	}
+	if msg := (&NoRunError{Workflow: "ci", Tip: sha('b')}).Error(); !strings.Contains(msg, sha('b')) || strings.Contains(msg, "within") {
+		t.Errorf("NoRunError.Error() without bound = %q, want tip without within", msg)
+	}
 }
 
 func TestBatchTestExportsAreNamedByAnExecutedAssertion(t *testing.T) {
