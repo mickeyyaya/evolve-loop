@@ -175,6 +175,8 @@ type hashedRecord struct {
 	Prev    string            `json:"prev,omitempty"`
 }
 
+var unhashedRecordFields = []string{"Hash"}
+
 func computeRecordHash(r Record) string {
 	payload, _ := json.Marshal(hashedRecord{
 		Scope:   r.Scope,
