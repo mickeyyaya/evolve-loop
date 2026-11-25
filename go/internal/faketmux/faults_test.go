@@ -2,12 +2,14 @@ package faketmux
 
 import (
 	"bytes"
-	"errors"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
 )
 
 type failWriter struct{}
@@ -57,7 +59,7 @@ func TestServer_AProcessListingFailureFailsTheForegroundQuery(t *testing.T) {
 	f := newFakeTmux(t)
 	sess := liveSession(t, f, "p")
 	s := f.server()
-	s.procs = func() ([]process, error) { return nil, errInjected }
+	s.procs = func(context.Context) ([]proctree.Process, error) { return nil, errInjected }
 
 	_, err := s.expand(sess, "#{pane_current_command}")
 
@@ -191,10 +193,6 @@ func TestSeams_InjectedFailuresSurface(t *testing.T) {
 	wantErr(t, s.killServer(invocation{}), "kill session seam")
 	wantErr(t, sess.kill(), "operation not permitted")
 
-	runPS = func() (string, error) { return "", errInjected }
-	if _, err := listProcesses(); !errors.Is(err, errInjected) {
-		t.Errorf("listProcesses = %v, want the ps failure", err)
-	}
 	restore()
 
 	for _, file := range []string{"in", "screen"} {
@@ -212,10 +210,10 @@ func TestSeams_InjectedFailuresSurface(t *testing.T) {
 
 func setSeams(t *testing.T) func() {
 	t.Helper()
-	open, signal, blocking, ps, started, temp := openFile, signalGroup, setBlocking, runPS, processStart, mkdirTemp
+	open, signal, blocking, list, started, temp := openFile, signalGroup, setBlocking, listProcesses, processStart, mkdirTemp
 	token, shell, command, group, own := newToken, paneShell, commandOf, groupOf, ownGroup
 	restore := func() {
-		openFile, signalGroup, setBlocking, runPS, processStart, mkdirTemp = open, signal, blocking, ps, started, temp
+		openFile, signalGroup, setBlocking, listProcesses, processStart, mkdirTemp = open, signal, blocking, list, started, temp
 		newToken, paneShell, commandOf, groupOf, ownGroup = token, shell, command, group, own
 	}
 	t.Cleanup(restore)
