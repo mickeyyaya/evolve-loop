@@ -184,6 +184,15 @@ var protectedGateFiles = []struct {
 	{"go/internal/phases/ship/base_red.go", GateGuarantee},
 	{"go/internal/phases/ship/repocontract.go", GateGuarantee},
 	{"go/internal/policy/held_proposals.go", PolicyGuarantee},
+	{"go/test/journeys/journeys.json", GateGuarantee},
+	{"go/test/journeys/journeys_test.go", GateGuarantee},
+	{"go/internal/journeys/assess.go", GateGuarantee},
+	{"go/internal/phases/ship/fixjourney.go", GateGuarantee},
+	{"go/internal/phases/ship/fixjourney_test.go", GateGuarantee},
+	{"go/internal/bridge/driver_claudecloud_test.go", GuardGuarantee},
+	{"go/cmd/evolve/cmd_cycle_resume_concurrent_test.go", GuardGuarantee},
+	{"go/internal/orchestrator/family_holds_test.go", GuardGuarantee},
+	{"go/internal/cli/agentcmd/agent_verdict_fence_test.go", GuardGuarantee},
 }
 
 var freedByTheNarrowFence = []string{

@@ -206,6 +206,12 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `FAILURELEARNING_RECURRENCE_LEDGER_FAILED` | the recurrence ledger keyed by the failing pattern failed to load, update or save (fields.op = load | record | save). Count() stays stale for this pattern, and the phase failure is never masked. fields.step=recurrence, path |
 | `FAILURELEARNING_REMEDIATION_TRUNCATED` | a failed phase self-reported more defects than the remediation cap. First items file as inbox items, and the rest drop; fix the emitter or raise the cap. fields.step=floor, reported, filed |
 
+### fix.proof
+
+| Code | Meaning |
+|---|---|
+| `FIX_PROOF_MISSING` | a manual fix commit has no usable Fix-Journey trailer. fields.subject is the commit subject and fields.problem is missing, malformed, unknown_journey, missing_test or registry_unreadable. A shadow signal: it blocks nothing |
+
 ### gate.contract
 
 | Code | Meaning |

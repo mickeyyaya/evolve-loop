@@ -29,6 +29,8 @@
 - **The guards log is best effort.** `appendGuardsLog` discards its error at that boundary on purpose. A read-only sandbox is expected to fail there, and the gate must never show that failure. The open, write and close live in `guardslog.Append`.
 - **The diff comes through the `GetDiffPaths` seam.** The default shells out to git. `ModeStaged` runs `git diff --cached --name-only`. `ModeRef` runs `git diff <ref>..HEAD --name-only`.
 
+- **`Type` reads the type of a subject.** `Type("fix(scope)!: x")` is `fix`. It returns an empty string when the subject has no conventional prefix. It uses the same `prefixRE` as `Run`, so the journey check and the gate read one prefix rule.
+
 ## Invariants
 
 - **Bypass needs the manual ship class.** An empty `ShipClass` resolves to `cycle`. An unset class can therefore never unlock the bypass. Any other class with `Bypass` is denied with `ErrScopeViolation`. `coverage_test.go` pins this.

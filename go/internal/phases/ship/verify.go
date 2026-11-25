@@ -153,6 +153,7 @@ func verifyClass(ctx context.Context, opts *Options, res *RunResult) error {
 		if err := verifyCommitGateAttestation(ctx, opts, res); err != nil {
 			return err
 		}
+		emitFixProof(opts)
 		fillManualBranchInboxTrailer(ctx, opts)
 		return runPersonaLint(ctx, opts, res)
 
