@@ -234,7 +234,6 @@ func boundaryHaltSteps(a boundaryArgs, root string) []boundaryStep {
 		boundaryStep{verb: "selfheal", args: append([]string{"incidents"}, at...)},
 		boundaryStep{verb: "selfheal", args: append([]string{"propose"}, at...)},
 		boundaryStep{verb: "quality", args: append([]string{"report", "--scope", "wave"}, at...)},
-		boundaryStep{verb: "ci", args: append([]string{"latency", "check"}, at...), advisory: true},
 		boundaryStep{verb: "wave", args: append([]string{"latency", "--check"}, at...), advisory: true},
 		boundaryStep{verb: "gc", args: append([]string{"--lease-wait", boundaryGCLeaseWait}, at...)})
 }
@@ -266,7 +265,7 @@ func runBoundarySteps(dispatch boundaryDispatch, steps []boundaryStep, stdout, s
 	released := false
 	for i, s := range steps {
 		fmt.Fprintf(stdout, "boundary: step %d/%d: %s\n", i+1, len(steps), s)
-		if rc, tail := dispatchKeepingStderrTail(dispatch, s.verb, s.args, stdout, stderr); rc != 0 && s.advisory {
+		if rc, tail := dispatchKeepingStderrTail(dispatch, s.verb, s.args, stdout, stderr); rc != 0 && rc != exitUsage && s.advisory {
 			fmt.Fprintf(stderr, "%sWARN: step %d/%d (%s) failed rc=%d; the latency check is advisory, the boundary continues\n", boundaryPrefix, i+1, len(steps), s, rc)
 			writeStderrTail(stderr, tail)
 		} else if rc != 0 {

@@ -225,7 +225,7 @@ func TestNewQualityCenter_AttachesThePublisherUnderTheQualityRole(t *testing.T) 
 func TestBoundary_RunsTheWaveQualityReportBeforeGC(t *testing.T) {
 	t.Parallel()
 	steps := boundaryHaltSteps(boundaryArgs{}, "/plane")
-	q := steps[len(steps)-4]
+	q := steps[len(steps)-3]
 
 	if q.verb != "quality" || strings.Join(q.args, " ") != "report --scope wave --project-root /plane" || steps[len(steps)-1].verb != "gc" {
 		t.Errorf("step before gc = %s %v, want quality report --scope wave --project-root /plane", q.verb, q.args)

@@ -75,7 +75,7 @@ func TestBoundaryRun_LaunchStepPassesTheRealLoopArgumentParser(t *testing.T) {
 
 func TestBoundaryRun_RefusedLaunchReturnsTheLoopsExitCodeAfterTheRelease(t *testing.T) {
 	t.Parallel()
-	fake := &fakeBoundaryVerbs{failAt: 17, code: exitUsage}
+	fake := &fakeBoundaryVerbs{failAt: 16, code: exitUsage}
 	var stdout, stderr bytes.Buffer
 	rc := runBoundaryWith(fake.dispatch, []string{"run", "--merge", "12", "--goal-text-file", fakeBoundaryGoalFile(t)}, &stdout, &stderr)
 	if rc != exitUsage {

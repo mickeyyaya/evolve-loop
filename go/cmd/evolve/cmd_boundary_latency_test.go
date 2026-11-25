@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"fmt"
 	"io"
 	"slices"
 	"strings"
@@ -10,7 +12,7 @@ import (
 
 var boundaryFullVerbs = []string{
 	"loop-stop", "pr", boundaryRatchetVerb, "sync-main", queueApplyVerb, waveBuildVerb, "inbox", "selfheal", "selfheal",
-	"quality", "ci", "wave", "gc", "code", "loop-stop", boundaryLogVerb, "loop",
+	"quality", "wave", "gc", "code", "loop-stop", boundaryLogVerb, "loop",
 }
 
 const latencyTestRoot = "/plane"
@@ -48,20 +50,19 @@ func TestBoundarySteps_RunTheT5AndT6LatencyChecksBetweenTheQualityReportAndGC(t 
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			quality := stepIndexOf(steps, "quality", "report")
-			ci := stepIndexOf(steps, "ci", "latency")
 			waveCheck := stepIndexOf(steps, "wave", "latency")
 			gc := stepIndexOf(steps, "gc", "--lease-wait")
-			if quality < 0 || ci < 0 || waveCheck < 0 || gc < 0 {
-				t.Fatalf("plan lacks a step: quality %d, ci latency %d, wave latency %d, gc %d\n%v", quality, ci, waveCheck, gc, steps)
+			if quality < 0 || waveCheck < 0 || gc < 0 {
+				t.Fatalf("plan lacks a step: quality %d, wave latency %d, gc %d\n%v", quality, waveCheck, gc, steps)
 			}
-			if !(quality < ci && ci < waveCheck && waveCheck < gc) {
-				t.Errorf("order: quality %d, ci %d, wave %d, gc %d; want the two checks between the quality report and gc", quality, ci, waveCheck, gc)
-			}
-			if got, want := strings.Join(steps[ci].args, " "), "latency check --project-root "+latencyTestRoot; got != want {
-				t.Errorf("ci step args = %q, want %q", got, want)
+			if !(quality < waveCheck && waveCheck < gc) {
+				t.Errorf("order: quality %d, wave %d, gc %d; want the check between the quality report and gc", quality, waveCheck, gc)
 			}
 			if got, want := strings.Join(steps[waveCheck].args, " "), "latency --check --project-root "+latencyTestRoot; got != want {
 				t.Errorf("wave step args = %q, want %q", got, want)
+			}
+			if ci := slices.IndexFunc(steps, func(s boundaryStep) bool { return s.verb == "ci" }); ci >= 0 {
+				t.Errorf("plan still contains a ci step at %d: %v", ci, steps[ci])
 			}
 		})
 	}
@@ -74,9 +75,7 @@ func TestBoundaryRun_AFailedLatencyCheckWarnsAndTheBoundaryContinuesToTheLaunch(
 		rcs   map[string]int
 		warns int
 	}{
-		{"ci latency check usage error", map[string]int{"ci": exitUsage}, 1},
 		{"wave latency check I/O error", map[string]int{"wave": exitIO}, 1},
-		{"both checks fail", map[string]int{"ci": exitRefused, "wave": exitIO}, 2},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -109,6 +108,24 @@ func TestBoundaryRun_AFailedLatencyCheckWarnsAndTheBoundaryContinuesToTheLaunch(
 	}
 }
 
+func TestBoundaryRun_AnAdvisoryStepUsageErrorFailsTheBoundary(t *testing.T) {
+	t.Parallel()
+	fake := &latencyCheckFake{rcByVerb: map[string]int{"wave": exitUsage}}
+	var stdout, stderr bytes.Buffer
+
+	rc := runBoundaryWith(fake.dispatch, []string{"run", "--merge", "12", "--goal-text-file", fakeBoundaryGoalFile(t)}, &stdout, &stderr)
+
+	if rc != exitUsage {
+		t.Errorf("rc = %d, want %d when an advisory step returns usage\n%s%s", rc, exitUsage, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "stopped there") {
+		t.Errorf("stderr did not report stopping on usage error\n%s", stderr.String())
+	}
+	if strings.Contains(stdout.String(), fakeBoundaryPidLine) {
+		t.Errorf("the loop launched after an advisory usage failure\n%s", stdout.String())
+	}
+}
+
 func TestBoundaryRun_PassingLatencyChecksPrintNoWarning(t *testing.T) {
 	t.Parallel()
 	fake := &latencyCheckFake{}
@@ -117,10 +134,10 @@ func TestBoundaryRun_PassingLatencyChecksPrintNoWarning(t *testing.T) {
 	rc := runBoundaryWith(fake.dispatch, []string{"run", "--goal-text-file", fakeBoundaryGoalFile(t)}, &stdout, &stderr)
 
 	if rc != 0 || strings.Contains(stderr.String(), "WARN") {
-		t.Errorf("rc = %d, stderr %q; want 0 and no WARN when both checks pass", rc, stderr.String())
+		t.Errorf("rc = %d, stderr %q; want 0 and no WARN when the check passes", rc, stderr.String())
 	}
-	if !slices.Contains(fake.verbs(), "ci") || !slices.Contains(fake.verbs(), "wave") {
-		t.Errorf("dispatched %v, want both latency checks", fake.verbs())
+	if !slices.Contains(fake.verbs(), "wave") {
+		t.Errorf("dispatched %v, want the wave latency check", fake.verbs())
 	}
 }
 
@@ -156,7 +173,6 @@ func TestBoundaryDispatch_RegistersTheLatencyCheckVerbs(t *testing.T) {
 		"wave next":    dispatchWaveVerb(nil),
 	}
 	calls := map[string][]string{
-		"ci":   {"latency", "check", "--project-root", t.TempDir()},
 		"wave": {"latency", "--check", "--project-root", t.TempDir()},
 	}
 	for name, dispatch := range dispatchers {
@@ -180,8 +196,7 @@ func TestWaveNext_AFailedLatencyCheckWarnsAndTheWaveLaunches(t *testing.T) {
 		failAt int
 		verb   string
 	}{
-		{"ci latency check fails", 12, "ci"},
-		{"wave latency check fails", 13, "wave"},
+		{"wave latency check fails", 12, "wave"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -208,6 +223,81 @@ func TestWaveNext_AFailedLatencyCheckWarnsAndTheWaveLaunches(t *testing.T) {
 			}
 			if !strings.Contains(h.stderr.String(), "WARN") || !strings.Contains(h.stderr.String(), "latency") {
 				t.Errorf("stderr lacks a latency WARN\n%s", h.stderr.String())
+			}
+		})
+	}
+}
+
+var boundaryInternalVerbs = map[string]bool{
+	boundaryRatchetVerb: true,
+	queueApplyVerb:      true,
+	waveBuildVerb:       true,
+	boundaryLogVerb:     true,
+}
+
+func boundaryStepSubverb(s boundaryStep) string {
+	if len(s.args) == 0 || strings.HasPrefix(s.args[0], "-") {
+		return ""
+	}
+	return s.args[0]
+}
+
+func checkBoundaryStepRegistered(dispatch boundaryDispatch, s boundaryStep) error {
+	var stdout, stderr bytes.Buffer
+	dispatch(s.verb, []string{"--unknown-flag-for-pin"}, &stdout, &stderr)
+	if strings.Contains(stderr.String(), "no handler for step") {
+		return fmt.Errorf("no dispatcher handler for verb %q", s.verb)
+	}
+	if boundaryInternalVerbs[s.verb] {
+		return nil
+	}
+	cmd := lookupCommand(s.verb)
+	if cmd == nil {
+		return fmt.Errorf("verb %q is not registered in commands", s.verb)
+	}
+	sub := boundaryStepSubverb(s)
+	if sub == "" {
+		return nil
+	}
+	if s.verb == "wave" && waveSubcommands[sub] == nil {
+		return fmt.Errorf("wave subverb %q is not in waveSubcommands", sub)
+	}
+	if s.verb == "selfheal" && selfhealSchemas[sub] == "" {
+		return fmt.Errorf("selfheal subverb %q is not in selfhealSchemas", sub)
+	}
+	var subOut, subErr bytes.Buffer
+	rc := cmd.Run([]string{sub, "--unknown-flag-for-pin"}, strings.NewReader(""), &subOut, &subErr)
+	if rc != exitUsage || !strings.Contains(subErr.String(), "unknown-flag-for-pin") {
+		return fmt.Errorf("subverb %q of %q is not registered (rc=%d stderr=%q)", sub, s.verb, rc, subErr.String())
+	}
+	return nil
+}
+
+func TestBoundarySteps_EachStepNamesARegisteredVerbAndSubverb(t *testing.T) {
+	t.Parallel()
+	noopRun := func(_ context.Context, _, _ string, _, _ []string, _ io.Reader, _, _ io.Writer) (int, error) {
+		return 0, nil
+	}
+	badStep := boundaryStep{verb: "ci", args: []string{"latency", "check"}}
+	if err := checkBoundaryStepRegistered(dispatchPlaneVerbs(noopRun), badStep); err == nil {
+		t.Fatal("fixture: checkBoundaryStepRegistered accepted missing ci latency step")
+	}
+	args := boundaryArgs{prs: []string{"12"}, goalText: "goal", maxCycles: "1"}
+	plans := []struct {
+		name     string
+		dispatch boundaryDispatch
+		steps    []boundaryStep
+	}{
+		{"boundary run", dispatchPlaneVerbs(noopRun), boundarySteps(args, latencyTestRoot)},
+		{"wave next", dispatchWaveVerb(noopRun), waveSteps(args, latencyTestRoot, []string{"claude-tmux"})},
+	}
+	for _, p := range plans {
+		t.Run(p.name, func(t *testing.T) {
+			t.Parallel()
+			for _, s := range p.steps {
+				if err := checkBoundaryStepRegistered(p.dispatch, s); err != nil {
+					t.Errorf("%s (%s): %v", p.name, s, err)
+				}
 			}
 		})
 	}

@@ -84,14 +84,15 @@ func defaultWaveEnv() waveEnv {
 	}
 }
 
+var waveSubcommands = map[string]func(waveEnv, []string, io.Writer, io.Writer) int{
+	"next": runWaveNext, "status": runWaveStatus, "supply": runWaveSupply, "latency": runWaveLatency, "watch": runWaveWatch, "note": runWaveNote, "stop": runWaveStop, "checkin": runWaveCheckin,
+}
+
 func runWaveWith(env waveEnv, args []string, stdout, stderr io.Writer) int {
-	handlers := map[string]func(waveEnv, []string, io.Writer, io.Writer) int{
-		"next": runWaveNext, "status": runWaveStatus, "supply": runWaveSupply, "latency": runWaveLatency, "watch": runWaveWatch, "note": runWaveNote, "stop": runWaveStop, "checkin": runWaveCheckin,
-	}
 	if len(args) == 0 {
 		return waveUsageError(stderr, errors.New("a sub-verb is required"))
 	}
-	run, ok := handlers[args[0]]
+	run, ok := waveSubcommands[args[0]]
 	if !ok {
 		return waveUsageError(stderr, fmt.Errorf("unknown sub-verb %q", args[0]))
 	}
