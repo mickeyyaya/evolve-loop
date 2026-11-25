@@ -334,7 +334,7 @@ func TestSegmentName_PadsTheBaseTo20Digits(t *testing.T) {
 	if got := segmentName(184467); got != "seg-00000000000000184467.ndjson" {
 		t.Fatalf("segmentName(184467) = %q", got)
 	}
-	if base, ok := segmentBase("seg-00000000000000184467.ndjson"); !ok || base != 184467 {
+	if base, ok := SegmentBase("seg-00000000000000184467.ndjson"); !ok || base != 184467 {
 		t.Fatalf("segmentBase = %d, %v, want 184467", base, ok)
 	}
 }
@@ -388,5 +388,42 @@ func TestRecord_ConstantsMatchTheSpec(t *testing.T) {
 	got := []string{SourceWatch, ReasonReset, ReasonMalformed, ReasonRetention, ReasonQueueFull, ReasonWriteError, ReasonLockDeadline}
 	if want := []string{"watch", "reset", "malformed", "retention", "queue_full", "write_error", "lock_deadline"}; !reflect.DeepEqual(got, want) || MaxRecordBytes != 4608 {
 		t.Fatalf("constants = %q, %d, want %q, 4608", got, MaxRecordBytes, want)
+	}
+}
+
+func TestSegmentBase_ParsesTheNameThatTheLogWrites(t *testing.T) {
+	t.Parallel()
+	l, root := newTestLog(t, 1)
+	mustAppend(t, l, signalRecord(1, "a"))
+	mustAppend(t, l, signalRecord(2, "b"))
+
+	bases := segmentBases(t, root)
+	entries, err := os.ReadDir(l.Dir())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var parsed []int64
+	for _, e := range entries {
+		if base, ok := SegmentBase(e.Name()); ok {
+			parsed = append(parsed, base)
+		}
+	}
+	if !reflect.DeepEqual(parsed, bases) || len(parsed) < 2 {
+		t.Errorf("SegmentBase over %d files = %v, want the log's bases %v", len(entries), parsed, bases)
+	}
+	if _, ok := SegmentBase("seg-12.ndjson"); ok {
+		t.Error("SegmentBase accepted a name with fewer than 20 digits")
+	}
+}
+
+func TestValidName_IsTheRuleThatNewEnforces(t *testing.T) {
+	t.Parallel()
+	for _, name := range []string{"ok", "a.b", "Upper", "a..b", ""} {
+		_, err := New(t.TempDir(), name, Config{})
+
+		if (err == nil) != ValidName(name) {
+			t.Errorf("name %q: New error = %v, ValidName = %v, want them to agree", name, err, ValidName(name))
+		}
 	}
 }

@@ -24,7 +24,7 @@ func segmentName(base int64) string {
 	return fmt.Sprintf("%s%0*d%s", segmentPrefix, segmentDigits, base, segmentSuffix)
 }
 
-func segmentBase(name string) (int64, bool) {
+func SegmentBase(name string) (int64, bool) {
 	digits, ok := strings.CutPrefix(name, segmentPrefix)
 	digits, hasSuffix := strings.CutSuffix(digits, segmentSuffix)
 	if !ok || !hasSuffix || len(digits) != segmentDigits {
@@ -41,7 +41,7 @@ func (l *Log) Segments() ([]Segment, error) {
 	}
 	var segs []Segment
 	for _, e := range entries {
-		if base, ok := segmentBase(e.Name()); ok {
+		if base, ok := SegmentBase(e.Name()); ok {
 			segs = append(segs, Segment{Base: base, Path: filepath.Join(l.dir, e.Name())})
 		}
 	}

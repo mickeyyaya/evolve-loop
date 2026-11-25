@@ -50,6 +50,7 @@ type Options struct {
 	EvolveDir string
 	Policy    Policy
 	Runs      []RunDir
+	Channels  []gcpolicy.ChannelRetention
 	Now       func() time.Time
 }
 
@@ -81,7 +82,7 @@ func Plan(opts Options) (Manifest, error) {
 	}
 
 	var warnings []string
-	logPlanner{now: now(), add: add, warn: func(w string) { warnings = append(warnings, w) }}.planCatalog(opts.EvolveDir, pol.LogCatalog())
+	logPlanner{now: now(), add: add, warn: func(w string) { warnings = append(warnings, w) }}.planCatalog(opts.EvolveDir, append(pol.LogCatalog(), gcpolicy.ChannelCategories(opts.Channels, pol.LogsTTLDays)...))
 
 	sort.Slice(items, func(i, j int) bool { return items[i].Path < items[j].Path })
 	return Manifest{Items: items, Warnings: warnings}, nil

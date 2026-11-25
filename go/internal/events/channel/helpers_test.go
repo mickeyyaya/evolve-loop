@@ -98,7 +98,7 @@ func segmentBases(t *testing.T, root string) []int64 {
 	}
 	var bases []int64
 	for _, e := range entries {
-		if base, ok := segmentBase(e.Name()); ok {
+		if base, ok := SegmentBase(e.Name()); ok {
 			bases = append(bases, base)
 		}
 	}

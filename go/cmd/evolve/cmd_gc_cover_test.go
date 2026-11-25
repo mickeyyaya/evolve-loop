@@ -116,11 +116,11 @@ func TestGCRunDirs_ADiscoveryOrPlanFailureIsReported(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	r := newGCRun(context.Background(), true, &stdout, &stderr)
 
-	if failed := r.runDirs(evolveDir, gc.Policy{}); !failed || !strings.Contains(stderr.String(), "evolve gc: run-dir discovery failed: gc: read runs dir") {
+	if failed := r.runDirs(evolveDir, gcPlanInputs{}); !failed || !strings.Contains(stderr.String(), "evolve gc: run-dir discovery failed: gc: read runs dir") {
 		t.Errorf("runs as a file: failed=%v stderr=%q, want the discovery failure", failed, stderr.String())
 	}
 	stderr.Reset()
-	if failed := r.runDirs("relative/.evolve", gc.Policy{}); !failed || !strings.Contains(stderr.String(), "evolve gc: run-dir retention plan failed: gc: EvolveDir must be absolute") {
+	if failed := r.runDirs("relative/.evolve", gcPlanInputs{}); !failed || !strings.Contains(stderr.String(), "evolve gc: run-dir retention plan failed: gc: EvolveDir must be absolute") {
 		t.Errorf("relative dir: failed=%v stderr=%q, want the plan failure", failed, stderr.String())
 	}
 }
@@ -132,12 +132,12 @@ func TestRunRunDirGC_ADiscoveryOrPlanFailureIsAWarning(t *testing.T) {
 	workspace := t.TempDir()
 	var stderr bytes.Buffer
 
-	runRunDirGC(loopConfig{EvolveDir: evolveDir}, workspace, "shadow", gc.Policy{}, &stderr)
+	runRunDirGC(loopConfig{EvolveDir: evolveDir}, workspace, "shadow", gcPlanInputs{}, &stderr)
 	if !strings.Contains(stderr.String(), "[gc] WARN: discover failed: gc: read runs dir") || !strings.Contains(stderr.String(), "[gc] shadow: 0 items") {
 		t.Errorf("stderr=%q, want the discover WARN and an empty shadow manifest", stderr.String())
 	}
 	stderr.Reset()
-	runRunDirGC(loopConfig{EvolveDir: "relative/.evolve"}, workspace, "enforce", gc.Policy{}, &stderr)
+	runRunDirGC(loopConfig{EvolveDir: "relative/.evolve"}, workspace, "enforce", gcPlanInputs{}, &stderr)
 	if !strings.Contains(stderr.String(), "[gc] WARN: plan failed: gc: EvolveDir must be absolute") || strings.Contains(stderr.String(), "enforce: applied") {
 		t.Errorf("stderr=%q, want the plan WARN and nothing applied", stderr.String())
 	}
@@ -174,7 +174,7 @@ func TestRunRunDirGC_AFailedEnforceApplyIsAWarning(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chmod(runsDir, 0o755) })
 	var stderr bytes.Buffer
 
-	runRunDirGC(loopConfig{EvolveDir: filepath.Join(projectRoot, ".evolve")}, t.TempDir(), "enforce", pol, &stderr)
+	runRunDirGC(loopConfig{EvolveDir: filepath.Join(projectRoot, ".evolve")}, t.TempDir(), "enforce", gcPlanInputs{Policy: pol}, &stderr)
 
 	if !strings.Contains(stderr.String(), "[gc] WARN: enforce apply failed:") || strings.Contains(stderr.String(), "[gc] enforce: applied") {
 		t.Errorf("stderr=%q, want the apply WARN and no applied line", stderr.String())
