@@ -12,6 +12,7 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/orchestrator` | the pool, the lane lease, the oversight loop and the supply census (ADR-0139 O4, O5, O6) | [internal-orchestrator.md](internal-orchestrator.md) |
 | `internal/config` | resolves the routing configuration once, at the composition root | [internal-config.md](internal-config.md) |
 | `internal/events/filter` | the one filter grammar of the event channels: the terms, the matcher, the channel selectors and the vocabulary (ADR-0127, E4) | [internal-events-filter.md](internal-events-filter.md) |
+| `internal/emptytests` | the guard that refuses a Go test, fuzz or benchmark with an empty body | [internal-emptytests.md](internal-emptytests.md) |
 | `internal/evalgate` | the verified checks that replace prose contracts between phases | [internal-evalgate.md](internal-evalgate.md) |
 | `internal/events/wake` | blocks a channel reader until the kernel posts a change, a process exit or an output hangup (kqueue, inotify); no poll (ADR-0127, E3) | [internal-events-wake.md](internal-events-wake.md) |
 | `internal/events/reader` | follows event channels: arm, catch up and wait; the cursor rules, the duplicate window and the last will of a loop (ADR-0127, E5) | [internal-events-reader.md](internal-events-reader.md) |
@@ -76,6 +77,7 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/adapters/ledger` | the hash-chained append-only ledger, its seals and anchors | [internal-adapters-ledger.md](internal-adapters-ledger.md) |
 | `internal/ledgerartifacts` | the ledger's write-once, content-addressed evidence store (`.evolve/ledger-artifacts/sha256/<2>/<62>`) | [internal-ledgerartifacts.md](internal-ledgerartifacts.md) |
 | `internal/attemptpostmortem` | records how a phase dispatch ended: the cause, the last commands, the suspect command and the pane tail. It renders the record into the next prompt (ADR-0130, R2) | [internal-attemptpostmortem.md](internal-attemptpostmortem.md) |
+| `internal/promptboundary` | the one line that splits a composed prompt into a byte-stable cacheable prefix and a per-cycle suffix; `Place` puts a per-try block below it | [internal-promptboundary.md](internal-promptboundary.md) |
 | `internal/atomicwrite` | the one crash-safe write-then-rename implementation: plain `Bytes`/`JSON` and the fsyncing `Durable` | [internal-atomicwrite.md](internal-atomicwrite.md) |
 | `internal/changedpkgs` | maps a change to its packages, covering tests and importers | [internal-changedpkgs.md](internal-changedpkgs.md) |
 | `internal/cyclestate` | the per-cycle state, verdicts and outcome record every phase shares | [internal-cyclestate.md](internal-cyclestate.md) |
@@ -110,6 +112,7 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/deliverable` | the ADR-0100 declared-deliverables gate: verify, salvage and host effects | [internal-deliverable.md](internal-deliverable.md) |
 | `internal/core/advisor` | the routing advisor that plans and re-plans a cycle's phases | [internal-core-advisor.md](internal-core-advisor.md) |
 | `internal/core/defectledger` | the audit phase's anti-laundering defect ledger and the continuation disposition gate (unit 09, ADR-0103) | [internal-core-defectledger.md](internal-core-defectledger.md) |
+| `internal/core/auditfacts` | the gate and floor facts block and the final-diff rubric of the audit prompt (ADR-0158 decisions 20 and 21) | [internal-core-auditfacts.md](internal-core-auditfacts.md) |
 | `internal/phases/runner/verdict` | the judge: classifies one try of a phase from its artifact, pane and snapshots | [internal-phases-runner-verdict.md](internal-phases-runner-verdict.md) |
 | `internal/core` | the cycle orchestrator: phase sequencing, gates, recovery and ship (filled by file group) | [internal-core.md](internal-core.md) |
 | `cmd/evolve` | the composition root and CLI of the `evolve` binary (filled by file group) | [cmd-evolve.md](cmd-evolve.md) |

@@ -903,3 +903,15 @@
 ./internal/mainsync
 ./internal/docstests
 ./internal/gitstarts
+
+# hostsentinel — the pure decision core, signal codes and publisher of the loop host sentinel (plan host-sentinel-inside-the-loop-2026-11).
+./internal/hostsentinel
+./internal/promptboundary
+# ledgerscan — one chunked, newest-first reader of ledger.jsonl with a raw-byte prefilter and early exit (ADR-0123 decision 5, plan C8).
+./internal/ledgerscan
+./internal/term
+./internal/emptytests
+./internal/workflowlint
+./internal/heldaudit
+# the gate and floor facts block and the final-diff rubric of the audit prompt (ADR-0158 decisions 20 and 21). 100% API + 100% line coverage gated.
+./internal/core/auditfacts

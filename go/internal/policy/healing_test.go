@@ -35,7 +35,7 @@ func TestHealingDetector_ReadsTheStageTheWindowAndTheCycles(t *testing.T) {
 func TestPolicyParse_RefusesABadHealingDetectorBlock(t *testing.T) {
 	t.Parallel()
 	cases := map[string]string{
-		`{"healing":{"detector":{"stage":"enforce"}}}`: "selfheal-repair-cycle-path",
+		`{"healing":{"detector":{"stage":"enforce"}}}`: "selfheal-repair-t1-lane-route",
 		`{"healing":{"detector":{"stage":"loud"}}}`:    `"loud"`,
 		`{"healing":{"detector":{"window_hours":-1}}}`: "window_hours",
 		`{"healing":{"detector":{"cycles":-2}}}`:       "cycles",
@@ -79,7 +79,7 @@ func TestHealingOrchestrator_DefaultsToShadowWithTwoIncidentsAPass(t *testing.T)
 func TestPolicyParse_RefusesABadHealingOrchestratorBlock(t *testing.T) {
 	t.Parallel()
 	cases := map[string]string{
-		`{"healing":{"orchestrator":{"stage":"enforce"}}}`:      "selfheal-repair-cycle-path",
+		`{"healing":{"orchestrator":{"stage":"enforce"}}}`:      "selfheal-repair-t1-lane-route",
 		`{"healing":{"orchestrator":{"stage":"loud"}}}`:         `orchestrator.stage "loud"`,
 		`{"healing":{"orchestrator":{"max_per_pass":-1}}}`:      "max_per_pass",
 		`{"healing":{"orchestrator":{"retry_after_hours":-1}}}`: "retry_after_hours",
@@ -124,7 +124,7 @@ func TestHealingValidator_DefaultsToShadowWithTheBudgetsOfTheSpec(t *testing.T) 
 func TestPolicyParse_RefusesABadHealingValidatorBlock(t *testing.T) {
 	t.Parallel()
 	cases := map[string]string{
-		`{"healing":{"validator":{"stage":"enforce"}}}`:       "selfheal-repair-cycle-path",
+		`{"healing":{"validator":{"stage":"enforce"}}}`:       "selfheal-repair-t1-lane-route",
 		`{"healing":{"validator":{"stage":"loud"}}}`:          `validator.stage "loud"`,
 		`{"healing":{"validator":{"window_hours":-1}}}`:       "window_hours",
 		`{"healing":{"validator":{"t1_repairs":-1}}}`:         "t1_repairs",

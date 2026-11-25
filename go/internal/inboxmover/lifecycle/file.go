@@ -57,10 +57,15 @@ func isLifecycleOwned(key string) bool {
 }
 
 func (m *Mover) File(raw []byte) (FileResult, error) {
+	return m.file(raw, RepairStamp{})
+}
+
+func (m *Mover) file(raw []byte, stamp RepairStamp) (FileResult, error) {
 	fields, item, err := decodeNewItem(raw)
 	if err != nil {
 		return FileResult{}, err
 	}
+	stamp.apply(fields)
 	if err := m.checkPriorityClass(item); err != nil {
 		return FileResult{}, err
 	}

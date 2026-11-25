@@ -37,12 +37,18 @@ func (r gcRun) cacheScope(projectRoot string) int {
 		return 0
 	}
 	failed := r.step(func(s gcRun) bool { return s.goCache(pol) })
+	if r.stopped() {
+		fmt.Fprintf(r.stderr, "evolve gc: stopped between the cache steps: the temp sweep did not run\n")
+		return 1
+	}
 	failed = r.step(func(s gcRun) bool { return s.pipelineTemp(pol.TempTTLHours) }) || failed
 	if failed {
 		return 1
 	}
 	return 0
 }
+
+func (r gcRun) stopped() bool { return r.cancellable && r.ctx.Err() != nil }
 
 func (r gcRun) diskFreeAboveTrim(projectRoot string, pol gc.Policy) bool {
 	floor := pol.CacheTrimFreeBytes()

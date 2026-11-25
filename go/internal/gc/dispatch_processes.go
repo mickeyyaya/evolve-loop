@@ -24,6 +24,7 @@ type DispatchProcessOptions struct {
 	PidAlive     func(int) bool
 	CycleClosed  func(int) bool
 	RecordedTree func(string) []proctree.Identity
+	Killable     proctree.Proof
 	Now          time.Time
 	TailTTL      time.Duration
 }
@@ -33,20 +34,55 @@ type DispatchProcessItem struct {
 	Rule    string
 }
 
-func StaleDispatch(o DispatchProcessOptions) proctree.Proof {
+func (o DispatchProcessOptions) tag(p proctree.Process) (string, proctree.DispatchID, bool) {
 	root := filepath.Clean(o.ProjectRoot)
+	tag, tagged := p.Env[ipcenv.DispatchIDKey]
+	id, ok := proctree.ParseDispatchID(tag)
+	if !tagged || !ok || !filepath.IsAbs(root) || p.Env[ProjectRootEnvKey] == "" || filepath.Clean(p.Env[ProjectRootEnvKey]) != root {
+		return "", proctree.DispatchID{}, false
+	}
+	return tag, id, true
+}
+
+func StaleDispatch(o DispatchProcessOptions) proctree.Proof {
 	return func(p proctree.Process) bool {
-		tag, tagged := p.Env[ipcenv.DispatchIDKey]
-		id, ok := proctree.ParseDispatchID(tag)
-		if !tagged || !ok || !filepath.IsAbs(root) || p.Env[ProjectRootEnvKey] == "" || filepath.Clean(p.Env[ProjectRootEnvKey]) != root {
+		tag, id, ok := o.tag(p)
+		if !ok {
 			return false
 		}
-		tree := o.RecordedTree(tag)
+		d := proctree.Dispatch{ID: tag, Tree: o.RecordedTree(tag), Killable: o.Killable}
 		if !o.PidAlive(id.Owner) {
-			return proctree.OwnedByDispatch(tag, tree, nil)(p)
+			return d.Owned()(p)
 		}
-		return p.Ppid == 1 && o.CycleClosed(id.Cycle) && proctree.Recorded(tree)(p) && !proctree.SharedHelper(p)
+		return p.Ppid == 1 && o.CycleClosed(id.Cycle) && proctree.Recorded(d.Tree)(p) && proctree.NotShared(p)
 	}
+}
+
+const (
+	RuleShared      = "shared"
+	RuleNotKillable = "not-killable"
+)
+
+type UnreapedItem struct {
+	Process proctree.Process
+	Rule    string
+}
+
+func UnreapedTagged(table []proctree.Process, o DispatchProcessOptions) []UnreapedItem {
+	reaped := StaleDispatch(o)
+	var items []UnreapedItem
+	for _, p := range table {
+		_, id, ok := o.tag(p)
+		if !ok || o.PidAlive(id.Owner) || reaped(p) {
+			continue
+		}
+		rule := RuleNotKillable
+		if proctree.SharedHelper(p) {
+			rule = RuleShared
+		}
+		items = append(items, UnreapedItem{Process: p, Rule: rule})
+	}
+	return items
 }
 
 func OrphanLogTail(o DispatchProcessOptions) proctree.Proof {

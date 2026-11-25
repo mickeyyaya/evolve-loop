@@ -14,20 +14,25 @@ const (
 	LogsCurrentLink     = "current"
 	LoopLogName         = "loop.log"
 	LogWriterPIDSuffix  = ".writer-pid"
-	LogRunDirGlob       = "[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]T[0-9][0-9][0-9][0-9][0-9][0-9]Z*"
+	LogRunDirGlob       = logRunIDShape + "*"
+	LegacyLogRunSuffix  = "-legacy"
 
-	logRunIDLayout         = "20060102T150405Z"
-	pollutedArchiveInfix   = ".polluted-"
-	pollutedArchiveLayout  = "20060102T150405.000000000"
-	bytesPerMB             = int64(1) << 20
-	defaultDispatchCapMB   = 512
-	defaultLoopCapMB       = 2048
-	defaultConsoleCapMB    = 1024
-	shipRepoContractScan   = "ship-repocontract-scan.log"
-	integrationTierLogName = "integration-tier.log"
+	logRunIDLayout          = "20060102T150405Z"
+	pollutedArchiveInfix    = ".polluted-"
+	pollutedArchiveLayout   = "20060102T150405.000000000"
+	bytesPerMB              = int64(1) << 20
+	defaultDispatchCapMB    = 512
+	defaultLoopCapMB        = 2048
+	defaultConsoleCapMB     = 1024
+	ShipRepoContractScanLog = "ship-repocontract-scan.log"
+	IntegrationTierLog      = "integration-tier.log"
+
+	logDigit      = "[0-9]"
+	logRunIDShape = logDigit + logDigit + logDigit + logDigit + logDigit + logDigit + logDigit + logDigit +
+		"T" + logDigit + logDigit + logDigit + logDigit + logDigit + logDigit + "Z"
 )
 
-var logRunIDRe = regexp.MustCompile(`^\d{8}T\d{6}Z$`)
+var logRunIDRe = regexp.MustCompile("^" + logRunIDShape + "$")
 
 var pollutedArchiveRe = regexp.MustCompile(`^cycle-\d+\.polluted-\d{8}T\d{6}\.\d{9}$`)
 
@@ -53,6 +58,8 @@ type LogCategory struct {
 	Homes         []LogHome
 	TTLDays       int
 	MaxTotalBytes int64
+	Pin           PinRule
+	RulePrefix    string
 }
 
 func (p Policy) LogCatalog() []LogCategory {
@@ -79,7 +86,19 @@ func resolveCategory(name string, r LogRetention, defaultTTL, defaultCapMB int, 
 }
 
 func ToolOutputFiles() []string {
-	return []string{shipRepoContractScan, integrationTierLogName}
+	return []string{ShipRepoContractScanLog, IntegrationTierLog}
+}
+
+func LogRunDir(evolveDir, runID string) string {
+	return filepath.Join(evolveDir, LogsDir, runID)
+}
+
+func LoopLogPath(evolveDir, runID string) string {
+	return filepath.Join(LogRunDir(evolveDir, runID), LoopLogName)
+}
+
+func LegacyLogRunDir(evolveDir, runID string) string {
+	return LogRunDir(evolveDir, runID+LegacyLogRunSuffix)
 }
 
 func LogRunID(at time.Time) string { return at.UTC().Format(logRunIDLayout) }

@@ -126,12 +126,71 @@ A concept primer serves a new reader. It builds the mental model before any rule
 
 ## Incident
 
-```markdown
-# <date>: <what broke, as a sentence>
+Copy the block to `docs/incidents/<id>.md`, where `<id>` is `<yyyy-mm-dd>-<slug>`. Replace the four placeholders `<id>`, `<title>`, `<level>` and `<status>`. Keep the zero values of the other keys until a fact fills them. Write prose under each heading, then run `evolve issue render <id>` and `evolve issue check <id>`. The renderer writes the three generated blocks; never edit them by hand.
 
-## Summary            (impact, duration, root cause, fix, in five lines)
-## Timeline           (a table: time | event | evidence)
-## Root cause         (the chain from the first cause to the symptom)
-## What changed       (each fix with its pull request and its regression test)
-## What we learned    (each lesson with the rule or the guard it became)
+| Section | Holds |
+|---|---|
+| Summary | the impact, the duration, the cause and the fix, then the generated status line |
+| Trigger and level | the signal or the report that started the record, and the reason for the level |
+| Timeline | a table of time, event and evidence |
+| Key logs | the trimmed log lines, each with its source |
+| Root cause and contributing factors | the chain from the first cause to the symptom, and the other factors |
+| Analysis | how the situation looked at each step, and which gate did not catch it |
+| Approaches taken | each approach, its result, and why it was kept or dropped |
+| Actions | the generated table of the `actions` key |
+| Effectiveness | the generated metric, baseline and check results |
+| Lessons | each lesson with the rule or the guard it became |
+
+```markdown
+---
+schema: incident-record/1
+id: <id>
+title: "<title>"
+level: <level>            # record | log
+status: <status>          # open | fixed | verified | reopened | unverifiable
+selfheal: ""
+fingerprint: ""
+signals: []
+prs: []
+items: []
+actions: []
+effectiveness:
+  metric: {code: "", filters: [], unit: "", since: ""}
+  baseline: {value: 0, units: 0}
+  target: 0
+  checks: 0
+  results: []
+verified_at: ""
+---
+
+# <title>
+
+## Summary
+
+<!-- GENERATED:status BEGIN -->
+<!-- GENERATED:status END -->
+
+## Trigger and level
+
+## Timeline
+
+## Key logs
+
+## Root cause and contributing factors
+
+## Analysis
+
+## Approaches taken
+
+## Actions
+
+<!-- GENERATED:actions BEGIN -->
+<!-- GENERATED:actions END -->
+
+## Effectiveness
+
+<!-- GENERATED:effectiveness BEGIN -->
+<!-- GENERATED:effectiveness END -->
+
+## Lessons
 ```

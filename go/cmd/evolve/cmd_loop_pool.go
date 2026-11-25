@@ -38,14 +38,20 @@ func liveWidthFile(evolveDir string) string {
 	return filepath.Join(evolveDir, lanebudget.LiveWidthFile)
 }
 
-func rollingPool(fc policy.FleetConfig, launch fleet.LaunchFn, widthFile string) poolRunFn {
+type poolControl struct {
+	hold   fleet.Hold
+	halted func() bool
+}
+
+func rollingPool(fc policy.FleetConfig, launch fleet.LaunchFn, widthFile string, ctl poolControl) poolRunFn {
 	return func(ctx context.Context, backlog []fleet.Todo, _ poolSupplyFn) []fleet.Result {
-		return fleet.RunPool(ctx, fleet.PoolConfig{Target: fc.Count, Concurrency: fc.Concurrency, LiveWidthFile: widthFile}, backlog, launch, nil)
+		cfg := fleet.PoolConfig{Target: fc.Count, Concurrency: fc.Concurrency, LiveWidthFile: widthFile, Hold: ctl.hold, Halted: ctl.halted}
+		return fleet.RunPool(ctx, cfg, backlog, launch, nil)
 	}
 }
 
 func dispatchPoolIteration(ctx context.Context, fc policy.FleetConfig, preflight func() error, planFn poolPlanFn, launch fleet.LaunchFn, waveIndex int) (ran bool, results []fleet.Result, err error) {
-	return planAndRunPool(ctx, fc, preflight, func(int) poolPlanFn { return planFn }, rollingPool(fc, launch, ""), waveIndex)
+	return planAndRunPool(ctx, fc, preflight, func(int) poolPlanFn { return planFn }, rollingPool(fc, launch, "", poolControl{}), waveIndex)
 }
 
 func planAndRunPool(ctx context.Context, fc policy.FleetConfig, preflight func() error, plan poolPlanAt, run poolRunFn, waveIndex int) (ran bool, results []fleet.Result, err error) {

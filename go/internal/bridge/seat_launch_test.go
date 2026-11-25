@@ -433,6 +433,10 @@ func TestSandboxWrap_ASeatRootIsWritableAndTheStoredLoginIsNotWhenHostIsolated(t
 	if !strings.Contains(iso, `(deny file-read* (subpath "`+filepath.Join(home, ".claude")+`"))`) {
 		t.Errorf("an isolated wrap must deny the read of the stored login:\n%s", iso)
 	}
+	claudeWriteDeny := `(deny file-write* (subpath "` + filepath.Join(home, ".claude") + `"))`
+	if !strings.Contains(iso, claudeWriteDeny) || strings.Contains(plain, claudeWriteDeny) {
+		t.Errorf("an isolated wrap must deny the write of the stored login, and a plain wrap must not:\n%s", iso)
+	}
 }
 
 func TestSeatLogin_TheHolderIsReadAtOneDoorHelperAndEachDoorCallsIt(t *testing.T) {

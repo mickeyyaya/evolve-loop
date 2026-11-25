@@ -43,7 +43,7 @@ func (f *fixture) briefs(fail error) *briefLog {
 
 func (f *fixture) ejection(cycle int, text string) signalcenter.Event {
 	f.t.Helper()
-	e := &integration.Ejection{Cycle: cycle, Cause: integration.CauseConflict, Diff: text}
+	e := &integration.Ejection{Cycle: cycle, Cause: integration.CauseGate, Diff: text}
 	path, err := e.WriteBrief(f.t.TempDir())
 	if err != nil {
 		f.t.Fatal(err)
@@ -57,7 +57,7 @@ func ejectedWith(cycle int, fields map[string]string) signalcenter.Event {
 }
 
 func briefOf(cycle int, text string) string {
-	return (&integration.Ejection{Cycle: cycle, Cause: integration.CauseConflict, Diff: text}).Brief()
+	return (&integration.Ejection{Cycle: cycle, Cause: integration.CauseGate, Diff: text}).Brief()
 }
 
 func TestOversight_AnEjectionSendsTheBriefToItsLaneAndKeepsItsCellsHeldUntilTheLandingFreesThem(t *testing.T) {

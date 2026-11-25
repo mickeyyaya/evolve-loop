@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
@@ -83,7 +84,7 @@ func TestMoveLegacyLoopLog_AnUnmakeableLegacyDirKeepsTheLog(t *testing.T) {
 	writeBoundaryFile(t, link, "old\n")
 	writeBoundaryFile(t, filepath.Join(dir, "logs"), "")
 
-	err := moveLegacyLoopLog(link, filepath.Join(dir, "logs", coverRunID+legacyLogSuffix), noLiveRun)
+	err := moveLegacyLoopLog(link, filepath.Join(dir, "logs", coverRunID+gcpolicy.LegacyLogRunSuffix), noLiveRun)
 
 	if err == nil || !strings.HasPrefix(err.Error(), "make the legacy log dir: ") || readText(t, link) != "old\n" {
 		t.Errorf("moveLegacyLoopLog = %v, want the make-dir error and the log kept", err)
@@ -98,7 +99,7 @@ func TestMoveLegacyLoopLog_AnUnremovableLegacyLogIsAnErrorAfterTheCopy(t *testin
 	dir := filepath.Join(t.TempDir(), ".evolve")
 	link := filepath.Join(dir, boundaryLoopLog)
 	writeBoundaryFile(t, link, "old\n")
-	legacyDir := filepath.Join(t.TempDir(), coverRunID+legacyLogSuffix)
+	legacyDir := filepath.Join(t.TempDir(), coverRunID+gcpolicy.LegacyLogRunSuffix)
 	if err := os.Chmod(dir, 0o500); err != nil {
 		t.Fatal(err)
 	}

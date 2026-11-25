@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "Two calls with different committed content can never share a template, pinned by a test",
+    "The history-floor tests and the core git-starts ceiling stay green"
+  ],
+  "created_at": "2026-11-24T09:30:00Z",
+  "files": [
+    "go/internal/core/history_floor_test.go"
+  ],
+  "fix": "Derive the template name from the committed content (for example core-history-floor- plus a short hash of the sorted file map), or bind each template name to one constant content map, so one value decides both.",
+  "id": "core-history-template-key-from-content",
+  "kind": "techdebt",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "summary": "Review of PR 1771 (round 2, 2026-11-24) found that newCommittedHistoryLane(t, template, committed, files) in go/internal/core/history_floor_test.go takes the gittest template name (the per-binary cache key) and the committed file map (what the cached repo holds) as two parameters. A later caller that reuses a name with different committed content gets the first content silently.",
+  "title": "newCommittedHistoryLane takes its template name from its committed content, so the cache key cannot disagree with what the template holds",
+  "weight": 0.3
+}

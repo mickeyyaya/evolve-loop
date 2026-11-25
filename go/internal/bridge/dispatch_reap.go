@@ -141,7 +141,7 @@ func (s *dispatchSweep) finish(ctx context.Context, deps Deps) {
 }
 
 func (s *dispatchSweep) ownership(ctx context.Context, deps Deps) proctree.Proof {
-	owned := proctree.OwnedByDispatch(s.id, s.recorded, s.livePaneTree(ctx, deps))
+	owned := proctree.Dispatch{ID: s.id, Tree: s.recorded, Live: s.livePaneTree(ctx, deps), Killable: TagKillable()}.Owned()
 	if s.cwdProofDir == "" {
 		s.refuse(deps)
 		return owned

@@ -39,8 +39,8 @@ func TestOwnedByDispatch_ATaggedSharedHelperNeedsTheRecordedTree(t *testing.T) {
 	table := []Process{daemon, chrome, server, mcp, zsh}
 
 	tree := []Identity{daemon.Identity(), zsh.Identity()}
-	none := Select(table, OwnedByDispatch(id, nil, nil))
-	inTree := Select(table, OwnedByDispatch(id, tree, tree))
+	none := Select(table, owned(id, nil, nil))
+	inTree := Select(table, owned(id, tree, tree))
 
 	if got := pids(none); len(got) != 1 || got[0] != 53 {
 		t.Errorf("no tree: selected %v, want only the MCP server 53", got)
@@ -57,13 +57,41 @@ func TestOwnedByDispatch_ARecordedSharedHelperMustStillBeALiveDescendantOfThePan
 	mcp := Process{Pid: 53, Ppid: 1, Started: t0, Comm: "node"}
 	tree := []Identity{daemon.Identity(), mcp.Identity()}
 
-	detached := Select([]Process{daemon, mcp}, OwnedByDispatch(id, tree, nil))
-	attached := Select([]Process{daemon, mcp}, OwnedByDispatch(id, tree, []Identity{daemon.Identity()}))
+	detached := Select([]Process{daemon, mcp}, owned(id, tree, nil))
+	attached := Select([]Process{daemon, mcp}, owned(id, tree, []Identity{daemon.Identity()}))
 
 	if got := pids(detached); len(got) != 1 || got[0] != 53 {
 		t.Errorf("detached daemon: selected %v, want only 53: a shared helper that left the pane serves other sessions", got)
 	}
 	if got := pids(attached); len(got) != 2 {
 		t.Errorf("attached daemon: selected %v, want [50 53]", got)
+	}
+}
+
+func owned(id string, tree, live []Identity) Proof {
+	return Dispatch{ID: id, Tree: tree, Live: live, Killable: ProgramIn(Launchers())}.Owned()
+}
+
+func TestNotShared_IsTheExactNegationOfSharedHelper(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		p    Process
+		want bool
+	}{
+		{"a tmux server", Process{Comm: "tmux", Args: []string{"tmux", "new-session"}}, false},
+		{"the Claude Code daemon", Process{Comm: "claude", Args: []string{"claude", "daemon", "run"}}, false},
+		{"Google Chrome", Process{Comm: "Google Chrome"}, false},
+		{"an MCP server", Process{Comm: "node", Args: []string{"node", "server.js"}}, true},
+		{"a zsh shell", Process{Comm: "/bin/zsh"}, true},
+		{"the zero process", Process{}, true},
+	}
+	for _, tc := range cases {
+		if got := NotShared(tc.p); got != tc.want {
+			t.Errorf("%s: NotShared=%v, want %v", tc.name, got, tc.want)
+		}
+		if NotShared(tc.p) == SharedHelper(tc.p) {
+			t.Errorf("%s: NotShared and SharedHelper agree", tc.name)
+		}
 	}
 }

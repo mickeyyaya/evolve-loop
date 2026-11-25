@@ -15,7 +15,8 @@ type failingReader struct{}
 func (failingReader) Read([]byte) (int, error) { return 0, errors.New("read failed") }
 
 func TestRunCI_DocsTests(t *testing.T) {
-	t.Parallel()
+	prev := current.Load()
+	t.Cleanup(func() { current.Store(prev) })
 	root := t.TempDir()
 	testFile := filepath.Join(root, "go", "internal", "x", "x_test.go")
 	if err := os.MkdirAll(filepath.Dir(testFile), 0o755); err != nil {

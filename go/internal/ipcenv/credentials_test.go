@@ -14,7 +14,7 @@ func TestCredentialIsolation_IsTheOneSet(t *testing.T) {
 		"GIT_CONFIG_GLOBAL":   "/ws/gitconfig",
 		"GIT_CONFIG_NOSYSTEM": "1",
 		"GIT_TERMINAL_PROMPT": "0",
-		"GIT_SSH_COMMAND":     "ssh -o BatchMode=yes",
+		"GIT_SSH_COMMAND":     GitSSHCommand,
 		"GH_CONFIG_DIR":       "/ws/gh",
 	}
 	if len(got.Set) != len(want) {
@@ -63,5 +63,17 @@ func TestCredentialSet_EnvIsSortedKeyValuePairs(t *testing.T) {
 	got := CredentialSet{Set: map[string]string{"B": "2", "A": "1"}}.Env()
 	if !slices.Equal(got, []string{"A=1", "B=2"}) {
 		t.Fatalf("Env = %q", got)
+	}
+}
+
+func TestGitSSHCommand_BlocksTheAgentTheHostConfigAndEveryKeyFile(t *testing.T) {
+	t.Parallel()
+	for _, want := range []string{"-F /dev/null", "-o BatchMode=yes", "-o IdentitiesOnly=yes", "-o IdentityAgent=none", "-o IdentityFile=/dev/null"} {
+		if !strings.Contains(GitSSHCommand, want) {
+			t.Errorf("GitSSHCommand = %q, want it to hold %q", GitSSHCommand, want)
+		}
+	}
+	if !strings.HasPrefix(GitSSHCommand, "ssh ") {
+		t.Errorf("GitSSHCommand = %q, want an ssh command", GitSSHCommand)
 	}
 }

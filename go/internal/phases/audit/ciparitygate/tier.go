@@ -153,5 +153,5 @@ func tierWhere(logPath string) string {
 	if logPath != "" {
 		return "both attempts: " + logPath
 	}
-	return "integration-tier.log unavailable"
+	return ciparity.TierLogName + " unavailable"
 }

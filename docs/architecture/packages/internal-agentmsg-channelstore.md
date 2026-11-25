@@ -18,6 +18,8 @@ The package uses `internal/events/channel`: `New`, `Log.Append`, `Log.Read`, `Lo
 | `(*Store).Append(ctx, cycle, Record) (int64, error)` | appends one `message` record to `msg.<cycle>` and returns its cursor |
 | `(*Store).Read(ctx, cycle, from) (Batch, error)` | returns the records from the cursor, the gaps of the log and the next cursor |
 | `(*Store).DeadLetter(ctx, cycle, Dead) error` | appends one `message` record to `msg.dead.<cycle>` |
+| `ChannelPrefix` | the prefix `msg.` of every channel of the store; the sandbox denies the prefix |
+| `Channels(cycle) []string` | the two channel names of a cycle: `msg.<cycle>` and `msg.dead.<cycle>` |
 | `ErrConfig` | the refusal of an incomplete config |
 | `ErrCursor` | the refusal of a negative cursor |
 

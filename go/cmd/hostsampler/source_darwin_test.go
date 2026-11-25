@@ -17,3 +17,14 @@ func TestNewSource_ReadsRealHost(t *testing.T) {
 		t.Fatalf("got %+v", got)
 	}
 }
+
+func TestNewSource_RecordsCarryCPUFromIostat(t *testing.T) {
+	read, err := newSource()
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool {
+		c, _ := read()
+		return c.HasCPUPct && c.CPUPct >= 0 && c.CPUPct <= 100
+	})
+}

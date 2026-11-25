@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -236,5 +237,31 @@ func TestConsoleComposeAcceptsAClassBoundRecordAndRefusesAMissingCommit(t *testi
 	gone.Commits = []CommitIdentity{{SHA: commitSHA40, BaseSHA: f.base, PatchID: "p"}}
 	if _, err := c.Compose(context.Background(), f.batchAt(t, 2), gone); err == nil {
 		t.Error("a record whose commit is absent must fail loudly")
+	}
+}
+
+func TestConsoleComposeMessageSaysNoneWhenThePRDeclaresNoIDs(t *testing.T) {
+	t.Parallel()
+	f := newComposeFixture(t)
+	pr := 100
+	for name, tc := range map[string]struct {
+		message string
+		want    bool
+	}{
+		"none declared":       {"chore: x\n\nCloses-Inbox: none", true},
+		"refs only":           {"chore: x\n\nRefs-Inbox: item-r", true},
+		"nothing declared":    {"chore: x", false},
+		"an id is declared":   {"chore: x\n\nCloses-Inbox: item-a", false},
+		"an id beside a none": {"chore: x\n\nCloses-Inbox: none\nCloses-Inbox: item-a", false},
+	} {
+		pr++
+		rec := f.console(t, pr, tc.message, map[string]string{strconv.Itoa(pr) + ".txt": "a\n"})
+		msg, err := Composer{Repo: f.repo}.message(context.Background(), rec)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Contains(msg, "Closes-Inbox: none\n"); got != tc.want {
+			t.Errorf("%s: none line = %v, want %v:\n%s", name, got, tc.want, msg)
+		}
 	}
 }

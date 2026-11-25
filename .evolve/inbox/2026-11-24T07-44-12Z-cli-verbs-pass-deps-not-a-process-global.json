@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "No package under go/internal/cli declares a package-level atomic Deps pointer, pinned by a guard test that scans go/internal/cli",
+    "TestRunCI_DocsTests and the inboxcmd tests run with t.Parallel",
+    "go test -race -count=1 passes for landcmd, inboxcmd and every other changed cli package"
+  ],
+  "created_at": "2026-11-24T08:05:00Z",
+  "files": [
+    "go/internal/cli/landcmd/deps.go",
+    "go/internal/cli/inboxcmd/deps.go",
+    "go/internal/cli/landcmd/cmd_pr.go",
+    "go/internal/cli/landcmd/cmd_ci.go",
+    "go/internal/cli/inboxcmd"
+  ],
+  "fix": "Thread the Deps value from the RunX verbs to the helpers as a parameter or a receiver, and remove the package-level atomic, in the two packages that have it on main: go/internal/cli/landcmd/deps.go and go/internal/cli/inboxcmd/deps.go. Then remove the per-package serial guards and the TestMain installers, because no test can swap another test deps.",
+  "id": "cli-verbs-pass-deps-not-a-process-global",
+  "kind": "techdebt",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "On 2026-11-24 two order-dependent test flakes on main ejected boundary PRs: inboxcmd (nil deps, fixed by a TestMain in #1759) and landcmd (TestPRMergeJourney_UpdateBranchTrainWithAPendingNewHead got an empty stdout, 1 in 15 race runs; it ejected PR 1746). Both have one root: each verb package keeps `current atomic.Pointer[Deps]`, its RunX entry point runs `current.Store(&deps)`, and helpers read `host()`. A parallel test that calls RunX with partial deps replaces the deps of every other running test. The landcmd fix made the swapping test serial and added a guard test (host_swap_serial_test.go). The guard covers one package, and the global stays.",
+  "title": "CLI verb packages pass their host deps down, instead of storing them in a process-wide atomic",
+  "weight": 0.6
+}

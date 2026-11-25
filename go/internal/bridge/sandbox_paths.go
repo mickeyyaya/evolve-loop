@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -116,6 +117,24 @@ func canonicalSandboxPath(path string) (string, error) {
 	}
 }
 
+var errOutsideScope = errors.New("resolves outside its declared scope")
+
+func canonicalWithin(base, rel string) (string, error) {
+	canonicalBase, err := canonicalSandboxPath(base)
+	if err != nil {
+		return "", err
+	}
+	expected := filepath.Join(canonicalBase, rel)
+	actual, err := canonicalSandboxPath(expected)
+	if err != nil {
+		return "", err
+	}
+	if actual != expected {
+		return "", fmt.Errorf("%w (%s -> %s)", errOutsideScope, expected, actual)
+	}
+	return expected, nil
+}
+
 const worktreePathTemplate = "{worktree_path}"
 
 const runDirGlob = ".evolve/runs/cycle-*"
@@ -138,17 +157,9 @@ func resolveSandboxWriteGrants(subpaths []string, root, worktree, workspace stri
 		if base == "" || !filepath.IsAbs(base) {
 			return nil, fmt.Errorf("write grant %q needs an absolute project root, worktree or workspace", declared)
 		}
-		canonicalBase, err := canonicalSandboxPath(base)
+		expected, err := canonicalWithin(base, rel)
 		if err != nil {
 			return nil, fmt.Errorf("write grant %q: %w", declared, err)
-		}
-		expected := filepath.Join(canonicalBase, rel)
-		actual, err := canonicalSandboxPath(expected)
-		if err != nil {
-			return nil, fmt.Errorf("write grant %q: %w", declared, err)
-		}
-		if actual != expected {
-			return nil, fmt.Errorf("write grant %q resolves outside its declared scope (%s -> %s)", declared, expected, actual)
 		}
 		if err := refuseRunDirsReach(declared, expected, root, ownRunDir); err != nil {
 			return nil, err

@@ -126,6 +126,8 @@ At `shadow`, the stage exit counts each `LOOP_ORCH_LANE_LATE_EXIT` with `status`
 |---|---|---|
 | `cycle.sealed` | `LOOP_ORCH_OVERSIGHT_ACTION`, `applied` false | the same with `applied` true. On `FAIL`, the cells of the lane are free |
 | `ship.landed` | the same | the cells are free, `LandingObserver` counts the landing, and the pool fills an open slot |
+| `ship.merged` (a member that the integration driver merged) | the record, `applied` false | the cells of the lane are free, `LandingObserver` counts a clean landing, and the pool fills the slot. A second event of the same cycle does nothing |
+| `SHIP_INTEGRATION_EJECTED` with `cause=conflict` and no shadow stamp | the record | `LandingObserver` counts a conflict, if the lane is known or not. The brief and the hold still need a lane |
 | a quota signal | the record, and `LOOP_ORCH_FAMILY_PAUSED` with `applied` false | the limit of the intake changes |
 | `loop.halt` | the record | admission stops |
 | a phase signal, a stall report | the heartbeat moves and the stall publishes at both stages | the same |
@@ -157,6 +159,9 @@ At `shadow`, the stage exit counts each `LOOP_ORCH_LANE_LATE_EXIT` with `status`
 - Only `enforce` lets the window gate admission (`TestPool_OnlyTheEnforceStageLetsTheWindowGateAdmission`). The loop wires the policy window into a real pool run (`TestDispatchPool_AtEnforceTheWindowFromThePolicyGatesTheRun`, `TestOrchestratorPool_WiresTheEnforceKeysAndTheFileRuleWithoutAGraph`). At `shadow`, the loop builds no window (`TestDispatchPool_AtShadowTheLoopBuildsNoWindow`).
 - The window never exceeds the pool width, so a window never lifts the `fleet.concurrency` cap and each halving binds at once (`TestRunPool_AWindowNeverLiftsTheConcurrencyCap`, `TestLaneWindow_TheSizedCountIsTheSmallerOfTheFleetCountAndTheConcurrencyCap`).
 - The package never polls and never stops a lane by itself. `TestOrchestrator_NeverPollsAndNeverStopsALaneByItself` parses each production file and refuses `time.Sleep`, `time.Tick`, `time.NewTicker`, `syscall.Kill`, `os.FindProcess` and the imports `os/exec`, `sysexec` and `proctree`. `TestOrchestratorGuard_FindsAPlantedPollAndKill` proves that the guard finds them.
+- `Oversight.ejected` is the one feeder of the window conflict input. A conflict ejection counts once for each event, before the lane lookup, and a `gate` or `proof` ejection counts nothing (`TestOversight_AConflictEjectionHalvesTheWindowAndAGateEjectionDoesNot`). An event that `integration.IsShadow` marks never counts (`TestOversight_AShadowEjectionDoesNotHalveTheWindow`).
+- `Oversight.merged` finds the lane with `ejectee`, so a delivered lane that already sealed is freed and counted (`TestOversight_AMergedMemberFreesTheLaneAndGrowsTheWindow`). It ignores a second event of the cycle (`TestOversight_ASecondMergedForTheSameCycleCountsOnce`).
+- Limit: with the orchestrator at `enforce`, an ejection stamped shadow still briefs and holds its lane. Only the window feed has the shadow filter.
 - The package has 100% statement coverage in `go/.cover-strict` and is listed in `go/.apicover-enforce`.
 
 ## Findings
@@ -202,3 +207,9 @@ The window takes a second limit, the host ceiling. The package starts no timer f
 - **The codes.** `LOOP_ORCH_HOST_PRESSURE` (INFO) carries `old`, `new`, `sized`, `cause`, `stage`, `applied` and the reading. `LOOP_HOST_PRESSURE_BLIND` (WARN) carries `error` and `os`. `Publish.HostPressure` and `Publish.HostBlind` send them.
 - **Width does not change for supply.** 8 admissible items under a ceiling of 12 open 8 lanes and raise no underfill WARN (`TestPool_SupplyEightAdmissibleOfTwelveCapOpensEightLanesAndRaisesNoUnderfillWarn`).
 - **A shrink never stops a lane.** Pinned by `TestPool_HighPressureCeilingStopsBackfillButKeepsRunningCycles`.
+
+## Disk floor hold (plan host-sentinel-inside-the-loop)
+
+- **`Pool.Hold`.** It passes the `fleet.Hold` of the host sentinel to `fleet.PoolConfig`. The hold lives in the fleet pool, not in the window. A second writer of the window ceiling overwrites the host pressure value.
+- **The idle cause `disk_floor`.** `idleCause` returns it right after `system_halt` when the transition has `Held` set. The underfill WARN skips this cause, as it does for `host_pressure`, so a hold is never reported as underfill or as `supply_empty` (`TestPool_AHoldReportsDiskFloorNotUnderfill`).
+- **The code.** `LOOP_ORCH_POOL_FLOOR_HOLD` (INFO) maps from `PoolFloorHold`. It carries `held`, `live` and `target`. It is not an idle or held transition, so it never raises an underfill WARN.

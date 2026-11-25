@@ -9,18 +9,18 @@ import (
 func TestEventsDefaults_AreTheChannelTableOfTheSpec(t *testing.T) {
 	t.Parallel()
 	want := []EventChannel{
-		{Name: "loop", Route: "module=loop", QoS: "lossless"},
-		{Name: "cycle", Route: "kind=phase.dispatched,phase.outcome,phase.aborted,cycle.sealed,ship.landed,system.failure", QoS: "lossless"},
-		{Name: "errors", Route: "severity>=WARN", QoS: "lossless"},
-		{Name: "ship", Route: "kind=ship.*", QoS: "lossless"},
-		{Name: "inbox", Route: "module=inbox", QoS: "lossless"},
-		{Name: "ledger", Route: "kind=ledger.appended", QoS: "best_effort"},
-		{Name: "quality.breach", Route: "kind=quality.breach,quality.warning", QoS: "lossless"},
-		{Name: "quality.reading", Route: "kind=quality.reading", QoS: "best_effort"},
-		{Name: "isolation.violation", Route: "kind=isolation.violation", QoS: "lossless"},
-		{Name: "selfheal.incident", Route: "kind=selfheal.incident", QoS: "lossless"},
-		{Name: "selfheal.decision", Route: "kind=selfheal.decision", QoS: "lossless"},
-		{Name: "signals", Route: "", QoS: "best_effort"},
+		{Name: "loop", Route: "module=loop", QoS: "lossless", MaxTotalMB: DefaultChannelMaxTotalMB},
+		{Name: "cycle", Route: "kind=phase.dispatched,phase.outcome,phase.aborted,cycle.sealed,ship.landed,system.failure", QoS: "lossless", MaxTotalMB: DefaultChannelMaxTotalMB},
+		{Name: "errors", Route: "severity>=WARN", QoS: "lossless", MaxTotalMB: DefaultChannelMaxTotalMB},
+		{Name: "ship", Route: "kind=ship.*", QoS: "lossless", MaxTotalMB: DefaultChannelMaxTotalMB},
+		{Name: "inbox", Route: "module=inbox", QoS: "lossless", MaxTotalMB: DefaultChannelMaxTotalMB},
+		{Name: "ledger", Route: "kind=ledger.appended", QoS: "best_effort", MaxTotalMB: 512},
+		{Name: "quality.breach", Route: "kind=quality.breach,quality.warning", QoS: "lossless", MaxTotalMB: DefaultChannelMaxTotalMB},
+		{Name: "quality.reading", Route: "kind=quality.reading", QoS: "best_effort", MaxTotalMB: DefaultChannelMaxTotalMB},
+		{Name: "isolation.violation", Route: "kind=isolation.violation", QoS: "lossless", MaxTotalMB: DefaultChannelMaxTotalMB},
+		{Name: "selfheal.incident", Route: "kind=selfheal.incident", QoS: "lossless", MaxTotalMB: DefaultChannelMaxTotalMB},
+		{Name: "selfheal.decision", Route: "kind=selfheal.decision", QoS: "lossless", MaxTotalMB: DefaultChannelMaxTotalMB},
+		{Name: "signals", Route: "", QoS: "best_effort", MaxTotalMB: 512},
 	}
 
 	got := EventsDefaults()

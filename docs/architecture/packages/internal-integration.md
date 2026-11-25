@@ -171,6 +171,13 @@ The review binding of a console PR covers the change of the PR. Train.Record giv
 
 The commit gate writes the review record, and it holds a copy of each launch record that it names. A review record of a docs-only change needs a run of the docs review, and the plain name does not satisfy the check. The class `docs-review` checks only the paths, and it proves no run. The caller owns the record schema and the closed list of classes, because this package cannot import the commit gate. That package imports this one through core.
 
+The constant `RatchetListsClass` names the class of the PR that the boundary step `ratchet-tighten` opens.
+
+- A record with this class sets `Deliverable.Tail`. `compareDeliverables` puts a Tail record after every other record. So a ratchet PR composes last, and a semantic clash ejects it and keeps the lane PRs.
+- A caller in `cmd/evolve` makes the binding with `ClassBinding`. The class is not in the list of the `--class` flag.
+- `Composer.message` writes `Closes-Inbox: none` on the composed commit of a console PR when the PR names no inbox id and its commits declare a trailer. This keeps the CI trailer check green for a batch PR with one ratchet PR.
+- Pinned by `TestOrderDeliverablesComposesTheRatchetListsPRLast` and `TestConsoleComposeMessageSaysNoneWhenThePRDeclaresNoIDs`.
+
 Train plans and lands the ready PRs. Plan does three things and pushes nothing:
 
 - It refuses a PR whose head is not the last recorded commit.
@@ -247,3 +254,20 @@ The files are `consolepr.go`, `train.go` and `deliverable.go`.
   - A record of a PR that the host reports as not open is spent, and one line names the PR. A record of an open PR whose change is on `main` is closed with the landed note and spent, and its inbox items move.
   - An open batch PR closes only when all of its commits name a `Source-PR`. Each named PR must be closed, on `main` or settled in the same pass. Else the batch PR stays open.
   - `PRHost.State` and `PRHost.OpenBatches` are the two host reads. `GhHost` uses `gh pr view` and `gh pr list`. A failed read is an error of the settle. The batch stops after it prints the lines of the work done.
+
+## The production enforce actor (I14 slice 1)
+
+- **The lane batcher.** `LaneBatcher.For(PendingBatch)` returns the `Merger.Compose` function of one flush. Each call deletes the ref `PoolBranch(pool, index)`, fetches `origin/main` with the explicit refspec, and cuts the branch from the live head. So a recheck, a red split or a second flush cuts from the main of that moment.
+  - The composer stage is always `enforce`. `Missing()` returns `Gate` while the composer has none.
+  - Pinned by `TestLaneBatcher_AReCompositionAndASecondFlushCutFromTheLiveOriginMain`.
+- **The compose rule.** `LaneBatcher` calls `Composer.composeAll`, the same loop as the train and the dry plan. It cuts through `Repo.CutFromOrigin`, which `StartBatchFromOrigin` also calls. So the plan and the enforce path cannot differ.
+- **The stop gate.** The production `Merger` comes from `integrationEnv.enforceMerger`, which wraps `CI` and `Main` in the `StopGate` of the train.
+- **One compose home.** `EnforceActor.Batcher` is the compose port. `Flush` returns `errTwoComposeHomes` when `Merger.Compose` is also set.
+- **The cut base.** `Flush` records `Composition.Batch.Base` as the base of the batch, not the base that the driver passed.
+- **Readiness.** `EnforceActor.Missing()` lists `Requeue`, `Promote`, `Briefs`, `Plane`, `CI`, `Main`, `Batcher` and the `Gate` of the batcher. The driver reads it through its own `readiness` interface, and `Check` returns `*MissingPortError`.
+- **The plane sync.** `Flush` calls `syncPlane` when a member merged. The result goes to `FlushResult.Failures` and never to the returned error. `PlaneOf(repo)` wraps `SyncToOrigin`.
+- **The merged signal.** `recordLanded` emits `SHIP_INTEGRATION_MERGED` with the kind `ship.merged`, `fields.cycle`, `fields.pr` and `fields.tip`, for each landed member.
+- **An ejection with no `Requeue` port** records a `DriverFailure` and returns an error. `LandingFeed` and `EnforceActor.Landing` no longer exist: the window feed lives in `orchestrator.Oversight`.
+- **Persist before return.** `Driver.flush` copies `FlushResult.Batch`, `Members` and `Failures` into the record and adds the decision before it returns a `Flush` error. A merge followed by an error is thus persisted (`TestDriverFlush_AMergeFollowedByAnErrorStillPersistsMerged`).
+- **Telemetry.** `publishFlush` and `fail` name the real stage and the PR of the batch. They stamp `shadow` only at the stage `shadow`. `IsShadow(fields)` reads that stamp.
+- **Limits.** Enforce stays refused until slices 2 and 4 supply the ports and the gate. The batcher fetch has its own refspec until `integration-sync-to-origin-uses-the-mainsync-fetch` lands.

@@ -34,11 +34,6 @@
       "package": "internal/modelquery",
       "test": "TestLive_HelpEffortLadders",
       "rule": "skip-hides-error"
-    },
-    {
-      "package": "internal/modelquery",
-      "test": "TestOllamaLister_FailureCarriesTheCommandOutput",
-      "rule": "error-text-match"
     }
   ]
 }

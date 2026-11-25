@@ -148,6 +148,7 @@ type gcRun struct {
 	abs            func(string) (string, error)
 	exec           sysexec.RunFunc
 	liveRuns       []string
+	cancellable    bool
 }
 
 func newGCRun(ctx context.Context, dryRun bool, stdout, stderr io.Writer) gcRun {
@@ -166,7 +167,11 @@ func newGCRun(ctx context.Context, dryRun bool, stdout, stderr io.Writer) gcRun 
 }
 
 func (r gcRun) step(run func(gcRun) bool) bool {
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.ctx), orphanGCTimeout)
+	parent := context.WithoutCancel(r.ctx)
+	if r.cancellable {
+		parent = r.ctx
+	}
+	ctx, cancel := context.WithTimeout(parent, orphanGCTimeout)
 	defer cancel()
 	r.ctx = ctx
 	return run(r)
@@ -231,6 +236,7 @@ func (r gcRun) project(projectRoot string) int {
 	if !ok {
 		return 1
 	}
+	pol.PrintEventsDiagnostics(r.stderr)
 	gcPol := gcBlock(pol)
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	opts := worktreeGCOptions(projectRoot, evolveDir, gcPol.Worktrees, r.stdout)
@@ -243,7 +249,7 @@ func (r gcRun) project(projectRoot string) int {
 		func(s gcRun) bool { return s.agedContinuations(projectRoot, ageOf, opts.WorktreeBase) },
 		func(s gcRun) bool { return s.worktrees(opts) },
 		func(s gcRun) bool { return s.devWorktrees(projectRoot, evolveDir, gcPol) },
-		func(s gcRun) bool { return s.runDirs(evolveDir, gcPol) },
+		func(s gcRun) bool { return s.runDirs(evolveDir, gcPlanInputsOf(pol)) },
 		func(s gcRun) bool { return s.goCache(gcPol) },
 		func(s gcRun) bool { return s.pipelineTemp(gcPol.TempTTLHours) },
 		func(s gcRun) bool { return s.seatSessions(gcPol, opts.WorktreeBase) },
@@ -370,9 +376,9 @@ func gcFlagCountSuffix(counts map[string]int, it gc.WorktreeItem) string {
 	return ""
 }
 
-func (r gcRun) runDirs(evolveDir string, pol gc.Policy) bool {
+func (r gcRun) runDirs(evolveDir string, in gcPlanInputs) bool {
 	discoverFailed := false
-	m, err := planRunDirGC(evolveDir, pol, func(err error) {
+	m, err := planRunDirGC(evolveDir, in, func(err error) {
 		discoverFailed = true
 		fmt.Fprintf(r.stderr, "evolve gc: run-dir discovery failed: %v; planning only the TTL rules\n", err)
 	})

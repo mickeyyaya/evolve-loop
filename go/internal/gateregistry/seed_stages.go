@@ -6,8 +6,10 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gatecontract"
+	"github.com/mickeyyaya/evolve-loop/go/internal/hostsentinel"
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
+	"github.com/mickeyyaya/evolve-loop/go/internal/selfheal"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -23,6 +25,20 @@ var stageSeeds = []stageSeed{
 	{key: "inbox.curator.stage"},
 	{key: "inbox.curator.trailer.stage"},
 	{key: "gc.remote_sweep.stage"},
+	{
+		key:     "gc.sentinel.hold.stage",
+		signal:  hostsentinel.CodeWouldHold,
+		site:    gatecontract.EmitSite{Path: "internal/hostsentinel/signals.go", Func: "WouldHold", Ref: "CodeWouldHold"},
+		fields:  []string{"would_hold", "free_bytes", "floor_bytes"},
+		closure: []string{"internal/hostsentinel"},
+	},
+	{
+		key:     "gc.sentinel.release.stage",
+		signal:  hostsentinel.CodeWouldRelease,
+		site:    gatecontract.EmitSite{Path: "internal/hostsentinel/signals.go", Func: "WouldRelease", Ref: "CodeWouldRelease"},
+		fields:  []string{"scopes", "free_bytes", "cache_bytes"},
+		closure: []string{"internal/hostsentinel"},
+	},
 	{key: "pr.merge_window.stage"},
 	{key: "workflow.findings_repair.code-review.stage"},
 	{key: "workflow.convergence.stage"},
@@ -46,6 +62,13 @@ var stageSeeds = []stageSeed{
 	{key: "docs_floor.stage"},
 	{key: "docs_floor.ste_stage"},
 	{key: "comment_floor.stage"},
+	{
+		key:     "comment_floor.history_stage",
+		signal:  core.CodeCommentHistoryShadow,
+		site:    gatecontract.EmitSite{Path: "internal/core/history_floor.go", Func: "emitHistoryShadow", Ref: "CodeCommentHistoryShadow"},
+		fields:  []string{"cycle", "count", "entries"},
+		closure: []string{"internal/commentaudit"},
+	},
 	{
 		key:     "held_proposals.stage",
 		signal:  ship.CodeHoldShadow,
@@ -80,6 +103,18 @@ var stageSeeds = []stageSeed{
 	{key: "healing.orchestrator.stage"},
 	{key: "healing.validator.stage"},
 	{key: "healing.live_reaction.stage"},
+	{
+		key:    "boundary.ratchet_merge.stage",
+		signal: signalcenter.CodeCLIRatchetMergeDecision,
+		site:   gatecontract.EmitSite{Path: "cmd/evolve/cmd_boundary_ratchet_record.go", Func: "emitRatchetRecordDecision", Ref: "CodeCLIRatchetMergeDecision"},
+		fields: []string{"stage", "pr", "head", "decision", "reason", "head_gate", "content_gate", "scans", "skipped_push", "candidate"},
+	},
+	{
+		key:    "healing.repair_cycle.stage",
+		signal: selfheal.CodeRepairRouted,
+		site:   gatecontract.EmitSite{Path: "internal/selfheal/repair_item.go", Func: "repairRouted", Ref: "CodeRepairRouted"},
+		fields: []string{"stage", "tier", "would_route", "would_refuse_audit"},
+	},
 }
 
 func StageEntries() []gatecontract.Entry {

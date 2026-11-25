@@ -64,6 +64,8 @@ Non-goals:
 | D20 | `sysexec.DefaultRunner` returns success with one WARN line when a command exits 0 and a child keeps the output pipe open past `WaitDelay`. | Go review, round 1 (M1). |
 | D21 | A recorded shared helper is stopped only while it is a live descendant of a recorded pane at sweep time. A helper that detached (for example a `claude daemon run` that other sessions now use) is spared. gc never stops a shared helper by tree membership alone. | Security delta check, round 3 (M-a). |
 | D22 | The reaper refuses to run when its own pid is not in the table, because it cannot prove its ancestors then. The tree directory is mode 0700. | Security delta check, round 3 (M-b and L-b). |
+| D24 | The tag-only kill uses an allow list of program names: the launchers in `proctree` and the CLI family binaries from the manifests (`bridge.TagKillable`). The shared class still wins over the allow list. The cwd proof stays on the shared class only. A dispatch-started `ollama serve` is not in the shared class, so its tag stops it today. A shared ollama server on 127.0.0.1:11434 is a known risk. The exemption waits for the item `proctree-shared-helpers-from-bridge-manifests`. | Follow-up M-c. A program that is not on the list is never stopped by the tag alone, so a new helper fails closed. |
+| D25 | gc removes a tree file when the bridge pid of its dispatch is dead and no member is a live process that gc can stop. gc prints `REPORT-ONLY` for each tagged process of a dead bridge that it spares, with the rule `shared` or `not-killable`. | Follow-ups L-a and 3. |
 | D23 | The cwd proof of the bridge sweep (2026-10-21) fails closed. The root, the worktree and the home directory must be absolute, and the worktree is resolved once. The base must be the top of a git checkout and must not hold the root or the home directory. A refusal turns off only the cwd proof and writes the WARN `BRIDGE_DISPATCH_SWEEP_REFUSED`. The proof takes only a process that ps dates at or after the dispatch second minus 2 s. That is the error bound of the Linux ps start time. | Review of PR #1103 (CRITICAL-1, HIGH-2, MEDIUM-4). `evolve subagent run` without `WORKTREE_PATH` sent no project root. Then the old guard let the sweep cover the plane, and the live loop (ppid 1, cwd = plane root) matched. Rejected: a guard on the path string only, because a later symlink swap widens it. Rejected: only `.evolve/worktrees/` as an allowlist, because console and test dispatches use other worktrees. |
 | D14 | Push-back on `TMUX_TMPDIR` for tests: the tests keep the per-pid socket in the default tmux directory. | gc lists sockets in the default directory. A private `TMUX_TMPDIR` can hide a leaked test server from the gc backstop. F8 is the root cause fix, and it is already on main. |
 
@@ -150,9 +152,8 @@ The kill path can stop a process that we do not own. This table lists each way, 
 
 The inbox item `.evolve/inbox/2026-10-08T17-00-00Z-dispatch-hygiene-followups.json` holds the first three items.
 
-- M-c: widen the shared class: Firefox and WebKit from Playwright, Electron helpers, `ssh-agent`, `gpg-agent`. Or change the tag-only kill to an allow list of program names.
-- L-a: gc removes a tree file when the owner of its dispatch is dead and all its members are gone.
-- A crashed bridge can leave a tagged shared helper with no persisted tree. gc spares it, and the operator must stop it by hand.
+- M-c, L-a and the crashed-bridge helper: built as D24 and D25, with one part open. The operator check is in the runtime reference.
+- M-c is open for a shared `ollama serve` that a dispatch starts: its tag stops it today. Item `proctree-shared-helpers-from-bridge-manifests` closes this part.
 - A Linux cgroup per dispatch (N1).
 - A sweep for the other paths that kill a session without a dispatch: `capture_models.go`, `launch_model_verification.go` and `recipe_adapter.go`. They start no dispatch tag today.
 - Legacy processes that have `EVOLVE_PROJECT_ROOT` but no dispatch tag (MCP servers started before this change). gc leaves them alone, by design. Do this one-time manual check after the change lands:
@@ -172,7 +173,7 @@ The inbox item `.evolve/inbox/2026-10-08T17-00-00Z-dispatch-hygiene-followups.js
 | D23: the cwd proof fails closed | done | [#1103](https://github.com/mickeyyaya/evolve-loop/pull/1103), [`2e5af99`](https://github.com/mickeyyaya/evolve-loop/commit/2e5af9988), [`ce8f538`](https://github.com/mickeyyaya/evolve-loop/commit/ce8f538a9) | none |
 | Test sessions get a refusing signal sender (S15) | done | [`1cba6ab`](https://github.com/mickeyyaya/evolve-loop/commit/1cba6abc7) | none |
 | Sweep for the other kill paths (`capture_models.go`, `recipe_adapter.go`) | done | cycle 2218, [`08b0d2d`](https://github.com/mickeyyaya/evolve-loop/commit/08b0d2d76) | none |
-| Later: M-c wider shared class, L-a tree file removal, crashed-bridge helper | not started | none | `dispatch-hygiene-followups` |
+| M-c allow list (D24), L-a tree file removal and report of spared helpers (D25) | in review | branch `console/dispatch-hygiene-followups` | `dispatch-hygiene-followups` |
 | Later: Linux cgroup per dispatch (N1), manual check of legacy MCP processes | not started | none | none (draft `dispatch-hygiene-cgroup-and-legacy`) |
 | Review follow-up `dispatch-hygiene-architecture-followups` | unverified: the item was consumed by the bookkeeping of PR 1605 ([`fd36f33`](https://github.com/mickeyyaya/evolve-loop/commit/fd36f3334)); no code change was traced | none | none |
 

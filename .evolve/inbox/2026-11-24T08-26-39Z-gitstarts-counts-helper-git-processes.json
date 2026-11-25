@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A gitstarts test shows that a _test.go call of each gittest helper that runs git is charged its real number of git processes",
+    "callCost has no method-name switch of its own: every cost it charges comes from the gittest table, pinned by a test",
+    "A guard test fails when a new exported gittest method that starts git has no cost entry",
+    "The recorded ceilings stay at or below today values after the counter learns the helper costs, or each raise is a separate reviewed change"
+  ],
+  "created_at": "2026-11-24T08:45:00Z",
+  "files": [
+    "go/internal/gitstarts/gitstarts.go",
+    "go/internal/gittest/template.go"
+  ],
+  "fix": "Give the cost of each gittest helper one home next to the helpers (for example a table that gittest exports), move the static entries of the callCost switch into that home, and make gitstarts.callCost read it, so a helper that runs git is charged its real process count. A guard test fails when a gittest method that runs git has no cost entry. Then the per-package ceilings measure real starts again.",
+  "id": "gitstarts-counts-helper-git-processes",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "On 2026-11-24 a CI fix for PR 1740 (core git starts 746 > recorded 730) added gittest.Repo.CommitAll (3 git processes) and Repo.Rename (1) and used them in core tests; those helpers arrive with PR 1740 and are not on main yet. gitstarts.Count (go/internal/gitstarts/gitstarts.go:41-66, callCost) is a static AST counter with a fixed switch: 5 for Fixture, Bare and At, 1 for Clone, 0 for FromTemplate and BareFromTemplate, 1 per .Git( selector, 1 for any call with a \"git\" string-literal argument, and 0 for every other method. The count fell to exactly 730 while 11 real per-test git starts still ran (honest count 741). The architecture review caught it as CRITICAL before ship. The gate stays open to the same evasion for any new helper that wraps git.",
+  "title": "The git-starts ceiling charges 0 for a gittest helper that runs git, so a helper hides real starts",
+  "weight": 0.7
+}

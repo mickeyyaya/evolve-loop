@@ -36,6 +36,8 @@ type loopBatchCoordinator struct {
 	lastGraph    graphLoad
 
 	newDriver         func(pool int) (*integration.Driver, error)
+	newEnforceActor   func(repo integration.Repo, pool int) integration.Actor
+	integrationEnvOf  func(root string, now time.Time) integrationEnv
 	driverFinishLimit time.Duration
 	driverTick        time.Duration
 	oversightSource   func() (orchestrator.Source, error)
@@ -43,6 +45,8 @@ type loopBatchCoordinator struct {
 	hostSamples       func([]byte) error
 	hostTicker        func(time.Duration) (<-chan time.Time, func())
 	startHooks        cycleStartHooks
+	sentinel          sentinelPorts
+	floorHold         fleet.Hold
 }
 
 func (b *loopBatchCoordinator) run() int {

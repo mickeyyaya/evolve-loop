@@ -122,6 +122,7 @@ const (
 	KindShipError              Kind = "ship.error"
 	KindShipWarning            Kind = "ship.warning"
 	KindShipDelivered          Kind = "ship.delivered"
+	KindShipMerged             Kind = "ship.merged"
 	KindSystemFailure          Kind = "system.failure"
 	KindQuotaPaused            Kind = "quota.paused"
 	KindLoginRequired          Kind = "login.required"
@@ -167,6 +168,7 @@ const (
 	KindCICompleted            Kind = "ci.completed"
 	KindLoopTick               Kind = "loop.tick"
 	KindExpectedAbsent         Kind = "signal.expected_absent"
+	KindHostSentinel           Kind = "host.sentinel"
 )
 
 const (
@@ -177,12 +179,12 @@ const (
 
 var knownKinds = map[Kind]bool{
 	KindPhaseDispatched: true, KindPhaseOutcome: true, KindPhaseAborted: true, KindGateRejected: true,
-	KindGatePassed: true, KindGateCorrected: true, KindShipLanded: true, KindShipError: true, KindShipWarning: true, KindShipDelivered: true, KindSystemFailure: true,
+	KindGatePassed: true, KindGateCorrected: true, KindShipLanded: true, KindShipError: true, KindShipWarning: true, KindShipDelivered: true, KindShipMerged: true, KindSystemFailure: true,
 	KindQuotaPaused: true, KindLoginRequired: true, KindBridgeWarning: true, KindBridgeTripwire: true, KindPaneLiveness: true,
 	KindLedgerAppended: true, KindOutcomeWarning: true, KindFailureDiagWarning: true, KindCarryoverWarning: true, KindFailureLearningWarning: true, KindConfigWarning: true, KindAdvisorWarning: true, KindRunnerWarning: true, KindInboxWarning: true, KindAuditWarning: true, KindObserverWarning: true, KindCycleSealed: true, KindLoopWave: true, KindLoopHalt: true, KindLoopWarning: true,
 	KindLoopEscalation: true, KindLoopStarted: true, KindLoopExit: true, KindLoopLost: true, KindListenerPanicked: true, KindRegistryDrift: true, KindSinkDropped: true,
 	KindQualityReading: true, KindQualityBreach: true, KindQualityWarning: true, KindIsolationViolation: true, KindIsolationContext: true, KindIsolationRequest: true, KindIsolationRequestDecision: true, KindIsolationEnv: true, KindCLIQueueApplied: true, KindLadderDecision: true, KindSelfhealIncident: true, KindSelfhealDecision: true,
-	KindControlBypass: true, KindWaveStarted: true, KindWaveEnded: true, KindInboxClaimed: true, KindInboxReleased: true, KindCICompleted: true, KindLoopTick: true, KindExpectedAbsent: true,
+	KindControlBypass: true, KindWaveStarted: true, KindWaveEnded: true, KindInboxClaimed: true, KindInboxReleased: true, KindCICompleted: true, KindLoopTick: true, KindExpectedAbsent: true, KindHostSentinel: true,
 }
 
 var terminalKinds = map[Kind]bool{
@@ -213,6 +215,8 @@ const (
 	CodeAuditCascadeShadow     Code = "AUDIT_CASCADE_SHADOW"
 	CodeParallelEvaluateShadow Code = "PARALLEL_EVALUATE_SHADOW"
 )
+
+const CodeCLIRatchetMergeDecision Code = "CLI_RATCHET_MERGE_DECISION"
 
 const CodeLatencyBudgetExceeded Code = "LATENCY_BUDGET_EXCEEDED"
 

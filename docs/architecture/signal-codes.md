@@ -119,6 +119,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 |---|---|
 | `BUILD_BASE_RED_ATTRIBUTED` | a build floor red was rerun on the lane base and every red test is red there too, so the floor does not refuse the lane; fields.keys (package.Test of each base-red test), main_red (the keys that are red on main too), took |
 | `BUILD_BASE_RED_UNJUDGED` | a build floor red could not be rerun on the lane base, so the lane is blamed as before; fields.keys (package.Test of each red test), cause |
+| `BUILD_COMMENT_HISTORY_SHADOW` | at comment_floor.history_stage shadow, the build removed history-carrying comments that no archive page records, and enforce would send the build back; fields.cycle, count, entries |
 | `BUILD_FLOOR_CONVERGING` | a build floor rejection after a correction held fewer findings, or the same count of different findings. Build got one more correction inside retry.floor_convergence_rounds. Fields: fields.before, after, round, bound |
 | `BUILD_FLOOR_FLAKY_NEW_TEST` | a build floor test run was RED on a package with a new test file, and its serialized retake was GREEN. The floor fails the run like the ship added-test backstop. Fields: fields.pkg, tests, retake=green, class=flaky_new_test |
 | `BUILD_FLOOR_RETAKE_GREEN` | a build floor test run was RED once and GREEN on its serialized retake under the integration-tier lock, so the build goes on. fields.pkg names the package or run; tests lists failed first-run names (used by evolve ci classify); retake=green |
@@ -146,6 +147,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 |---|---|
 | `CLI_QUEUE_FAILED` | the boundary failed to apply a queued CLI request (cli-contract.md §4 rule 3). The request moved to .evolve/queue/failed/. Fields: verb, request, rc, shelf |
 | `CLI_QUEUE_UNLANDED` | the applied queue left tracked changes beyond the loop stamps; the next sync-main refuses them until an operator lands them (cli-contract.md §4.6); fields paths |
+| `CLI_RATCHET_MERGE_DECISION` | at boundary.ratchet_merge.stage shadow or enforce, the boundary step ratchet-tighten decided whether to record its pull request for the next integration batch. fields.stage, pr, head, decision (would_record, recorded, already_recorded, no_record or none), reason (a typed refusal such as scan_size_red, head_moved or stale_open_pr), head_gate, content_gate, scans, skipped_push (true when the push of an unchanged tip was skipped) and candidate give the decision and each gate |
 | `CLI_SEAT_TOKEN_MOVED` | the operator ran evolve auth seat-token set or clear; fields.verb names the verb and fields.at the time; the token is never in the signal |
 
 ### config
@@ -236,13 +238,26 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `HEALING_INCIDENT_OPENED` | the incident detector opened an incident record under .evolve/incidents; fields incident, class, fingerprint, tier, state, transition, recurrence, stage, and from the live reaction on a sealed FAIL also reaction: would_brake, braked, brake_already_engaged or brake_failed (llm-isolation.md §18, §24) |
 | `HEALING_INCIDENT_REOPENED` | the incident detector reopened a closed incident, because its signal fired again after the close; the same fields as HEALING_INCIDENT_OPENED (llm-isolation.md §18, §22) |
 | `HEALING_PROPOSAL_REFUSED` | the catalog validator refused a proposal of the orchestrator agent; fields incident, class, tier, action, verdict, precondition, reason, stage (llm-isolation.md §19, §19.2, §24) |
+| `HEALING_REPAIR_ROUTED` | an accepted open-repair-item proposal was filed as a console-routed pipeline-repair item; fields incident, item, tier, stage, would_route (lane for a T1 item once the lane route ships, console for T0 and T2), would_refuse_audit (no other family can judge the builder) (llm-isolation.md section 20.2) |
 
 ### host
 
 | Code | Meaning |
 |---|---|
 | `HOST_DISK_LOW` | free disk space on the host volume is below the pause line, so the cycle start waits before it dispatches. fields.free_pct, pause_pct and path give the reading, and fields.outcome is paused (the first wait) or gave_up (the maximum pause from preflight.disk_guard.max_pause_s passed and the cycle start stopped) |
+| `HOST_GOCACHE_OVER` | the host sentinel measured the go build cache over gc.go_cache_max_gb; WARN. Fields: fields.cache_bytes, limit_bytes |
+| `HOST_LANE_HOLD` | the host sentinel holds new lane starts because free disk is under gc.disk_floor_gb; running lanes continue; WARN. Fields: fields.free_bytes, floor_bytes |
+| `HOST_LANE_HOLD_STUCK` | the hold on new lanes lasted longer than gc.sentinel.hold_max_s and stays on; INCIDENT. Fields: fields.held_s, free_bytes |
+| `HOST_ORPHANS_HIGH` | the host sentinel counted more orphan processes of finished cycles than gc.sentinel.orphan_processes_max; WARN. Fields: fields.count, limit |
+| `HOST_ORPHAN_SERVERS_HIGH` | the host sentinel counted more owner-dead tmux servers than gc.sentinel.orphan_servers_max; WARN. Fields: fields.count, limit |
+| `HOST_RELEASED` | the mid-wave release ran the go cache trim and the pipeline temp sweep; INFO. Fields: fields.freed_bytes (free disk delta), cache_bytes (re-measured) |
+| `HOST_RELEASE_SKIPPED` | the host sentinel skipped a mid-wave release; INFO. Fields: fields.reason (gc_lease_held or the failure) |
+| `HOST_SENTINEL_BLIND` | the host sentinel could not read the host for 3 samples in a row; WARN. Fields: fields.reason |
+| `HOST_SENTINEL_DISK_FLOOR` | the host sentinel read free disk under gc.disk_floor_gb during a wave; WARN. Fields: fields.free_bytes, floor_bytes, warn_bytes, path |
+| `HOST_SENTINEL_DISK_WARN` | the host sentinel read free disk under gc.disk_warn_gb and over the floor during a wave; INFO. Fields: fields.free_bytes, warn_bytes, path |
 | `HOST_VERIFY_LOCK_WAIT` | a verification run asked for the host verification lock. fields.source names the caller (build-floor or acs-suite), fields.wait_ms the time that it waited, and fields.outcome is acquired or unserialized (the wait bound passed or the lock failed, so the run went on without the lock) |
+| `HOST_WOULD_HOLD` | at gc.sentinel.hold.stage shadow, the host sentinel records the hold on new lanes that enforce sets or clears; INFO. Fields: fields.would_hold (true or false), free_bytes, floor_bytes |
+| `HOST_WOULD_RELEASE` | at gc.sentinel.release.stage shadow, the host sentinel records the mid-wave release that enforce starts; INFO. Fields: fields.scopes, free_bytes, cache_bytes |
 
 ### inbox
 
@@ -361,10 +376,11 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `LOOP_ORCH_LANE_STALLED` | a lane had no live signal (cycle signals, pane-watch, events, or stdout) for fleet.orchestrator.stall_minutes (ADR-0139 O5). Published once per lane; missing cycles have unknown heartbeats and keep their slot. Fields: fields.todo, stage, last_heartbeat, stall_minutes |
 | `LOOP_ORCH_OPTIMISTIC_ADMISSION_FAILED` | an optimistically admitted lane (ADR-0143 W1b) hit a composed-tree gate failure or fleet rebase conflict. Published once at first failure; D3 counts failures only when admission of that todo is in-wave; WARN. Fields: fields.todo, held_by, gate |
 | `LOOP_ORCH_OVERSIGHT_ACTION` | the oversight loop (ADR-0139 O6) mapped a cycle, ship, errors, or loop event to a lane action. At shadow applied is false; at enforce applied is true; INFO. Fields: fields.actions, lane, cycle, event, stage, applied, verdict/target |
+| `LOOP_ORCH_POOL_FLOOR_HOLD` | the pool started or ended a hold on new lanes because free disk is under gc.disk_floor_gb. Running lanes continue and a held pool is never reported as underfilled. One event at each change; INFO. Fields: fields.held (true or false), live, target |
 | `LOOP_ORCH_POOL_HELD` | a pool fill round stopped below its width because admission refused every pending todo while a lane was in flight. Fires once per live/pending count change at wave start and round end; INFO. Fields: fields.live, target |
-| `LOOP_ORCH_POOL_IDLE` | an orchestrator pool slot stays free after a lane exit: no admissible todo, empty supply, operator stop, or run_max_lanes reached; INFO. Fields: fields.live, target, cause (family_held, run_cap, supply_empty, admission_refused, bench, operator_stop, host_pressure or system_halt) |
+| `LOOP_ORCH_POOL_IDLE` | an orchestrator pool slot stays free after a lane exit: no admissible todo, empty supply, operator stop, or run_max_lanes reached; INFO. Fields: fields.live, target, cause (family_held, run_cap, supply_empty, admission_refused, bench, operator_stop, host_pressure, system_halt or disk_floor) |
 | `LOOP_ORCH_POOL_RESUPPLIED` | an orchestrator pool slot stayed free after a lane exit, so the pool re-ran the plan source and added a ready todo. One event per added todo; INFO. Fields: fields.todo, live, target |
-| `LOOP_ORCH_POOL_UNDERFILLED` | the pool had an idle or held transition with fewer than fleet.min_lanes in flight while not stopped; WARN. family_held names family-held todos so they do not read as supply failures. Fields: fields.live, target, min_lanes, ready, cause (family_held, run_cap, supply_empty, admission_refused, bench, operator_stop, host_pressure or system_halt), family_held |
+| `LOOP_ORCH_POOL_UNDERFILLED` | the pool had an idle or held transition with fewer than fleet.min_lanes in flight while not stopped; WARN. family_held names family-held todos so they do not read as supply failures. Fields: fields.live, target, min_lanes, ready, cause (family_held, run_cap, supply_empty, admission_refused, bench, operator_stop, host_pressure, system_halt or disk_floor), family_held |
 | `LOOP_ORCH_SUPPLY` | the supply census (ADR-0139 O6, spec section 4) before a plan counts inbox items in 7 classes plus window and console items. The full record is .evolve/waves/supply.json; INFO. Fields: seven class names, window, console |
 | `LOOP_ORCH_SUPPLY_SHORT` | the supply census found fewer admissible items than the window, so the plan lanes cannot all be filled. Refusal causes sit in the supply record and evolve wave supply; INFO. Fields: seven class names, window |
 | `LOOP_ORCH_WINDOW` | the adaptive orchestrator pool window (ADR-0139 O8) changed size: +1 per clean landing, halved on conflict (min window.min), following sized count. Publishes once per change in enforce pool only; INFO. Fields: fields.old, new, sized, cause |
@@ -539,13 +555,13 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_GIT_STAGE_FAILED` | atomic-ship: staging failed (transient) |
 | `SHIP_HELD_FOR_OPERATOR` | atomic-ship: at held_proposals.stage enforce, a lane change touching the fence or pipeline item waits for evolve landing approve. Main did not move (ADR-0157) |
 | `SHIP_HELD_PROPOSAL_REJECTED` | atomic-ship: the operator rejected this tree of a held proposal with evolve landing reject; main did not move (ADR-0157) |
-| `SHIP_HOLD_SHADOW` | at held_proposals.stage shadow, a lane landing that touches the fence or works a pipeline-kind item lands, and the ship records that enforce would hold it for the operator (ADR-0157); fields.cycle, tree, reasons |
+| `SHIP_HOLD_SHADOW` | at held_proposals.stage shadow, a lane landing that touches the fence or works a pipeline-kind item lands, and the ship records that enforce would hold it for the operator (ADR-0157); fields.cycle, tree, reasons, record_error, audit_plan (the route that enforce would audit on, as family/cli/tier) and audit_wait (the typed reason that no audit could start); the plan is computed with no launch |
 | `SHIP_INTEGRATION_COMPOSED` | a deliverable composed onto the integration branch and passed its L1 gates; fields.wave, fields.cycle and fields.batch name it |
 | `SHIP_INTEGRATION_DELIVERED` | a fleet lane delivered its record to the wave integration (kind ship.delivered). At enforce, lane ship stopped before main. Fields: fields.wave, fields.cycle, fields.commits, fields.record |
 | `SHIP_INTEGRATION_DRIVER_FAILED` | the integration driver failed a step. fields.step names the step and fields.error the error; failure writes to the wave record too, so lost signals cannot hide it |
 | `SHIP_INTEGRATION_EJECTED` | a deliverable went back to its lane. fields.cause names why (conflict, gate, or proof); fields.paths lists conflicted paths. fields.brief_file holds the long brief path |
 | `SHIP_INTEGRATION_FLUSHED` | a batch PR opened; fields.trigger names the flush trigger and fields.pr the PR |
-| `SHIP_INTEGRATION_MERGED` | a batch PR merged into main by a fast-forward to the tested tip; fields.pr names the PR and fields.tip the tip |
+| `SHIP_INTEGRATION_MERGED` | a deliverable merged into main by the fast-forward of its batch (kind ship.merged); fields.cycle names the cycle, fields.pr the batch PR and fields.tip the tested tip |
 | `SHIP_INTEGRATION_REVERTED` | the check after a merge reverted one cycle commit alone; fields.cycle names it and fields.commit the reverted commit |
 | `SHIP_INTEGRITY_TREE_DRIFT` | post-ship: the shipped tree drifted from the verified one (integrity) |
 | `SHIP_INVALID_CLASS` | verify-class: unknown ship class |

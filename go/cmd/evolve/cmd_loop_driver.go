@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -114,7 +115,7 @@ func (b *loopBatchCoordinator) productionDriver(pool int) (*integration.Driver, 
 		ShadowBase: base,
 		Startup:    startup,
 		Stage:      b.integrationStage,
-		Actors:     integration.StageActors(actor, nil),
+		Actors:     integration.StageActors(actor, b.enforceActorOf(repo, pool)),
 		Epoch:      b.cfg.Epoch,
 		Store:      integration.FileWaveStore{Root: root},
 		Records:    func() integration.RecordSet { return integration.ListRecords(root) },
@@ -122,6 +123,30 @@ func (b *loopBatchCoordinator) productionDriver(pool int) (*integration.Driver, 
 		Last:       b.highestCycle,
 		Publish:    b.deps.Signals,
 	}, nil
+}
+
+func (b *loopBatchCoordinator) enforceActorOf(repo integration.Repo, pool int) integration.Actor {
+	if b.newEnforceActor != nil {
+		return b.newEnforceActor(repo, pool)
+	}
+	return b.productionEnforceActor(repo, pool)
+}
+
+func (b *loopBatchCoordinator) productionEnforceActor(repo integration.Repo, pool int) integration.Actor {
+	envOf := b.integrationEnvOf
+	if envOf == nil {
+		envOf = productionIntegrationEnv
+	}
+	env := envOf(b.cfg.ProjectRoot, b.clock())
+	ports := env.ports()
+	composer := integration.Composer{Repo: ports.Repo, Regen: env.regenPort(ports.Repo, b.cfg.ProjectRoot, b.stderr)}
+	return integration.EnforceActor{
+		Repo:    repo,
+		Merger:  env.enforceMerger(b.cfg.ProjectRoot, b.stderr),
+		Batcher: integration.LaneBatcher{Repo: ports.Repo, Composer: composer, Wave: "p" + strconv.Itoa(pool)},
+		Plane:   integration.PlaneOf(repo),
+		Publish: b.deps.Signals,
+	}
 }
 
 func (b *loopBatchCoordinator) integrationStage() (string, error) {

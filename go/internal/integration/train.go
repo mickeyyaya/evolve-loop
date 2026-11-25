@@ -371,7 +371,7 @@ func (t Train) complete(ctx context.Context, rec DeliverableRecord, act func() e
 }
 
 func (t Train) closeInbox(ctx context.Context, rec DeliverableRecord) ([]string, error) {
-	ids, err := t.Composer.Repo.closingIDs(ctx, rec.Commits)
+	ids, _, err := t.Composer.Repo.closingIDs(ctx, rec.Commits)
 	if err != nil || len(ids) == 0 {
 		return nil, err
 	}

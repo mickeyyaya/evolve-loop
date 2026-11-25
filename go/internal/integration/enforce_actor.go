@@ -12,14 +12,19 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-const enforceOrigin = "integration.EnforceActor"
+const (
+	enforceOrigin = "integration.EnforceActor"
+	stepPlaneSync = "plane sync"
+	fieldTip      = "tip"
+)
+
+var (
+	errTwoComposeHomes = errors.New("integration: the batcher and Merger.Compose both set the compose step")
+	errNoRequeue       = errors.New("integration: an ejected deliverable has no requeue port")
+)
 
 type PlaneSync interface {
 	Sync(ctx context.Context) (SyncOutcome, error)
-}
-
-type LandingFeed interface {
-	NoteEjected(ctx context.Context, cycle int, briefPath string) error
 }
 
 type Requeuer interface {
@@ -38,7 +43,7 @@ type EnforceActor struct {
 	Repo    Repo
 	Merger  Merger
 	Plane   PlaneSync
-	Landing LandingFeed
+	Batcher Batcher
 	Requeue Requeuer
 	Briefs  BriefStore
 	Promote Promoter
@@ -72,6 +77,12 @@ func (a EnforceActor) Flush(ctx context.Context, b PendingBatch) (FlushResult, e
 
 	var lastBatch Batch
 	m := a.Merger
+	if a.Batcher != nil {
+		if m.Compose != nil {
+			return res, errTwoComposeHomes
+		}
+		m.Compose = a.Batcher.For(b)
+	}
 	origCompose := m.Compose
 	m.Compose = func(ctx context.Context, recs []DeliverableRecord) (Composition, error) {
 		comp, err := origCompose(ctx, recs)
@@ -95,12 +106,61 @@ func (a EnforceActor) Flush(ctx context.Context, b PendingBatch) (FlushResult, e
 			res.Members[ref] = MemberResult{Status: MemberEjected}
 		}
 	}
-	prNum, promoteErr := a.recordLanded(ctx, out, byCycle, &res)
-	res.Batch = IntegrationBatch{Index: b.Index, Base: b.Base, Branch: lastBatch.Branch, Tip: lastBatch.Tip, PR: prNum, Members: cycles}
+	prNum, promoteErr := a.recordLanded(ctx, out, byCycle, &res, lastBatch.Tip)
+	res.Batch = IntegrationBatch{Index: b.Index, Base: cutBase(lastBatch, b.Base), Branch: lastBatch.Branch, Tip: lastBatch.Tip, PR: prNum, Members: cycles}
+	a.syncPlane(ctx, &res)
 	return res, errors.Join(landErr, promoteErr)
 }
 
-func (a EnforceActor) recordLanded(ctx context.Context, out Outcome, byCycle map[int]DeliverableRecord, res *FlushResult) (int, error) {
+func cutBase(cut Batch, fallback string) string {
+	if cut.Base != "" {
+		return cut.Base
+	}
+	return fallback
+}
+
+func (a EnforceActor) syncPlane(ctx context.Context, res *FlushResult) {
+	if a.Plane == nil || !anyMerged(res.Members) {
+		return
+	}
+	outcome, err := a.Plane.Sync(ctx)
+	switch {
+	case err != nil:
+		res.Failures = append(res.Failures, DriverFailure{Step: stepPlaneSync, Error: err.Error(), At: a.now()})
+	case outcome == SyncBlocked || outcome == SyncDiverged:
+		res.Failures = append(res.Failures, DriverFailure{Step: stepPlaneSync, Error: fmt.Sprintf("plane sync %s", outcome), At: a.now()})
+	}
+}
+
+func anyMerged(members map[int]MemberResult) bool {
+	for _, m := range members {
+		if m.Status == MemberMerged {
+			return true
+		}
+	}
+	return false
+}
+
+func (a EnforceActor) Missing() []string {
+	var missing []string
+	for _, port := range []struct {
+		name   string
+		absent bool
+	}{
+		{"Requeue", a.Requeue == nil}, {"Promote", a.Promote == nil}, {"Briefs", a.Briefs == nil}, {"Plane", a.Plane == nil},
+		{"CI", a.Merger.CI == nil}, {"Main", a.Merger.Main == nil},
+	} {
+		if port.absent {
+			missing = append(missing, port.name)
+		}
+	}
+	if a.Batcher == nil {
+		return append(missing, "Batcher")
+	}
+	return append(missing, a.Batcher.Missing()...)
+}
+
+func (a EnforceActor) recordLanded(ctx context.Context, out Outcome, byCycle map[int]DeliverableRecord, res *FlushResult, tip string) (int, error) {
 	var promoteErr error
 	prNum := 0
 	for _, ref := range slices.Concat(out.Landed, out.OnMain) {
@@ -112,6 +172,11 @@ func (a EnforceActor) recordLanded(ctx context.Context, out Outcome, byCycle map
 			prNum = out.Via[ref]
 		}
 		res.Members[rec.Cycle] = MemberResult{Status: MemberMerged, Landed: true}
+		emitEvent(a.Publish, enforceOrigin, signalcenter.Event{
+			Cycle: rec.Cycle, Kind: signalcenter.KindShipMerged, Code: CodeMerged, Severity: signalcenter.SeverityInfo,
+			Reason: fmt.Sprintf("cycle %d merged into main", rec.Cycle),
+			Fields: map[string]string{fieldCycle: strconv.Itoa(rec.Cycle), fieldPR: strconv.Itoa(out.Via[ref]), fieldTip: tip},
+		})
 		if a.Promote != nil {
 			if err := a.Promote.Promote(ctx, rec); err != nil {
 				res.Failures = append(res.Failures, DriverFailure{Step: "promote", Error: err.Error(), At: a.now()})
@@ -141,17 +206,13 @@ func (a EnforceActor) ejectMember(ctx context.Context, rec DeliverableRecord, ca
 		Reason: fmt.Sprintf("%s is ejected on a %s", ej.Label(), ej.Cause),
 		Fields: ej.Fields(briefPath),
 	})
-	if a.Requeue != nil {
-		if err := a.Requeue.Requeue(ctx, rec, briefPath); err != nil {
-			res.Failures = append(res.Failures, DriverFailure{Step: "requeue", Error: err.Error(), At: a.now()})
-			return err
-		}
+	if a.Requeue == nil {
+		res.Failures = append(res.Failures, DriverFailure{Step: "requeue", Error: errNoRequeue.Error(), At: a.now()})
+		return errNoRequeue
 	}
-	if a.Landing != nil {
-		if err := a.Landing.NoteEjected(ctx, rec.Cycle, briefPath); err != nil {
-			res.Failures = append(res.Failures, DriverFailure{Step: "landing", Error: err.Error(), At: a.now()})
-			return err
-		}
+	if err := a.Requeue.Requeue(ctx, rec, briefPath); err != nil {
+		res.Failures = append(res.Failures, DriverFailure{Step: "requeue", Error: err.Error(), At: a.now()})
+		return err
 	}
 	return nil
 }

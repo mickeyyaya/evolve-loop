@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gateclass"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -27,9 +28,9 @@ const (
 )
 
 const (
-	TierKernel   = "T0"
-	TierPipeline = "T1"
-	TierItem     = "T2"
+	TierKernel   = string(gateclass.T0)
+	TierPipeline = string(gateclass.T1)
+	TierItem     = string(gateclass.T2)
 )
 
 var classTiers = map[Class]string{

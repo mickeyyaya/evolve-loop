@@ -253,7 +253,8 @@ func gcSweepOfLeak(root string, ownerAlive, cycleClosed bool, table []proctree.P
 			tree, _ := proctree.LoadTree(proctree.TreeDir(root), id)
 			return tree
 		},
-		Now: reapT0.Add(48 * time.Hour),
+		Killable: TagKillable(),
+		Now:      reapT0.Add(48 * time.Hour),
 	}
 	planned = gc.PlanDispatchProcesses(table, opts)
 	reaper := proctree.Reaper{

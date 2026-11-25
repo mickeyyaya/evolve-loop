@@ -18,6 +18,7 @@ func TestCheckSeatLogin_MapsEachStateToALevel(t *testing.T) {
 		seatlogin.StateBad:      LevelHalt,
 		seatlogin.StateOrphan:   LevelWarn,
 		seatlogin.StateFault:    LevelWarn,
+		seatlogin.StateExpiring: LevelWarn,
 	}
 	for state, want := range cases {
 		got := CheckSeatLogin(inspectorOf(state, "the message"))
@@ -27,6 +28,30 @@ func TestCheckSeatLogin_MapsEachStateToALevel(t *testing.T) {
 		if !strings.Contains(got.Message+got.Detail, "the message") {
 			t.Errorf("state %v: the inspector message is lost: %+v", state, got)
 		}
+	}
+}
+
+func TestCheckSeatLogin_EachFlaggedStateHasItsOwnHeadlineAndAnOkStateKeepsTheMessage(t *testing.T) {
+	want := map[seatlogin.State]string{
+		seatlogin.StateBad:      "the seat token is bad",
+		seatlogin.StateOrphan:   "the seat directory and the holder disagree",
+		seatlogin.StateFault:    "the seat directory and the holder disagree",
+		seatlogin.StateExpiring: "near its renewal date",
+	}
+	for state, headline := range want {
+		if got := CheckSeatLogin(inspectorOf(state, "the message")); !strings.Contains(got.Message, headline) || got.Detail != "the message" {
+			t.Errorf("state %v: %+v", state, got)
+		}
+	}
+	if got := CheckSeatLogin(inspectorOf(seatlogin.StateIsolated, "the message")); got.Message != "the message" || got.Detail != "" {
+		t.Errorf("an ok state: %+v", got)
+	}
+}
+
+func TestCheckSeatLogin_AnUnknownStateHaltsAndNamesItself(t *testing.T) {
+	got := CheckSeatLogin(inspectorOf(seatlogin.State(99), "the message"))
+	if got.Level != LevelHalt || !strings.Contains(got.Message, "unknown seat state") {
+		t.Fatalf("got %+v", got)
 	}
 }
 

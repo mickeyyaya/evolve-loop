@@ -131,6 +131,16 @@ func gcRemoteStage(p Policy) string {
 	return p.GC.RemoteStage()
 }
 
+func gcSentinelStage(block func(gcpolicy.SentinelPolicy) gcpolicy.SentinelStageBlock) func(Policy) string {
+	return func(p Policy) string {
+		var sentinel gcpolicy.SentinelPolicy
+		if p.GC != nil {
+			sentinel = p.GC.Sentinel
+		}
+		return string(block(sentinel).Effective())
+	}
+}
+
 func fleetBudgetStage(p Policy) string {
 	if budget := p.FleetConfig().Budget; budget != nil {
 		return budget.Stage
@@ -154,6 +164,8 @@ var stageReaders = map[string]stageReader{
 	"inbox.curator.stage":                        plainStage(func(p Policy) string { return p.InboxCuratorConfig().Stage }),
 	"inbox.curator.trailer.stage":                plainStage(Policy.InboxTrailerStage),
 	"gc.remote_sweep.stage":                      plainStage(gcRemoteStage),
+	"gc.sentinel.hold.stage":                     plainStage(gcSentinelStage(func(s gcpolicy.SentinelPolicy) gcpolicy.SentinelStageBlock { return s.Hold })),
+	"gc.sentinel.release.stage":                  plainStage(gcSentinelStage(func(s gcpolicy.SentinelPolicy) gcpolicy.SentinelStageBlock { return s.Release })),
 	"pr.merge_window.stage":                      Policy.PRMergeWindowStage,
 	"workflow.findings_repair.code-review.stage": plainStage(func(p Policy) string { return p.WorkflowConfig().CodeReviewRepair.Stage }),
 	"workflow.convergence.stage":                 plainStage(func(p Policy) string { return p.ConvergenceConfig().Stage }),
@@ -171,6 +183,7 @@ var stageReaders = map[string]stageReader{
 	"docs_floor.stage":                           plainStage(func(p Policy) string { return p.DocsFloorConfig().Stage }),
 	"docs_floor.ste_stage":                       plainStage(func(p Policy) string { return p.DocsFloorConfig().SteStage }),
 	"comment_floor.stage":                        plainStage(func(p Policy) string { return p.CommentFloorConfig().Stage }),
+	"comment_floor.history_stage":                plainStage(func(p Policy) string { return string(p.CommentFloorConfig().HistoryStage) }),
 	"held_proposals.stage":                       plainStage(func(p Policy) string { return p.HeldProposalsStage().String() }),
 	"cover_changed.stage":                        plainStage(func(p Policy) string { return p.CoverChangedConfig().Stage }),
 	"retrospectives.stage":                       plainStage(func(p Policy) string { return p.RetrospectivesConfig().Stage }),
@@ -193,6 +206,8 @@ var stageReaders = map[string]stageReader{
 	"healing.orchestrator.stage":                 plainStage(func(p Policy) string { return p.HealingOrchestrator().Stage }),
 	"healing.validator.stage":                    plainStage(func(p Policy) string { return p.HealingValidator().Stage }),
 	"healing.live_reaction.stage":                plainStage(func(p Policy) string { return p.HealingLiveReaction().Stage }),
+	"boundary.ratchet_merge.stage":               plainStage(func(p Policy) string { return string(p.RatchetMergeStage()) }),
+	"healing.repair_cycle.stage":                 plainStage(func(p Policy) string { return string(p.HealingRepairCycle().Stage) }),
 	"gates.scan_cache_gate":                      plainStage(func(p Policy) string { return p.GatesConfig().ScanCacheGate }),
 	"handoff.build-audit.stage":                  handoffStage("build-audit"),
 	"handoff.intent-scout.stage":                 handoffStage("intent-scout"),

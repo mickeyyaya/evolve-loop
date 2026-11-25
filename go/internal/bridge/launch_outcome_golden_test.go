@@ -52,6 +52,8 @@ func launchCtx(state string) context.Context {
 	return ctx
 }
 
+const launchFixtureBudget = 3 * time.Minute
+
 func launchThroughFixture(t *testing.T, ctx context.Context, deps Deps, script []string, req core.BridgeRequest) (core.BridgeResponse, string, error) {
 	t.Helper()
 	ensureLaunchFixtureDriver(t)
@@ -76,7 +78,15 @@ func launchThroughFixture(t *testing.T, ctx context.Context, deps Deps, script [
 	if req.Agent == "" {
 		req.Agent = "build"
 	}
+	if deps.ReadStage == "" {
+		deps.ReadStage = envStageOff
+	}
+	ctx, cancel := context.WithTimeout(ctx, launchFixtureBudget)
+	defer cancel()
 	resp, err := NewEngine(deps).Launch(ctx, req)
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		t.Fatalf("the fixture launch exceeded %s: the engine waits on something the fixture does not supply (resp cause %q, err %v)", launchFixtureBudget, resp.CauseCode, err)
+	}
 	return resp, ws, err
 }
 

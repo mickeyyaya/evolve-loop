@@ -261,6 +261,16 @@ The similarity is the token Jaccard of the title and the acceptance of two items
 
 `inbox.curator.trailer.stage` sets the stage of `evolve inbox trailer-check --range`. `shadow` (the default) prints violations and exits 0. `enforce` prints violations and exits 1. Any other value or unknown key fails `policy.Load`.
 
+## Boundary ratchet record (`boundary.ratchet_merge`)
+
+`boundary.ratchet_merge.stage` sets what the boundary step `ratchet-tighten` does with its pull request. The words are `off`, `shadow` and `enforce`. An absent key or an empty word means `shadow`.
+
+- `off` records nothing and emits no signal.
+- `shadow` reports `would record` and records nothing.
+- `enforce` records the PR for the next integration batch.
+
+Any other word or unknown key fails `policy.Load`. The field type is the named string type `RatchetMergeStage`. An unreadable policy file gives no record and the reason `policy_unreadable`.
+
 ## Live incident reaction (`healing.live_reaction`)
 
 The block configures the live reaction of the incident detector ([internal-selfheal.md](packages/internal-selfheal.md#the-live-reaction)). Each cycle process runs it on a `cycle.sealed` event with the verdict FAIL. It opens an incident at once when a `pipeline-code` failure class fails for the third time ([failure-identity-lifecycle.md §4](failure-identity-lifecycle.md#4-failure-class-fingerprint)).
@@ -268,6 +278,14 @@ The block configures the live reaction of the incident detector ([internal-selfh
 | Key | Meaning | Default | Refused |
 |---|---|---|---|
 | `stage` | `off` arms nothing. `shadow` writes the incident record and emits the `selfheal.incident` event with the field `reaction` `would_brake`. `enforce` also engages the loop brake `.evolve/loop-stop` once, so the rolling pool admits no new lane. | `shadow` | a value other than `off`, `shadow` or `enforce` |
+
+## Repair cycle (`healing.repair_cycle`)
+
+The block configures the filing of repair items by `evolve selfheal propose` ([llm-isolation.md §20.5](llm-isolation.md#205-as-built-x16-shadow)).
+
+| Key | Meaning | Default | Refused |
+|---|---|---|---|
+| `stage` | `off` files no item. `shadow` files each accepted `open-repair-item` proposal as a console-routed item and emits `HEALING_REPAIR_ROUTED`. | `shadow` | `enforce` (until the item `selfheal-repair-t1-lane-route` ships) and any value other than `off` or `shadow` |
 
 ## Convergence policy (`workflow.convergence`)
 
@@ -369,6 +387,20 @@ The block sets how long a continuation binding lives (2026-10-27). `evolve gc` r
 | `max_age_cycles` | the number of cycles after which `evolve gc` releases a binding. The age is `lastCycleNumber` of `state.json` minus the cycle of the binding. | 100 | below 1, above 10000, or not a number |
 
 Why: on 2026-10-27 the registry held 101 bindings, and 89 of them came from cycles before 1900 (the oldest from cycle 1127). Each kept its worktree out of `evolve worktree cleanup --stale`.
+
+## Event channels (`events`)
+
+The block sets the event channels ([event-channels.md](event-channels.md) section 2). The file lays its keys over `EventsDefaults()`, by channel name. A new name adds a channel. An unknown key, or a value out of range, fails the load of the whole file. A refused route does not. `evolve events channels` and `evolve gc` print one line for it.
+
+| Key | Meaning | Default | Refused |
+|---|---|---|---|
+| `segment_mb`, `lock_deadline_ms`, `queue_events`, `queue_bytes` | the size of a segment, the lock wait, and the Publisher queue limits | 16, 250, 1024, 4 MiB | below 1 |
+| `enqueue_deadline_ms` | the wait for queue space; 0 never waits | 0 | below 0 |
+| `channels.<name>.route` | a filter expression | the compiled route; empty for a new channel | a route that the grammar refuses (the load goes on) |
+| `channels.<name>.qos` | `lossless` or `best_effort` | the compiled value; `best_effort` for a new channel | any other value |
+| `channels.<name>.ttl_days` | the retention age | `gc.logs_ttl_days` | below 1 |
+| `channels.<name>.max_total_mb` | the retention size cap | 128; 512 for `ledger` and `signals` | below 1 |
+| `channels.<name>.segment_mb` | the size at which this segment rotates | the global `segment_mb` | below 1 |
 
 ## Wave health check (`wave.checkin`)
 

@@ -837,7 +837,7 @@ The sandbox today generates SBPL for `sandbox-exec` and an argv for `bwrap` from
 | Read of other files under `.evolve/runs/` | deny | `(deny file-read-data (subpath ".evolve/runs"))` before the literal grants | `--tmpfs .evolve/runs` | I-5 | built at `shadow` (X5) |
 | Read of raw output (`*-stdout.log`, `*-final-pane.txt`; the CLI transcripts in `$HOME` stay open, §8.5 and §11.1) | deny | `(deny file-read-data (require-all (subpath ".evolve/runs") (regex #"(-stdout\.log\|...)$")))` and a deny of `<ws>/.bridge/`, after the grants | `--ro-bind /dev/null <file>` for each raw file of the workspace, `--tmpfs <ws>/.bridge` | I-4 | built at `shadow` (X5); the logs stay in the workspace |
 | Read of the CLI's own config in `$HOME` | allow | `(allow file-read* (subpath "~/.<cli dir>"))` from manifest `home_reads` | `--ro-bind` | I-5 | allowed (all of `$HOME`) |
-| Read of secrets in `$HOME` | deny | `(deny file-read-data ...)` for `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.netrc`, `~/.config/gh`, `~/.docker/config.json`, `~/.kube`, `~/.git-credentials`, `~/.config/git/credentials`, and the dirs of the other families | `--tmpfs <dir>`, `--ro-bind /dev/null <file>` | I-5 | built at `shadow` for the listed secrets (X5); not the dirs of the other families |
+| Read of secrets in `$HOME` | deny | `(deny file-read-data ...)` for `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.netrc`, `~/.config/gh`, `~/.docker/config.json`, `~/.kube`, `~/.git-credentials`, `~/.config/git/credentials`, `~/.config/gcloud`, `~/.azure`, `~/.npmrc`, `~/.pypirc`, `~/.cargo/credentials.toml`, `~/.cargo/credentials`, `~/.codex/auth.json`, `~/.gemini/oauth_creds.json` and `~/.gemini/google_accounts.json`. Each secret also gets `(deny file-write* ...)`. A cell keeps the login file that its own manifest `home_reads` covers | `--tmpfs <dir>`, `--ro-bind /dev/null <file>` | I-5 | built at `shadow` for the listed secrets (X5); not the dirs of the other families |
 | Read of the rest of `$HOME` | deny at `enforce` | no grant | not bound | I-5 | allowed |
 | Write of the worktree and the own run dir | allow | as today (`go/internal/bridge/sandbox_paths.go:161-201`) | as today | I-7 | allowed |
 | Write of another cycle, `.evolve/events/`, `.evolve/resume-witness/` | deny | as today | as today | I-7 | denied |
@@ -917,7 +917,9 @@ The cause is in the host setup. The git credential helper of the host for `https
 
 **S1. Git asks no credential helper in a cell.** The key set of `gittest.IsolateHostCredentials` (`internal/gittest/credentials.go`) moves to one production home, `ipcenv.CredentialIsolation(ghConfigDir, gitConfigGlobal)`. It returns a typed set with two parts:
 
-- `Set`: `GIT_CONFIG_GLOBAL` at the path that the caller gives, `GIT_CONFIG_NOSYSTEM=1`, `GIT_TERMINAL_PROMPT=0`, `GIT_SSH_COMMAND=ssh -o BatchMode=yes`, and `GH_CONFIG_DIR` at an empty dir of the workspace. `gittest` passes `os.DevNull` for the global config. A cell passes the file `<workspace>/gitconfig`.
+- `Set`: `GIT_CONFIG_GLOBAL` at the path that the caller gives, `GIT_CONFIG_NOSYSTEM=1`, `GIT_TERMINAL_PROMPT=0`, `GIT_SSH_COMMAND` at the constant `ipcenv.GitSSHCommand`, and `GH_CONFIG_DIR` at an empty dir of the workspace. `gittest` passes `os.DevNull` for the global config. A cell passes the file `<workspace>/gitconfig`.
+- The ssh command reads no ssh config, offers no agent and no key file, and never prompts. A cell fetch over ssh fails with an error. It never uses a key of the host. No cell and no phase fetches over ssh.
+- The contract tests `TestAgentSandboxContract_N8b_ACellGhCallSaysNotLoggedInAndReadsNoHostConfig` and `TestAgentSandboxContract_N8c_ACellGitHasNoCredentialHelper` run `gh` and `git` in the sandbox with the env of `Deps.cellEnv`, against a fake home.
 - `Unset`: `GH_TOKEN` and `GITHUB_TOKEN`. The key is dropped from the parent env, the manifest env (`cliEnv`, `default_env`) and `Deps.Env`.
 
 The builder commits in its worktree, and the git evidence of completion waits for that commit. Thus the cell keeps the commit identity.
@@ -1751,6 +1753,14 @@ A T0 flag in a loop cycle refuses the ship with `HEALING_I10_VIOLATION`. The rep
 - The `frozen-check` pattern flags a change of a predicate package of another cycle. The digest of item `tdd-predicates-frozen-at-handoff` is not built yet.
 - The T1 judge rule is `cliroute.Decision.IndependentOf`. It removes the builder family from the audit seat, or refuses with `ErrNoIndependentFamily`. X16 calls it for a T1 repair cycle.
 - The classifier package, the ship check and the floor check are on the protected list (`go/internal/guards/integrity_surface.go`). The manifest is the one home of the T0 paths. An entry with `Constitution: true` is also a healing constitution path.
+
+### 20.5 As built (X16, shadow)
+
+- `evolve selfheal propose` files one `pipeline-repair` item for each accepted `open-repair-item` proposal (`selfheal.OpenRepairItem`). The Mover verb `FileRepair` writes it, with `route: console`, a `tier` stamp of T1 or T2, and `protected_files` for a T0 repair.
+- `tier` is a loop stamp: an author cannot write it. T0 is not stamped. `inboxbatch.Item.RepairTier` derives T0 from a non-empty `protected_files`, so one function holds the belief.
+- The policy key `healing.repair_cycle.stage` is `shadow` by default. `off` files nothing. `enforce` is refused until the item `selfheal-repair-t1-lane-route` ships.
+- The event `HEALING_REPAIR_ROUTED` records the stage, the tier, `would_route` and `would_refuse_audit`. The value of `would_route` is lane for T1, and console for T0 and T2. The value of `would_refuse_audit` is true when `IndependentOf` on the routing table finds no family other than the builder. The console does the repair.
+- Deferred as items: the lane route at `enforce`, the T2 stage and the red-reproduction gate. The mutation gate, the close on ship, the rank input and the flip-rate verb are also deferred.
 
 ## 21. No agent writes its own oracle (I-11)
 

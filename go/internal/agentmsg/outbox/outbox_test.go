@@ -602,3 +602,21 @@ func TestOutbox_ADraftThatCannotBeRemovedIsReportedAndTheWatcherGoesOn(t *testin
 		t.Errorf("last event = %+v, want rule %s", last, outbox.RuleRemove)
 	}
 }
+
+func TestLayout_TreeDirAndDispatchDirAreTheParentsOfOutAndBoxAndUseTheOneRelativeConstant(t *testing.T) {
+	t.Parallel()
+	l := outbox.Layout{Root: "/r", Cycle: 7}
+	if got, want := l.TreeDir(), filepath.Join("/r", filepath.FromSlash(outbox.TreeRel)); got != want {
+		t.Fatalf("tree: got %q want %q", got, want)
+	}
+	if outbox.TreeRel != ".evolve/msg" {
+		t.Fatalf("the tree is the protected-surface fragment of the plan: %q", outbox.TreeRel)
+	}
+	dir := l.DispatchDir("r/7/build/p1")
+	if filepath.Dir(l.OutDir("r/7/build/p1")) != dir || filepath.Dir(l.BoxDir("r/7/build/p1")) != dir {
+		t.Fatalf("out and box live in the dispatch dir %q: %q %q", dir, l.OutDir("r/7/build/p1"), l.BoxDir("r/7/build/p1"))
+	}
+	if filepath.Dir(filepath.Dir(dir)) != l.TreeDir() {
+		t.Fatalf("the dispatch dir is <tree>/<cycle>/<key>: %q", dir)
+	}
+}

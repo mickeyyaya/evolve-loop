@@ -17,7 +17,8 @@ import (
 )
 
 func Attach(c *signalcenter.Center, role, evolveDir string, stderr io.Writer) func() {
-	return attach(c, role, evolveDir, os.Getenv(ipcenv.DispatchIDKey), policy.EventsDefaults(), stderr)
+	ev := policy.LoadForEvents(paths.PolicyPath(evolveDir), stderr).EventsConfig()
+	return attach(c, role, evolveDir, os.Getenv(ipcenv.DispatchIDKey), ev, stderr)
 }
 
 func attach(c *signalcenter.Center, role, evolveDir, dispatch string, ev policy.EventsPolicy, stderr io.Writer) func() {

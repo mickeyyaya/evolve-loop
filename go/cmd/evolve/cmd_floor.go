@@ -53,6 +53,7 @@ var floorTierTable = []floorTier{
 	staticFloorTier("apicover", "make apicover-check"),
 	staticFloorTier("cover", "make cover-strict"),
 	staticFloorTier("ratchet", "go run ./cmd/evolve ratchet check --root ."),
+	staticFloorTier("yaml", "go run ./cmd/evolve yaml check"),
 }
 
 type floorLintWorkflow struct {

@@ -5,10 +5,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
 
-const TierLockWait = 5 * time.Minute
+const (
+	TierLockWait = 5 * time.Minute
+	TierLogName  = gcpolicy.IntegrationTierLog
+)
 
 func TierLockPath(projectRoot string) string {
 	return filepath.Join(paths.EvolveDirOf(projectRoot), "locks", "integration-tier.lock")

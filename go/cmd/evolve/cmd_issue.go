@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -11,6 +12,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/incidentbundle"
 	"github.com/mickeyyaya/evolve-loop/go/internal/incidentkb"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -19,6 +21,7 @@ import (
 const issueUsage = `Usage:
   evolve issue evidence add [--project-root P] <incident-id> <source-file>
   evolve issue check [--project-root P] [<incident-id>]
+  evolve issue render [--project-root P] <incident-id>
   evolve issue list [--project-root P] [--status S] [--code C] [--json]`
 
 func runIssue(args []string, _ io.Reader, stdout, stderr io.Writer) int {
@@ -27,11 +30,45 @@ func runIssue(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runIssueEvidenceAdd(args[2:], stdout, stderr)
 	case len(args) >= 1 && args[0] == "check":
 		return runIssueCheck(args[1:], stdout, stderr)
+	case len(args) >= 1 && args[0] == "render":
+		return runIssueRender(args[1:], stdout, stderr)
 	case len(args) >= 1 && args[0] == "list":
 		return runIssueList(args[1:], stdout, stderr)
 	}
-	fmt.Fprintln(stderr, "evolve issue: expected `evidence add`, `check`, or `list`\n"+issueUsage)
+	fmt.Fprintln(stderr, "evolve issue: expected `evidence add`, `check`, `render`, or `list`\n"+issueUsage)
 	return 10
+}
+
+func runIssueRender(args []string, stdout, stderr io.Writer) int {
+	root, rest, ok := issueFlags("evolve issue render", args, stderr)
+	if !ok || len(rest) != 1 {
+		fmt.Fprintln(stderr, issueUsage)
+		return 10
+	}
+	id := rest[0]
+	if !incidentkb.ValidID(id) {
+		fmt.Fprintf(stderr, "evolve issue render: incident id %q must look like yyyy-mm-dd-slug\n", id)
+		return 1
+	}
+	path := incidentkb.RecordPath(root, id)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve issue render: %v\n", err)
+		return 1
+	}
+	rendered, err := incidentkb.RenderFor(id, raw)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve issue render: %s: %v\n", id, err)
+		return 1
+	}
+	if !bytes.Equal(rendered, raw) {
+		if err := atomicwrite.Bytes(path, rendered); err != nil {
+			fmt.Fprintf(stderr, "evolve issue render: %v\n", err)
+			return 1
+		}
+	}
+	fmt.Fprintf(stdout, "rendered %s\n", id)
+	return 0
 }
 
 func issueFlags(name string, args []string, stderr io.Writer) (root string, rest []string, ok bool) {

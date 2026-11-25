@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
@@ -19,6 +20,8 @@ var effectiveStageDefaults = map[string]string{
 	"inbox.curator.stage":                        "shadow",
 	"inbox.curator.trailer.stage":                "shadow",
 	"gc.remote_sweep.stage":                      "shadow",
+	"gc.sentinel.hold.stage":                     "shadow",
+	"gc.sentinel.release.stage":                  "shadow",
 	"pr.merge_window.stage":                      "off",
 	"workflow.findings_repair.code-review.stage": "shadow",
 	"workflow.convergence.stage":                 "shadow",
@@ -36,6 +39,7 @@ var effectiveStageDefaults = map[string]string{
 	"docs_floor.stage":                           "enforce",
 	"docs_floor.ste_stage":                       "shadow",
 	"comment_floor.stage":                        "shadow",
+	"comment_floor.history_stage":                "shadow",
 	"held_proposals.stage":                       "shadow",
 	"cover_changed.stage":                        "enforce",
 	"retrospectives.stage":                       "shadow",
@@ -58,7 +62,9 @@ var effectiveStageDefaults = map[string]string{
 	"healing.orchestrator.stage":                 "shadow",
 	"healing.validator.stage":                    "shadow",
 	"healing.live_reaction.stage":                "shadow",
+	"healing.repair_cycle.stage":                 "shadow",
 	"gates.scan_cache_gate":                      "shadow",
+	"boundary.ratchet_merge.stage":               "shadow",
 	"handoff.build-audit.stage":                  "shadow",
 	"handoff.intent-scout.stage":                 "shadow",
 	"handoff.scout-triage.stage":                 "shadow",
@@ -77,6 +83,7 @@ var effectiveStageProbes = map[string]stageProbe{
 	"healing.detector.stage":                     {set: "off", want: "off"},
 	"healing.orchestrator.stage":                 {set: "off", want: "off"},
 	"healing.validator.stage":                    {set: "off", want: "off"},
+	"healing.repair_cycle.stage":                 {set: "off", want: "off"},
 	"audit_cascade.stage":                        {set: "shadow", want: "shadow"},
 	"isolation.context.stage":                    {set: "shadow", want: "shadow"},
 	"workflow.findings_repair.code-review.stage": {set: "enforce", want: "shadow"},
@@ -319,6 +326,32 @@ func TestResolveQueueStage_OnlyTheExactWordEnforceEnforces(t *testing.T) {
 	for raw, want := range cases {
 		if got := policy.ResolveQueueStage(raw); got != want {
 			t.Errorf("ResolveQueueStage(%q) = %q, want %q", raw, got, want)
+		}
+	}
+}
+
+func TestSentinelStageReaders_AgreeWithTheGCPolicyResolver(t *testing.T) {
+	t.Parallel()
+	for _, stage := range []string{"off", "shadow", "enforce", ""} {
+		values := map[string]string{}
+		if stage != "" {
+			values["gc.sentinel.hold.stage"] = stage
+			values["gc.sentinel.release.stage"] = stage
+		}
+		p := policyWith(t, values)
+		got, err := p.EffectiveStages()
+		if err != nil {
+			t.Fatalf("stage %q: EffectiveStages: %v", stage, err)
+		}
+		var sentinel gcpolicy.SentinelPolicy
+		if p.GC != nil {
+			sentinel = p.GC.Sentinel
+		}
+		if got["gc.sentinel.hold.stage"] != string(sentinel.Hold.Effective()) || got["gc.sentinel.release.stage"] != string(sentinel.Release.Effective()) {
+			t.Errorf("stage %q: reader hold %q release %q, gcpolicy hold %q release %q", stage, got["gc.sentinel.hold.stage"], got["gc.sentinel.release.stage"], sentinel.Hold.Effective(), sentinel.Release.Effective())
+		}
+		if enforced := stage == "enforce"; (got["gc.sentinel.hold.stage"] == "enforce") != enforced || sentinel.HoldEnforced() != enforced {
+			t.Errorf("stage %q: enforced mismatch, reader %q HoldEnforced %v", stage, got["gc.sentinel.hold.stage"], sentinel.HoldEnforced())
 		}
 	}
 }

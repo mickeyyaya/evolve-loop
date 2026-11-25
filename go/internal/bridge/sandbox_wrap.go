@@ -15,20 +15,24 @@ func defaultSandboxWrap(deps Deps) SandboxWrapper {
 	return defaultSandboxWrapWithProbe(deps, sandbox.Probe)
 }
 
+func effectiveSandboxMode(deps Deps) string {
+	mode := strings.TrimSpace(deps.SandboxMode)
+	if mode == "" {
+		return config.SandboxModeAuto
+	}
+	switch mode {
+	case config.SandboxModeOff, config.SandboxModeOn, config.SandboxModeAuto:
+		return mode
+	}
+	if deps.Stderr != nil {
+		fmt.Fprintf(deps.Stderr, "[bridge] WARN: sandbox mode %q unrecognized (want auto|on|off); treating as auto\n", mode)
+	}
+	return config.SandboxModeAuto
+}
+
 func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult) SandboxWrapper {
 	return func(req SandboxWrapRequest) ([]string, WrapOutcome) {
-		mode := strings.TrimSpace(deps.SandboxMode)
-		if mode == "" {
-			mode = config.SandboxModeAuto
-		}
-		switch mode {
-		case config.SandboxModeOff, config.SandboxModeOn, config.SandboxModeAuto:
-		default:
-			if deps.Stderr != nil {
-				fmt.Fprintf(deps.Stderr, "[bridge] WARN: sandbox mode %q unrecognized (want auto|on|off); treating as auto\n", mode)
-			}
-			mode = config.SandboxModeAuto
-		}
+		mode := effectiveSandboxMode(deps)
 		if mode == config.SandboxModeOff {
 			return nil, WrapOutcome{}
 		}
@@ -65,8 +69,7 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 			OmitStoredLogin: req.HostIsolated,
 		}
 		if req.HostIsolated {
-			cfg.DenyReadPaths = append(cfg.DenyReadPaths, storedLoginDeny(home)...)
-			cfg.MaskFiles = existingFiles(filepath.Join(home, storedLoginJSON))
+			cfg = withStoredLoginDeny(cfg, home)
 		}
 		cred := deps.dispatchCredentialDeny(deps.execStage())
 		deps.warnCredentialCoversCell(cred.write, req)
@@ -103,6 +106,9 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 		}
 		cfg.RepoRoot, cfg.WritePaths = paths[0], paths[1:]
 		cfg = deps.withProtectedWrites(cfg, ownWorktree(req, cfg.WritePaths), cfg.RepoRoot)
+		if cfg, err = withMessaging(cfg, req.Messaging); err != nil {
+			return deps.refuseWrap(CauseProfile, fmt.Sprintf("sandbox messaging scope unavailable: %v", err))
+		}
 		socketDir, sockets, err := tmuxSocketGuard()
 		if err != nil {
 			return deps.refuseWrap(CauseProfile, fmt.Sprintf("sandbox tmux socket guard unavailable: %v", err))
@@ -217,6 +223,7 @@ func sandboxPrefixForLaunch(deps Deps, cfg *Config, terminalPath string) ([]stri
 		WriteSubpaths: cfg.SandboxWriteSubpaths,
 		HostIsolated:  cfg.Decision.HostIsolated,
 		SeatRoot:      cfg.Decision.Dir,
+		Messaging:     cfg.Messaging,
 	})
 }
 
@@ -301,10 +308,14 @@ func storedLoginDeny(home string) []string {
 	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
 		return nil
 	}
-	return []string{dir}
+	return pathSpellings(dir)
 }
 
 const storedLoginJSON = ".claude.json"
+
+func storedLoginMask(home string) []string {
+	return existingFiles(pathSpellings(filepath.Join(home, storedLoginJSON))...)
+}
 
 func seatFrozenFiles(seatRoot string) []string {
 	return []string{filepath.Join(seatRoot, storedLoginJSON), filepath.Join(seatRoot, seatSettingsName)}
@@ -318,4 +329,12 @@ func existingFiles(candidates ...string) []string {
 		}
 	}
 	return out
+}
+
+func withStoredLoginDeny(cfg sandbox.Config, home string) sandbox.Config {
+	dir, files := storedLoginDeny(home), storedLoginMask(home)
+	cfg.DenyReadPaths = append(slices.Clone(cfg.DenyReadPaths), dir...)
+	cfg.MaskFiles = files
+	cfg.DenyWritePaths = append(slices.Clone(cfg.DenyWritePaths), append(slices.Clone(dir), files...)...)
+	return cfg
 }

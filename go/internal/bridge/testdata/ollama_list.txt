@@ -1,0 +1,4 @@
+NAME                ID              SIZE      MODIFIED
+gemma4:latest       c6eb396dbd59    9.6 GB    3 days ago
+phi4:latest         ac896e5b8b34    9.1 GB    16 months ago
+

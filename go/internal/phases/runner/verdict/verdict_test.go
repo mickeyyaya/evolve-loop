@@ -11,6 +11,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/deliverable"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
@@ -148,8 +149,18 @@ func TestRunnerCodes_AreRegisteredWithDocsUnderModuleRunner(t *testing.T) {
 
 func TestDispatch_HasExactlyTheDeclaredFields(t *testing.T) {
 	d := Dispatch{7, "run", "audit", "ws", "wt", "root", 2, "ws/audit-report.md", Snapshot{}, false, bridgeResp, nil, 200, "opus", "profile", nil}
-	if d.Cycle != 7 || d.ModelSource != "profile" || d.ExplanationDocumentationVersion != 2 {
-		t.Fatal("positional construction")
+	roots := rootsFor(d)
+	if roots.Cycle != 7 || roots.Workspace != "ws" || roots.Worktree != "wt" || roots.DispatchedArtifact != "ws/audit-report.md" ||
+		roots.ExplanationDocumentationVersion != 2 || roots.EvolveDir != paths.EvolveDirOf("root") {
+		t.Errorf("rootsFor lost a positional field: %+v", roots)
+	}
+	if id := identityOf(d); id != (Identity{Cycle: 7, RunID: "run", Phase: "audit"}) {
+		t.Errorf("identityOf lost a positional field: %+v", id)
+	}
+	h := newHarness(t, probe{})
+	resp := h.e.classify(context.Background(), d, reconciliation{}, classifyAs(core.VerdictPASS, ""))
+	if resp.ResolvedModel != "opus" || resp.ModelSource != "profile" || resp.DurationMS != 200 || resp.Phase != "audit" {
+		t.Errorf("response lost a positional field: %+v", resp)
 	}
 }
 

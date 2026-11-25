@@ -35,6 +35,7 @@ func Packages() []string {
 		"./internal/evalqualitycheck/...",
 		"./internal/inboxrank/...",
 		"./internal/ipcenv/...",
+		"./internal/emptytests/...",
 	}
 }
 
@@ -233,8 +234,10 @@ var treeReadingSelections = []TestSelection{
 	{Package: "./internal/sysexec", Tests: []string{
 		"TestBridgeDriverLaunchFuncs_EachNamesARealDriverFunction",
 		"TestIsolationMatrix_N2_NoLLMSpawnOutsideTheBridgeLaunchAPI",
+		"TestOnlyTheBridgeCallsARunnerWithAnLLMBinary",
 		"TestOnlyTheBridgeStartsAnLLMBinary",
 		"TestPipelineCode_StartsEveryProcessThroughCommand",
+		"TestRunnerArity_IsTheParameterCountOfModelqueryRunner",
 	}},
 	{Package: "./internal/testaudit", Tests: []string{
 		"TestTreeRatchet",

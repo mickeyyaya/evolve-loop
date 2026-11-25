@@ -19,7 +19,7 @@ const (
 	healingT2Repairs         = 6
 	healingBreakerFailures   = 2
 	healingBreakerOpenHours  = 24
-	healingEnforceItem       = "selfheal-repair-cycle-path"
+	healingEnforceItem       = "selfheal-repair-t1-lane-route"
 )
 
 type HealingPolicy struct {
@@ -27,6 +27,7 @@ type HealingPolicy struct {
 	Orchestrator *HealingOrchestratorPolicy `json:"orchestrator,omitempty"`
 	Validator    *HealingValidatorPolicy    `json:"validator,omitempty"`
 	LiveReaction *HealingLiveReactionPolicy `json:"live_reaction,omitempty"`
+	RepairCycle  *HealingRepairCyclePolicy  `json:"repair_cycle,omitempty"`
 }
 
 type HealingOrchestratorPolicy struct {
@@ -119,6 +120,9 @@ func (h *HealingPolicy) validate() error {
 	if err := h.LiveReaction.validate(); err != nil {
 		return err
 	}
+	if err := h.RepairCycle.validate(); err != nil {
+		return err
+	}
 	if h.Detector == nil {
 		return nil
 	}
@@ -171,7 +175,7 @@ func (v *HealingValidatorPolicy) validate() error {
 
 func healingStageError(part, stage, why string) error {
 	if stage == HealingStageEnforce {
-		return errors.New(part + `.stage "enforce" lands with the inbox item ` + healingEnforceItem + ` (X16); ` + why + `, so use "shadow"`)
+		return errors.New(part + `.stage "enforce" lands with the inbox item ` + healingEnforceItem + `; ` + why + `, so use "shadow"`)
 	}
 	return fmt.Errorf(`%s.stage %q: the stages are "off" and "shadow"`, part, stage)
 }
@@ -200,4 +204,34 @@ func (l *HealingLiveReactionPolicy) validate() error {
 		return nil
 	}
 	return fmt.Errorf(`live_reaction.stage %q: the stages are "off", "shadow" and "enforce"`, l.Stage)
+}
+
+var ErrRepairCycleEnforceBlocked = errors.New(`repair_cycle.stage "enforce" lands with the inbox item ` + healingEnforceItem + `, so use "shadow"`)
+
+type HealingRepairCyclePolicy struct {
+	Stage RequestStage `json:"stage,omitempty"`
+}
+
+func (p Policy) HealingRepairCycle() HealingRepairCyclePolicy {
+	out := HealingRepairCyclePolicy{}
+	if p.Healing != nil && p.Healing.RepairCycle != nil {
+		out = *p.Healing.RepairCycle
+	}
+	if out.Stage == "" {
+		out.Stage = RequestStageShadow
+	}
+	return out
+}
+
+func (r *HealingRepairCyclePolicy) validate() error {
+	if r == nil {
+		return nil
+	}
+	switch r.Stage {
+	case "", RequestStageOff, RequestStageShadow:
+		return nil
+	case RequestStageEnforce:
+		return ErrRepairCycleEnforceBlocked
+	}
+	return fmt.Errorf(`repair_cycle.stage %q: the stages are "off" and "shadow"`, r.Stage)
 }

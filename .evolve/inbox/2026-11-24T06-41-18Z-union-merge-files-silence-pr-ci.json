@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Two branches that each add a package to the enforced apicover set from the same base change disjoint files (for example one file per package), so git merge-tree of the two branches reports no conflict, pinned by a test that builds both branches in a fixture repo",
+    "evolve integration batch --dry-run on a PR with mergeable_state=dirty prints an eject reason that names 'dirty' and the conflicting paths, pinned by a test",
+    "The console ship floor fails when the PR is green on its base but a ratchet (testdup, gitstarts or sizeratchet) is red on origin/main plus the PR diff, pinned by a test with a fixture repo"
+  ],
+  "created_at": "2026-11-24T06:45:00Z",
+  "files": [
+    ".gitattributes",
+    "go/.apicover-enforce",
+    "go/internal/integration",
+    "go/internal/ciwatch",
+    "go/internal/commitgate"
+  ],
+  "fix": "(1) Remove the hand-edited union file from the PR path: generate go/.apicover-enforce (and .cover-strict) from data that has one row per package file, or move the per-PR rows into per-package files, so two PRs never edit the same lines. Until then, the integration batch and evolve ci watch name 'no CI run: GitHub mergeable_state=dirty' as a distinct eject reason with the conflicting union paths, instead of an empty head-ci state. (2) The console pre-ship floor (and evolve commit-gate for console ships) runs its CI-parity checks on a composed tree: origin/main plus the PR diff, the same tree CI tests.",
+  "id": "union-merge-files-silence-pr-ci",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "On 2026-11-24, batch 2 ejected 21 of 23 recorded console PRs. Two pipeline causes hid the reds until the batch. (1) .gitattributes marks go/.apicover-enforce, go/.cover-strict and docs/history/code-comments/*.md as merge=union. Local git merge-tree and git apply --3way honour the union driver, so the integration batch composes these PRs cleanly. GitHub's mergeability check does not honour it: when main and a PR both changed go/.apicover-enforce, GitHub sets mergeable_state=dirty and creates no pull_request run. PRs 1723, 1729, 1730, 1737, 1743, 1752, 1753 and 1756 had no CI run on their heads, and a close and reopen did not start one. The batch reported only 'eject PR #N head ci' with an empty state. (2) The console pre-ship floor ran apicover, ratchets and tests on the PR's own tree on its old base. CI tests the PR merged with main, so composed reds passed locally: testdup 332>330 (1731) and 331>330 (1761), core git starts 746>730 (1740), sizeratchet BwrapPrefix 63>62 and defaultSandboxWrapWithProbe 101>98 (1745), and the stageevidence routed-source guard (1735).",
+  "title": "A PR that touches a merge=union file gets no GitHub CI, and the console ship floor checks the PR on its old base",
+  "weight": 0.8
+}
