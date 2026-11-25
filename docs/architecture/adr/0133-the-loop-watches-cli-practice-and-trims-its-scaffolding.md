@@ -1,5 +1,7 @@
 # ADR-0133: The loop watches the practice of each CLI, and trims its prompt scaffolding by measure
 
+> **Note (2026-11-25):** Extended by the plan [persona-diet-2026-11.md](../../plans/persona-diet-2026-11.md) and the convention [persona-writing.md](../../conventions/persona-writing.md). The plan widens decision 4: each core change applies the full persona shape, and personas with no launch in 200 cycles change in groups.
+
 - **Status:** Accepted (2026-10-12). M0 (the documents) is in force. M1 to M5 are lanes of the plan.
 - **Plan:** [model-capability-practice-2026-10.md](../../plans/model-capability-practice-2026-10.md).
 - **Research:** [model-capability-practice-2026-10.md](../../research/model-capability-practice-2026-10.md).
