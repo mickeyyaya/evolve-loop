@@ -14,6 +14,7 @@ import (
 	"encoding/hex"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseintegrity"
 	"github.com/mickeyyaya/evolve-loop/go/test/fixtures"
 )
@@ -588,5 +589,29 @@ func TestBootBinaryRefresh_AnUnverifiableDeltaBootsAsIsAndRetiresNothing(t *test
 	}
 	if !strings.Contains(errBuf.String(), "unverifiable") {
 		t.Errorf("stderr = %q, want the unverifiable delta named", errBuf.String())
+	}
+}
+
+func TestBootBinaryRefresh_UnfetchedOriginRefusesRebuild(t *testing.T) {
+	repo := gittest.Fixture(t)
+	repo.Write("go/a.go", "package a\n")
+	repo.Git("add", "-A")
+	repo.Git("commit", "-q", "-m", "base")
+	origin := gittest.Bare(t)
+	repo.Git("remote", "add", "origin", origin.Dir)
+	head := repo.Git("rev-parse", "HEAD")
+
+	swapBinaryCommit(t, "000000000000")
+	spy := swapRefreshSeams(t, head, nil, true, nil, nil, nil)
+	swapFleetLaneCheck(t, false, nil)
+	var errBuf bytes.Buffer
+
+	res := bootBinaryRefresh(loopConfig{ProjectRoot: repo.Dir, EvolveDir: t.TempDir()}, &errBuf)
+
+	if res.Rebuilt || spy.rebuildCalls != 0 || spy.execCalls != 0 {
+		t.Fatalf("an unfetched origin/main ref must refuse rebuild and re-exec: res=%+v spy=%+v", res, spy)
+	}
+	if !strings.Contains(errBuf.String(), "cannot verify") {
+		t.Errorf("stderr = %q, want verification warning", errBuf.String())
 	}
 }

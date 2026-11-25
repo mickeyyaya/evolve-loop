@@ -986,4 +986,11 @@ var serialTests = map[string]string{
 	"main.TestMidWave_AnUnreadableDiskAfterTheRunNamesTheFailure":                                                          "sets GOCACHE and TMPDIR through t.Setenv and swaps the process-wide gc reapers",
 	"main.TestProductionSentinelPorts_TheReleaseRunsTheCacheScopeUnderTheGCLease":                                          "sets GOCACHE and TMPDIR through t.Setenv and swaps the process-wide gc reapers",
 	"main.TestCacheScope_RunsExactlyTheStepsThatTheSentinelAnnounces":                                                      "swaps the gcDiskFreeBytes seam and sets GOCACHE and TMPDIR through t.Setenv in gcWorktreeEnv",
+	"main.TestBootBinaryRefresh_FailedArmBootsAsIsWithoutReExec":                                                           "TDD-owned test that swaps package-level bootRefresh and loopchain seams without t.Parallel",
+	"main.TestBootBinaryRefresh_ReExecArmsTheWaveHandoff":                                                                  "TDD-owned test that swaps package-level bootRefresh and loopchain seams without t.Parallel",
+	"main.TestBootBinaryRefresh_ShippedPlaneHeadStillRebuilds":                                                             "TDD-owned test that swaps package-level bootRefresh seams without t.Parallel",
+	"main.TestBootBinaryRefresh_UnshippedPlaneHeadDoesNotRebuild":                                                          "TDD-owned test that swaps package-level bootRefresh seams without t.Parallel",
+	"main.TestBootBinaryRefresh_ZeroResumeWavesArmsNothing":                                                                "TDD-owned test that swaps package-level bootRefresh and loopchain seams without t.Parallel",
+	"main.TestRunLoop_BootRefreshReExecCarriesTheResumePointTheLaunchTook":                                                 "TDD-owned test that swaps package-level bootRefresh, loopchain, and runLoop seams without t.Parallel",
+	"main.TestBootBinaryRefresh_UnfetchedOriginRefusesRebuild":                                                             "swaps package-level bootRefresh seams without t.Parallel",
 }

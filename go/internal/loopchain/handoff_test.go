@@ -108,3 +108,23 @@ func TestTakeHandoff_ReportsAHandoffAtWaveZeroApartFromNoHandoff(t *testing.T) {
 		t.Fatalf("a re-exec at wave 0 is still a handoff (the boundary it re-exec'd at already ran its boot work): waves=%d taken=%v err=%v", waves, taken, err)
 	}
 }
+
+func TestArmHandoff_WritesClaimAndRejectsUnwritableTarget(t *testing.T) {
+	dir := t.TempDir()
+	marker := filepath.Join(dir, AttemptFile)
+	if err := ArmHandoff(marker, Claim{PID: 4242, Commit: commit, At: fixedNow}, 3); err != nil {
+		t.Fatalf("arm handoff: %v", err)
+	}
+	waves, taken, err := TakeHandoff(marker, Claim{PID: 4242, Commit: rebuiltCommit, At: fixedNow.Add(time.Minute)})
+	if err != nil || !taken || waves != 3 {
+		t.Fatalf("take armed handoff: waves=%d taken=%v err=%v", waves, taken, err)
+	}
+
+	unwritable := filepath.Join(dir, "dir-as-marker")
+	if err := os.Mkdir(unwritable, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := ArmHandoff(unwritable, Claim{PID: 4242, Commit: commit, At: fixedNow}, 1); err == nil {
+		t.Fatal("arming onto a directory must return an error")
+	}
+}

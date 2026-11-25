@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/loopchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
@@ -28,6 +30,7 @@ var (
 	bootBinaryRefreshFn       = bootBinaryRefresh
 	bootRefreshBinaryCommitFn = version.Commit
 	bootRefreshHeadFn         = defaultBootRefreshHead
+	bootRefreshHeadShippedFn  = defaultBootRefreshHeadShipped
 	bootRefreshSourceDeltaFn  = defaultBootRefreshSourceDelta
 	bootRefreshRebuildFn      = defaultBootRefreshRebuild
 	bootRefreshExecFn         = defaultBootRefreshExec
@@ -80,6 +83,19 @@ func defaultBootRefreshExecTarget(projectRoot string) (bool, string, error) {
 func defaultBootRefreshHead(projectRoot string) (string, error) {
 	out, err := sysexec.Command(context.Background(), "git", "-C", projectRoot, "rev-parse", "HEAD").Output()
 	return strings.TrimSpace(string(out)), err
+}
+
+func defaultBootRefreshHeadShipped(projectRoot, head string) (bool, error) {
+	ctx := context.Background()
+	g := gitexec.Default(projectRoot)
+	if _, _, code, err := g.Capture(ctx, "remote", "get-url", gitexec.Remote); err != nil || code != 0 {
+		return true, nil
+	}
+	_, stderr, code, err := g.Capture(ctx, "merge-base", "--is-ancestor", head, gitexec.RemoteMain)
+	if err != nil || (code != 0 && code != 1) {
+		return false, fmt.Errorf("git merge-base --is-ancestor %s %s exit=%d err=%v: %s", head, gitexec.RemoteMain, code, err, strings.TrimSpace(stderr))
+	}
+	return code == 0, nil
 }
 
 func defaultBootRefreshSourceDelta(projectRoot, from, to string) (bool, error) {
@@ -154,13 +170,7 @@ func bootBinaryRefresh(cfg loopConfig, stderr io.Writer) bootBinaryRefreshResult
 	}
 	res.Stale = true
 
-	laneActive, lerr := bootRefreshFleetLaneFn(cfg)
-	if lerr != nil {
-		fmt.Fprintf(stderr, "[loop] boot-refresh: WARN fleet-lane check unverifiable (%v) — cannot prove the plane is idle, so refusing to rebuild the shared binary; booting as-is\n", lerr)
-		return res
-	}
-	if laneActive {
-		fmt.Fprintf(stderr, "[loop] boot-refresh: a concurrent fleet lane is active (fresh run lease) — refusing to rebuild the plane binary mid-batch; the heal lands at the next idle boot\n")
+	if !bootRefreshHeadShipped(projectRoot, head, stderr) || bootRefreshFleetBlocked(cfg, stderr) {
 		return res
 	}
 
@@ -185,13 +195,57 @@ func bootBinaryRefresh(cfg loopConfig, stderr io.Writer) bootBinaryRefreshResult
 	}
 	res.Rebuilt = true
 
-	if shipPinPresent(cfg) {
-		if !bootRefreshRepinFn(cfg, stderr) {
-			fmt.Fprintf(stderr, "[loop] boot-refresh: NOT exec'ing — the pin above stayed unreconciled, so the child would halt as tampered\n")
-			return res
-		}
+	if shipPinPresent(cfg) && !bootRefreshRepinFn(cfg, stderr) {
+		fmt.Fprintf(stderr, "[loop] boot-refresh: NOT exec'ing — the pin above stayed unreconciled, so the child would halt as tampered\n")
+		return res
+	}
+	if !armBootWaveHandoff(cfg, binCommit, stderr) {
+		return res
 	}
 
+	bootRefreshExecWithMarker(cfg, markerPath, head, stderr)
+	return res
+}
+
+func bootRefreshHeadShipped(projectRoot, head string, stderr io.Writer) bool {
+	shipped, err := bootRefreshHeadShippedFn(projectRoot, head)
+	if err != nil {
+		fmt.Fprintf(stderr, "[loop] boot-refresh: WARN cannot verify whether HEAD %.12s is shipped to %s (%v) — refusing to rebuild from an unverified commit; booting as-is\n", head, gitexec.RemoteMain, err)
+		return false
+	}
+	if !shipped {
+		fmt.Fprintf(stderr, "[loop] boot-refresh: HEAD %.12s is ahead of %s (unshipped) — refusing to rebuild the loop binary from an unshipped commit; booting as-is\n", head, gitexec.RemoteMain)
+		return false
+	}
+	return true
+}
+
+func bootRefreshFleetBlocked(cfg loopConfig, stderr io.Writer) bool {
+	laneActive, err := bootRefreshFleetLaneFn(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "[loop] boot-refresh: WARN fleet-lane check unverifiable (%v) — cannot prove the plane is idle, so refusing to rebuild the shared binary; booting as-is\n", err)
+		return true
+	}
+	if laneActive {
+		fmt.Fprintf(stderr, "[loop] boot-refresh: a concurrent fleet lane is active (fresh run lease) — refusing to rebuild the plane binary mid-batch; the heal lands at the next idle boot\n")
+		return true
+	}
+	return false
+}
+
+func armBootWaveHandoff(cfg loopConfig, binCommit string, stderr io.Writer) bool {
+	if cfg.ResumeWaves <= 0 {
+		return true
+	}
+	attemptPath := filepath.Join(cfg.EvolveDir, chainBoundaryRefreshAttemptFile)
+	if err := loopchain.ArmHandoff(attemptPath, loopchain.Claim{PID: os.Getpid(), Commit: binCommit, At: time.Now()}, cfg.ResumeWaves); err != nil {
+		fmt.Fprintf(stderr, "[loop] boot-refresh: WARN cannot arm wave handoff (%v) — booting the old binary as-is (rebuilt copy is on disk and pin-reconciled for the next launch)\n", err)
+		return false
+	}
+	return true
+}
+
+func bootRefreshExecWithMarker(cfg loopConfig, markerPath, head string, stderr io.Writer) {
 	tmp := markerPath + ".tmp"
 	if werr := os.WriteFile(tmp, []byte(head+"\n"), 0o644); werr == nil {
 		_ = os.Rename(tmp, markerPath)
@@ -201,7 +255,6 @@ func bootBinaryRefresh(cfg loopConfig, stderr io.Writer) bootBinaryRefreshResult
 		_ = os.Remove(markerPath)
 		fmt.Fprintf(stderr, "[loop] boot-refresh: WARN re-exec failed (%v) — booting the old binary (rebuilt copy is on disk and pin-reconciled for the next launch)\n", err)
 	}
-	return res
 }
 
 func bootRefreshOff(evolveDir string) bool {

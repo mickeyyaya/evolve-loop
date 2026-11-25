@@ -49,10 +49,32 @@ func (r *Refresher) alreadyAttempted(runningCommit string) bool {
 	return rec.RunningCommit == runningCommit
 }
 
+func ArmHandoff(attemptPath string, c Claim, wavesDone int) error {
+	return writeAttempt(attemptPath, attempt{
+		RunningCommit: c.Commit,
+		Timestamp:     c.At.UTC().Format(time.RFC3339),
+		PID:           c.PID,
+		WavesDone:     wavesDone,
+	})
+}
+
 func (r *Refresher) recordAttempt(runningCommit string, batch int) error {
-	buf, err := json.Marshal(attempt{RunningCommit: runningCommit, Batch: batch, Timestamp: r.opts.now().UTC().Format(time.RFC3339), PID: r.opts.handoff.PID, WavesDone: r.opts.handoff.WavesDone})
+	return writeAttempt(
+		filepath.Join(r.roots.EvolveDir, r.opts.attemptFile),
+		attempt{
+			RunningCommit: runningCommit,
+			Batch:         batch,
+			Timestamp:     r.opts.now().UTC().Format(time.RFC3339),
+			PID:           r.opts.handoff.PID,
+			WavesDone:     r.opts.handoff.WavesDone,
+		},
+	)
+}
+
+func writeAttempt(attemptPath string, a attempt) error {
+	buf, err := json.Marshal(a)
 	if err == nil {
-		err = os.WriteFile(filepath.Join(r.roots.EvolveDir, r.opts.attemptFile), buf, 0o644)
+		err = os.WriteFile(attemptPath, buf, 0o644)
 	}
 	if err != nil {
 		return fmt.Errorf("write boundary-refresh attempt marker: %w", err)
