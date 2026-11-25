@@ -15,20 +15,24 @@ func defaultSandboxWrap(deps Deps) SandboxWrapper {
 	return defaultSandboxWrapWithProbe(deps, sandbox.Probe)
 }
 
+func effectiveSandboxMode(deps Deps) string {
+	mode := strings.TrimSpace(deps.SandboxMode)
+	if mode == "" {
+		return config.SandboxModeAuto
+	}
+	switch mode {
+	case config.SandboxModeOff, config.SandboxModeOn, config.SandboxModeAuto:
+		return mode
+	}
+	if deps.Stderr != nil {
+		fmt.Fprintf(deps.Stderr, "[bridge] WARN: sandbox mode %q unrecognized (want auto|on|off); treating as auto\n", mode)
+	}
+	return config.SandboxModeAuto
+}
+
 func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult) SandboxWrapper {
 	return func(req SandboxWrapRequest) ([]string, WrapOutcome) {
-		mode := strings.TrimSpace(deps.SandboxMode)
-		if mode == "" {
-			mode = config.SandboxModeAuto
-		}
-		switch mode {
-		case config.SandboxModeOff, config.SandboxModeOn, config.SandboxModeAuto:
-		default:
-			if deps.Stderr != nil {
-				fmt.Fprintf(deps.Stderr, "[bridge] WARN: sandbox mode %q unrecognized (want auto|on|off); treating as auto\n", mode)
-			}
-			mode = config.SandboxModeAuto
-		}
+		mode := effectiveSandboxMode(deps)
 		if mode == config.SandboxModeOff {
 			return nil, WrapOutcome{}
 		}
@@ -102,6 +106,9 @@ func defaultSandboxWrapWithProbe(deps Deps, probeFunc func() sandbox.ProbeResult
 		}
 		cfg.RepoRoot, cfg.WritePaths = paths[0], paths[1:]
 		cfg = deps.withProtectedWrites(cfg, ownWorktree(req, cfg.WritePaths), cfg.RepoRoot)
+		if cfg, err = withMessaging(cfg, req.Messaging); err != nil {
+			return deps.refuseWrap(CauseProfile, fmt.Sprintf("sandbox messaging scope unavailable: %v", err))
+		}
 		socketDir, sockets, err := tmuxSocketGuard()
 		if err != nil {
 			return deps.refuseWrap(CauseProfile, fmt.Sprintf("sandbox tmux socket guard unavailable: %v", err))
@@ -216,6 +223,7 @@ func sandboxPrefixForLaunch(deps Deps, cfg *Config, terminalPath string) ([]stri
 		WriteSubpaths: cfg.SandboxWriteSubpaths,
 		HostIsolated:  cfg.Decision.HostIsolated,
 		SeatRoot:      cfg.Decision.Dir,
+		Messaging:     cfg.Messaging,
 	})
 }
 

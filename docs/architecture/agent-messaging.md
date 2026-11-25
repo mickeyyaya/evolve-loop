@@ -480,7 +480,7 @@ The threat is a confused or injected agent, not a hostile local user (research �
 | T11 | A retry with the same id changes the content | the content digest; `ErrIDConflict` | §6 |
 | T12 | A reader skips its queue with a large cursor | a cursor past the head is refused; a read or an ack at the head clears the queue. A reader loses only its own messages | §6 |
 | T13 | A past or planned dispatch acts | only a `live` roster entry can send, read or ack; the token must agree with the roster | §4 |
-| T14 | An agent reads the mailbox of another dispatch | read confinement in the sandbox (M6); an unsandboxed phase stays a limit | §13 |
+| T14 | An agent reads the mailbox of another dispatch | read confinement in the sandbox (M6). The sandbox also denies `file-read*` on the message store, so a mailbox cannot be read through the log of the cycle. An unsandboxed phase stays a limit. | §13 |
 | T15 | An agent changes an archive in `runs/` | the retro reads the protected store; the ledger holds the archive hash | §7 |
 
 ### 16. What this does not do
@@ -490,6 +490,7 @@ The threat is a confused or injected agent, not a hostile local user (research �
 - **No authority transfer.** A message cannot grant a permission, change the policy or the config, or change a gate.
 - **No exactly-once delivery.**
 - **No message starts an agent.**
+- **No Linux mask for a channel created after launch.** See the Limits list: `bwrap` cannot mask a path that does not exist when the cell starts.
 - **No vendor feature is the transport** (Claude agent teams, `SendMessage`, MCP channels). They are previews, the OS user sets their scope, and they do not cover agy (plan §5).
 
 ## Limits
@@ -501,6 +502,8 @@ The threat is a confused or injected agent, not a hostile local user (research �
 - **A retry loses its replies.** A reply to `dispatch:<old>` goes to the past entry of a phase, not to its retry. The seal moves it to the dead letters.
 - **A one-call window.** The broker reads the roster before it takes its lock. A dispatch that becomes `past` in that time can still send one message.
 - **An unsandboxed phase can read other mailboxes.** Read confinement (§13) needs the sandbox.
+- **The Linux rules have no real-process proof.** On Linux the rules of M6 are `bwrap` masks. A mask is `--tmpfs` on the tree and on each `msg.*` channel directory that exists at launch, plus the two channels of the cycle. A unit test checks the argv. A real-process test runs on darwin only. The bridge creates the tree and the channel directories of the cycle before launch, because a mask target must exist.
+- **On Linux, a channel that is created after launch is not masked.** `bwrap` masks fixed paths when it starts, so a `msg.*` channel of another cycle that appears later stays readable in that cell. The darwin profile has no such gap, because its store rule is a path prefix.
 - **The ledger never shrinks during a cycle.** The accepted ids, the digests, the grants and the dead letters stay in memory until the service stops. The cycle budget bounds them.
 - **A hung disk holds a send.** The ADR-0127 lock deadline bounds the wait for the channel lock, not a `write` that the kernel holds.
 - **The order of the queue cap.** A recipient acks its queue only with the cursor of its next read. A recipient that never reads blocks new messages to itself at the queue cap.

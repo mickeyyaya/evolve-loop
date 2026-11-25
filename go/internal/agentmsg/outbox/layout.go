@@ -17,20 +17,30 @@ type Layout struct {
 	Cycle int
 }
 
+const TreeRel = ".evolve/msg"
+
+func (l Layout) TreeDir() string {
+	return filepath.Join(l.Root, filepath.FromSlash(TreeRel))
+}
+
 func (l Layout) cycleDir() string {
-	return filepath.Join(l.Root, ".evolve", "msg", strconv.Itoa(l.Cycle))
+	return filepath.Join(l.TreeDir(), strconv.Itoa(l.Cycle))
 }
 
 func keyOf(dispatch string) string {
 	return base64.RawURLEncoding.EncodeToString([]byte(dispatch))
 }
 
+func (l Layout) DispatchDir(dispatch string) string {
+	return filepath.Join(l.cycleDir(), keyOf(dispatch))
+}
+
 func (l Layout) OutDir(dispatch string) string {
-	return filepath.Join(l.cycleDir(), keyOf(dispatch), "out")
+	return filepath.Join(l.DispatchDir(dispatch), "out")
 }
 
 func (l Layout) BoxDir(dispatch string) string {
-	return filepath.Join(l.cycleDir(), keyOf(dispatch), "box")
+	return filepath.Join(l.DispatchDir(dispatch), "box")
 }
 
 func (l Layout) Locate(path string) (dispatch, id, resolved string, err error) {
