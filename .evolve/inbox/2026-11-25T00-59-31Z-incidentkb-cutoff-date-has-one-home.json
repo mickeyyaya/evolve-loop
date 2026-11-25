@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "The two documents do not state the cutoff date as a literal, or a test fails when a stated date differs from incidentkb.LegacyCutoff",
+    "evolve docs ste-lint --strict reports 0 findings on the changed documents"
+  ],
+  "created_at": "2026-11-25T00:59:31Z",
+  "files": [
+    "docs/architecture/packages/internal-incidentkb.md",
+    "docs/plans/incident-knowledge-base-2026-11.md",
+    "go/internal/incidentkb"
+  ],
+  "fix": "Name the constant in the prose (for example 'the date in incidentkb.LegacyCutoff') instead of the literal, or add a test that the dates written in those two documents equal incidentkb.LegacyCutoff.",
+  "id": "incidentkb-cutoff-date-has-one-home",
+  "kind": "techdebt",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "summary": "The architecture review of PR 1791 (incident record template, I1) found the literal date 2026-11-25 in docs/architecture/packages/internal-incidentkb.md:14 and in docs/plans/incident-knowledge-base-2026-11.md:86 and :252, beside the constant incidentkb.LegacyCutoff. When the cutoff moves, the prose stays wrong with no test to catch it.",
+  "title": "The incident-record legacy cutoff date has one home",
+  "weight": 0.3
+}

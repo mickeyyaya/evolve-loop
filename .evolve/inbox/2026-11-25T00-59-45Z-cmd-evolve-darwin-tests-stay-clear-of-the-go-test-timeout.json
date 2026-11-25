@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "The margin report of go/cmd/testlatency (make print-test-timeout-darwin, -timeout-margin) shows at least 10m of margin for cmd/evolve on the macOS job of the PR that makes the change",
+    "A test in cmd/testlatency or the package wall ratchet fails when a darwin package margin falls below a threshold that policy data holds",
+    "No timeout or ratchet number is raised"
+  ],
+  "created_at": "2026-11-25T00:59:45Z",
+  "files": [
+    "go/cmd/evolve/cli_contract_mutants_integration_test.go",
+    "go/Makefile",
+    ".github/workflows/go.yml"
+  ],
+  "fix": "Find the slowest cmd/evolve tests on darwin (the margin report from cmd/testlatency), and cut their cost or move them to their own package so that the slowest package has a margin of at least a third of the timeout on the slowest runner seen. Do not raise DARWIN_TEST_TIMEOUT without operator approval.",
+  "id": "cmd-evolve-darwin-tests-stay-clear-of-the-go-test-timeout",
+  "kind": "hardening",
+  "origin": "console",
+  "priority_class": "stability",
+  "summary": "On 2026-11-24 the macOS job of PRs 1789 and 1790 failed with panic: test timed out after 30m0s in go/cmd/evolve, inside TestCLIContract_HarnessKillsEachMutantOfDossierShow. Both passed on a rerun of the failed job. The macOS job of main (the whole job, not the package alone) took 14, 20 and 32 minutes on three commits in a row, so runner speed varies by more than two times, and cmd/evolve reaches the 30m DARWIN_TEST_TIMEOUT on a slow runner. The package wall ratchet measures speed-adjusted CPU, so it does not catch a wall-clock overrun on a slow runner. Every batch PR is at risk of a false red.",
+  "title": "The cmd/evolve darwin tests stay well inside the go test timeout on a slow macOS runner",
+  "weight": 0.7
+}

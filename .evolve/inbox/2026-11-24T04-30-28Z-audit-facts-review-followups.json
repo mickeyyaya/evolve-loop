@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "namesIn no longer exists: changedNames and declaredNames each take at most three parameters and no bool, and changed() has no parallel whole map",
+    "A test fails if evolve-auditor.md or skills/audit/SKILL.md names a heading that differs from auditfacts.RegressionHeading or auditfacts.HonestyHeading, or neither file names a heading literal",
+    "One exported Go test-function predicate serves auditfacts, handoff/evidence and testdup, and a test pins its answer for Test, Benchmark, Fuzz, Testify and Example",
+    "A diff that only deletes an assertion line inside a test function lists that test in changed_tests, pinned by a test in covchanged and in auditfacts",
+    "A worktree symlink to a file outside the worktree is never read by the facts seeder, pinned by a test",
+    "go test -count=1 -race passes for core/auditfacts, covchanged, phases/audit and handoff/evidence, and make apicover-enforce reports 0 uncovered for them"
+  ],
+  "created_at": "2026-11-24T04:30:28Z",
+  "files": [
+    "go/internal/core/auditfacts/auditfacts.go",
+    "go/internal/core/auditfacts/auditfacts_test.go",
+    "go/internal/covchanged/declared.go",
+    "go/internal/handoff/evidence/evidence.go",
+    "go/internal/testdup/testdup.go",
+    "go/internal/phases/audit/facts_seed.go",
+    "agents/evolve-auditor.md",
+    "skills/audit/SKILL.md"
+  ],
+  "fix": "(1) Split namesIn into changedNames(in, file, lines) and declaredNames(in, file), extract the shared .go, Protected and ReadFile prelude, and make changed() iterate tracked and untracked files as two sources with no side map. (2) Drop the literal headings from evolve-auditor.md and the audit SKILL.md (say 'the two mandatory sections of the block'), or extend TestPersonaReference_FinalDiffReviewIsAPointerToTheHostBlockNotACopyOfItsFormats to assert that every literal heading in both homes equals an auditfacts constant. (3) Export one test-function predicate from covchanged or a small gotestname helper, and use it in auditfacts, handoff/evidence and testdup, with Example kept as an explicit option for testdup. (4) Map the new-side position of each removed hunk to its enclosing function in covchanged.ChangedFuncNames, with a test for a deleted assertion line; if that is not wanted, state the limit in the auditfacts package note and in Rubric. (5) Reject a path whose filepath.Rel to the worktree starts with '..', and skip symlinks, in the audit phase ReadFile seam; add a test with an untracked symlink to a file outside the worktree.",
+  "id": "audit-facts-review-followups",
+  "kind": "techdebt",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "summary": "The full-diff review of PR 1744 (r2) left findings that do not block the merge. (1) auditfacts.namesIn(in, file, lines, whole) has four parameters and a flag argument; changed() keeps a parallel whole map beside the lines map. (2) agents/evolve-auditor.md:91 and skills/audit/SKILL.md:74 write the headings '## Final Diff Regression Review' and '## Guard Honesty Check' as literals, while auditfacts.RegressionHeading and auditfacts.HonestyHeading own them. (3) isTestFunc in auditfacts is a third home for the rule that names a Go test function, beside internal/handoff/evidence testPrefixes and internal/testdup. The homes differ on Example. (4) A pure-deletion hunk (a removed assertion or guard line under --unified=0) has no added line, so ChangedFuncNames never names its function and the function is absent from changed_unprotected_functions and changed_tests. Deleting an assertion is the usual way to hollow a test, and the Guard Honesty Check lists only those entries. (5) facts_seed.go ReadFile joins req.Worktree with a path from git ls-files or git diff without a check that the result stays inside the worktree. An untracked symlink could make the host read a file outside it. Impact is low: names only, and a Go parse must succeed.",
+  "title": "Audit gate facts: split namesIn, project the heading names from Go, share the test-func predicate, catch deleted assertions",
+  "weight": 0.5
+}

@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "The guard fails for an emit site that fills Outcome.Routed without a registered scorer test, and for a registered test name that does not exist, pinned by probe tests",
+    "Each registered scorer test reaches ClassConflict through its emit site, and a mutant that drops the routed items from Seal.Outcome fails one of them",
+    "PR 1735's rebuild passes TestStageEvidenceRoutedSourceGuard and the full CI on main plus the PR"
+  ],
+  "created_at": "2026-11-24T08:30:00Z",
+  "files": [
+    "go/internal/stageevidence/routed_source_check_test.go",
+    "go/internal/stageevidence/seal.go",
+    "go/cmd/evolve/cmd_stage_chain.go",
+    "go/internal/phases/ship/stage_evidence.go"
+  ],
+  "fix": "Design first (design review before build): (1) add real scorer tests that run seal -> Outcome -> Score and reach ClassConflict through each emit site (stageevidence/seal.go Outcome literal, cmd/evolve/cmd_stage_chain.go, phases/ship/stage_evidence.go); (2) give the guard an explicit registry: each emit site (file and hit kind) maps to a named scorer test, and the guard fails for an emit site with no registered test or a registered test that does not exist; (3) replace verifySealOutcomeUnrouted with a check that Seal.Outcome carries the routed items. Land this inside 1735's rebuild (or before it), then re-ship 1735.",
+  "id": "stage-evidence-routed-guard-registers-emit-sites",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "PR 1735 (shadow-contract K2 wiring, rebuilt as console/shadow-contract-k2-wiring-r4 in dev/rb-1690c-r4) fills Seal.Outcome.Routed and the held-proposal item. On main, TestStageEvidenceRoutedSourceGuard (go/internal/stageevidence/routed_source_check_test.go, added by cycle 2620 from item stage-evidence-scorer-conflict-class-guard) fails on every emit site that fills Routed, and its helper verifySealOutcomeUnrouted asserts that Seal.Outcome does NOT fill Routed. The guard's message says to add a scorer test and 'register it', but it has no registry. The guard item said that the first change that fills Routed must enable the conflict class. So 1735 cannot pass CI until the guard grows from 'Routed stays empty' to 'each emit site that fills Routed has a scorer test that reaches ClassConflict'. 1735 was held out of the 2026-11-24 batch 2 for this reason.",
+  "title": "The routed-source guard registers each stage-evidence emit site with a scorer test that reaches the conflict class, so K2c-K2e can fill Routed",
+  "weight": 0.7
+}

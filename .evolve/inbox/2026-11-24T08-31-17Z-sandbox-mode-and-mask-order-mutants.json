@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "The mutant that returns SandboxModeOn for an unknown mode fails a bridge test",
+    "Either a sandbox test fails when the messaging and file mask groups swap, or the package note states that their order is not a contract"
+  ],
+  "created_at": "2026-11-24T08:55:00Z",
+  "files": [
+    "go/internal/bridge/sandbox_wrap.go",
+    "go/internal/bridge/sandbox_wrap_test.go",
+    "go/internal/adapters/sandbox/sandbox.go"
+  ],
+  "fix": "(1) Assert effectiveSandboxMode(Deps{SandboxMode: \"bogus\"}) == config.SandboxModeAuto directly, and assert exactly one WARN line in the wrap test. (2) Decide whether bwrap mount precedence between the messaging and file mask groups is a contract; if it is, add a test that pins their order in BwrapPrefix's output; if not, record that in the sandbox package note.",
+  "id": "sandbox-mode-and-mask-order-mutants",
+  "kind": "test",
+  "origin": "console",
+  "priority_class": "correctness",
+  "summary": "The review of PR 1766 (M6 sandbox rebuild, 2026-11-24) found two surviving mutants that already existed before it. (1) go/internal/bridge/sandbox_wrap.go effectiveSandboxMode: `return config.SandboxModeAuto` changed to `config.SandboxModeOn` for an unknown mode passes every bridge test. The test at sandbox_wrap_test.go runs under a nested claude, where the wrap is skipped, and its substring checks do not reject a second WARN. (2) go/internal/adapters/sandbox/sandbox.go BwrapPrefix: swapping the messaging masks and the file masks in the final slices.Concat passes the sandbox tests, so their relative order is not pinned.",
+  "title": "Pin the sandbox mode fallback and the bwrap mask-group order with tests that kill two surviving mutants",
+  "weight": 0.4
+}
