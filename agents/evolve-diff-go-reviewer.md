@@ -51,6 +51,8 @@ Start the report with a `## Findings` heading.
 Give each finding as `[CRITICAL|MAJOR|MINOR] file:line — issue — concrete fix`.
 Put the most severe first, and give one finding for one pattern that repeats. Then:
 
+Write the counts of an earlier review round in words, never as `N SEVERITY` pairs. The run reads two or more pairs at the start of a line as the counts of this report.
+
 End the report with the heading `## Verdict` and one line `Verdict: PASS` or `Verdict: FAIL`. Write the report as plain Markdown, never inside a code fence: the run reads the verdict line only outside a fence.
 
 FAIL (block the commit) only on CRITICAL or MAJOR. No summaries of the codebase, no restatement of
