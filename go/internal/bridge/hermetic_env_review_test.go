@@ -30,16 +30,16 @@ func TestCellEnv_EveryEntryWithNoStageReadsThePolicy(t *testing.T) {
 	enforcePolicyRoot(t, "enforce")
 	cfg := seatConfig("claude-tmux")
 	entries := map[string][]string{
-		"dispatchEnv": dispatchEnv(Deps{}, cfg),
-		"paneEnv":     Deps{}.paneEnv(cfg),
-		"probeEnv":    probeEnv(Deps{}, "claude"),
+		"dispatchEnv": mustDispatchEnv(Deps{}, cfg),
+		"paneEnv":     mustPaneEnv(Deps{}, cfg),
+		"probeEnv":    mustProbeEnv(Deps{}, "claude"),
 	}
 	for entry, env := range entries {
 		if env == nil || slices.Contains(envNames(env), "FOO_LEAK") {
 			t.Errorf("%s with an empty Deps.EnvStage must follow the policy enforce; env names %v", entry, envNames(env))
 		}
 	}
-	if !slices.Contains(dispatchEnv(Deps{EnvStage: "off"}, cfg), "FOO_LEAK=secret-value-1") {
+	if !slices.Contains(mustDispatchEnv(Deps{EnvStage: "off"}, cfg), "FOO_LEAK=secret-value-1") {
 		t.Error("an explicit Deps.EnvStage wins over the policy")
 	}
 }
@@ -49,7 +49,7 @@ func TestCellEnv_NoPolicyFileMeansShadow(t *testing.T) {
 		t.Setenv(k, v)
 	}
 	t.Setenv("EVOLVE_PROJECT_ROOT", t.TempDir())
-	if !slices.Contains(dispatchEnv(Deps{}, seatConfig("codex")), "FOO_LEAK=secret-value-1") {
+	if !slices.Contains(mustDispatchEnv(Deps{}, seatConfig("codex")), "FOO_LEAK=secret-value-1") {
 		t.Fatal("with no policy the stage is the compiled default shadow, so the child keeps today's env")
 	}
 }
@@ -59,7 +59,7 @@ func TestProcessEnv_FollowsTheStage(t *testing.T) {
 		t.Setenv(k, v)
 	}
 	enforcePolicyRoot(t, "off")
-	if !slices.Contains(probeEnv(Deps{}, "codex"), "FOO_LEAK=secret-value-1") {
+	if !slices.Contains(mustProbeEnv(Deps{}, "codex"), "FOO_LEAK=secret-value-1") {
 		t.Fatal("probeEnv at off must keep today's env")
 	}
 }
@@ -76,7 +76,7 @@ func TestN1_GateAndBypassVariablesReachNoSeatAtEnforce(t *testing.T) {
 		pipeline[name] = "1"
 	}
 	for _, cli := range manifestCLIs(t) {
-		env := dispatchEnv(Deps{EnvStage: "enforce", Env: pipeline}, seatConfig(cli))
+		env := mustDispatchEnv(Deps{EnvStage: "enforce", Env: pipeline}, seatConfig(cli))
 		names := envNames(env)
 		for _, name := range gateAndBypassNames {
 			if slices.Contains(names, name) {
@@ -95,13 +95,13 @@ func TestCellEnv_AnOptInPassesItsTargetAtEnforce(t *testing.T) {
 	t.Setenv("ANTHROPIC_BASE_URL", "https://proxy.example")
 	t.Setenv("OPENAI_API_KEY", "sk-test")
 	t.Setenv("BRIDGE_ALLOW_ANTHROPIC_BASE_URL", "1")
-	if names := envNames(dispatchEnv(Deps{EnvStage: "enforce"}, seatConfig("claude-p"))); slices.Contains(names, "ANTHROPIC_BASE_URL") {
+	if names := envNames(mustDispatchEnv(Deps{EnvStage: "enforce"}, seatConfig("claude-p"))); slices.Contains(names, "ANTHROPIC_BASE_URL") {
 		t.Fatal("without the policy opt-in, ANTHROPIC_BASE_URL must not pass, whatever the environment says")
 	}
-	if !slices.Contains(dispatchEnv(Deps{EnvStage: "enforce", AllowAnthropicBaseURL: true}, seatConfig("claude-p")), "ANTHROPIC_BASE_URL=https://proxy.example") {
+	if !slices.Contains(mustDispatchEnv(Deps{EnvStage: "enforce", AllowAnthropicBaseURL: true}, seatConfig("claude-p")), "ANTHROPIC_BASE_URL=https://proxy.example") {
 		t.Fatal("with bridge.allow_anthropic_base_url the opted-in endpoint must reach claude, or the route changes silently")
 	}
-	if !slices.Contains(dispatchEnv(Deps{EnvStage: "enforce", AllowOpenAIAPIKey: true}, seatConfig("codex")), "OPENAI_API_KEY=sk-test") {
+	if !slices.Contains(mustDispatchEnv(Deps{EnvStage: "enforce", AllowOpenAIAPIKey: true}, seatConfig("codex")), "OPENAI_API_KEY=sk-test") {
 		t.Fatal("bridge.allow_openai_api_key must pass its target too")
 	}
 }
@@ -152,7 +152,7 @@ func TestEnvStage_ReadsThePolicyOfTheProjectRootInDepsEnv(t *testing.T) {
 	enforced := os.Getenv("EVOLVE_PROJECT_ROOT")
 	t.Setenv("EVOLVE_PROJECT_ROOT", t.TempDir())
 	deps := Deps{Env: map[string]string{"EVOLVE_PROJECT_ROOT": enforced}}
-	if slices.Contains(envNames(dispatchEnv(deps, seatConfig("codex"))), "FOO_LEAK") {
+	if slices.Contains(envNames(mustDispatchEnv(deps, seatConfig("codex"))), "FOO_LEAK") {
 		t.Fatal("the stage must come from the project root that the dispatch carries in Deps.Env")
 	}
 }
@@ -170,7 +170,7 @@ func TestEnvStage_AnUnreadablePolicyWarnsLoudly(t *testing.T) {
 	}
 	t.Setenv("EVOLVE_PROJECT_ROOT", root)
 	var stderr strings.Builder
-	env := dispatchEnv(Deps{Stderr: &stderr}, seatConfig("codex"))
+	env := mustDispatchEnv(Deps{Stderr: &stderr}, seatConfig("codex"))
 	if !strings.Contains(stderr.String(), "WARN isolation stage") || !slices.Contains(env, "FOO_LEAK=secret-value-1") {
 		t.Fatalf("a bad policy must warn and keep the shadow env; stderr=%q", stderr.String())
 	}

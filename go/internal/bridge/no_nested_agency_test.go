@@ -15,7 +15,7 @@ import (
 func TestCellEnv_EachStageGivesTheChildTheDepthAndPhaseMarkers(t *testing.T) {
 	t.Setenv(ipcenv.DispatchDepthKey, "")
 	for _, stage := range []string{"off", "shadow", "enforce"} {
-		env := dispatchEnv(Deps{EnvStage: stage}, seatConfig("claude-p"))
+		env := mustDispatchEnv(Deps{EnvStage: stage}, seatConfig("claude-p"))
 		for _, want := range []string{ipcenv.DispatchDepthKey + "=1", ipcenv.PhaseKey + "=build"} {
 			if !slices.Contains(env, want) {
 				t.Errorf("stage %s: the child misses %s, so the refusals of a nested dispatch do not fire; env names %v", stage, want, envNames(env))
@@ -26,7 +26,7 @@ func TestCellEnv_EachStageGivesTheChildTheDepthAndPhaseMarkers(t *testing.T) {
 
 func TestCellEnv_AChildIsOneLevelDeeperThanItsLauncher(t *testing.T) {
 	t.Setenv(ipcenv.DispatchDepthKey, "2")
-	env := dispatchEnv(Deps{EnvStage: "enforce"}, seatConfig("codex"))
+	env := mustDispatchEnv(Deps{EnvStage: "enforce"}, seatConfig("codex"))
 	if !slices.Contains(env, ipcenv.DispatchDepthKey+"=3") || slices.Contains(env, ipcenv.DispatchDepthKey+"=2") {
 		t.Fatalf("a launcher at depth 2 must give its child depth 3 only; env %v", env)
 	}

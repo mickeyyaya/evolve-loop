@@ -146,6 +146,7 @@ var treeReadingSelections = []TestSelection{
 		"TestAgentSandboxContract",
 		"TestAgentSandboxContract_TheHostHoldsTheCredentialThatTheCellCannotRead",
 		"TestAgentSandboxContract_TheSelfhealOrchestratorSeatHoldsN3AndN4",
+		"TestCUJ_EachCorrectionCommandRunsInCell",
 		"TestCompletionContractVocabulary_EveryRequestNamesItsContractByTheTypedConstant",
 		"TestCompletionContractVocabulary_SpelledOnce",
 		"TestDriverNames_AreBuiltOnlyByResolve",

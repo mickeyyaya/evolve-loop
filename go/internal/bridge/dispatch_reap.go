@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -51,13 +52,37 @@ func dispatchTagLine(id string) string {
 	return "export " + ipcenv.DispatchIDKey + "=" + shellQuotePOSIX(id)
 }
 
-func dispatchEnv(deps Deps, cfg *Config) []string {
-	cell, _ := deps.cellEnv(cfg)
+func dispatchEnv(deps Deps, cfg *Config) ([]string, error) {
+	cell, _, err := deps.cellEnv(cfg)
+	if err != nil {
+		return nil, err
+	}
 	env := slices.DeleteFunc(cell, isDispatchTag)
 	if cfg.DispatchID == "" {
-		return env
+		return env, nil
 	}
-	return append(env, ipcenv.DispatchIDKey+"="+cfg.DispatchID)
+	return append(env, ipcenv.DispatchIDKey+"="+cfg.DispatchID), nil
+}
+
+type dispatchRun struct {
+	name     string
+	args     []string
+	stdin    io.Reader
+	stdout   io.Writer
+	stderr   io.Writer
+	extraEnv []string
+}
+
+func (deps Deps) runDispatch(ctx context.Context, cfg *Config, run dispatchRun) (int, error) {
+	env, err := dispatchEnv(deps, cfg)
+	if err != nil {
+		return ExitBadFlags, err
+	}
+	rc, err := deps.Runner(ctx, run.name, cfg.Worktree, run.args, append(env, run.extraEnv...), run.stdin, run.stdout, run.stderr)
+	if err != nil {
+		return ExitMissingBinary, err
+	}
+	return rc, nil
 }
 
 func isDispatchTag(kv string) bool { return strings.HasPrefix(kv, ipcenv.DispatchIDKey+"=") }

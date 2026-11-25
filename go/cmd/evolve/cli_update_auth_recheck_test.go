@@ -15,7 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
-var smokeArtifactPath = regexp.MustCompile(`OK to (\S+) and`)
+var smokeArtifactPath = regexp.MustCompile(`line to (\S+) and`)
 
 type answeringTmux struct {
 	*bridge.FakeTmuxController
@@ -36,7 +36,7 @@ func (a answeringTmux) PasteBuffer(ctx context.Context, session string) error {
 }
 
 func probeDeps(tmux bridge.TmuxController) bridge.Deps {
-	return bridge.Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: io.Discard}
+	return bridge.Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: io.Discard, CellBinRoot: fixedCellBinRoot}
 }
 
 func credentialBenched(t *testing.T, family string) (string, *clihealth.Store) {

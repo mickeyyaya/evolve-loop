@@ -41,15 +41,23 @@ func Default() (Store, error) {
 	if root != "" {
 		return Store{Dir: root}, nil
 	}
+	home, err := PasswdHome()
+	if err != nil {
+		return Store{}, fmt.Errorf("dispatch credential: %w", err)
+	}
+	return Store{Dir: filepath.Join(home, ".evolve", "dispatch")}, nil
+}
+
+func PasswdHome() (string, error) {
 	uid := strconv.Itoa(os.Getuid())
 	u, err := lookupID(uid)
 	if err != nil {
-		return Store{}, fmt.Errorf("dispatch credential: the passwd entry of uid %s: %w", uid, err)
+		return "", fmt.Errorf("the passwd entry of uid %s: %w", uid, err)
 	}
 	if u.HomeDir == "" {
-		return Store{}, fmt.Errorf("dispatch credential: uid %s has no home directory", uid)
+		return "", fmt.Errorf("uid %s has no home directory", uid)
 	}
-	return Store{Dir: filepath.Join(u.HomeDir, ".evolve", "dispatch")}, nil
+	return u.HomeDir, nil
 }
 
 func (s Store) HeldDir() string { return filepath.Join(s.Dir, heldDir) }

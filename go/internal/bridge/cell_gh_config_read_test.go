@@ -90,8 +90,8 @@ func TestCellEnv_NoOptInOrPassthroughLetsAGitHubTokenIntoACell(t *testing.T) {
 			EnvStage: stage, Stderr: io.Discard, HostGitConfig: fakeHostGit(nil), Env: pipeline,
 			AllowAnthropicBaseURL: true, AllowOpenAIAPIKey: true,
 		}
-		env, _ := deps.cellEnv(cfg)
-		for where, got := range map[string][]string{"cellEnv": env, "headless": dispatchEnv(deps, cfg)} {
+		env, _, _ := deps.cellEnv(cfg)
+		for where, got := range map[string][]string{"cellEnv": env, "headless": mustDispatchEnv(deps, cfg)} {
 			for _, key := range githubTokenKeys {
 				if v, ok := lastEnvValue(got, key); ok {
 					t.Errorf("%s %s: %s = %q reached the cell although it is on the passthrough list", stage, where, key, v)

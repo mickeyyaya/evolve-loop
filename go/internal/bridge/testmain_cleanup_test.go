@@ -22,3 +22,7 @@ func RunTestMainCleanups() {
 		fn()
 	}
 }
+
+func SetCellBinRootForTest(dir string) {
+	cellBinRootDefault = func() (string, error) { return dir, nil }
+}

@@ -26,8 +26,17 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "TestMain: set CODEX_HOME: %v\n", err)
 		os.Exit(1)
 	}
+	cellBinRoot, err := os.MkdirTemp("", "evcellbin")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "TestMain: isolate the cell-bin root: %v\n", err)
+		os.Exit(1)
+	}
+	bridge.SetCellBinRootForTest(cellBinRoot)
 	code := tmuxtest.Main(m)
 	bridge.RunTestMainCleanups()
+	if err := os.RemoveAll(cellBinRoot); err != nil {
+		fmt.Fprintf(os.Stderr, "TestMain: remove %s: %v\n", cellBinRoot, err)
+	}
 	if err := os.RemoveAll(codexHome); err != nil {
 		fmt.Fprintf(os.Stderr, "TestMain: remove %s: %v\n", codexHome, err)
 	}

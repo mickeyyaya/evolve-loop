@@ -21,6 +21,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/usageevidence"
 )
 
+var cellBinRoot string
+
+func fixedCellBinRoot() (string, error) { return cellBinRoot, nil }
+
 func TestMain(m *testing.M) {
 	restore, err := gittest.IsolateHostCredentials()
 	if err != nil {
@@ -90,7 +94,16 @@ func TestMain(m *testing.M) {
 	defaultDispatchGate = dispatchGate{open: func() (dispatchcred.Store, error) {
 		return dispatchcred.Store{Dir: filepath.Join(usageDir, "dispatch")}, nil
 	}}
+	cellBinDir, err := os.MkdirTemp("", "evcmdcellbin")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "TestMain: isolate cell-bin: %v\n", err)
+		os.Exit(1)
+	}
+	cellBinRoot = cellBinDir
 	code := tmuxtest.Main(m)
+	if err := os.RemoveAll(cellBinDir); err != nil {
+		fmt.Fprintf(os.Stderr, "TestMain: remove %s: %v\n", cellBinDir, err)
+	}
 	if err := os.RemoveAll(codexHome); err != nil {
 		fmt.Fprintf(os.Stderr, "TestMain: remove %s: %v\n", codexHome, err)
 	}

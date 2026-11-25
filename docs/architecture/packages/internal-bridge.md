@@ -962,3 +962,12 @@ The guard checks a closed marker table: `requireTmux`, `testhost.Tool` with `"tm
 - The adapter keeps one listing per resolved (binary, argv) pair, so `agy` and `agy-claude` share one run and a failed listing fails both. A family with no models id and an unknown family return an error before any process starts.
 - `bridge` imports `modelquery`; `modelquery` never imports `bridge`.
 - Pinned by `model_lister_test.go` and `model_formats_test.go`. The fixtures are `testdata/agy_models.txt` and `testdata/ollama_list.txt`.
+## The cell PATH
+
+Every cell environment holds `PATH=<cell-bin directory>:<host PATH>` at each isolation stage. The cause of the old failure was the host `PATH`: the host process had no `evolve` directory on it, and `hermeticEnv` copies the host value. A correction line such as `evolve phase verify triage --workspace <dir>` then ended with exit 127. The rule, the stages and the failure handling are in [llm-isolation](../llm-isolation.md) section 6.1. The plan is [phase-cell-has-no-evolve-on-path](../../plans/phase-cell-has-no-evolve-on-path-2026-11.md).
+
+- `Deps.ExecutablePath` and `Deps.CellBinRoot` are the seams. A test sets both, so no test writes to the real home.
+- The cell-bin directory is exact when it holds one entry, the `evolve` link to the target. A planted second file (for example `git`) makes it not exact, so the launch rebuilds it. Root and directory are mode 0700. Each launch removes its own stage and aside directories.
+- One publish rule serves the fresh root and the repair. It renames the stage into place. When that fails, it moves the old directory aside and renames again. A launch fails only when the directory is still not exact after 8 attempts. A lost race to another launcher is a success. Pinned by `TestCellBinDir_ManyConcurrentLaunchesRepairAPlantedDirectoryAllSucceed`, `TestCellBinDir_APlantedFileBesideTheLinkIsRebuiltToExactlyTheLink` and `TestCellBinDir_TheRootAndTheDirectoryAreOwnerOnly`.
+- `evolve doctor live` asks the cell for `command -v evolve` and fails when the answer is not the `cell-bin` entry. An earlier `evolve` on the user `PATH` shows there.
+- Agent-facing text names only class A verbs of `agentclass`. `TestAgentCorrections_AreClassA` in `internal/core` enforces it.
