@@ -89,7 +89,7 @@ var unfillablePhaseFields = map[string]string{
 	"BuildExplanationState": "enum string with a closed value set", "Input": "interface, not text",
 	"BypassPolicy": "bool flag", "ComposePhases": "bool flag", "Spec": "pointer, not text",
 	"UpstreamSignals": "map of any", "Assignment": "struct of tier and effort", "Driver": "struct, not text",
-	"BudgetScale": "float, not text", "Ladder": "pointer, not text", "BeforeClose": "func, not text",
+	"BudgetScale": "float, not text", "Ladder": "pointer, not text", "BeforeClose": "func, not text", "Admit": "func, not text",
 	"PermissionMode": "closed value set that selects the CLI mode",
 }
 
