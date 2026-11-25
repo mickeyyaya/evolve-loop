@@ -282,3 +282,59 @@ func TestStageReportPrintsOneLinePerStageKey(t *testing.T) {
 		}
 	}
 }
+
+func TestStageVerifyAndReportShowTypedNotReadyReason(t *testing.T) {
+	t.Parallel()
+	entry, ok := lookupStageEntry("held_proposals.stage")
+	if !ok {
+		t.Fatal("held_proposals.stage missing from registry")
+	}
+	repo, err := filepath.Abs(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	policyBytes, err := os.ReadFile(filepath.Join(repo, ".evolve", "policy.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ver, err := stageevidence.DecisionVersion(filepath.Join(repo, "go"), entry.Shadow.Closure, policyBytes, entry.Shadow.PolicySubtree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := stageevidence.Link("", stageevidence.Record{
+		Key:     "held_proposals.stage",
+		Version: ver,
+		Kind:    stageevidence.KindDecision,
+		ID:      1,
+		Seq:     1,
+		Fields:  map[string]string{"would_hold": "true", "item": "item-1"},
+	})
+	chainPath := writeStageChain(t, stageevidence.Chain{
+		Records:  []stageevidence.Record{rec},
+		Outcomes: []stageevidence.Outcome{{ID: 1, Shipped: true, RoutesMeasured: false}},
+	})
+	verifyJSON, _, code := runStageVerb(t, "verify", "held_proposals.stage", "--json", "--project-root", repo, "--chain", chainPath)
+	if code != cliExitFailed {
+		t.Errorf("verify exited %d, want %d", code, cliExitFailed)
+	}
+	if res := decodeResult(t, verifyJSON); res.Ready || res.NotReady != stageevidence.ReasonConflictsUnmeasured {
+		t.Errorf("verify json = %+v, want not ready %q", res, stageevidence.ReasonConflictsUnmeasured)
+	}
+	verifyText, _, _ := runStageVerb(t, "verify", "held_proposals.stage", "--project-root", repo, "--chain", chainPath)
+	if !strings.Contains(verifyText, "not ready: "+string(stageevidence.ReasonConflictsUnmeasured)) {
+		t.Errorf("verify text lacks not ready reason:\n%s", verifyText)
+	}
+	reportText, _, reportCode := runStageVerb(t, "report", "--project-root", repo, "--chain", chainPath)
+	if reportCode != cliExitOK {
+		t.Fatalf("report exited %d", reportCode)
+	}
+	for _, line := range strings.Split(strings.TrimSpace(reportText), "\n") {
+		if strings.HasPrefix(line, "held_proposals.stage\t") {
+			if !strings.Contains(line, "not_ready="+string(stageevidence.ReasonConflictsUnmeasured)) {
+				t.Errorf("held_proposals.stage row lacks not_ready reason: %s", line)
+			}
+		} else if strings.Contains(line, string(stageevidence.ReasonConflictsUnmeasured)) {
+			t.Errorf("unrelated row printed not_ready reason: %s", line)
+		}
+	}
+}

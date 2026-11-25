@@ -153,6 +153,9 @@ func writeStageVerifyText(stdout io.Writer, res stageevidence.Result, verifyErr 
 		status = "ready"
 	}
 	fmt.Fprintf(stdout, "%s: %s\n", res.Key, status)
+	if res.NotReady != "" {
+		fmt.Fprintf(stdout, "not ready: %s\n", res.NotReady)
+	}
 	if res.Error != "" {
 		detail := res.Error
 		if verifyErr != nil {
@@ -219,8 +222,8 @@ func runStageReport(args []string, stdout, stderr io.Writer) int {
 		if res.Ready {
 			status = "ready"
 		}
-		fmt.Fprintf(stdout, "%s\t%s\tscorer=%s\tversion=%s\tdecisions=%d\tfalse_stops=%d\tescapes=%d\tconflicts=%d\terror=%s\n",
-			res.Key, status, res.Scorer, res.Version, res.Decisions, res.FalseStops, res.Escapes, res.Conflicts, res.Error)
+		fmt.Fprintf(stdout, "%s\t%s\tscorer=%s\tversion=%s\tdecisions=%d\tfalse_stops=%d\tescapes=%d\tconflicts=%d\tnot_ready=%s\terror=%s\n",
+			res.Key, status, res.Scorer, res.Version, res.Decisions, res.FalseStops, res.Escapes, res.Conflicts, res.NotReady, res.Error)
 	}
 	return cliExitOK
 }

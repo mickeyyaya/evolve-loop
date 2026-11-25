@@ -284,3 +284,42 @@ func TestEveryKeyGetsAScorer(t *testing.T) {
 		}
 	}
 }
+
+func TestDependsOnConflictRequiresMeasuredRoutes(t *testing.T) {
+	t.Parallel()
+	if !stageevidence.DependsOnConflict("held_proposals.stage") {
+		t.Fatal("DependsOnConflict(held_proposals.stage) = false, want true")
+	}
+	for _, key := range []string{stageKey, "inbox.curator.stage", "gc.sentinel.hold.stage"} {
+		if stageevidence.DependsOnConflict(key) {
+			t.Errorf("DependsOnConflict(%q) = true, want false", key)
+		}
+	}
+	heldRec := func(id, seq int, ver string, fields map[string]string) stageevidence.Record {
+		return stageevidence.Record{Key: "held_proposals.stage", Version: ver, Kind: stageevidence.KindDecision, ID: id, Seq: seq, Fields: fields}
+	}
+	unmeasured := stageevidence.Chain{
+		Records:  linked([]stageevidence.Record{heldRec(1, 1, currentVersion, map[string]string{"cycle": "1"})}),
+		Outcomes: []stageevidence.Outcome{{ID: 1, Shipped: true}},
+	}
+	got := stageevidence.Score(unmeasured, currentVersion, gatecontract.Promotion{MinDecisions: 1}, stageevidence.ScorerFor("held_proposals.stage"))
+	if got.Ready || got.NotReady != stageevidence.ReasonConflictsUnmeasured {
+		t.Errorf("unmeasured held_proposals.stage = ready %v not_ready %q, want not ready %q", got.Ready, got.NotReady, stageevidence.ReasonConflictsUnmeasured)
+	}
+	measured := stageevidence.Chain{
+		Records:  unmeasured.Records,
+		Outcomes: []stageevidence.Outcome{{ID: 1, Shipped: true, RoutesMeasured: true}},
+	}
+	got = stageevidence.Score(measured, currentVersion, gatecontract.Promotion{MinDecisions: 1}, stageevidence.ScorerFor("held_proposals.stage"))
+	if !got.Ready || got.NotReady != "" {
+		t.Errorf("measured held_proposals.stage = ready %v not_ready %q, want ready with no reason", got.Ready, got.NotReady)
+	}
+	stale := stageevidence.Chain{
+		Records:  linked([]stageevidence.Record{heldRec(1, 1, "old-version", map[string]string{"cycle": "1"})}),
+		Outcomes: []stageevidence.Outcome{{ID: 1, Shipped: true}},
+	}
+	got = stageevidence.Score(stale, currentVersion, gatecontract.Promotion{MinDecisions: 1}, stageevidence.ScorerFor("held_proposals.stage"))
+	if got.Ready || got.NotReady != "" {
+		t.Errorf("uncounted stale record = ready %v not_ready %q, want not ready with no reason", got.Ready, got.NotReady)
+	}
+}

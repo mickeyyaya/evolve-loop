@@ -32,6 +32,12 @@ const (
 	ClassConflict  Class = "conflict"
 )
 
+type NotReadyReason string
+
+const (
+	ReasonConflictsUnmeasured NotReadyReason = "conflicts_unmeasured"
+)
+
 var (
 	ErrBrokenChain    = errors.New("broken chain")
 	ErrEmptyChain     = errors.New("empty chain")
@@ -87,12 +93,13 @@ type Record struct {
 }
 
 type Outcome struct {
-	Scope      ScopeKind `json:"scope,omitempty"`
-	ID         int       `json:"id"`
-	Shipped    bool      `json:"shipped,omitempty"`
-	Incomplete bool      `json:"incomplete,omitempty"`
-	Failed     []string  `json:"failed,omitempty"`
-	Routed     []string  `json:"routed,omitempty"`
+	Scope          ScopeKind `json:"scope,omitempty"`
+	ID             int       `json:"id"`
+	Shipped        bool      `json:"shipped,omitempty"`
+	Incomplete     bool      `json:"incomplete,omitempty"`
+	RoutesMeasured bool      `json:"routes_measured,omitempty"`
+	Failed         []string  `json:"failed,omitempty"`
+	Routed         []string  `json:"routed,omitempty"`
 }
 
 type Chain struct {
@@ -119,6 +126,7 @@ type Result struct {
 	ChainDigest      string         `json:"chain_digest,omitempty"`
 	Error            string         `json:"error,omitempty"`
 	Ready            bool           `json:"ready"`
+	NotReady         NotReadyReason `json:"not_ready,omitempty"`
 	FirstCycle       int            `json:"first_cycle"`
 	LastCycle        int            `json:"last_cycle"`
 	Decisions        int            `json:"decisions"`
@@ -161,6 +169,10 @@ func DefaultScorer() Scorer {
 
 func ScorerFor(_ string) Scorer {
 	return DefaultScorer()
+}
+
+func DependsOnConflict(key string) bool {
+	return key == "held_proposals.stage"
 }
 
 type hashedRecord struct {
@@ -266,6 +278,7 @@ func Score(chain Chain, version string, promotion gatecontract.Promotion, scorer
 		res.Key = chain.Records[0].Key
 		res.ChainDigest = chain.chainDigest()
 	}
+	unmeasuredConflict := false
 	for _, r := range chain.Records {
 		if r.Kind == KindLate {
 			res.Late = append(res.Late, r)
@@ -283,9 +296,16 @@ func Score(chain Chain, version string, promotion gatecontract.Promotion, scorer
 			continue
 		}
 		tallyRecord(&res, r, out, scorer)
+		if DependsOnConflict(r.Key) && !out.RoutesMeasured {
+			unmeasuredConflict = true
+		}
+	}
+	if unmeasuredConflict {
+		res.NotReady = ReasonConflictsUnmeasured
 	}
 	minDecisions := max(promotion.MinDecisions, 1)
-	res.Ready = res.Decisions >= minDecisions &&
+	res.Ready = res.NotReady == "" &&
+		res.Decisions >= minDecisions &&
 		res.Escapes <= promotion.MaxEscapes &&
 		res.FalseStops <= promotion.MaxFalseStops &&
 		res.Conflicts == 0

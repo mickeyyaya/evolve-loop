@@ -155,4 +155,23 @@ func TestAPICover_NamesTheEvidenceRecorderAndSealExports(t *testing.T) {
 	_ = seal.IsPrefixOf(records)
 	_, _ = stageevidence.ParseWorkingName(filepath.Base(stageevidence.WorkingPath(dir, scope)))
 	_ = []stageevidence.Kind{stageevidence.KindOpen, stageevidence.KindClose}
+
+	if !stageevidence.DependsOnConflict("held_proposals.stage") || stageevidence.DependsOnConflict("k") {
+		t.Fatal("DependsOnConflict mismatch")
+	}
+	unmeasured := stageevidence.Score(stageevidence.Chain{
+		Records:  []stageevidence.Record{stageevidence.Link("", stageevidence.Record{Key: "held_proposals.stage", Version: "v1", Kind: stageevidence.KindDecision, ID: 1, Seq: 1})},
+		Outcomes: []stageevidence.Outcome{{ID: 1, Shipped: true, RoutesMeasured: false}},
+	}, "v1", gatecontract.Promotion{MinDecisions: 1}, stageevidence.ScorerFor("held_proposals.stage"))
+	var wantReason stageevidence.NotReadyReason = stageevidence.ReasonConflictsUnmeasured
+	if unmeasured.Ready || unmeasured.NotReady != wantReason {
+		t.Fatalf("unmeasured conflict class = %+v, want not ready %q", unmeasured, wantReason)
+	}
+	measured := stageevidence.Score(stageevidence.Chain{
+		Records:  []stageevidence.Record{stageevidence.Link("", stageevidence.Record{Key: "held_proposals.stage", Version: "v1", Kind: stageevidence.KindDecision, ID: 1, Seq: 1})},
+		Outcomes: []stageevidence.Outcome{{ID: 1, Shipped: true, RoutesMeasured: true}},
+	}, "v1", gatecontract.Promotion{MinDecisions: 1}, stageevidence.ScorerFor("held_proposals.stage"))
+	if !measured.Ready || measured.NotReady != "" {
+		t.Fatalf("measured conflict class = %+v, want ready with empty NotReady", measured)
+	}
 }
