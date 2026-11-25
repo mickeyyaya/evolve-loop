@@ -11,7 +11,7 @@ import (
 
 func runTmuxCLI(t *testing.T, fx launchFixture, cli string, tmux *fakeTmux, lookup map[string]string, extra ...string) (int, string) {
 	t.Helper()
-	eng := NewEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(lookup),
+	eng := newTestEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(lookup),
 		CaptureBaseline: zeroBaselineCapture})
 	var stdout, stderr bytes.Buffer
 	code := eng.LaunchArgs(context.Background(), fx.args(cli, extra...), nil, &stdout, &stderr)

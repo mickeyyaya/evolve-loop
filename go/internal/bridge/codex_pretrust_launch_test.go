@@ -86,7 +86,7 @@ func TestLaunchDispatchesPreflightBeforeDriverLaunch(t *testing.T) {
 	defer func() { ResetDriversForTesting(); registerBuiltins() }()
 
 	fx := newFixture(t, "cb3-orderpin", "")
-	eng := NewEngine(Deps{Sleep: func(d time.Duration) {}, LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Sleep: func(d time.Duration) {}, LookupEnv: mapLookup(nil)})
 	var stdout, stderr bytes.Buffer
 	code := eng.LaunchArgs(context.Background(), fx.args("cb3-orderpin"), nil, &stdout, &stderr)
 	if code != ExitOK {

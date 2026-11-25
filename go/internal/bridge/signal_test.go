@@ -26,11 +26,11 @@ func recordingSignals() (*signalcenter.Center, *[]signalcenter.Event) {
 
 func TestNewEngine_SignalsWiredReportsTheInjectedCenter(t *testing.T) {
 	t.Parallel()
-	if NewEngine(Deps{Stderr: io.Discard}).SignalsWired() {
+	if newTestEngine(Deps{Stderr: io.Discard}).SignalsWired() {
 		t.Error("no Center → not wired (the nil Null Object is a test affordance; the production root always injects one)")
 	}
 	c, _ := recordingSignals()
-	if !NewEngine(Deps{Signals: c, Stderr: io.Discard}).SignalsWired() {
+	if !newTestEngine(Deps{Signals: c, Stderr: io.Discard}).SignalsWired() {
 		t.Error("an injected Center must be reported wired")
 	}
 }
@@ -39,7 +39,7 @@ func TestNewEngine_MissingTokenResolverIsABridgeWarningNotAStderrLine(t *testing
 	t.Parallel()
 	c, got := recordingSignals()
 	var stderr bytes.Buffer
-	NewEngine(Deps{Signals: c, Stderr: &stderr})
+	newTestEngine(Deps{Signals: c, Stderr: &stderr})
 	if strings.Contains(stderr.String(), "TokenResolver") {
 		t.Errorf("the hand-written [engine] WARN line is gone; the sink renders the event: %q", stderr.String())
 	}
@@ -52,7 +52,7 @@ func TestNewEngine_MissingTokenResolverIsABridgeWarningNotAStderrLine(t *testing
 		t.Errorf("a construction-time warning: module bridge, no cycle yet, its own code: %+v", e)
 	}
 	*got = nil
-	NewEngine(Deps{Signals: c, Stderr: &stderr, TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) { return tokenusage.Result{}, nil }})
+	newTestEngine(Deps{Signals: c, Stderr: &stderr, TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) { return tokenusage.Result{}, nil }})
 	if len(*got) != 0 {
 		t.Errorf("a wired resolver warns nothing: %+v", *got)
 	}
@@ -78,7 +78,7 @@ func TestAttemptWarn_IsABridgeWarningWithTheCallIdentity(t *testing.T) {
 func TestRecordModelAttempt_ATripwireIsABridgeTripwire(t *testing.T) {
 	t.Parallel()
 	c, got := recordingSignals()
-	e := NewEngine(Deps{Signals: c, Stderr: io.Discard})
+	e := newTestEngine(Deps{Signals: c, Stderr: io.Discard})
 	req := core.BridgeRequest{CLI: "agy", Agent: "build", Cycle: 7, RunID: "run-7", Workspace: t.TempDir()}
 	end := time.Now()
 	start := end.Add(-tripwireSuccessThreshold - time.Minute)
@@ -172,7 +172,7 @@ func sinkDeps(w io.Writer) *signalcenter.Center {
 func TestRecordModelAttempt_LedgerAppendFailureIsABridgeWarning(t *testing.T) {
 	t.Parallel()
 	c, got := recordingSignals()
-	e := NewEngine(Deps{Signals: c, Stderr: io.Discard, TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) { return tokenusage.Result{}, nil }})
+	e := newTestEngine(Deps{Signals: c, Stderr: io.Discard, TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) { return tokenusage.Result{}, nil }})
 	notADir := filepath.Join(t.TempDir(), "workspace-is-a-file")
 	if err := os.WriteFile(notADir, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)

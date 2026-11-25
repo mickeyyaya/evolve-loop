@@ -129,7 +129,7 @@ func TestEngineLaunch_ClaudeTmuxCarriesTheProfileDenyList(t *testing.T) {
 		t.Fatalf("seed artifact: %v", err)
 	}
 	tmux := &fakeTmux{paneSeq: []string{"❯"}}
-	eng := NewEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), CaptureBaseline: zeroBaselineCapture})
+	eng := newTestEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), CaptureBaseline: zeroBaselineCapture})
 
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-tmux", Profile: profile, Model: "sonnet", Prompt: "x",

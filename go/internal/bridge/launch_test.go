@@ -2,11 +2,13 @@ package bridge
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 type recordedCall struct {
@@ -121,6 +123,17 @@ func run(t *testing.T, fr *fakeRunner, args []string) (int, string) {
 func newTestEngine(d Deps) *Engine {
 	if d.LookupEnv == nil {
 		d.LookupEnv = mapLookup(nil)
+	}
+	if d.SandboxFence == nil {
+		d.SandboxFence = func(context.Context, string) error { return nil }
+	}
+	if d.SandboxReports == nil {
+		d.SandboxReports = func(_ context.Context, tag string, _ time.Time) ([]byte, error) {
+			raw, err := json.Marshal(struct {
+				EventMessage string `json:"eventMessage"`
+			}{EventMessage: fenceMessage(tag)})
+			return append(raw, '\n'), err
+		}
 	}
 	return NewEngine(d)
 }
@@ -259,7 +272,7 @@ func noSandboxWrap() SandboxWrapper {
 func runWithSandbox(t *testing.T, fr *fakeRunner, sw SandboxWrapper, args []string) (int, string) {
 	t.Helper()
 	var stderr strings.Builder
-	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil), SandboxWrap: sw})
+	eng := newTestEngine(Deps{Runner: fr.runner(), SandboxWrap: sw})
 	code := eng.LaunchArgs(context.Background(), args, nil, io.Discard, &stderr)
 	return code, stderr.String()
 }

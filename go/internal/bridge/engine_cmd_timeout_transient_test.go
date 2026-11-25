@@ -14,7 +14,7 @@ func TestEngineLaunch_CmdTimeout124_WrapsTransient(t *testing.T) {
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-test", "")
 	fr := &fakeRunner{exit: ExitCmdTimeout}
-	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
 
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-p", Profile: prof, Model: "auto", Prompt: "x",
@@ -39,7 +39,7 @@ func TestEngineLaunch_MissingBinary127_StaysPlain(t *testing.T) {
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "eng-test", "")
 	fr := &fakeRunner{exit: ExitMissingBinary}
-	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
 
 	_, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-p", Profile: prof, Model: "auto", Prompt: "x",

@@ -8,7 +8,7 @@ import (
 )
 
 func envCapturingEngine(seen map[string][]string) *Engine {
-	return NewEngine(Deps{
+	return newTestEngine(Deps{
 		LookupEnv: mapLookup(nil),
 		LookPath:  func(b string) (string, error) { return "/usr/bin/" + b, nil },
 		Runner: func(_ context.Context, name, _ string, args, env []string, _ io.Reader, stdout, _ io.Writer) (int, error) {

@@ -17,7 +17,7 @@ func TestEngineLaunch_BootMS_CapturedOnColdBoot(t *testing.T) {
 	}
 	tmux := &fakeTmux{paneSeq: []string{tmuxPromptMarkerDefault}}
 	var onBoot []int64
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux:            tmux,
 		Sleep:           func(time.Duration) {},
 		LookupEnv:       mapLookup(nil),
@@ -52,7 +52,7 @@ func TestEngineLaunch_BootMS_ZeroWhenBootNeverCompletes(t *testing.T) {
 	fx := newFixture(t, "claude-tmux", "")
 	tmux := &fakeTmux{}
 	var onBoot []int64
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux:            tmux,
 		Sleep:           func(time.Duration) {},
 		LookupEnv:       mapLookup(nil),
@@ -90,7 +90,7 @@ func TestEngineLaunch_BootMS_ZeroOnWarmNamedSession(t *testing.T) {
 		paneSeq:  []string{tmuxPromptMarkerDefault},
 	}
 	var onBoot []int64
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux:            tmux,
 		Sleep:           func(time.Duration) {},
 		LookupEnv:       mapLookup(nil),

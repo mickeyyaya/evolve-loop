@@ -45,7 +45,7 @@ func runTripwireCase(t *testing.T, c tripwireCase) (stderr, record string) {
 	var errBuf bytes.Buffer
 	signals := signalcenter.New()
 	signals.Subscribe(signalcenter.Filter(signalcenter.StderrSink(&errBuf), signalcenter.SeverityWarn))
-	e := NewEngine(Deps{
+	e := newTestEngine(Deps{
 		Now:           func() time.Time { return end },
 		Stderr:        io.Discard,
 		Signals:       signals,

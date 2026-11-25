@@ -19,7 +19,7 @@ const codeTokensRowUnattributed signalcenter.Code = "TOKENS_ROW_UNATTRIBUTED"
 func attributionEngine(t *testing.T, stage string) (*Engine, *signalcenter.Center) {
 	t.Helper()
 	signals := signalcenter.New()
-	engine := NewEngine(Deps{
+	engine := newTestEngine(Deps{
 		Now:                   func() time.Time { return time.Date(2026, 10, 27, 9, 0, 0, 0, time.UTC) },
 		Stderr:                io.Discard,
 		Signals:               signals,
@@ -98,7 +98,7 @@ func TestEngineLaunch_RowCarriesTheRequestAttribution(t *testing.T) {
 	prof := writeProfile(t, ws, "eng-attribution", "")
 	artifact := filepath.Join(ws, "artifact.md")
 	fr := &fakeRunner{writeArtifactPath: artifact, writeArtifactBody: "OK\n"}
-	engine := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
+	engine := newTestEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
 
 	if _, err := engine.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-p", Profile: prof, Model: "auto", Prompt: "work",

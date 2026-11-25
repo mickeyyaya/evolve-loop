@@ -81,7 +81,7 @@ func TestEngineLaunch_SubmitResendScheduleReachesVerifySubmitted(t *testing.T) {
 	}
 	var stderr bytes.Buffer
 	var sleeps []time.Duration
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux:                 tm,
 		Stderr:               &stderr,
 		LookupEnv:            mapLookup(nil),

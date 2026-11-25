@@ -30,6 +30,7 @@ var protectedGateFiles = []struct {
 	{"go/internal/phases/ship/foreign_predicate_guard_test.go", GuardGuarantee},
 	{"go/internal/bridge/driver_tmux_submitverify_guard_test.go", GuardGuarantee},
 	{"go/internal/bridge/integration_wait_guard_test.go", GuardGuarantee},
+	{"go/internal/bridge/sandbox_fakes_guard_test.go", GuardGuarantee},
 	{"go/internal/sysexec/command_guard_test.go", GuardGuarantee},
 	{"go/internal/sysexec/llm_launch_guard_test.go", GuardGuarantee},
 	{"go/internal/sysexec/llm_runner_guard_test.go", GuardGuarantee},

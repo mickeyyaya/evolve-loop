@@ -47,7 +47,7 @@ func TestTmuxREPL_StdoutContract_CancelAfterIdle_CompletesNotTimeout(t *testing.
 
 	var stderr bytes.Buffer
 	sleep, fired := waitLoopTickCanceller(&stderr, 5, cancel)
-	eng := NewEngine(Deps{Tmux: tmux, Sleep: sleep, LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Tmux: tmux, Sleep: sleep, LookupEnv: mapLookup(nil)})
 
 	var stdout bytes.Buffer
 	code := eng.LaunchArgs(ctx, fx.args("claude-tmux", "--allow-bypass", "--completion=stdout"), nil, &stdout, &stderr)
@@ -80,7 +80,7 @@ func TestTmuxREPL_StdoutContract_CancelWhileStreaming_StillTimesOut(t *testing.T
 
 	var stderr bytes.Buffer
 	sleep, fired := waitLoopTickCanceller(&stderr, 5, cancel)
-	eng := NewEngine(Deps{Tmux: tmux, Sleep: sleep, LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Tmux: tmux, Sleep: sleep, LookupEnv: mapLookup(nil)})
 
 	var stdout bytes.Buffer
 	code := eng.LaunchArgs(ctx, fx.args("claude-tmux", "--allow-bypass", "--completion=stdout"), nil, &stdout, &stderr)
@@ -158,7 +158,7 @@ func TestTmuxREPL_GitContract_CancelAfterEvidenceCommit_CompletesNotTimeout(t *t
 		advanced = true
 		cancel()
 	})
-	eng := NewEngine(Deps{Tmux: tmux, Sleep: sleep, LookupEnv: mapLookup(nil), Runner: gr.run})
+	eng := newTestEngine(Deps{Tmux: tmux, Sleep: sleep, LookupEnv: mapLookup(nil), Runner: gr.run})
 
 	var stdout bytes.Buffer
 	code := eng.LaunchArgs(ctx, fx.args("claude-tmux", "--allow-bypass", "--completion=git", "--agent=build"), nil, &stdout, &stderr)
@@ -197,7 +197,7 @@ func TestTmuxREPL_GitContract_CancelWithoutEvidenceCommit_StillTimesOut(t *testi
 
 	var stderr bytes.Buffer
 	sleep, fired := waitLoopTickCanceller(&stderr, 2, cancel)
-	eng := NewEngine(Deps{Tmux: tmux, Sleep: sleep, LookupEnv: mapLookup(nil), Runner: gr.run})
+	eng := newTestEngine(Deps{Tmux: tmux, Sleep: sleep, LookupEnv: mapLookup(nil), Runner: gr.run})
 
 	var stdout bytes.Buffer
 	code := eng.LaunchArgs(ctx, fx.args("claude-tmux", "--allow-bypass", "--completion=git", "--agent=build"), nil, &stdout, &stderr)

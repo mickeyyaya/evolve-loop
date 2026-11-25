@@ -18,7 +18,7 @@ func TestContextFillWarn_ContributorsMatchPeakPromptReading(t *testing.T) {
 	ws := t.TempDir()
 
 	var errBuf bytes.Buffer
-	e := NewEngine(Deps{
+	e := newTestEngine(Deps{
 		Now:                func() time.Time { return end },
 		Stderr:             &errBuf,
 		Signals:            sinkDeps(&errBuf),
@@ -56,7 +56,7 @@ func TestContextFillWarn_ContributorsFallBackToUsageWithoutPeakData(t *testing.T
 	ws := t.TempDir()
 
 	var errBuf bytes.Buffer
-	e := NewEngine(Deps{
+	e := newTestEngine(Deps{
 		Now:                func() time.Time { return end },
 		Stderr:             &errBuf,
 		Signals:            sinkDeps(&errBuf),
