@@ -93,6 +93,18 @@ The week use comes from the usage windows that the pre-wave usage probe records.
 
 With `order: headroom`, the builder can start on claude, the family of the auditor and the tdd engineer. `Compile` reports this as a `cross_family_with` warning. The checked-in `.evolve/policy.json` does not set `order` yet. The operator applies D5 (W3) and then this rule at a wave boundary.
 
+## Judge seat for the handoff check
+
+The handoff check has a judge seat. It asks "does this evidence meet the meaning of this ask?". The plan [handoff-judge-one-seat-walker-ac-1b-console-2026-11](../plans/handoff-judge-one-seat-walker-ac-1b-console-2026-11.md) holds the design.
+
+- The chain of the agent `handoff-judge` is `agy`, then `claude`. The entry has a `cli` list and no `model` key.
+- The tier is the key `handoff.<pair>.judge_tier` in `.evolve/policy.json`. Routing never holds a second copy of it.
+- The profile `.evolve/profiles/handoff-judge.json` sets `allowed_clis` to `agy` and `claude`. So the after-chain tail never adds `agy-claude`.
+- The envelope of the profile is `balanced` to `top`. The walker never steps below `balanced`.
+- The walker skips each seat that serves the model of the author, or a model of the vendor of the author in another family.
+
+`TestHandoffJudge_ProfileAndRoutingAgree` pins that the profile, the routing entry and the resolved plan agree.
+
 ## Routing Principles
 
 - Use deterministic Go for fixed checks, state transitions, hashing, and gates.

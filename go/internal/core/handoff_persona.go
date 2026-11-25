@@ -17,8 +17,6 @@ import (
 
 const handoffRequestHeading = "### Handoff request (ADR-0141)\n"
 
-const handoffUnattributed = "unattributed"
-
 var handoffLedgerPairOf = map[string]string{
 	string(PhaseTriage): request.PairScoutTriage,
 	string(PhaseTDD):    request.PairTriageTDD,
@@ -122,12 +120,12 @@ func stampLedger(path string, in ReviewInput, tree string) (string, error) {
 	stamp := map[string]any{}
 	author, found, authorErr := dispatchAuthor(in.Workspace, in.Phase, in.Cycle)
 	if !found {
-		author = handoff.Author{CLI: handoffUnattributed}
+		author = handoff.Author{CLI: handoff.Unattributed}
 		cause := "no matching record"
 		if authorErr != nil {
 			cause = authorErr.Error()
 		}
-		fmt.Fprintf(in.errOut(), "[orchestrator] WARN handoff %s: no dispatch record names the author, so it is set to %s (%s)\n", filepath.Base(path), handoffUnattributed, cause)
+		fmt.Fprintf(in.errOut(), "[orchestrator] WARN handoff %s: no dispatch record names the author, so it is set to %s (%s)\n", filepath.Base(path), handoff.Unattributed, cause)
 	}
 	stamp["author"] = author
 	recorded := recordedOutputDigest(fields)

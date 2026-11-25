@@ -233,7 +233,7 @@ func TestHandoffReviewer_NoTrustworthyDispatchRecordReplacesTheAuthorWithUnattri
 			in, path, errBuf := personaReviewInput(t, "build", ledger)
 			setup(t, in.Workspace)
 			stampHandoffAuthor(in, "")
-			if got := authorOf(t, path); got != (handoff.Author{CLI: handoffUnattributed}) {
+			if got := authorOf(t, path); got != (handoff.Author{CLI: handoff.Unattributed}) {
 				t.Errorf("author = %+v, want unattributed", got)
 			}
 			if n := strings.Count(errBuf.String(), "WARN"); n != 1 || !strings.Contains(errBuf.String(), "unattributed") {
@@ -335,7 +335,7 @@ func TestHandoffReviewer_UnreadableLedgerWarnsAndAnUnreadableDispatchRecordIsUna
 		}
 		stampHandoffAuthor(in, "")
 		raw, _ := os.ReadFile(path)
-		if authorOf(t, path) != (handoff.Author{CLI: handoffUnattributed}) || !strings.Contains(errBuf.String(), "unattributed") {
+		if authorOf(t, path) != (handoff.Author{CLI: handoff.Unattributed}) || !strings.Contains(errBuf.String(), "unattributed") {
 			t.Errorf("ledger %s stderr %q", raw, errBuf)
 		}
 	})
@@ -625,7 +625,7 @@ func TestRecordHandoffCheck_ASymlinkedLedgerIsNeitherReadNorRewritten(t *testing
 	t.Parallel()
 
 	ws, link, _ := symlinkedLedger(t, "tdd-build")
-	if err := recordHandoffCheck(ws, "tdd-build", handoff.Check{}); !errors.Is(err, errHandoffLedgerNotRegular) {
+	if err := recordHandoffCheck(ws, "tdd-build", handoff.Check{}, nil); !errors.Is(err, errHandoffLedgerNotRegular) {
 		t.Fatalf("recordHandoffCheck = %v, want errHandoffLedgerNotRegular", err)
 	}
 	assertLedgerLeftAsALink(t, ws, link)
@@ -692,7 +692,7 @@ func TestRecordHandoffCheck_AHardLinkedLedgerIsNeitherReadNorRewritten(t *testin
 	t.Parallel()
 
 	ws, ledger := hardLinkedLedger(t, "tdd-build")
-	if err := recordHandoffCheck(ws, "tdd-build", handoff.Check{}); !errors.Is(err, errHandoffLedgerNotRegular) {
+	if err := recordHandoffCheck(ws, "tdd-build", handoff.Check{}, nil); !errors.Is(err, errHandoffLedgerNotRegular) {
 		t.Fatalf("recordHandoffCheck = %v, want errHandoffLedgerNotRegular", err)
 	}
 	assertNoSecretRewritten(t, ledger)
