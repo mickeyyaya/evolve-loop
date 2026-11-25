@@ -68,7 +68,7 @@ func selfhealProject(t *testing.T, policyJSON string) string {
 
 func selfhealTestEnv(gh func(context.Context, string, ...string) (string, error)) selfhealEnv {
 	return selfhealEnv{
-		now: func() time.Time { return selfhealNow }, gh: gh, declared: func(f string) bool { return f == "claude" }, families: func() []string { return []string{"agy", "claude"} },
+		now: func() time.Time { return selfhealNow }, gh: gh, declared: func(f string) bool { return f == "claude" }, families: func() []string { return []string{"agy", "claude"} }, auditRefused: func(string) (bool, error) { return false, nil },
 		newCenter: func(root, evolveDir string, console io.Writer) (*signalcenter.Center, func()) {
 			c := newRootSignalCenter(root, evolveDir, console)
 			return c, rootwire.Attach(c, roleSelfheal, evolveDir, console)

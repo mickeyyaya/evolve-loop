@@ -67,10 +67,14 @@ func runSelfhealPropose(env selfhealEnv, w codeEnvelopeWriter, root string, pol 
 }
 
 type proposePass struct {
+	stderr    io.Writer
 	root      string
 	pol       policy.Policy
 	incidents []selfheal.Incident
 	since     time.Time
+	signals   []signalcenter.Event
+	stage     string
+	now       time.Time
 }
 
 func proposeDiagnoses(env selfhealEnv, root string, pol policy.Policy, stderr io.Writer) (proposeReport, []string, error) {
@@ -93,27 +97,21 @@ func proposeDiagnoses(env selfhealEnv, root string, pol policy.Policy, stderr io
 	if len(pending) == 0 {
 		return report, nil, nil
 	}
-	pass := proposePass{root: root, pol: pol, incidents: incidents, since: now.Add(-hours(pol.HealingDetector().WindowHours))}
-	signals, err := selfheal.LoadSignals(paths.EventChannelsRoot(evolveDir), proposeChannels, pass.since)
+	since := now.Add(-hours(pol.HealingDetector().WindowHours))
+	signals, err := selfheal.LoadSignals(paths.EventChannelsRoot(evolveDir), proposeChannels, since)
 	if err != nil {
 		return report, nil, err
 	}
+	pass := proposePass{stderr: stderr, root: root, pol: pol, incidents: incidents, since: since, signals: signals, stage: cfg.Stage, now: now}
 	decider, err := newProposalDecider(env, pass)
 	if err != nil {
 		return report, nil, err
 	}
-	var proposals []selfheal.Proposal
-	for i, inc := range pending {
-		p := diagnoseIncident(env, root, inc, signals, cfg.Stage, now, stderr)
-		proposals = append(proposals, decider.decide(p, inc, now))
-		if p.State == selfheal.ProposalSkipped {
-			proposals = append(proposals, skippedAfterRefusal(pending[i+1:], inc, cfg.Stage, now)...)
-			break
-		}
-	}
+	proposals, decided := pass.diagnose(env, pending, decider)
 	if err := decider.appendLedger(evolveDir); err != nil {
 		return report, nil, err
 	}
+	decider.openRepairItems(env, pass, decided)
 	for _, p := range proposals {
 		if err := selfheal.WriteProposal(selfheal.ProposalsDir(evolveDir), p); err != nil {
 			return report, nil, err
@@ -122,6 +120,22 @@ func proposeDiagnoses(env selfhealEnv, root string, pol policy.Policy, stderr io
 	}
 	decider.publish(env, root, stderr)
 	return report, decider.warnings, nil
+}
+
+func (pass proposePass) diagnose(env selfhealEnv, pending []selfheal.Incident, decider *proposalDecider) ([]selfheal.Proposal, []decidedProposal) {
+	var proposals []selfheal.Proposal
+	var decided []decidedProposal
+	for i, inc := range pending {
+		diagnosed := diagnoseIncident(env, pass.root, inc, pass.signals, pass.stage, pass.now, pass.stderr)
+		p := decider.decide(diagnosed, inc, pass.now)
+		proposals = append(proposals, p)
+		decided = append(decided, decidedProposal{inc: inc, p: p})
+		if diagnosed.State == selfheal.ProposalSkipped {
+			proposals = append(proposals, skippedAfterRefusal(pending[i+1:], inc, pass.stage, pass.now)...)
+			break
+		}
+	}
+	return proposals, decided
 }
 
 func skippedAfterRefusal(rest []selfheal.Incident, refused selfheal.Incident, stage string, now time.Time) []selfheal.Proposal {

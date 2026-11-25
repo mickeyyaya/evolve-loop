@@ -238,6 +238,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `HEALING_INCIDENT_OPENED` | the incident detector opened an incident record under .evolve/incidents; fields incident, class, fingerprint, tier, state, transition, recurrence, stage, and from the live reaction on a sealed FAIL also reaction: would_brake, braked, brake_already_engaged or brake_failed (llm-isolation.md §18, §24) |
 | `HEALING_INCIDENT_REOPENED` | the incident detector reopened a closed incident, because its signal fired again after the close; the same fields as HEALING_INCIDENT_OPENED (llm-isolation.md §18, §22) |
 | `HEALING_PROPOSAL_REFUSED` | the catalog validator refused a proposal of the orchestrator agent; fields incident, class, tier, action, verdict, precondition, reason, stage (llm-isolation.md §19, §19.2, §24) |
+| `HEALING_REPAIR_ROUTED` | an accepted open-repair-item proposal was filed as a console-routed pipeline-repair item; fields incident, item, tier, stage, would_route (lane for a T1 item once the lane route ships, console for T0 and T2), would_refuse_audit (no other family can judge the builder) (llm-isolation.md section 20.2) |
 
 ### host
 
