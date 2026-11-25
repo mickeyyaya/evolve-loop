@@ -5,7 +5,8 @@
     "Each migration keeps the predicate's intent; a predicate whose subject no longer exists is archived with a reason, not deleted silently.",
     "Docs in STE: the acs predicate quality gate doc records the compile guard.",
     "`go vet -tags acs ./acs/cycle334/` is clean and `go test -tags acs -count=1 ./acs/cycle334/` passes on main (port it to DefaultHours/UsageReset, or retire it and name the quotareset test that pins the behaviour)",
-    "Branch cycle-cd3ae73e-2352 holds the unmerged acs vet baseline, Makefile target and ci.yml step; land or retire it, then evolve gc no longer flags cycle-cd3ae73e-2352"
+    "Branch cycle-cd3ae73e-2352 holds the unmerged acs vet baseline, Makefile target and ci.yml step; land or retire it, then evolve gc no longer flags cycle-cd3ae73e-2352",
+    "A data file lists the acs/cycleNNNN packages that are expected to fail on main, and a command (for example evolve acs expected-red) prints it, so a builder compares a red acs package against it without a rerun on a clean main (2026-11-25: about 20 such packages fail on a clean origin/main, and acs/cycle1911 calls bridgechain.ApplyCLIHealthBench with 6 arguments where it takes 5)"
   ],
   "created_at": "2026-11-02T04:20:00Z",
   "deps": [],
