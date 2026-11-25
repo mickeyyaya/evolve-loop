@@ -42,7 +42,7 @@ func fixtureChain() stageevidence.Chain {
 		Outcomes: []stageevidence.Outcome{
 			{ID: 1, Failed: []string{"lint"}},
 			{ID: 2, Shipped: true},
-			{ID: 3, Routed: []string{"item-9"}},
+			{ID: 3, Routed: []string{"item-9"}, RoutesMeasured: true},
 			{ID: 4, Shipped: true},
 		},
 	}
@@ -69,9 +69,9 @@ func (m memoryChain) ReadChain(context.Context, string) (stageevidence.Chain, er
 
 func wantCases() []stageevidence.Case {
 	return []stageevidence.Case{
-		{Class: stageevidence.ClassEscape, Cycle: 1, Seq: 1},
-		{Class: stageevidence.ClassFalseStop, Cycle: 2, Seq: 2},
-		{Class: stageevidence.ClassConflict, Cycle: 3, Seq: 3},
+		{Class: stageevidence.ClassEscape, ID: 1, Seq: 1},
+		{Class: stageevidence.ClassFalseStop, ID: 2, Seq: 2},
+		{Class: stageevidence.ClassConflict, ID: 3, Seq: 3},
 	}
 }
 
@@ -89,8 +89,8 @@ func TestVerdictRecomputesFromFixtureChain(t *testing.T) {
 	if !slices.Equal(got.Cases, wantCases()) {
 		t.Errorf("cases = %+v, want %+v", got.Cases, wantCases())
 	}
-	if got.Version != currentVersion || got.FirstCycle != 1 || got.LastCycle != 4 {
-		t.Errorf("version %q range %d to %d, want %q 1 to 4", got.Version, got.FirstCycle, got.LastCycle, currentVersion)
+	if got.Version != currentVersion || got.FirstID != 1 || got.LastID != 4 {
+		t.Errorf("version %q range %d to %d, want %q 1 to 4", got.Version, got.FirstID, got.LastID, currentVersion)
 	}
 	if got.ChainDigest != chain.Records[len(chain.Records)-1].Hash {
 		t.Errorf("chain digest %q is not the hash of the last record", got.ChainDigest)
@@ -132,12 +132,25 @@ func singleFault(fields map[string]string, outcome stageevidence.Outcome) stagee
 	}
 }
 
+func heldKeyed(chain stageevidence.Chain) stageevidence.Chain {
+	records := slices.Clone(chain.Records)
+	for i := range records {
+		if records[i].ID == chain.Outcomes[0].ID {
+			records[i].Key = "held_proposals.stage"
+		}
+		records[i].Hash = ""
+		records[i].Prev = ""
+	}
+	chain.Records = linked(records)
+	return chain
+}
+
 func TestPromotionDataDecidesReadiness(t *testing.T) {
 	t.Parallel()
 	clean := singleFault(map[string]string{"would_stop": "false"}, stageevidence.Outcome{Shipped: true})
 	escape := singleFault(map[string]string{"would_skip": "true", "check": "lint"}, stageevidence.Outcome{Failed: []string{"lint"}})
 	falseStop := singleFault(map[string]string{"would_stop": "true"}, stageevidence.Outcome{Shipped: true})
-	conflict := singleFault(map[string]string{"would_hold": "true", "item": "item-9"}, stageevidence.Outcome{Routed: []string{"item-9"}})
+	conflict := singleFault(map[string]string{"would_hold": "true", "item": "item-9"}, stageevidence.Outcome{Routed: []string{"item-9"}, RoutesMeasured: true})
 	loose := gatecontract.Promotion{MinDecisions: 1, MaxEscapes: 5, MaxFalseStops: 5}
 	cases := []struct {
 		name      string
@@ -206,8 +219,8 @@ func TestIncompleteAndLateEvidenceNeverCount(t *testing.T) {
 	if got.Decisions != 2 {
 		t.Errorf("decisions = %d, want 2: an incomplete cycle and a late record never count", got.Decisions)
 	}
-	if !slices.Equal(got.IncompleteCycles, []int{1}) {
-		t.Errorf("incomplete cycles = %v, want [1]", got.IncompleteCycles)
+	if !slices.Equal(got.IncompleteScopes, []string{"cycle-1"}) {
+		t.Errorf("incomplete scopes = %v, want [cycle-1]", got.IncompleteScopes)
 	}
 	if len(got.Late) != 1 || got.Late[0].ID != 3 || got.Late[0].Seq != 3 {
 		t.Errorf("late = %+v, want the one record of cycle 3 seq 3 listed", got.Late)
@@ -285,41 +298,114 @@ func TestEveryKeyGetsAScorer(t *testing.T) {
 	}
 }
 
-func TestDependsOnConflictRequiresMeasuredRoutes(t *testing.T) {
+func TestCasesAndIncompleteScopesNameTheirScopeSoEqualIdsStayApart(t *testing.T) {
 	t.Parallel()
-	if !stageevidence.DependsOnConflict("held_proposals.stage") {
-		t.Fatal("DependsOnConflict(held_proposals.stage) = false, want true")
+	pool := decision(2, 1, currentVersion, map[string]string{"would_stop": "true"})
+	pool.Scope = stageevidence.ScopePool
+	cycle := decision(2, 1, currentVersion, map[string]string{"would_stop": "true"})
+	chain := stageevidence.Chain{
+		Records: linked([]stageevidence.Record{pool, cycle}),
+		Outcomes: []stageevidence.Outcome{
+			{Scope: stageevidence.ScopePool, ID: 2, Shipped: true},
+			{ID: 2, Shipped: true},
+			{Scope: stageevidence.ScopeCurator, ID: 2, Incomplete: true},
+			{ID: 9, Incomplete: true},
+			{ID: 3, Incomplete: true},
+		},
 	}
-	for _, key := range []string{stageKey, "inbox.curator.stage", "gc.sentinel.hold.stage"} {
-		if stageevidence.DependsOnConflict(key) {
-			t.Errorf("DependsOnConflict(%q) = true, want false", key)
+	got := stageevidence.Score(chain, currentVersion, gatecontract.Promotion{MinDecisions: 1}, stageevidence.DefaultScorer())
+	if len(got.Cases) != 2 || got.Cases[0].ScopeKey() != (stageevidence.ScopeKey{Kind: stageevidence.ScopePool, ID: 2}) || got.Cases[1].ScopeKey() != stageevidence.CycleScope(2) {
+		t.Errorf("cases = %+v, want one pool-2 case and one cycle-2 case", got.Cases)
+	}
+	if want := []string{"curator-2", "cycle-3", "cycle-9"}; !slices.Equal(got.IncompleteScopes, want) {
+		t.Errorf("incomplete scopes = %v, want %v ordered by kind then id", got.IncompleteScopes, want)
+	}
+}
+
+func TestIncompleteScopesOrderByKindBeforeIdWhenTheTwoOrdersDisagree(t *testing.T) {
+	t.Parallel()
+	chain := stageevidence.Chain{
+		Outcomes: []stageevidence.Outcome{
+			{ID: 3, Incomplete: true},
+			{Scope: stageevidence.ScopeCurator, ID: 5, Incomplete: true},
+		},
+	}
+	got := stageevidence.Score(chain, currentVersion, gatecontract.Promotion{MinDecisions: 1}, stageevidence.DefaultScorer())
+	if want := []string{"curator-5", "cycle-3"}; !slices.Equal(got.IncompleteScopes, want) {
+		t.Errorf("incomplete scopes = %v, want %v ordered by kind before id", got.IncompleteScopes, want)
+	}
+}
+
+func TestDefaultScorerCountsAConflictWhenAnyItemOfAHeldRecordIsRouted(t *testing.T) {
+	t.Parallel()
+	held := stageevidence.Record{Fields: map[string]string{stageevidence.FieldWouldHold: "true", stageevidence.FieldItem: "a" + stageevidence.ItemSeparator + "b"}}
+	cases := []struct {
+		name   string
+		routed []string
+		want   stageevidence.Class
+	}{
+		{"the second item is routed", []string{"b"}, stageevidence.ClassConflict},
+		{"the first item is routed", []string{"a"}, stageevidence.ClassConflict},
+		{"another item is routed", []string{"c"}, stageevidence.ClassNone},
+		{"nothing is routed", nil, stageevidence.ClassNone},
+	}
+	for _, c := range cases {
+		if got := stageevidence.DefaultScorer().Classify(held, stageevidence.Outcome{Routed: c.routed}); got != c.want {
+			t.Errorf("%s: class = %q, want %q", c.name, got, c.want)
 		}
 	}
-	heldRec := func(id, seq int, ver string, fields map[string]string) stageevidence.Record {
-		return stageevidence.Record{Key: "held_proposals.stage", Version: ver, Kind: stageevidence.KindDecision, ID: id, Seq: seq, Fields: fields}
+}
+
+func TestAHeldDecisionOfAnOutcomeWithoutMeasuredRoutesIsNotReadyAndNeverZeroConflicts(t *testing.T) {
+	t.Parallel()
+	held := map[string]string{stageevidence.FieldWouldHold: "true", stageevidence.FieldItem: "item-9"}
+	measured := heldKeyed(singleFault(held, stageevidence.Outcome{Routed: []string{"other"}, RoutesMeasured: true}))
+	unmeasured := heldKeyed(singleFault(held, stageevidence.Outcome{}))
+	promotion := gatecontract.Promotion{MinDecisions: 1}
+
+	gotMeasured := stageevidence.Score(measured, currentVersion, promotion, stageevidence.DefaultScorer())
+	gotUnmeasured := stageevidence.Score(unmeasured, currentVersion, promotion, stageevidence.DefaultScorer())
+
+	if !gotMeasured.Ready || gotMeasured.NotReady != "" {
+		t.Errorf("measured result = %+v, want ready", gotMeasured)
 	}
-	unmeasured := stageevidence.Chain{
-		Records:  linked([]stageevidence.Record{heldRec(1, 1, currentVersion, map[string]string{"cycle": "1"})}),
-		Outcomes: []stageevidence.Outcome{{ID: 1, Shipped: true}},
+	if gotUnmeasured.Ready || gotUnmeasured.NotReady != stageevidence.ReasonConflictsUnmeasured {
+		t.Errorf("unmeasured result ready = %t, not ready = %q; want not ready with %q", gotUnmeasured.Ready, gotUnmeasured.NotReady, stageevidence.ReasonConflictsUnmeasured)
 	}
-	got := stageevidence.Score(unmeasured, currentVersion, gatecontract.Promotion{MinDecisions: 1}, stageevidence.ScorerFor("held_proposals.stage"))
-	if got.Ready || got.NotReady != stageevidence.ReasonConflictsUnmeasured {
-		t.Errorf("unmeasured held_proposals.stage = ready %v not_ready %q, want not ready %q", got.Ready, got.NotReady, stageevidence.ReasonConflictsUnmeasured)
+}
+
+func TestAMeasuredSealWithARoutedItemScoresOneConflict(t *testing.T) {
+	t.Parallel()
+	r, raw := sealedRig(t)
+	seal, records, err := stageevidence.BuildSeal(r.scope, raw, stageevidence.SealInput{Routed: []string{"item-9"}, RoutesMeasured: true})
+	if err != nil {
+		t.Fatal(err)
 	}
-	measured := stageevidence.Chain{
-		Records:  unmeasured.Records,
-		Outcomes: []stageevidence.Outcome{{ID: 1, Shipped: true, RoutesMeasured: true}},
+	held := linked([]stageevidence.Record{decision(r.scope.ID, 1, currentVersion, map[string]string{stageevidence.FieldWouldHold: "true", stageevidence.FieldItem: "item-9"})})
+	chain := stageevidence.Chain{Records: held, Outcomes: []stageevidence.Outcome{seal.Outcome(r.scope)}}
+
+	got := stageevidence.Score(chain, currentVersion, gatecontract.Promotion{MinDecisions: 1}, stageevidence.DefaultScorer())
+
+	if len(records) == 0 || !seal.RoutesMeasured || got.Conflicts != 1 || got.Ready {
+		t.Errorf("seal measured = %t, conflicts = %d, ready = %t; want a measured seal with one conflict and not ready", seal.RoutesMeasured, got.Conflicts, got.Ready)
 	}
-	got = stageevidence.Score(measured, currentVersion, gatecontract.Promotion{MinDecisions: 1}, stageevidence.ScorerFor("held_proposals.stage"))
-	if !got.Ready || got.NotReady != "" {
-		t.Errorf("measured held_proposals.stage = ready %v not_ready %q, want ready with no reason", got.Ready, got.NotReady)
+}
+
+func TestAMeasuredSealKeepsItsRoutesThroughTheOutcomeAndTheStoredVerification(t *testing.T) {
+	t.Parallel()
+	r, raw := sealedRig(t)
+	seal, _, err := stageevidence.BuildSeal(r.scope, raw, stageevidence.SealInput{Routed: []string{"item-9"}, RoutesMeasured: true})
+	if err != nil {
+		t.Fatal(err)
 	}
-	stale := stageevidence.Chain{
-		Records:  linked([]stageevidence.Record{heldRec(1, 1, "old-version", map[string]string{"cycle": "1"})}),
-		Outcomes: []stageevidence.Outcome{{ID: 1, Shipped: true}},
+
+	outcome := seal.Outcome(r.scope)
+	_, verifyErr := stageevidence.VerifyStored(r.scope, raw, seal)
+
+	if !outcome.RoutesMeasured || !slices.Equal(outcome.Routed, []string{"item-9"}) {
+		t.Errorf("outcome = %+v, want the measured routes of the seal", outcome)
 	}
-	got = stageevidence.Score(stale, currentVersion, gatecontract.Promotion{MinDecisions: 1}, stageevidence.ScorerFor("held_proposals.stage"))
-	if got.Ready || got.NotReady != "" {
-		t.Errorf("uncounted stale record = ready %v not_ready %q, want not ready with no reason", got.Ready, got.NotReady)
+	if verifyErr != nil {
+		t.Errorf("VerifyStored of a measured seal = %v, want nil", verifyErr)
 	}
 }

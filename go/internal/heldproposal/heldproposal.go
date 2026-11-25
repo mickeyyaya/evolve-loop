@@ -45,13 +45,15 @@ type Inputs struct {
 type Decision struct {
 	Hold    bool
 	Reasons []string
+	Items   []string
 }
 
 func Decide(in Inputs) Decision {
-	var reasons []string
+	var reasons, items []string
 	for _, it := range in.Items {
 		if routed, why := inboxbatch.ConsoleRouted(it, in.Protected); routed {
 			reasons = append(reasons, "routed:"+why)
+			items = append(items, it.ID)
 		}
 	}
 	for _, path := range in.Changed {
@@ -61,7 +63,8 @@ func Decide(in Inputs) Decision {
 	}
 	slices.Sort(reasons)
 	reasons = slices.Compact(reasons)
-	return Decision{Hold: len(reasons) > 0, Reasons: reasons}
+	slices.Sort(items)
+	return Decision{Hold: len(reasons) > 0, Reasons: reasons, Items: slices.Compact(items)}
 }
 
 type Record struct {

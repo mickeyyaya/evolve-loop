@@ -535,7 +535,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	warnRetiredControls(console, os.Environ())
 	st := storage.New(evolveDir)
 	ld := ledger.New(evolveDir, ledger.WithSignals(signals))
-
+	stageSite := newStageEvidenceSite(projectRoot, ld, signals)
 	br := bridge.NewDefault(projectRoot, signals)
 	if err := newBypassAuditor(evolveDir, signals, console).applySandboxOff(br, run.sandboxOff); err != nil {
 		return orchDeps{Signals: signals, CloseSignals: closeSignals, RoutingErr: err}
@@ -597,7 +597,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 		core.PhaseBuildPlanner: buildplanner.New(buildplanner.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf}).BaseRunner(),
 		core.PhaseBuild:        swarmrunner.New(build.New(build.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, PhaseIO: cfg.PhaseIO, CompactPrompts: cfg.CompactPrompts}), walked, swarm.ModeWriter, swCfg),
 		core.PhaseAudit:        audit.NewDefaultWithStageCompactSpec(walked, prm, cfg.PhaseIO, cfg.CompactPrompts, documentSpecPtr(cfg), audit.WithContractVerifier(verifierOf), audit.WithHostEffects(hostEffectsOf), audit.WithSignals(func() *signalcenter.Center { return signals })),
-		core.PhaseShip:         ship.New(ship.Config{Runner: sysexec.DefaultRunner, PhaseIO: cfg.PhaseIO, ManifestGate: gatesCfg.ManifestGate, RepoContractGate: gatesCfg.RepoContractGate, Signals: signals, Integration: shipIntegration, HeldAudit: heldAuditPort(projectRoot, console), HeldAuditPlan: heldAuditPlanPort(projectRoot, console)}),
+		core.PhaseShip:         ship.New(ship.Config{Runner: sysexec.DefaultRunner, PhaseIO: cfg.PhaseIO, ManifestGate: gatesCfg.ManifestGate, RepoContractGate: gatesCfg.RepoContractGate, Signals: signals, Integration: shipIntegration, HeldAudit: heldAuditPort(projectRoot, console), HeldAuditPlan: heldAuditPlanPort(projectRoot, console), StageEvidence: stageSite.shipOpener()}),
 		core.PhaseRetro:        retro.New(retro.Config{Bridge: walked, Prompts: prm, Model: "auto", CompactPrompts: cfg.CompactPrompts, Router: cliRouter, ContractVerifier: verifierOf}),
 		core.PhaseDebugger:     debugger.New(debugger.Config{Bridge: walked, Prompts: prm, ContractVerifier: verifierOf, HostEffects: hostEffectsOf, CompactPrompts: cfg.CompactPrompts}),
 	}
@@ -671,7 +671,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	opts = append(opts, core.WithKB(research.NewFileKBWithRecall(kbRootsAbs(projectRoot), kbRecallK(projectRoot))))
 
 	opts = append(opts, core.WithShipFloor(policyShipFloor))
-	opts = append(opts, core.WithRetryConfig(pol.RetryConfig()))
+	opts = append(opts, core.WithRetryConfig(pol.RetryConfig()), core.WithStageEvidence(stageSite.coreEvidence()))
 	opts = append(opts, core.WithFailureCountReader(failureCountReader(projectRoot)))
 	opts = append(opts, core.WithFailureClassReader(failureClassReader(projectRoot)))
 	opts = append(opts, core.WithScopePathResolver(scopePathResolver))
