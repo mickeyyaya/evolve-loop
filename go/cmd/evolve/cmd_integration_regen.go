@@ -52,7 +52,7 @@ func (r derivedRegen) checkout(ctx context.Context, onto string) (string, error)
 	if _, err := r.Repo.Git(ctx, r.Repo.Dir, "", "worktree", "prune"); err != nil {
 		return "", err
 	}
-	dir, err := os.MkdirTemp(r.Dir, "regen-")
+	dir, err := os.MkdirTemp(r.Dir, "evolve-regen-")
 	if err != nil {
 		return "", err
 	}

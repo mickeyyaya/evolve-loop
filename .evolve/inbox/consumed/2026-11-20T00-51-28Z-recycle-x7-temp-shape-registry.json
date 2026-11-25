@@ -4,6 +4,11 @@
     "Red first: a temp dir with a live socket stays",
     "Red first: an evcodexhome dir past the horizon with no holder goes"
   ],
+  "consumed": {
+    "at": "2026-11-25T05:17:12Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-11-20T00:51:28Z",
   "deps": [
     "recycle-x8-test-tmux-socket-reap",

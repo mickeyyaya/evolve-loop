@@ -315,7 +315,7 @@ func classifierScratch(projectRoot string) (string, error) {
 	if err := os.MkdirAll(parent, 0o755); err != nil {
 		return "", err
 	}
-	return os.MkdirTemp(parent, "probe-")
+	return os.MkdirTemp(parent, "evolve-modelprobe-")
 }
 
 func salvageProbeDiagnostics(scratch, evolveDir, tag string, now func() time.Time, log io.Writer) {

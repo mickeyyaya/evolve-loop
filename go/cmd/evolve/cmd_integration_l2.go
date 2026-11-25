@@ -62,7 +62,7 @@ func l2Checkout(repo integration.Repo, evolveDir string) integration.Checkout {
 		if err := os.MkdirAll(base, 0o755); err != nil {
 			return "", nil, err
 		}
-		dir, err := os.MkdirTemp(base, "tip-")
+		dir, err := os.MkdirTemp(base, "evolve-l2-tip-")
 		if err != nil {
 			return "", nil, err
 		}
