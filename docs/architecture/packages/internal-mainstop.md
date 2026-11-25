@@ -33,6 +33,16 @@
 - The lock is on a second file, because the write replaces the record through a rename.
 - `Update` writes through `atomicwrite`. An error of the function or of the write leaves the record as it was, and `Update` returns the stop on disk.
 
+## The judged record
+
+- `JudgedPath` is `main-red-judged.json` in the `.evolve` directory. It holds the one `main` commit that ship last judged against the required CI run.
+- `Judged` tells if a commit is the recorded one. A missing or broken record is "not judged".
+- `ClaimJudged` takes the lock of `main-red-stop.json`, reads the record and writes the commit when it is new. It returns `true` to the one caller that wrote it, and releases the lock before it returns.
+- `ReleaseJudged` takes the same lock and removes the record when it names the given SHA. `mainCI` calls it when the stop cannot be opened, so the next lane judges that SHA again. Pinned by `TestReleaseJudged_OnlyTheRecordOfThatShaIsRemoved` and `TestCheckMainRedStop_AStopThatCannotBeOpenedLeavesTheShaUnjudgedForTheNextLane`.
+- A caller judges after it holds the claim, and runs the slow work outside the lock. `core.OpenMainRedStop` takes the same lock through `Update`, and the lock is not reentrant.
+- A lane that ships during the run of the claimant sees a judged commit and goes on with no stop. The train still refuses a red `main`.
+- The record is not part of the stop. A new stop never reads it, and a release never clears it.
+
 ## Invariants
 
 - The package imports `baseattr`, `covchanged`, `adapters/flock`, `atomicwrite` and the standard library. It imports no pipeline package.

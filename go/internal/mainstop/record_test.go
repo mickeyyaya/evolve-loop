@@ -156,3 +156,110 @@ func TestUpdate_ConcurrentUpdatesLoseNoKey(t *testing.T) {
 		t.Errorf("after %d concurrent updates the stop has %d keys, %v", len(keys), len(stop.Keys), err)
 	}
 }
+
+func TestClaimJudged_OneClaimantPerShaAndANewShaClaimsAgain(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if Judged(dir, "aaa") {
+		t.Fatal("a sha is judged before any claim")
+	}
+	if claimed, err := ClaimJudged(dir, "aaa"); err != nil || !claimed {
+		t.Fatalf("first claim = %v, %v, want claimed", claimed, err)
+	}
+	if claimed, err := ClaimJudged(dir, "aaa"); err != nil || claimed {
+		t.Fatalf("second claim of the same sha = %v, %v, want refused", claimed, err)
+	}
+	if !Judged(dir, "aaa") || Judged(dir, "bbb") {
+		t.Error("Judged must name only the claimed sha")
+	}
+	if claimed, err := ClaimJudged(dir, "bbb"); err != nil || !claimed || Judged(dir, "aaa") {
+		t.Errorf("claim of a new sha = %v, %v, want claimed and the old sha replaced", claimed, err)
+	}
+}
+
+func TestClaimJudged_ConcurrentClaimantsOfOneShaYieldExactlyOneWinner(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	won := 0
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if claimed, err := ClaimJudged(dir, "aaa"); err == nil && claimed {
+				mu.Lock()
+				won++
+				mu.Unlock()
+			}
+		}()
+	}
+	wg.Wait()
+	if won != 1 {
+		t.Errorf("winners = %d, want 1", won)
+	}
+}
+
+func TestClaimJudged_ABrokenRecordIsOverwrittenAndAnUnwritableOneIsAnError(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := os.WriteFile(JudgedPath(dir), []byte("{not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if claimed, err := ClaimJudged(dir, "aaa"); err != nil || !claimed {
+		t.Fatalf("claim over a broken record = %v, %v, want claimed", claimed, err)
+	}
+	blocked := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(JudgedPath(blocked), "keep"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if claimed, err := ClaimJudged(blocked, "aaa"); err == nil || claimed {
+		t.Errorf("claim over a directory = %v, %v, want a write error", claimed, err)
+	}
+	file := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(file, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ClaimJudged(file, "aaa"); err == nil {
+		t.Error("claim under a file = nil error, want the lock error")
+	}
+}
+
+func TestReleaseJudged_OnlyTheRecordOfThatShaIsRemoved(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if _, err := ClaimJudged(dir, "aaa"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ReleaseJudged(dir, "bbb"); err != nil || !Judged(dir, "aaa") {
+		t.Fatalf("release of another sha = %v, judged(aaa) = %v, want the record kept", err, Judged(dir, "aaa"))
+	}
+	if err := ReleaseJudged(dir, "aaa"); err != nil || Judged(dir, "aaa") {
+		t.Errorf("release = %v, judged(aaa) = %v, want the record removed", err, Judged(dir, "aaa"))
+	}
+	if claimed, err := ClaimJudged(dir, "aaa"); err != nil || !claimed {
+		t.Errorf("claim after release = %v, %v, want claimed again", claimed, err)
+	}
+}
+
+func TestReleaseJudged_ALockOrRemoveFailureIsAnError(t *testing.T) {
+	t.Parallel()
+	file := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(file, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := ReleaseJudged(file, "aaa"); err == nil {
+		t.Error("release under a file = nil error, want the lock error")
+	}
+	dir := t.TempDir()
+	if _, err := ClaimJudged(dir, "aaa"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+	if err := ReleaseJudged(dir, "aaa"); err == nil {
+		t.Error("release in a read-only directory = nil error, want the remove error")
+	}
+}

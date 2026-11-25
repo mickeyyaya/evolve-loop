@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciwatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
@@ -108,6 +109,8 @@ type Options struct {
 	landWindow func(ctx context.Context, opts *Options, res *RunResult) (RunResult, bool, error)
 
 	baseRun baseattr.Runner
+
+	mainCI ciwatch.Fetcher
 
 	Signals *signalcenter.Center
 
