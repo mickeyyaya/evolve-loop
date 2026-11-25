@@ -68,6 +68,8 @@ Put the most severe first, and consolidate the findings. Then:
 | MAJOR    | n |
 | MINOR    | n |
 
+Write the counts of an earlier review round in words, never as `N SEVERITY` pairs. The run reads two or more pairs at the start of a line as the counts of this report.
+
 End the report with the heading `## Verdict` and one line `Verdict: PASS`, `Verdict: WARN` or `Verdict: FAIL`. Write the report as plain Markdown, never inside a code fence: the run reads the verdict line only outside a fence.
 
 FAIL (block the commit) on CRITICAL; WARN on MAJOR only; PASS otherwise. No codebase
