@@ -20,6 +20,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/addedtests"
 	"github.com/mickeyyaya/evolve-loop/go/internal/changedpkgs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ipcenv"
 	"github.com/mickeyyaya/evolve-loop/go/internal/lanebudget"
 	"github.com/mickeyyaya/evolve-loop/go/internal/repocontract"
@@ -57,7 +58,7 @@ func tierSelections(all, tree []repocontract.TestSelection) []repocontract.TestS
 
 const packWaitDelay = 2 * time.Second
 
-const scanLogName = "ship-repocontract-scan.log"
+const scanLogName = gcpolicy.ShipRepoContractScanLog
 
 type packOutcome struct {
 	failures   []packFailure

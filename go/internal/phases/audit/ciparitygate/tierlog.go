@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 )
 
 type tierLog struct {
@@ -14,7 +16,7 @@ type tierLog struct {
 	writtenPath string
 }
 
-func (l *tierLog) target() string { return filepath.Join(l.workspace, "integration-tier.log") }
+func (l *tierLog) target() string { return filepath.Join(l.workspace, ciparity.TierLogName) }
 
 func (l *tierLog) append(n int, note string, a attempt) error {
 	if l.workspace == "" {
@@ -36,7 +38,7 @@ func (l *tierLog) append(n int, note string, a attempt) error {
 
 func (g *Gates) logAttempt(req Request, l *tierLog, n int, note string, a attempt) {
 	if err := l.append(n, note, a); err != nil {
-		g.warn(gateTier, req, CodeTierLogWriteFailed, "integration-tier.log write failed: "+err.Error(), "path", l.target(), "attempt", strconv.Itoa(n), "err", err.Error())
+		g.warn(gateTier, req, CodeTierLogWriteFailed, ciparity.TierLogName+" write failed: "+err.Error(), "path", l.target(), "attempt", strconv.Itoa(n), "err", err.Error())
 	}
 }
 
