@@ -201,6 +201,15 @@ early boundary: #1012 waited 1h35m0s (bound 1h0m0s); pool 2/4 lanes: run evolve 
 | Run more cycles in each wave | policy `wave.max_cycles`, or `--max-cycles N` |
 | Show more cycles in the facts section | policy `wave.facts_max_cycles` (default 20) |
 
+## The protection of main
+
+The design is in [§10 of the integration plan](../plans/wave-integration-2026-10.md#branch-protection-on-main).
+
+- **Step 1 (live).** The console applied step 1 on `2026-11-24`. It sets `allow_force_pushes=false`, `allow_deletions=false` and `enforce_admins=false`, with no required checks and no required reviews.
+- **Read back.** Run `gh api repos/mickeyyaya/evolve-loop/branches/main/protection` to read the live rules of `main`.
+- **Admin rule.** When `enforce_admins=false` holds, the rules do not bind admin identities that the console, the lanes and the train use.
+- **Step 2 (waits for I9).** Step 2 adds one required check, and it is not applied before I9.
+
 ## The console PR train
 
 The design is in [§10 of the integration plan](../plans/wave-integration-2026-10.md#10-amendment-of-2026-11-04-console-prs-enter-the-train).
