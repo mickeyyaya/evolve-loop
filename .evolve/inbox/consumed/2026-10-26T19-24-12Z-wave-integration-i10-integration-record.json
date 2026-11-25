@@ -3,8 +3,14 @@
     "A second lease holder adopts the recorded branch",
     "A write with a stale tip fails",
     "A PR of the old epoch closes",
-    "Each batch has its own branch integration/w<wave>-b<n>, cut from origin/main, and the branch is deleted after the merge"
+    "Each batch has its own branch integration/w\u003cwave\u003e-b\u003cn\u003e, cut from origin/main, and the branch is deleted after the merge"
   ],
+  "consumed": {
+    "at": "2026-11-25T02:07:11Z",
+    "via": "inbox curate",
+    "cycle": "console",
+    "resolution": "inbox curator: a lane's triage claimed the item as landed, and the commit is on main and changes a declared path (landed_sha faebee052)"
+  },
   "created_at": "2026-10-26T19:24:12Z",
   "deps": [
     "wave-integration-i0-deliverable-record"
@@ -23,7 +29,7 @@
   "routed_at": "2026-10-26T19:24:12Z",
   "routed_reason": "plan audit 2026-10-27: the plan owner is lane, or the surface is not a gate file",
   "source": "console, 2026-10-27, plan audit: track unfinished components",
-  "summary": "Component I10 of the plan docs/plans/wave-integration-2026-10.md (decisions D19 and D23, ADR-0147). The spec is docs/architecture/wave-orchestrator.md section 15. The orchestrator holds .evolve/waves/integration-<wave>.json: the branch, the tip, the open PR, the members and the loop lease epoch. Each branch write uses --force-with-lease on the recorded tip. On a resume, the new lease holder adopts the branch or discards it, and closes a PR of an older epoch.",
+  "summary": "Component I10 of the plan docs/plans/wave-integration-2026-10.md (decisions D19 and D23, ADR-0147). The spec is docs/architecture/wave-orchestrator.md section 15. The orchestrator holds .evolve/waves/integration-\u003cwave\u003e.json: the branch, the tip, the open PR, the members and the loop lease epoch. Each branch write uses --force-with-lease on the recorded tip. On a resume, the new lease holder adopts the branch or discards it, and closes a PR of an older epoch.",
   "title": "Wave integration I10: the integration record, with the lease epoch, the adoption on resume and force-with-lease",
   "weight": 0.6
 }
