@@ -1,6 +1,7 @@
 package stageevidence
 
 import (
+	"cmp"
 	"strconv"
 	"strings"
 )
@@ -38,6 +39,10 @@ func (r Record) ScopeKey() ScopeKey {
 	return normalizeScope(r.Scope, r.ID)
 }
 
+func (c Case) ScopeKey() ScopeKey {
+	return normalizeScope(c.Scope, c.ID)
+}
+
 func (o Outcome) ScopeKey() ScopeKey {
 	return normalizeScope(o.Scope, o.ID)
 }
@@ -53,4 +58,8 @@ func ParseScope(label string) (ScopeKey, bool) {
 
 func knownScopeKind(k ScopeKind) bool {
 	return k == ScopeCycle || k == ScopePool || k == ScopeFleet || k == ScopeCurator
+}
+
+func compareScopes(a, b ScopeKey) int {
+	return cmp.Or(cmp.Compare(a.Kind, b.Kind), cmp.Compare(a.ID, b.ID))
 }

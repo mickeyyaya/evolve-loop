@@ -50,6 +50,8 @@ type cycleRun struct {
 	o   *Orchestrator
 	ctx context.Context
 
+	stage *stageSession
+
 	protectedRouteDiags []Diagnostic
 	predicatesAtBuild   map[string]string
 	predicateBaseFault  string

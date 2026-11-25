@@ -131,7 +131,7 @@ func TestReaderBuildsChainFromSealsAndScoresIt(t *testing.T) {
 		t.Fatalf("chain = %+v, want one record from each cycle, two outcomes and a digest", chain)
 	}
 	res, err := stageevidence.Verify(context.Background(), reader, evKeyA, evVersion, gatecontract.Promotion{MinDecisions: 2, MaxFalseStops: 0}, nil)
-	if err != nil || res.Decisions != 2 || res.FalseStops != 1 || res.Ready || res.FirstCycle != 1 || res.LastCycle != 2 {
+	if err != nil || res.Decisions != 2 || res.FalseStops != 1 || res.Ready || res.FirstID != 1 || res.LastID != 2 {
 		t.Fatalf("res=%+v err=%v, want 2 decisions, 1 false stop (cycle 2 shipped), not ready", res, err)
 	}
 	other, err := reader.ReadChain(context.Background(), evKeyB)
@@ -257,8 +257,8 @@ func TestUnsealedWorkingFileIsIncomplete(t *testing.T) {
 		t.Fatalf("incomplete=%v records=%d, want cycle 3 incomplete and only the 2 sealed records", incomplete, len(chain.Records))
 	}
 	res := stageevidence.Score(chain, evVersion, gatecontract.Promotion{MinDecisions: 1, MaxFalseStops: 5}, nil)
-	if len(res.IncompleteCycles) != 1 || res.Decisions != 2 {
-		t.Fatalf("score incomplete=%v decisions=%d, want the unsealed cycle reported and not counted", res.IncompleteCycles, res.Decisions)
+	if len(res.IncompleteScopes) != 1 || res.Decisions != 2 {
+		t.Fatalf("score incomplete=%v decisions=%d, want the unsealed cycle reported and not counted", res.IncompleteScopes, res.Decisions)
 	}
 }
 

@@ -68,6 +68,20 @@ func TestAmplifiedUnmeasuredOutcomeOnNonConflictKeyNeverSetsReason(t *testing.T)
 	}
 }
 
+func TestAmplifiedStaleVersionRecordIsUncountedAndSetsNoReason(t *testing.T) {
+	t.Parallel()
+	stale := amplifiedHeld(1, 1)
+	stale.Version = "old-version"
+	chain := stageevidence.Chain{
+		Records:  linked([]stageevidence.Record{stale}),
+		Outcomes: []stageevidence.Outcome{{ID: 1, Shipped: true}},
+	}
+	got := stageevidence.Score(chain, currentVersion, gatecontract.Promotion{MinDecisions: 1}, stageevidence.ScorerFor("held_proposals.stage"))
+	if got.Ready || got.NotReady != "" {
+		t.Errorf("stale unmeasured record = ready %v not_ready %q, want not ready with no reason", got.Ready, got.NotReady)
+	}
+}
+
 func TestAmplifiedEmptyChainHasNoReason(t *testing.T) {
 	t.Parallel()
 	got := stageevidence.Score(stageevidence.Chain{}, currentVersion, gatecontract.Promotion{MinDecisions: 1}, stageevidence.ScorerFor("held_proposals.stage"))
