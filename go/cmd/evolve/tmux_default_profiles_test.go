@@ -24,12 +24,16 @@ func TestProfilesDefaultToTmux(t *testing.T) {
 			t.Fatalf("read %s: %v", p, err)
 		}
 		var prof struct {
-			CLI string `json:"cli"`
+			CLI       string `json:"cli"`
+			CLIPinned bool   `json:"cli_pinned"`
 		}
 		if parseErr := json.Unmarshal(b, &prof); parseErr != nil {
 			t.Fatalf("parse %s: %v", p, parseErr)
 		}
-		if prof.CLI != "" && !strings.HasSuffix(prof.CLI, "-tmux") {
+		if prof.CLIPinned && !strings.HasSuffix(prof.CLI, "-cloud") {
+			t.Errorf("%s sets cli_pinned for %q: only a cloud seat is pinned, because it draws on cloud-session credit", filepath.Base(p), prof.CLI)
+		}
+		if prof.CLI != "" && !strings.HasSuffix(prof.CLI, "-tmux") && !prof.CLIPinned {
 			t.Errorf("%s pins a non-tmux default cli %q — the tmux-LLM path is the default; "+
 				"headless is opt-in via EVOLVE_CLI / EVOLVE_<AGENT>_CLI / a policy pin, not a profile default",
 				filepath.Base(p), prof.CLI)

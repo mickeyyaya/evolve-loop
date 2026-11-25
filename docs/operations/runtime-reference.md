@@ -858,8 +858,8 @@ Full vocabulary (push, tag, release, propagate, publish, ship): [docs/guides/pub
 The `claude-cloud` driver starts a Claude Code session in the cloud through the bridge. The session clones the GitHub remote at the pushed branch, does the task and opens a pull request later. The design is [llm-isolation.md](../architecture/llm-isolation.md) §5.2.
 
 1. Commit the work, then push the branch: `git push -u origin <branch>`. The driver refuses a branch with commits that are not pushed, and a remote that is not on GitHub.
-2. Route the seat to the cloud driver. Add a rule to `cli_routing.agents` in `.evolve/policy.json`, for example `"console-builder": {"cli": ["claude-cloud"]}`. A profile with `"cli": "claude-cloud"` also selects it.
-3. Check the route: `evolve cli-routing explain console-builder --static`. The chain starts with `claude-cloud`.
+2. Run the profile `cloud-builder`. Its chain starts with `claude-cloud` (`"cli_pinned": true`), then follows `cli_routing.default`. Edit no policy file. An `agents.cloud-builder` rule still wins.
+3. Check the route: `evolve cli-routing explain cloud-builder --static`. The chain starts with `claude-cloud`.
 4. Write the task to a file, then run `evolve agent run <profile> --input task.md --json` with the flags of the profile. A writer profile also needs `--worktree` and `--writable`.
 5. Read the session from the envelope (`data.cloud`) or with `evolve cloud list`. Open the URL to follow the session.
 

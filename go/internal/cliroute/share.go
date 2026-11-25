@@ -65,6 +65,8 @@ func sharePin(res resolution, family string) string {
 	switch {
 	case llmroute.IsOperatorChoice(res.plan.PrimarySource):
 		return res.plan.PrimarySource
+	case res.rule == rulePinned && familyOf(res.prof.CLI) == family:
+		return "profile " + res.req.Agent
 	case res.pinsFamily(res.req.CallerCLI, family):
 		return "the caller cli " + res.req.CallerCLI
 	case res.pinsFamily(res.req.Overlay.CLI, family):
