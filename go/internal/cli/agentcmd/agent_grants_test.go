@@ -124,7 +124,7 @@ func TestAgentList_NamesEachConfinedProfileInNameOrder(t *testing.T) {
 	for _, p := range got {
 		names = append(names, p.Name)
 	}
-	if strings.Join(names, ",") != "adversarial-review,console-builder,zz-second-review" {
+	if strings.Join(names, ",") != "adversarial-review,cloud-builder,console-builder,zz-second-review" {
 		t.Errorf("list = %v, want the confined profiles and the worktree build seat in name order, and not the sneaky writer", names)
 	}
 }
