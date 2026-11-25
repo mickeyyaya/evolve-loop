@@ -232,10 +232,10 @@ func TestC1827_008_StateJSONWriterDelegatesToTheDurableWriterUnchanged(t *testin
 		if err := json.Unmarshal(body, &back); err != nil || back.LastCycleNumber != 1825 {
 			t.Errorf("state.json does not hold the latest write: %+v, %v", back, err)
 		}
-		if mode := permOf(t, path); mode != 0o600 {
+		if mode := acsassert.FilePerm(t, path); mode != 0o600 {
 			t.Errorf("state.json mode = %v, want the writer's 0600", mode)
 		}
-		if names := entryNames(t, dir); !slices.Equal(names, []string{"state.json"}) {
+		if names := acsassert.DirEntryNames(t, dir); !slices.Equal(names, []string{"state.json"}) {
 			t.Errorf("the state dir holds %v, want only state.json", names)
 		}
 	})
@@ -273,11 +273,11 @@ func TestC1827_009_SegmentWriterDelegatesToTheDurableWriterUnchanged(t *testing.
 		if want := strings.Join(lines[:8], ""); string(sealed) != want {
 			t.Errorf("the segment does not hold the sealed prefix byte for byte:\n got %q\nwant %q", sealed, want)
 		}
-		if mode := permOf(t, seg); mode != 0o600 {
+		if mode := acsassert.FilePerm(t, seg); mode != 0o600 {
 			t.Errorf("segment mode = %v, want the writer's 0600", mode)
 		}
-		if names := entryNames(t, segDir); !slices.Equal(names, []string{"seg-0001.jsonl.gz"}) {
-			t.Errorf("ledger-segments holds %v, want only the segment", names)
+		if names := acsassert.DirEntryNames(t, segDir); !slices.Equal(names, []string{"manifest.jsonl", "seg-0001.jsonl.gz"}) {
+			t.Errorf("ledger-segments holds %v, want only the manifest and the segment", names)
 		}
 		if err := l.VerifyDeep(context.Background()); err != nil {
 			t.Errorf("VerifyDeep after the seal: %v", err)
@@ -308,10 +308,10 @@ func TestC1827_010_EvidenceStoreWriterDelegatesToTheDurableWriterUnchanged(t *te
 			if err != nil || !bytes.Equal(got, body) {
 				t.Errorf("%s: Get = (%q, %v), want the stored body", stage, got, err)
 			}
-			if mode := permOf(t, path); mode != 0o444 {
+			if mode := acsassert.FilePerm(t, path); mode != 0o444 {
 				t.Errorf("%s: object mode = %v, want the store's write-once 0444", stage, mode)
 			}
-			if names := entryNames(t, filepath.Dir(path)); !slices.Equal(names, []string{filepath.Base(path)}) {
+			if names := acsassert.DirEntryNames(t, filepath.Dir(path)); !slices.Equal(names, []string{filepath.Base(path)}) {
 				t.Errorf("%s: the fan-out dir holds %v, want only the object", stage, names)
 			}
 		}
