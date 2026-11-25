@@ -4,6 +4,11 @@
     "go.yml keeps the host sampler stderr in a log file that the job uploads beside runner-samples.ndjson, in the linux and darwin jobs.",
     "The macOS spawn shim (C13 part B) is NOT part of this change: the operator did not approve it."
   ],
+  "consumed": {
+    "at": "2026-11-25T12:29:26Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-11-23T15:51:54Z",
   "files": [
     ".github/workflows/required.yml",

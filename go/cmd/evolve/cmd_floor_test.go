@@ -31,6 +31,7 @@ var floorCIParity = []floorCIStep{
 	{tier: "apicover", workflow: "go.yml", job: "build-test", want: "make apicover-check"},
 	{tier: "cover", workflow: "go.yml", job: "build-test", want: "make cover-strict"},
 	{tier: "acs-durable", workflow: "ci.yml", job: "acs-durable", want: "go test -count=1 -tags acs ./acs/regression/..."},
+	{tier: "yaml", workflow: "required.yml", job: "ste-lint", want: "yaml check"},
 }
 
 type floorWorkflow struct {
@@ -210,12 +211,14 @@ func TestFloorRun_TierCommandsMatchRequiredCI(t *testing.T) {
 	for _, step := range floorCIParity {
 		t.Run(step.tier+"/"+step.want, func(t *testing.T) {
 			t.Parallel()
-			reusedByRequired := false
-			for _, job := range required.Jobs {
-				reusedByRequired = reusedByRequired || job.Uses == "./.github/workflows/"+step.workflow
-			}
-			if !reusedByRequired {
-				t.Fatalf("required.yml no longer calls %s, so the table is stale", step.workflow)
+			if step.workflow != "required.yml" {
+				reusedByRequired := false
+				for _, job := range required.Jobs {
+					reusedByRequired = reusedByRequired || job.Uses == "./.github/workflows/"+step.workflow
+				}
+				if !reusedByRequired {
+					t.Fatalf("required.yml no longer calls %s, so the table is stale", step.workflow)
+				}
 			}
 			wf := loadFloorWorkflow(t, root, step.workflow)
 			if !strings.Contains(wf.jobRuns(step.job), step.want) {

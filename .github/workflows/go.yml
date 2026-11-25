@@ -35,7 +35,8 @@ jobs:
       - name: runner sampler (host CPU, memory, load each second; runs until the job ends)
         run: |
           if go build -o bin/hostsampler ./cmd/hostsampler; then
-            nohup bin/hostsampler -out "$GITHUB_WORKSPACE/go/runner-samples.ndjson" > /dev/null 2>&1 &
+            : > "$GITHUB_WORKSPACE/go/runner-sampler.log"
+            nohup bin/hostsampler -out "$GITHUB_WORKSPACE/go/runner-samples.ndjson" > /dev/null 2>> "$GITHUB_WORKSPACE/go/runner-sampler.log" &
           else
             echo "::warning::hostsampler build failed; the run has no runner samples"
           fi
@@ -138,6 +139,7 @@ jobs:
             go/test-e2e.json
             go/test-rusage.ndjson
             go/runner-samples.ndjson
+            go/runner-sampler.log
       - name: line-coverage strict (go/.cover-strict; per-package hard-fail, ADR-0101)
         # Packages listed in go/.cover-strict declare the statement coverage they
         # ship with (100% for internal/signalcenter). Enforced here AND by
@@ -169,7 +171,8 @@ jobs:
       - name: runner sampler (host CPU, memory, load each second; runs until the job ends)
         run: |
           if go build -o bin/hostsampler ./cmd/hostsampler; then
-            nohup bin/hostsampler -out "$GITHUB_WORKSPACE/go/runner-samples.ndjson" > /dev/null 2>&1 &
+            : > "$GITHUB_WORKSPACE/go/runner-sampler.log"
+            nohup bin/hostsampler -out "$GITHUB_WORKSPACE/go/runner-samples.ndjson" > /dev/null 2>> "$GITHUB_WORKSPACE/go/runner-sampler.log" &
           else
             echo "::warning::hostsampler build failed; the run has no runner samples"
           fi
@@ -224,6 +227,7 @@ jobs:
             go/test-e2e.json
             go/test-rusage.ndjson
             go/runner-samples.ndjson
+            go/runner-sampler.log
       - name: line-coverage strict of the darwin set (go/.cover-strict floors of go/.darwin-set packages; hard-fail)
         run: make cover-strict-darwin
 
@@ -248,7 +252,8 @@ jobs:
       - name: runner sampler (host CPU, memory, load each second; runs until the job ends)
         run: |
           if go build -o bin/hostsampler ./cmd/hostsampler; then
-            nohup bin/hostsampler -out "$GITHUB_WORKSPACE/go/runner-samples.ndjson" > /dev/null 2>&1 &
+            : > "$GITHUB_WORKSPACE/go/runner-sampler.log"
+            nohup bin/hostsampler -out "$GITHUB_WORKSPACE/go/runner-samples.ndjson" > /dev/null 2>> "$GITHUB_WORKSPACE/go/runner-sampler.log" &
           else
             echo "::warning::hostsampler build failed; the run has no runner samples"
           fi
@@ -267,6 +272,7 @@ jobs:
             go/test-integration.json
             go/test-rusage.ndjson
             go/runner-samples.ndjson
+            go/runner-sampler.log
 
   lint:
     name: vet + gofmt (Go 1.23)
