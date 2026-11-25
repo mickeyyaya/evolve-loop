@@ -58,7 +58,7 @@ presets.json (config)  ─┘            pure, deterministic                    
 ```
 
 - **`Recommend` is pure** over `(DetectReport, PresetConfig)` — no clock/env/disk/rand, no map-iteration order leaks (families/CLIs sorted before any "first" pick). The baseline tier/CLI come from each phase's profile (`default_tier`/`default_cli`, threaded into `PhaseStatus` by `Detect`). The only preset behavior in code is a generic `tier_bias` interpreter (`default`/`down`/`up`/`min`/`max`); the preset *set*, descriptions, and bias selection are config.
-- **Clamping + cross-family.** Every tier is clamped into `[envelope.min..envelope.max]`; every CLI must be in `allowed_clis` (or `all`) AND authed. Builder/auditor split across families when ≥2 are authed, preferring each profile's default family; single-family is a legitimate fallback (not a warning). No allowed family available → `warning` + `degraded`.
+- **Clamping + cross-family.** Every tier is clamped into `[envelope.min..envelope.max]`; every CLI must be in `allowed_clis` (or `all`) AND authed. A floor role holds no `allowed_clis`; its ceiling is the floor family. Builder/auditor split across families when ≥2 are authed, preferring each profile's default family; single-family is a legitimate fallback (not a warning). No allowed family available → `warning` + `degraded`.
 - **`Apply` is the write + gate.** It has these properties:
   - Lossless raw-map merge (preserves `floor`/`cli_health`/foreign pins).
   - A pin is emitted ONLY where `differs_from_default`.

@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
@@ -23,7 +22,7 @@ func TestClaudeFamilyFloor(t *testing.T) {
 		t.Fatalf("Get(builder): %v", err)
 	}
 	builderFam := family(builder.CLI)
-	floor := policy.DefaultFloors()["claude"]
+	floor := effectiveFloors(t)["claude"]
 
 	claudeCount := 0
 	for _, name := range names {
@@ -57,12 +56,6 @@ func TestClaudeFamilyFloor(t *testing.T) {
 		for _, fb := range p.CLIFallback {
 			if family(fb) != family(p.CLI) {
 				t.Errorf("floor entry %s: cli_fallback %q leaves the %s family — a floored phase fails LOUDLY on quota rather than silently handing %s to another family (see the floor doc)", name, fb, family(p.CLI), why)
-			}
-		}
-		for _, allowed := range p.AllowedCLIs {
-			if allowed == "all" || family(allowed) == builderFam {
-				t.Errorf("floor entry %s: allowed_clis=%v admits the builder's family — a policy pin could breach the floor at dispatch while every profile guard stays green (mirror the tdd-engineer allowed_clis precedent)", name, p.AllowedCLIs)
-				break
 			}
 		}
 	}

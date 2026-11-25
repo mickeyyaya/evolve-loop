@@ -112,10 +112,7 @@
     "default": "balanced",
     "max": "deep"
   },
-  "allowed_clis": [
-    "claude"
-  ],
-  "_note": "Restricted to claude — RED-phase test writing is safety-critical.",
+  "_note": "Restricted to claude by the floor in cli_routing.floors — RED-phase test writing is safety-critical.",
   "research_quota": {
     "web_search": 3,
     "web_fetch": 5,
