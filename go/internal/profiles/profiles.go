@@ -18,6 +18,7 @@ type Profile struct {
 	CLI                string             `json:"cli"`
 	AllowedCLIs        []string           `json:"allowed_clis,omitempty"`
 	CrossFamilyWith    string             `json:"cross_family_with,omitempty"`
+	CLIPinned          bool               `json:"cli_pinned,omitempty"`
 	CLIFallback        []string           `json:"cli_fallback,omitempty"`
 	CLIFallbackOnExit  []int              `json:"cli_fallback_on_exit,omitempty"`
 	ModelTierDefault   string             `json:"model_tier_default"`

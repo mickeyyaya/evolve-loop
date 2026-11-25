@@ -62,6 +62,9 @@ var fixtureFiles = []string{
 	".evolve/phases/console-builder/phase.json",
 	".evolve/profiles/console-builder.json",
 	"agents/evolve-console-builder.md",
+	".evolve/phases/cloud-builder/phase.json",
+	".evolve/profiles/cloud-builder.json",
+	"agents/evolve-cloud-builder.md",
 }
 
 func project(t *testing.T) string {

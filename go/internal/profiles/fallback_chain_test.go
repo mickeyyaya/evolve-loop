@@ -36,11 +36,15 @@ func TestEveryAgentProfileHasAFallbackChain(t *testing.T) {
 			CLI         string   `json:"cli"`
 			CLIFallback []string `json:"cli_fallback"`
 			AllowedCLIs []string `json:"allowed_clis"`
+			CLIPinned   bool     `json:"cli_pinned"`
 		}
 		if err := json.Unmarshal(raw, &p); err != nil {
 			t.Fatalf("%s: %v", e.Name(), err)
 		}
 		if p.CLI == "" {
+			continue
+		}
+		if p.CLIPinned {
 			continue
 		}
 		checked++

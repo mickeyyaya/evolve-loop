@@ -83,7 +83,7 @@ The pin wins over the classifier, also for a cached catalog. A pin to a model th
 
 Since v22.27.0, one table in `.evolve/policy.json` (`cli_routing`) decides which CLI runs each dispatch ([ADR-0119](../architecture/adr/0119-one-routing-table-one-resolver.md)). The table of this repository has these rules:
 
-- A phase below the `deep` tier uses `default` (`claude`, then `agy`, then `agy-claude`). `builder` uses `agy`, then `agy-claude`, then `claude` at `balanced` on Gemini 4 Hydrogen (High). `console-builder` uses `claude`, then `agy-claude`, then `agy` at `balanced`. `evolve cli-routing explain <agent>` prints the chain and the model of an agent.
+- A phase below the `deep` tier uses `default` (`claude`, then `agy`, then `agy-claude`). `builder` uses `agy`, then `agy-claude`, then `claude` at `balanced` on Gemini 4 Hydrogen (High). `console-builder` uses `claude`, then `agy-claude`, then `agy` at `balanced`. `cloud-builder` starts on `claude-cloud`, then follows `default`. `evolve cli-routing explain <agent>` prints the chain and the model of an agent.
 - A phase at the `deep` tier walks `claude`, then `agy`, then `agy-claude`, with `share_pct` 50 ([ADR-0150](../architecture/adr/0150-the-deep-tier-gives-its-first-family-a-fixed-share-of-the-seats-and-paces-it-by-its-week-window.md)).
 - A phase at the `top` tier walks `agy-claude`, then `claude`.
 - The Claude-family floor agents (the auditor, the adversarial review, the tdd engineer, the code reviewer and the spec verifiers) run Claude Code only.
