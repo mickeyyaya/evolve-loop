@@ -91,7 +91,7 @@ func TestErrorCodeNamesTheTypedErrors(t *testing.T) {
 			t.Errorf("ErrorCode(%v) = %q, want %q", err, got, want)
 		}
 	}
-	if got := stageevidence.ErrorCode(errors.New("disk gone")); got != "error" {
-		t.Errorf("ErrorCode of an untyped error = %q, want error", got)
+	if got := stageevidence.ErrorCode(errors.New("disk gone")); got != stageevidence.ErrorCodeUntyped {
+		t.Errorf("ErrorCode of an untyped error = %q, want %q", got, stageevidence.ErrorCodeUntyped)
 	}
 }

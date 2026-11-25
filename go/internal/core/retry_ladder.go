@@ -3,13 +3,16 @@ package core
 import (
 	"cmp"
 	"fmt"
+	"maps"
 	"slices"
+	"strconv"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/convergence"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/modelcatalog"
 	"github.com/mickeyyaya/evolve-loop/go/internal/retryladder"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/stageevidence"
 )
 
 const (
@@ -268,10 +271,17 @@ func (o *Orchestrator) emitLadderDecision(cs CycleState, ask ladderAsk, from str
 	decision.Severity, decision.Code = signalcenter.SeverityInfo, CodeLadderDecision
 	decision.Reason = fmt.Sprintf("retry ladder (%s) for %s: %s at %s -> %s %s", stage, ask.phase, d.Class, from, d.Action, d.Rung)
 	o.signals.Emit(decision)
+	o.recordStage(cs.CycleID, StageKeyRetryLadder, ladderEvidence(base.Fields, d))
 	for _, code := range d.Signals {
 		warn := base
 		warn.Severity, warn.Code = signalcenter.SeverityWarn, signalcenter.Code(code)
 		warn.Reason = fmt.Sprintf("retry ladder (%s) for %s: %s at %s", stage, ask.phase, code, from)
 		o.signals.Emit(warn)
 	}
+}
+
+func ladderEvidence(signalFields map[string]string, d retryladder.Decision) map[string]string {
+	fields := maps.Clone(signalFields)
+	fields[stageevidence.FieldWouldStop] = strconv.FormatBool(d.Action == retryladder.ActionStop)
+	return fields
 }

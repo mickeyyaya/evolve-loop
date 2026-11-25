@@ -1,14 +1,18 @@
 // Package stagescore tallies shadow-stage decisions against their real outcomes.
 package stagescore
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/stageevidence"
+)
 
 type Decision string
 
 const (
-	WouldStop Decision = "would_stop"
-	WouldSkip Decision = "would_skip"
-	WouldHold Decision = "would_hold"
+	WouldStop Decision = stageevidence.FieldWouldStop
+	WouldSkip Decision = stageevidence.FieldWouldSkip
+	WouldHold Decision = stageevidence.FieldWouldHold
 )
 
 type Outcome string

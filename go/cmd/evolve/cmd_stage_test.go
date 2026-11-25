@@ -142,7 +142,7 @@ func TestStageVerifyRecomputesTheVerdictFromTheChainFile(t *testing.T) {
 	faulty := stageChainFile(t, version, map[string]string{"would_stop": "false"}, map[string]string{"would_stop": "true"})
 	out, _, code = runStageVerb(t, "verify", stageVerbKey, "--json", "--project-root", root, "--chain", faulty)
 	res = decodeResult(t, out)
-	wantCase := stageevidence.Case{Class: stageevidence.ClassFalseStop, Cycle: 2, Seq: 2}
+	wantCase := stageevidence.Case{Class: stageevidence.ClassFalseStop, ID: 2, Seq: 2}
 	if code != cliExitFailed || res.Ready || res.FalseStops != 1 || !slices.Contains(res.Cases, wantCase) {
 		t.Errorf("chain with a false stop: exit %d ready %v false stops %d cases %+v", code, res.Ready, res.FalseStops, res.Cases)
 	}
@@ -165,14 +165,14 @@ func TestStageVerifyPrintsTheRangeTheDigestTheCountsAndEachCase(t *testing.T) {
 	for _, line := range []string{
 		"not ready",
 		"decision version: " + version,
-		"evidence range: cycle 1 to cycle 2",
+		"evidence range: id 1 to id 2",
 		"chain digest: " + digest,
 		"decisions: 2",
 		"false stops: 1",
 		"escapes: 0",
 		"conflicts: 0",
-		"incomplete cycles: 0",
-		"false_stop cycle 2 seq 2",
+		"incomplete scopes: 0",
+		"false_stop cycle-2 seq 2",
 	} {
 		if !strings.Contains(out, line) {
 			t.Errorf("verify output lacks %q:\n%s", line, out)

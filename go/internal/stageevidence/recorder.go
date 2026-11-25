@@ -11,14 +11,13 @@ import (
 )
 
 const (
-	WorkingDirName   = "stage-evidence"
-	FaultWriteFailed = "write-failed"
-	counterPrefix    = "counter."
-	faultField       = "fault"
-	buildField       = "build"
-	workingSuffix    = ".ndjson"
-	workingMode      = 0o644
-	workingDirMode   = 0o755
+	WorkingDirName = "stage-evidence"
+	counterPrefix  = "counter."
+	faultField     = "fault"
+	buildField     = "build"
+	workingSuffix  = ".ndjson"
+	workingMode    = 0o644
+	workingDirMode = 0o755
 )
 
 func WorkingPath(evolveDir string, scope ScopeKey) string {
@@ -93,7 +92,7 @@ func (r *Recorder) Close() {
 		fields[counterPrefix+key] = strconv.Itoa(n)
 	}
 	if r.faulted {
-		fields[faultField] = FaultWriteFailed
+		fields[faultField] = CauseWriteFailed
 	}
 	r.fault(r.write(Record{Kind: KindClose, Fields: fields}))
 }
