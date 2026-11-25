@@ -1,0 +1,53 @@
+- id: inst-L1540b
+  pattern: "maximal-prompt-explicitness-did-not-produce-the-sidecar-artifact"
+  description: >-
+    inst-L1531c diagnosed the recurring Gate A failure (cycles 396-407, 1471, 1476, 1504,
+    1531) as a scout that satisfies verifiability so thoroughly in PROSE that it registers
+    the eval-file obligation as already discharged, and prescribed an instruction-side
+    remedy. That remedy was implemented at maximum strength. Cycle 1540's dispatched
+    scout-prompt.txt names the two required files as ABSOLUTE paths on lines 8-9 -- the
+    very top of the prompt, before any persona content -- and repeats the obligation twice
+    more: line 165 ("write eval under absolute `workspace` path ... avoids writing evals to
+    cycle worktree where gate cannot see them") and line 166 ("Inline AC in scout-report
+    NOT sufficient ... self-verify each <workspace>/.evolve/evals/<slug>.md exists before
+    finalizing. Do NOT write only to the cycle worktree"), plus gate #6 in the checklist
+    table at line 197.
+    The scout then ran 532 seconds, produced an unusually complete report -- two P0 tasks
+    each with target files, verifiableBy, three-item acceptance criteria, a named
+    "Cheapest gaming fake", a decision trace -- and wrote ZERO eval files. Verified absent
+    from all three candidate roots: <workspace>/.evolve/evals/ does not exist at all,
+    <projectRoot>/.evolve/evals/ has no matching file, and the cycle worktree's
+    .evolve/evals/ (679 files) has no file for either slug. This was not the worktree-path
+    trap that lines 165-166 pre-empt; the files were written NOWHERE.
+    The falsifying conclusion: instruction explicitness is saturated on this failure and is
+    not the binding constraint. Absolute paths at the top of the prompt, three restatements,
+    and a checklist entry did not move the outcome. The obligation is a SIDECAR -- an
+    artifact separate from the deliverable the agent's completion criterion is organized
+    around -- and a sidecar that is not a precondition of the deliverable is structurally
+    droppable no matter how loudly it is requested.
+  confidence: 0.85
+  source: "cycle-1540/pipeline-defect-infra-systemic"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1540
+    task: "pipeline-defect-infra-systemic"
+    errorCategory: "planning"
+    failedStep: "scout"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "evals-materialized: neither selected slug has an eval file on any of the three searched roots"
+  preventiveAction: >-
+    Stop strengthening the instruction; change the structure. Move the evals-materialized
+    check OUT of the post-hoc review gate and INTO the scout phase's own self-verify
+    (`evolve phase verify scout`), where it stats <workspace>/.evolve/evals/<slug>.md for
+    every slug in `## Selected Tasks` and fails while the agent still has a turn to fix it
+    -- the phase cannot self-report done with a dangling slug. Failing that, make the
+    sidecar a precondition rather than a follow-up: require the scout report to carry a
+    per-task `evalPath` field that is verified by stat, so an unwritten eval leaves a
+    visibly dangling pointer in the deliverable instead of a silent absence elsewhere. When
+    a remedy is "say it more clearly" and the class recurs after the clearer wording ships,
+    treat the recurrence as evidence AGAINST the instruction-side model, not as a reason to
+    say it more clearly again.
+  relatedInstincts: ["inst-L1540a", "inst-L1531c", "inst-L1528b", "inst-L1516a"]
+  contradicts: ["inst-L1531c"]

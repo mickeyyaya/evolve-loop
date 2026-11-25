@@ -1,0 +1,17 @@
+- id: inst-L2281a
+  pattern: "a-known-base-red-main-still-receives-new-lanes-and-the-build-floor-ends-them-before-audit"
+  description: "SYSTEMIC (same offender as inst-L2271a, inst-L2121a, inst-L2113a and inst-L2111a; same no-effect correction as inst-L2246a). Cycle 2281 (code-index-backends-g3-bench-verb, attempt 3, lineage 2188 and 2226) started 11 seconds after the retrospective of cycle 2271 recorded that main 67a8d49f6 is red and asked for a loop halt. The base was not repaired and the lane was dispatched on it. The build handoff floor runs the tests of each changed package under -tags integration. The diff changes go/cmd/evolve, so the floor ran TestPRRefresh_TheRealGeneratorsOfACloneCommitOnlyTheStaleIndex, which clones committed HEAD (go/cmd/evolve/cmd_pr_refresh_integration_test.go:21). HEAD holds two research-index entries that start with a blank line (2026-11-10-03 of commit 05f6fe2f9 and 2026-11-10-04 of commit 663d563bc), and go/internal/researchindex/researchindex.go:99 refuses them. The Builder found the cause, staged the fix and declared a BLOCKER, but a staged fix is not in the clone and the ship guard denies a commit. The correction redispatch was rejected again after 44 minutes, and the cycle ended in Build with no audit. The 38 cycle predicates and the tests of the changed packages pass on the staged tree. Before a Build starts on a diff that changes go/cmd/evolve, run the offender on a clone of the base: if it fails there, do not build in the lane. When a floor offender names a file that the diff did not add, run git show HEAD:<file>; if HEAD holds the defect, stop with a BLOCKER verdict, add no file of another cycle to the diff, and route to the console."
+  confidence: 0.9
+  source: "cycle-2281/code-index-backends-g3-bench-verb (audit-fail-reason.json; build-report.md#Correction 1; build-interactions.ndjson correction_redispatch; builder-selfcheck-findings.json)"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 2281
+    task: "code-index-backends-g3-bench-verb"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["build handoff floor offender TestPRRefresh on a clone of main HEAD 67a8d49f6 (entries 2026-11-10-03 and 2026-11-10-04 start with a blank line)", "correction redispatch rejected again on the same offender after 44 minutes", "explanation handoff missing, and the document does not describe two files of the repair"]
+  preventiveAction: "Console: delete the leading blank line of the two entries on main, run evolve pr refresh, and dispatch no lane until a clone of main passes go test -tags integration -run TestPRRefresh_ ./cmd/evolve. Then send the salvaged cycle-2281 worktree to Audit; do not rebuild it. Loop: when a retrospective records infra-systemic with halt-and-diagnose for a red base, hold the dispatch of each lane on that base SHA. Build floor: re-run each offender on a clone of the base commit and attribute a base-red offender to the base (inbox item gate-contract-g4-base-red-attribution). Correction ladder: start no correction round when the Builder verdict declares a BLOCKER that only a commit can clear. Builder: prove a base red with git show HEAD:<file> and stop; do not stage files of other cycles."
+  relatedInstincts: ["inst-L2271a", "inst-L2246a", "inst-L2121a", "inst-L2113a", "inst-L2111a", "inst-L2240a"]
+  contradicts: []

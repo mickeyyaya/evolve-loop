@@ -1,0 +1,154 @@
+- id: cycle-1501-the-slugs-only-machine-memory-is-an-eval-reauthored-per-attempt-in-a-worktree-that-never-lands
+  pattern: "the-only-machine-checked-memory-a-recurring-slug-has-is-its-eval-file-and-that-file-is-re-authored-from-the-inbox-items-happy-path-fix-text-on-every-attempt-inside-a-worktree-that-is-discarded-when-the-attempt-fails-so-the-criteria-set-is-a-fresh-draw-each-time-and-attempt-N-plus-1-routinely-drops-the-exact-criterion-attempt-N-was-graded-CRITICAL-on"
+  description: >-
+    THE FIRING, WITH THE DECAY MEASURED. `.evolve/evals/carryover-lane-retirement-verifiableby.md`
+    is the same path on every attempt at this slug. Counting `criterion:` keys in
+    each attempt's preserved snapshot:
+
+      cycle-1486  8 criteria   (207090d7, branch cycle-42824668-1486)
+      cycle-1493 10 criteria   (e2a227ff, branch cycle-42824668-1493)
+      cycle-1500  7 criteria   (31a7e856, branch cycle-42824668-1500)
+      cycle-1502  7 criteria   (5beb586b, concurrent sibling lane)
+      cycle-1501  4 criteria   (THIS attempt — the one that shipped the CRITICAL)
+
+    `git show main:.evolve/evals/carryover-lane-retirement-verifiableby.md` →
+    "does not exist in 'main'". `git show 7ad61417~1:<same path>` → does not exist
+    on this lane's own base. The file has been authored at least five times and has
+    landed zero times. It is not a regression gate; it is a per-attempt scratch file
+    that happens to share a filename with its predecessors.
+
+    THE DROPPED CRITERION IS THE DEFECT. The 7-criterion version live in the sibling
+    lane's tree at 23:23 the same day carries, verbatim:
+
+      - criterion: "The verifiableBy contract executes in the fresh worktree base and
+        the probe refuses to execute agent-authored shell in the operator's main
+        checkout"
+        max_if_missing: 7
+
+    Cycle-1501's 4-criterion re-authoring drops it. Cycle-1501's delivered code
+    (`go/internal/core/carryover_retire.go:46`) calls
+    `sysexec.DefaultRunner(ctx, "sh", worktree, []string{"-c", command}, ...)` with
+    `worktree = cfg.ProjectRoot` (`go/cmd/evolve/cmd_loop.go:221`) — the operator's
+    live main checkout. The audit graded it H1 CRITICAL; the adversarial phase
+    reproduced arbitrary execution with an operator `GH_TOKEN` canary in the env dump.
+    Three other criteria vanished in the same pass: absent-evidence-is-not-satisfied-
+    evidence, retired-verdict-survives-FreshenSpecs, and no-silent-caps-on-skipped.
+    The four that survived (retire-on-zero, no-false-retirement, transactional write,
+    wiring proof) all went GREEN — `TestC1501_001`–`004` pass on a diff carrying a
+    CRITICAL. The suite certified precisely the half of the contract the diff got right.
+
+    WHY THE SET SHRANK, AND THAT IS THE TRANSFERABLE PART. The eval is regenerated
+    from `.evolve/inbox/2026-08-15T13-30-00Z-carryover-lane-retirement-verifiableby.json`,
+    whose `fix` field is the cycle-1479 audit prescription — a DECISION spec ("run
+    the todo's verifiableBy before dispatch and drop the lane"). Security criteria do
+    not appear in a decision spec, so they can only enter the eval if the author
+    reads the PREDECESSOR EVAL, which lives in a discarded worktree, or the
+    predecessor LESSON, which no code-writing phase receives
+    ([[cycle-1496-a-retry-carries-the-items-spec-and-never-its-predecessors-lesson]]).
+    The observable consequence: criteria survive across attempts in proportion to how
+    directly the item text implies them — the same prose-compressibility selection
+    pressure 1496 identified for remedies, now measured on the eval itself, which is
+    the ONLY artifact in this chain that gates.
+
+    THE DECAY IS INVISIBLE BY CONSTRUCTION. Nothing compares attempt N's eval to
+    attempt N-1's. `evolve eval quality-check` grades an eval standalone (are the
+    criteria specific, evidenced, failing-first) and answers YES for a well-written
+    4-criterion file. No gate reads `continuation.cycle: 1486` in the item and asks
+    "did this attempt keep the prior attempt's criteria?" — a deterministic file join
+    with no LLM in it. The auditor caught it (M1) only by reading the slug's incident
+    history by hand, one phase after the CRITICAL had already been written.
+  confidence: 0.94
+  source: >-
+    cycle-1501/carryover-lane-retirement-verifiableby —
+    .evolve/evals/carryover-lane-retirement-verifiableby.md (4 criteria, added new by
+    this diff; git status `A`);
+    git show 207090d7:<same path> = 8 criteria (branch cycle-42824668-1486);
+    git show e2a227ff:<same path> = 10 criteria (branch cycle-42824668-1493);
+    git show 31a7e856:<same path> = 7 criteria (branch cycle-42824668-1500);
+    git show 5beb586b:<same path> = 7 criteria (branch cycle-42824668-1502, concurrent),
+    including criterion 4 "executes in the fresh worktree base and the probe refuses
+    to execute agent-authored shell in the operator's main checkout" (max_if_missing 7);
+    git show main:<same path> → "does not exist in 'main'";
+    git show 7ad61417~1:<same path> → does not exist on this lane's base;
+    .evolve/runs/cycle-1501/audit-report.md M1 (eval under-specification) and H1
+    (CRITICAL, carryover_retire.go:46 ← cmd_loop.go:221);
+    .evolve/runs/cycle-1501/adversarial-review-report.md F1 (executed proof: env dump
+    contained the injected GH_TOKEN canary verbatim);
+    .evolve/runs/cycle-1501/acs-verdict.json (TestC1501_001-004 green on a CRITICAL diff);
+    .evolve/inbox/2026-08-15T13-30-00Z-carryover-lane-retirement-verifiableby.json
+    (`fix` = the cycle-1479 audit prescription, a decision spec with no security clause)
+  type: "failure-lesson"
+  category: "structural"
+  pattern_systemic: true
+  systemic: true
+  applies_to:
+    - ".evolve/evals/"
+    - "go/internal/phases/tdd"
+    - "go/internal/core/routing_dispatch.go"
+    - "go/internal/phases/ship/repocontract.go"
+    - "agents/evolve-tdd-engineer.md"
+    - "agents/evolve-auditor.md"
+  failureContext:
+    cycle: 1501
+    task: "carryover-lane-retirement-verifiableby"
+    errorCategory: "context"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "M1 MEDIUM: the cycle eval omits timeout, execution-root and authority criteria, so all four graders pass on a diff carrying a CRITICAL (.evolve/evals/carryover-lane-retirement-verifiableby.md:2-15)"
+      - "H1 CRITICAL: the criterion dropped from the eval is exactly the one the diff violates — agent-writable verifiableBy executed as sh -c in cfg.ProjectRoot (carryover_retire.go:46 via cmd_loop.go:221)"
+    priorOccurrences:
+      - "cycle-1486 — same slug, 8-criterion eval, FAIL on H1 CRITICAL (unsandboxed sh -c in the operator checkout)"
+      - "cycle-1493 — same eval path, 10 criteria, lane did not land"
+      - "cycle-1496 — same slug, 7 criteria per its lesson; containment landed, authority did not"
+      - "cycle-1500 — same eval path, 7 criteria, lane did not land; its own retro named the eval-re-authoring class"
+    upstreamSignals:
+      - "the inbox item carries `continuation.cycle` binding this attempt to its predecessor — the join key needed to diff the evals is present in the item and read by nothing"
+      - "a 7-criterion version of the same file existed on disk in a concurrent sibling lane's tree at 23:23 the same day; no cross-lane eval read is performed"
+      - "eval quality-check passed the 4-criterion file — a standalone quality grade cannot see a deletion"
+  governingVariable: >-
+    Wrong assumption: "an eval file at a stable path is a regression gate for the
+    slug it names." True relationship: an artifact gates across attempts only if it
+    PERSISTS across attempts, and every artifact this pipeline produces for a FAILING
+    lane dies with the worktree. Evals therefore have exactly the memory of the
+    channel that regenerates them — the inbox item's `fix` text — and inherit its
+    shape: a decision spec yields decision criteria and never authorship, execution-root,
+    or persistence criteria. The second-order effect is worse than forgetting: the
+    eval does not merely omit the hard criteria, it AFFIRMATIVELY CERTIFIES the
+    remainder, so a shrinking criteria set converts into a rising green count. Cycle
+    1501 scored 4/4 green where 1493 would have scored 4/10, and no signal anywhere
+    in the pipeline distinguishes "passed a harder test" from "passed a shorter one."
+    The tell is exact and cheap to check: an eval file whose slug has a
+    `continuation.cycle` in its inbox item, and whose criteria count is LOWER than
+    the predecessor cycle's file at the same path.
+  preventiveAction: >-
+    (1) LAND THE EVAL BEFORE THE LANE, OR CARRY IT FORWARD BY JOIN. Either evals for a
+    slug with a `continuation.cycle` are written to main at mint time (they are
+    `.evolve/**`-only, path-filtered out of the Go CI matrix, so landing them is cheap),
+    or the TDD phase MUST resolve `continuation.cycle: N`, read the predecessor's file
+    at the same path from that cycle's preserved branch, and seed from it. Deterministic
+    file join, no LLM, no ranking. Owner: `go/internal/phases/tdd` + the continuation
+    adoption site in `go/internal/core/routing_dispatch.go`.
+    (2) GATE CRITERION-COUNT MONOTONICITY. When a predecessor eval exists for the same
+    slug, block the TDD→Build transition if the new file drops any predecessor criterion
+    without an explicit `retired_criterion:` line naming the criterion and the reason.
+    Silent deletion is the whole defect; an explicit deletion is a reviewable decision.
+    Red-first test pinning the 1501 shape: 7 criteria in, 4 out, transition blocked.
+    (3) RESTORE THE FOUR DROPPED CRITERIA VERBATIM before any further attempt at this
+    slug — execution-root refusal, absent-evidence-is-not-satisfied-evidence,
+    retired-verdict-survives-FreshenSpecs, no-silent-caps — and add the two the chain
+    has never had: a timeout bound and an authority clamp on the writer.
+    (4) MAKE `evolve eval quality-check` COMPARATIVE, NOT STANDALONE. Its verdict must
+    include "criteria retained vs predecessor: N/M" whenever a predecessor exists. A
+    quality check that cannot see a deletion certifies the deletion.
+    (5) AS AUDITOR: when every cycle grader is green and any defect is CRITICAL, that
+    combination is itself a finding about the eval, not only about the diff. Cycle
+    1501's auditor did exactly this (M1) — keep it, and raise it above MEDIUM when the
+    slug has a `continuation.cycle`.
+  relatedInstincts:
+    - "cycle-1496-a-retry-carries-the-items-spec-and-never-its-predecessors-lesson"
+    - "cycle-1500-the-retry-reauthors-the-eval-and-silently-retires-the-criterion-it-failed-on"
+    - "cycle-1486-inert-metadata-promoted-to-executable-input-without-a-trust-boundary-review"
+    - "cycle-1496-new-executable-field-lands-three-lines-under-the-comment-stating-the-clamp-it-skips"
+    - "cycle-1492-remedy-on-disk-in-four-places-reaches-no-agent-with-authority-to-apply-it"
+  contradicts: []

@@ -1,0 +1,119 @@
+- id: cycle-1204-new-default-binding-key-omits-sibling-clamps
+  pattern: "new-peer-added-to-a-rule-set-copies-the-happy-path-shape-but-not-the-clamps-its-siblings-earned-from-measured-incidents"
+  description: >
+    Cycle-1204 added `rootCauseRule` as the THIRD default-on binding signal in
+    `go/internal/inboxbatch/rules.go` `DefaultRules()`. The builder's stated method was to
+    "mirror `campaignRule`'s shape exactly" (build-report.md:15) and it did — the spanning-chain
+    edge construction, the `byX` map-then-chain body, the `TrimSpace` empty guard. What it
+    mirrored was the SHAPE. What it did not carry is the set of clamps its siblings each
+    acquired the hard way:
+    - `campaignRule` fusion is bounded because `campaign` is a PARTITION: `Classify`
+      (classify.go:66-91) refuses to union two distinct non-empty campaigns on any inferred
+      edge — a guard added after the measured 2026-07-28 incident (17 campaigns collapsed into
+      one ~37-item serialized cluster).
+    - `fileAreaRule` is bounded above by `hubAreaMaxItems = 5` and below by `minAreaDepth = 2`,
+      BOTH added after measured fusion incidents documented in the file itself
+      (55/61 items, then 43/84 items — rules.go:88-108).
+    - `rootCauseRule` shipped with NO group-size ceiling and NO provenance check. Any writer,
+      including an agent autofiling into `.evolve/inbox/`, asserts "these items are the same
+      defect" and the classifier believes it unconditionally.
+    Adversarial review demonstrated both consequences with an executed probe against the real
+    `Classify`/`RenderMarkdown` path (F2): 11 campaign-less items sharing one forged
+    `root_cause` collapse into a single cluster chunked into 3 sequential `DependsOnPrev`
+    batches (scheduling starvation — the exact mode the campaign partition guard exists to
+    prevent, re-opened through an unguarded field), and because batch weight is
+    `max(member weight)` (classify.go:130-136) three 0.1-weight fillers ride into the
+    top-ranked batch at weight 0.95 (weight amplification — work reaches build with no
+    independent justification).
+    Exposure is bounded, and bounded by ACCIDENT rather than by design: root-cause edges DO
+    inherit the campaign partition guard, because `Classify` applies it per-edge regardless of
+    which rule emitted the edge. So only campaign-less items can fuse — which, for an
+    autofiled backlog, is the common case (19 of the 20 live items carrying `root_cause` have
+    an empty `campaign`).
+    THE ORDERING TRAP: this defect is latent rather than live ONLY because of the sibling
+    defect D1 (the key is prose, so nothing groups). The two defects MASK EACH OTHER, which is
+    why neither surfaced as a test failure and why six green tests plus a clean adversarial
+    severity ceiling of MEDIUM coexisted with a rule that is simultaneously a no-op and a trap.
+    The moment a normalizing producer lands — i.e. exactly the deferred follow-up this cycle
+    queues — D1 dissolves and D2 goes live in the same commit.
+  confidence: 0.85
+  source: "cycle-1204/add-inboxbatch-rootcause-rule"
+  type: "failure-lesson"
+  category: "structural"
+  applies_to:
+    - "agents/evolve-scout.md"
+    - "agents/evolve-builder.md"
+    - "agents/evolve-tdd-engineer.md"
+    - "agents/evolve-auditor.md"
+  failureContext:
+    cycle: 1204
+    task: "add-inboxbatch-rootcause-rule"
+    errorCategory: "reasoning"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["D2"]
+  observed:
+    - "Builder's explicit method was 'mirrors campaignRule's shape exactly' — shape copied, clamps not"
+    - "Both sibling rules carry ceilings/partitions whose in-file comments name the measured incidents that produced them"
+    - "The new rule is default-on, so the clamps are load-bearing from the first commit, not from a later opt-in"
+    - "Bounding came from an unrelated guard (Classify's per-edge campaign partition) the author did not invoke by design"
+    - "19/20 live root_cause-carrying items are campaign-less, so the accidental bound covers the rare case, not the common one"
+    - "D1 (prose key ⇒ zero groups) hides D2 (no ceiling) — mutual masking, so tests stay green over both"
+  rule: >
+    When adding a peer to an existing rule/strategy/policy SET, the acceptance surface is the
+    set's INVARIANTS, not the sibling's code shape. Before registering a new member:
+    (a) Enumerate every clamp, ceiling, floor, partition and provenance check carried by each
+        existing member, and for each one state in the report whether the new member needs it,
+        with a reason. In-file comments that name a past incident ("added after 55/61 items
+        fused") are the invariant's provenance — a clamp with an incident behind it may not be
+        skipped silently.
+    (b) A clamp the new member appears not to need because of an UNRELATED guard elsewhere is
+        not a design decision — name the guard, state the residual exposure, and prove the
+        boundary. Bounded-by-accident becomes unbounded when the unrelated guard moves.
+    (c) A new member that is DEFAULT-ON is load-bearing immediately; "we can add the ceiling
+        later" is only valid if the member is opt-in until the ceiling lands.
+    (d) When two defects in one diff mask each other, fixing either one alone ships the other
+        LIVE. Record the ordering constraint explicitly as a dependency between the follow-up
+        items — never let the unmasking fix land first.
+  why: >
+    `DefaultRules()` decides how the whole backlog is grouped, and its output feeds two sinks
+    that both matter: the triage LLM's prompt (`RenderMarkdown` → `inbox_batches` →
+    `top_n` selection) and the scheduler (union-find clustering → batch composition, ordering,
+    `DependsOnPrev` serialization, and per-batch max-weight). An unclamped grouping key
+    therefore buys an inbox writer two capabilities at once: serialize an arbitrary number of
+    otherwise-parallel lanes, and lift arbitrary low-weight work into the top-ranked batch.
+    `.evolve/inbox/` is explicitly untrusted (ADR-0073 clamp-parity, consoleroute.go:29-41) and
+    agents can write to it. Every sibling rule in this file already paid for its ceiling with a
+    production fusion incident; shipping the third one bare re-opens a class the file's own
+    comments document as already-learned.
+  preventiveAction: >
+    Any diff that registers a new member into `inboxbatch.DefaultRules()` — or into any
+    analogous default-on rule/strategy set — MUST include, before green: (1) a report table
+    enumerating each existing member's clamps (`campaignRule` → Classify partition guard
+    classify.go:66-91; `fileAreaRule` → hubAreaMaxItems=5 / minAreaDepth=2 rules.go:88-108) with
+    an explicit need/not-needed verdict and reason for the new member; (2) a group-size ceiling
+    mirroring `hubAreaMaxItems` unless the field is a proven partition, plus a TDD RED test
+    that constructs a group ABOVE the ceiling and asserts the excess does not fuse (a test that
+    only exercises 2-3 item groups cannot distinguish "ceiling present" from "ceiling absent");
+    (3) an assertion that per-batch weight cannot be lifted by co-batching — construct one
+    low-weight and one high-weight member sharing the key and pin the resulting batch weight;
+    (4) if the new member is prose-keyed or has no normalizing producer, register it OPT-IN
+    (beside `ConnectsRule`) and not in `DefaultRules()` until the ceiling and the contract both
+    land. Auditor: treat "mirrors <sibling> exactly" in a build report as a signal to diff the
+    new member against the sibling's GUARDS, not its body.
+  relatedInstincts:
+    - "[[cycle-1204-json-field-shape-inferred-from-name-not-corpus]]"
+    - "[[cycle-703-specific-handler-after-broad-catchall]]"
+    - "[[cycle-1139-default-flip-promotes-dormant-zero-values-to-policy]]"
+    - "[[cycle-86-risk-flag-mitigation-not-binding]]"
+  contradicts: []
+  reviewerNote: >
+    The build report DID name a fusion risk and DID mitigate it — risk (b), "full-clique edges
+    would blow up edge count", mitigated by copying the spanning-chain pattern. That mitigation
+    is real and the auditor verified it (len(group)-1 edges, no blowup). The miss is that the
+    risk register was scoped to EDGE COUNT (a performance property) while the siblings' clamps
+    exist for CLUSTER SIZE and WEIGHT (scheduling and selection properties). Copying a
+    sibling's spanning-chain shape addresses the cheap risk and inherits none of the expensive
+    ones. Worth noting when tuning builder risk-register prompts: "how many edges" and "how
+    big may one cluster get" are different questions, and only the second is what
+    hubAreaMaxItems and the campaign partition were built to answer.

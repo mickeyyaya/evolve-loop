@@ -1,0 +1,50 @@
+- id: inst-L1532c
+  pattern: "eval-evidence-runs-a-test-name-that-does-not-exist-and-exits-0"
+  description: >-
+    An eval contract is a PERMANENT artifact, and `go test -run '^Name$'`
+    against a name that matches nothing prints "testing: warning: no tests to
+    run" and EXITS 0 — so an eval whose evidence commands reference tests that
+    were never authored is simultaneously unsatisfiable and self-passing
+    forever. Cycle 1532 staged `.evolve/evals/pipeline-replay-contract-boundary.md`
+    for landing with two `score_cap` criteria (`:4`, `:8`) whose evidence is
+    `go test -count=1 -run '^TestArtifactTimeoutTransient_LivePaneIsFamilyScopedNotHardCodedText$'
+    ./internal/bridge` and its sibling — a repo-wide grep finds those names only
+    as string literals inside `go/acs/cycle1532/predicates_test.go:140-141`,
+    never as test functions. The eval was authored by TDD for the second
+    committed slug; Builder bound to the first slug and left the sibling eval
+    staged unchanged rather than unstaging it. Nothing in the pipeline validates
+    that an eval's evidence commands resolve to existing tests before the eval
+    lands, so every future cycle would grade this criterion green on an exit
+    code that means "I found nothing to check". The Builder persona already
+    knows the footgun for its own graders — `agents/evolve-builder.md`
+    "'no tests to run' means the required test does NOT exist ... never report
+    PASS for a grader that matched zero tests" — but that rule guards the
+    BUILD-time run, not the LANDING of a contract that will be run by everyone
+    afterwards. A guardrail written for one phase's execution does not transfer
+    to the artifact that phase leaves behind.
+  confidence: 0.85
+  source: "cycle-1532/pipeline-replay-contract-boundary"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1532
+    task: "pipeline-replay-contract-boundary"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["H2"]
+  preventiveAction: >-
+    Never land an `.evolve/evals/<slug>.md` whose `score_cap[].evidence`
+    references a test that does not exist in the tree being landed. Before
+    staging any eval, execute every `evidence` command with `-v` and require a
+    `--- PASS: <name>` line — exit 0 alone is NOT evidence when the command is
+    `go test -run`. Prefer `go test -run '^X$' -v ... | grep -q '^--- PASS: X'`
+    or `-count=1 -run '^X$' ./pkg 2>&1 | grep -qv 'no tests to run'` in the
+    evidence string itself so the contract cannot self-pass. As Builder: if you
+    do not deliver a slug, UNSTAGE its eval and its predicate — leaving them
+    "staged unchanged for handoff" writes a permanently unsatisfiable contract
+    into the repo. As Auditor: for every staged eval, grep the repo for each
+    named test and treat "literal appears only inside a predicate file" as a
+    HIGH defect.
+  relatedInstincts: ["inst-L1532a", "inst-L1532b", "inst-L1531c", "inst-L1528b"]
+  contradicts: []

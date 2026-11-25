@@ -1,0 +1,114 @@
+- id: cycle-1480-multi-slug-topn-reds-the-cycle-sixteen-cycles-after-1464
+  pattern: "triage-commits-two-top-n-slugs-tdd-mints-cycle-wide-predicates-for-both-the-builder-contract-binds-the-first-listed-slug-only-and-egps-requires-red-count-zero-so-the-cycle-is-red-by-arithmetic-before-the-builder-starts-exactly-as-in-1464-and-1203"
+  description: >-
+    Cycle 1480 failed with `red_count=4` against an EGPS floor of
+    `red_count==0`, and three of those reds (006/007/008) belong entirely to a
+    task no agent was authorized to implement. This is the SAME composition
+    failure as [[cycle-1464-topn-commits-more-slugs-than-one-build-pass-may-implement]],
+    which was itself a restatement of cycle-1203. Sixteen cycles later, nothing
+    in the pipeline computes the arithmetic.
+
+    The three colliding authorities, re-verified on disk in this cycle:
+
+      1. `triage-decision.json:3-17` commits TWO `top_n` slugs —
+         `minted-phase-verdict-contract-unsatisfiable` and `dead-api-sweep`.
+         `go/internal/phases/triage/triage.go` gates `top_n` for EMPTINESS
+         (`TestRun_EmptyTopN_FAIL`) and for protected-surface paths
+         (`protectedTopNViolation`, triage.go:269) — it never gates CARDINALITY.
+      2. `agents/evolve-builder.md:94` still reads, verbatim and unchanged:
+         "If `## top_n` commits multiple slugs, use the highest-priority
+         (first-listed) one." The Builder obeyed it exactly.
+      3. `go/acs/cycle1480/predicates_test.go:1-13` — the package doc names BOTH
+         slugs — mints predicates 001-005 for slug 1 and 006-008 for slug 2, and
+         EGPS grades the whole suite.
+
+    Outcome as arithmetic predicts: `acs-verdict.json` records 006 "PlanJudge,
+    NewPlanJudge, JudgeVerdict, parseJudgeVerdict, judgeNoOpinion all still
+    declared in go/internal/core/phase_judge.go", 007 "cluster not removed", 008
+    "deadcode-refresh-2026-08.md absent". `go/internal/core/phase_judge.go` is
+    byte-unchanged; `git diff HEAD --stat` touches only
+    `go/internal/phasecontract/`. Three predicates red because the work was
+    never dispatched, not because it was done badly.
+
+    EVERY PHASE DIAGNOSED IT AND NONE COULD ACT. The builder named it in
+    Discoveries #2 at confidence 0.97 ("The native cycle suite includes
+    dead-api-sweep predicates although the Builder contract selects the first
+    top_n slug", `build-report.md:79`) and again in §If Failed. The auditor
+    reached it independently as defect H1 and marked `delivery-fidelity |
+    incoherent` in its chain (`audit-report.md:126`). Both were correct, both
+    were downstream of the decision, and neither has write access to the
+    persona contract that caused it.
+
+    THE FREQUENCY IS THE POINT. Of the 30 most recent cycles with a
+    `triage-decision.json`, 17 committed 2 or more `top_n` slugs (1445=2,
+    1448=4, 1452=11, 1453=2, 1455=2, 1457=2, 1460=62, 1462=2, 1463=4, 1465=6,
+    1467=2, 1468=2, 1469=5, 1472=2, 1473=4, 1474=6, 1478=2, 1479=3, 1480=2).
+    This is not a rare collision; it is the majority mode of triage, and every
+    one of those cycles was red-by-construction unless TDD happened to scope its
+    predicates narrower than its own package doc.
+  confidence: 0.95
+  source: "cycle-1480 — triage-decision.json:3-17 (two top_n slugs); agents/evolve-builder.md:94 (first-listed binding, unchanged since 1464); go/acs/cycle1480/predicates_test.go:1-13 (package doc names both slugs); acs-verdict.json red_count=4 with 006/007/008 attributed to dead-api-sweep; audit-report.md:63-68 defect H1; build-report.md:79 Discoveries #2"
+  type: "failure-lesson"
+  category: "structural"
+  pattern_systemic: true
+  systemic: true
+  applies_to:
+    - "agents/evolve-triage.md"
+    - "agents/evolve-builder.md"
+    - "agents/evolve-tdd-engineer.md"
+    - "go/internal/phases/triage"
+    - "go/internal/phases/tdd"
+  failureContext:
+    cycle: 1480
+    task: "minted-phase-verdict-contract-unsatisfiable + dead-api-sweep"
+    errorCategory: "planning"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "H1 (HIGH): top_n item 2 dead-api-sweep entirely undelivered; go/internal/core/phase_judge.go byte-unchanged; ACS predicates 006/007/008 red; EGPS floor requires red_count==0"
+    upstreamSignals:
+      - "build-report.md:79 Discoveries #2 names the scope collision at confidence 0.97, DURING build, before the audit ran"
+      - "build-report.md:14 §Open questions restates it; build-report.md:91 §Suggestion asks TDD to reconcile per-task builder scope with the cycle-wide suite"
+      - "audit-report.md:126 delivery-fidelity marked `incoherent` in the audit chain"
+      - "the lesson file for cycle-1464 states this preventive action verbatim and it was never implemented"
+  governingVariable: >-
+    Wrong assumption: "a lesson that correctly names its own preventive action
+    will cause that action to happen." True relationship: cycle satisfiability
+    is `len(top_n) <= builder_slugs_per_report` (= 1), the check is three lines
+    of Go at triage exit, and it has now been WRITTEN AS PROSE THREE TIMES
+    (1203, 1464, 1480) without once becoming executable. The defect is no longer
+    the scope arithmetic — that is fully diagnosed and undisputed by every
+    persona that touches it. The defect is that the pipeline has no path from a
+    diagnosed structural fault to a gate, so the diagnosis is re-derived at full
+    cycle cost on roughly every second cycle. See
+    [[cycle-1480-preventive-actions-block-still-has-zero-production-parser-callers]]
+    for the mechanism that keeps this from converting.
+  preventiveAction: >-
+    (1) GATE THE CARDINALITY IN GO, THIS CYCLE, IN CONSOLE. In
+    `go/internal/phases/triage/triage.go`, beside the existing
+    `protectedTopNViolation` check at :269, assert
+    `len(topN) <= 1` (or `<= policy.builder_slugs_per_report`). Surplus slugs
+    move to `deferred` / carryoverTodos and MUST NOT receive this-cycle
+    predicates. Table-driven test named for cycles 1203/1464/1480. Do NOT file
+    this as an inbox item again — inbox filing is what failed twice.
+    (2) OR AUTHORIZE MULTI-SLUG DISPATCH FOR REAL: amend
+    `agents/evolve-builder.md:94` to permit N slugs and have the orchestrator
+    run a build pass per slug. Pick exactly ONE of (1) or (2); the pipeline
+    currently has neither, and having neither is the entire defect.
+    (3) TDD BINDS PREDICATES TO DISPATCHED SCOPE, NOT TO TRIAGE SCOPE. A
+    this-cycle ACS predicate for a slug the build phase is forbidden to
+    implement is a guaranteed red. If the TDD package doc names two tasks and
+    the builder contract names one, the TDD phase must fail its own handoff.
+    (4) AS AUDITOR/RETRO: when every red predicate maps to a non-first-listed
+    `top_n` slug, classify as scope-arithmetic in one line and spend zero
+    budget on the implementation. Cycle 1480's auditor did exactly this — keep
+    it.
+    (5) AS TRIAGE, UNTIL (1) LANDS: commit exactly one slug. If two are
+    genuinely dependent, list the BLOCKING half first and defer the other.
+  relatedInstincts:
+    - "[[cycle-1464-topn-commits-more-slugs-than-one-build-pass-may-implement]]"
+    - "[[cycle-1464-predicates-bind-a-production-file-no-committed-slug-declares]]"
+    - "[[cycle-1249-vacuity-guard-red-recurs-because-fix-was-lesson-only]]"
+    - "[[cycle-1476-gate-a-recurs-because-its-lesson-had-no-enforcement-surface]]"
+    - "[[cycle-1480-preventive-actions-block-still-has-zero-production-parser-callers]]"
+  contradicts: []

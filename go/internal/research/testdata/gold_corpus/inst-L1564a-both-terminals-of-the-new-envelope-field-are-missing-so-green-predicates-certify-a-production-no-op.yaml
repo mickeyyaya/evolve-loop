@@ -1,0 +1,91 @@
+- id: inst-L1564a
+  pattern: "a-new-request-response-envelope-field-with-a-writer-on-one-side-and-a-reader-on-the-other-but-no-terminal-at-either-end-is-dead-plumbing-that-every-in-process-predicate-greens"
+  description: >-
+    Cycle 1564 shipped PASS on a feature that is provably unreachable in
+    production, and every deterministic gate agreed with it: acs suite
+    red_count=0, gofmt clean, go vet exit 0, both binding tests --- PASS,
+    package tests ok.
+
+    THE TWO DEAD ENDS, GREPPED.
+      PRODUCER — `BridgeResponse.SessionID` (core/ports.go:351) has exactly one
+        non-declaration reference and it is a READ:
+        `runner.go:1218  SessionID: bres.SessionID`.
+        `grep -rn 'SessionID' --include='*.go' internal/bridge/` → ZERO hits.
+        Nothing ever assigns it, so `resp.SessionID` is permanently "".
+      CONSUMER — `BridgeRequest.ResumeSessionID` (core/ports.go:335) has exactly
+        one non-declaration reference and it is a WRITE:
+        `runner.go:904  ResumeSessionID: req.ResumeSessionID`.
+        Nothing in internal/bridge/ reads it; no `--resume` launch argument
+        exists anywhere in the repo (all 18 `--resume` hits are the operator
+        string `evolve loop --resume`).
+    Because the producer is always "", the guard at cyclerun_dispatch.go:214 and
+    retry_opts.go:167 always takes the else branch: THE ENTIRE TTL GATE IS
+    UNREACHABLE and delivered token savings are exactly 0 for a `tokenopt-` item
+    whose scored metric IS token savings.
+
+    WHY THE TESTS COULD NOT SEE IT. Both ACS predicates
+    (acs/cycle1564/predicates_test.go:72,86) shell out to two binding tests, and
+    both binding tests drive `retrySessionProbe`
+    (core/cyclerun_session_resume_test.go:63-88) — a fake PhaseRunner that
+    MANUFACTURES a SessionID no bridge returns, then asserts on
+    PhaseRequest.ResumeSessionID, a field no bridge consumes. GREEN therefore
+    proves one thing: two struct fields exist and are copied between two
+    in-process structs. The predicate passes IDENTICALLY on the delivered no-op
+    and on a correct implementation, so it has zero discriminating power over
+    the thing the cycle was for. The eval's own anti-no-op row (the beyond-TTL
+    fresh-boot case) inherits the defect: it guards a branch that is itself
+    unreachable, and is satisfiable only through the synthetic 6-min-per-read
+    clock at cyclerun_session_resume_test.go:135.
+
+    THE CONTRACT SAID WHERE THE TERMINAL WAS. triage-decision.json:8 committed
+    files=["go/internal/bridge/", "go/internal/core/cyclerun_dispatch.go"].
+    `git diff HEAD --name-only -- internal/bridge/` is EMPTY. The half of the
+    committed file set containing the only code able to satisfy AC1 was never
+    touched, and the Builder disclosed exactly this in Open Questions
+    (build-report.md:14) and Risks (build-report.md:52) and then wrote PASS. A
+    known-unreachable feature disclosed in Open Questions is a DEFERRAL, not a
+    PASS — the honest verdict shape was PARTIAL with the bridge seam carried.
+  confidence: 0.9
+  source: "cycle-1564/tokenopt-session-resume-on-retry"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1564
+    task: "tokenopt-session-resume-on-retry"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["H1", "H1b", "H2"]
+  preventiveAction: >-
+    TWO MECHANICAL CHECKS, both cheap enough to be unconditional.
+    (1) TERMINAL-WITNESS LENS (audit + builder self-verification): when a diff
+    adds a field to a request/response envelope, the phase MUST name the
+    terminal WRITER and the terminal READER by file:line. Run
+    `grep -rn '<FieldName>' --include='*.go' internal/ cmd/ | grep -v _test.go`
+    and count non-declaration references per side. One reference on a side means
+    that side has no terminal — that is dead plumbing and blocks PASS, no matter
+    how green the suite is. This is the check that would have taken two greps in
+    cycle 1564.
+    (2) BIND THE PREDICATE AT THE OUTERMOST SEAM THE CRITERION NAMES, NOT THE
+    SEAM YOU BUILT. AC1 said "retry dispatches CARRY --resume", which is an ARGV
+    fact, so the predicate belongs where argv is built:
+    `internal/bridge/engine.go:435-436` already turns a BridgeRequest field into
+    a flag (`if req.SessionName != "" { args = append(args, "--session-name="+...) }`)
+    and is the sole precedent. Assert the BUILT LAUNCH ARGV contains
+    `--resume=<id>` for a BridgeRequest carrying ResumeSessionID, and that it is
+    ABSENT when the field is empty. A predicate that a fake in-process runner can
+    satisfy is not evidence about production; if the only way to green a row is a
+    hand-built probe that manufactures the value under test, the row is testing
+    the probe.
+    NEVER accept a criterion whose evidence column reads "no measurement" — AC2
+    ("measured input tokens on retried phases drop vs baseline") had no baseline,
+    no measurement and no eval row, and a criterion with no citation FAILS for
+    that criterion.
+  relatedInstincts:
+    - "[[inst-L1559b]]"
+    - "[[inst-L1557a]]"
+    - "[[inst-L1557c]]"
+    - "[[inst-L1563c]]"
+    - "[[inst-L1554d]]"
+    - "[[inst-L1564b]]"
+  contradicts: []

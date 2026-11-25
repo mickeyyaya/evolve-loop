@@ -1,0 +1,32 @@
+- id: inst-L1583b
+  pattern: "blocking-predicate-events-require-authorized-repair-receipts"
+  description: >-
+    SYSTEMIC: a Builder's correct refusal to edit a TDD-owned predicate is safe
+    only if the blocking event reaches TDD with the exact file and remedy and
+    TDD returns a verifiable receipt. In cycle 1583 the Builder emitted a
+    critical incorrect-acceptance-predicate event and premise-challenge emitted
+    FAIL/BLOCK, but shadow mode converted the latter to effective PASS and the
+    repair prompt carried only `red_count=3`. Re-entering TDD without the
+    semantic defect reproduced the same three RED predicates across audit
+    passes.
+  confidence: 0.99
+  source: "cycle-1583/pipeline-defect-pipeline-blocker-cycle1582"
+  type: "failure-lesson"
+  category: "episodic"
+  systemic: true
+  failureContext:
+    cycle: 1583
+    task: "pipeline-defect-pipeline-blocker-cycle1582"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["M1", "abnormal-events:incorrect-acceptance-predicate"]
+  preventiveAction: >-
+    At the Build-to-Audit boundary, consume every HIGH/critical predicate event
+    and every CRITICAL premise-challenge FAIL. Re-dispatch TDD once with the
+    cited file, falsified criterion, and replacement behavior; block Audit until
+    a receipt proves the authorized file changed and the named predicates ran.
+    If no authorized repair route exists, route to console instead of silently
+    converting the blocking judgment to PASS.
+  relatedInstincts: ["inst-L1528d", "inst-L1570a", "inst-L1574c", "inst-L1577b"]
+  contradicts: ["inst-L1528d"]

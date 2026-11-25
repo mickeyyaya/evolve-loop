@@ -1,0 +1,106 @@
+- id: cycle-1363-tdd-named-the-missing-test-and-no-grader-covered-it
+  pattern: "the-tdd-phase-wrote-the-blocking-requirement-in-prose-under-a-house-rule-heading-instead-of-as-a-red-test-so-the-builder-dropped-it-and-every-mechanical-channel-graders-acs-self-verification-stayed-green-because-none-of-them-encodes-a-tdd-authored-clause"
+  description: >-
+    The cycle-1363 defect was not discovered by the auditor — it was SPECIFIED by
+    the TDD phase and then lost. `.evolve/runs/cycle-1363/test-report.md:36-42`
+    (House Rule #2, "caller proof") says verbatim:
+
+      > Builder must also add the package's own gate-invoked test (e.g.
+      > `TestNoResidualTrackedIgnoredFiles` in `go/internal/gitignoreresidual`,
+      > calling `gitignoreresidual.Check` against the real repo root) — this is
+      > the file `go test ./internal/gitignoreresidual/...` actually executes at
+      > ship time; the ACS predicates above exercise the exported API directly
+      > and **do not substitute for it**.
+
+    Triage named the same shape
+    (`files=[... go/internal/repocontract/gitignore_residual_test.go]`,
+    `triage-decision.json`), and the scout AC required the guard to run "in the
+    module's project root (not just `go/`)". Three phases asked for it. The
+    shipped diff has none of it, and the build report's Self-Verification section
+    lists ten commands, all PASS, none of them the missing test — the omission is
+    not visible as an omission anywhere in the report.
+
+    What is diagnostic is that no mechanical channel dissented:
+
+      * 6/6 eval graders green — every grader asserts registration or fixture
+        behaviour;
+      * ACS 161 green / 0 red (`acs-verdict.json`), because the real-repo
+        predicate lives under `//go:build acs` where it does run;
+      * builder self-assessed confidence 0.88, "Quality concerns: none";
+      * the TDD phase's two "House Rule" paragraphs are PROSE in
+        `test-report.md`. The TDD phase wrote 6 tests in 2 files
+        (`acs/cycle1363/predicates_test.go`, `phases/ship/repocontract_gitignoreresidual_test.go`)
+        and none of the 6 is a RED test for its own House Rule #2. A requirement
+        the TDD phase states but does not encode as a failing test has no
+        enforcement channel at all — it is an instruction in a document the
+        grader never reads.
+
+    This is the fresh-code twin of
+    [[cycle-1176-residency-check-proves-existence-not-contract-conformance]]:
+    there, contract clauses sat eighteen lines above the tests that were read and
+    nobody diffed source against clauses; here the clause sat in the TDD report
+    and nobody diffed the diff against it.
+  confidence: 0.85
+  source: "cycle-1363 — .evolve/runs/cycle-1363/test-report.md:36-42 (House Rule #2), triage-decision.json (files[] names the test), build-report.md:44-51 (ten-command self-verification, missing test absent), acs-verdict.json (161 green/0 red), audit-report.md D1 ('This was specified, not overlooked by the pipeline')"
+  type: "failure-lesson"
+  category: "structural"
+  applies_to:
+    - "agents/evolve-tdd-engineer.md"
+    - "agents/evolve-builder.md"
+    - "agents/evolve-auditor.md"
+    - "go/internal/phases/"
+  failureContext:
+    cycle: 1363
+    task: "add-gitignore-residual-tracked-guard"
+    errorCategory: "planning"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "TDD phase explicitly required a plain-build TestNoResidualTrackedIgnoredFiles calling Check on the real repo root (test-report.md:36-42); builder did not add it"
+      - "all six eval graders pass while the capability is absent — every grader tests registration or fixtures (Goodhart gap named by the auditor)"
+    upstreamSignals:
+      - "the requirement was stated three times (scout AC, triage files[], TDD House Rule #2) and encoded as an executable RED test zero times"
+      - "build-report.md Self-Verification lists 10 PASS commands; a missing required test is structurally invisible in a list of passing commands"
+      - "builder Quality Signals said 'Quality concerns: none' while the cycle's central capability was unwired"
+  governingVariable: >-
+    Wrong assumption: "a requirement written clearly and repeatedly in the TDD
+    handoff will be delivered, because the builder reads the handoff." True
+    relationship: in a pipeline graded by executable artifacts, a requirement's
+    force equals the strength of the channel that can FAIL on its absence.
+    Prose in `test-report.md` has no such channel: graders grade the eval,
+    ACS grades its predicates, self-verification enumerates what was run (never
+    what was required and skipped). So a TDD-authored requirement that is not
+    itself a RED test is advisory, and the cycle's most important requirement is
+    exactly the one most likely to be phrased as guidance ("Builder must also
+    add …") because the TDD phase could not write it as red without the
+    production package existing yet. That last clause is the trap: "I cannot
+    write this test yet" quietly becomes "I will describe this test instead."
+  preventiveAction: >-
+    (1) TDD PHASE: NO REQUIREMENT IN PROSE THAT COULD BE A RED TEST. If the
+    requirement is "package P must contain a plain-build test calling P.F against
+    the real repo root", the TDD phase can encode that TODAY as a meta-test in a
+    package that already exists (e.g. in `phases/ship`: assert the registered
+    package directory contains an untagged test file referencing a repo-root
+    resolver). A "House Rule" heading is not an enforcement mechanism.
+    (2) BUILDER: CLAUSE-COVERAGE TABLE OVER THE TDD REPORT. Before writing the
+    build report, enumerate every imperative sentence in `test-report.md`
+    (`must`, `Builder must also`, `do not substitute`) and emit one row: clause |
+    where satisfied (file:line) | test proving it | verdict. `Self-Verification`
+    listing N passing commands must not stand in for it — a list of what ran
+    cannot show what was required and skipped.
+    (3) AUDITOR: DIFF THE TDD REPORT AGAINST THE DIFF FIRST. The cycle-1363
+    auditor found this by reading `test-report.md:36-42` and grepping for the
+    named symbol. Make that the first integrity check on any cycle whose TDD
+    report contains "must also add" — it is a two-minute grep and it caught a
+    blocking defect that six graders and 161 ACS predicates missed.
+    (4) EVAL AUTHORING: AT LEAST ONE GRADER MUST BE A DELETION TEST. For any
+    "add a gate/guard" eval, one grader must fail if the guard is present on disk
+    but unreachable from the gate's real command. Graders that assert
+    registration or fixture behaviour are all satisfiable without the capability.
+  relatedInstincts:
+    - "[[cycle-1176-residency-check-proves-existence-not-contract-conformance]]"
+    - "[[cycle-1139-inherited-slice-spec-assumed-implemented]]"
+    - "[[cycle-86-risk-flag-mitigation-not-binding]]"
+    - "[[cycle-100-challenged-premise-without-enforcement]]"
+    - "[[cycle-1363-registered-suite-asserts-on-fixtures-not-the-repo]]"
+  contradicts: []

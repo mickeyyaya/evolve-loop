@@ -1,0 +1,52 @@
+- id: inst-L1734a
+  pattern: "a-bracketed-paste-prompt-with-no-typed-turn-is-refusable-as-untrusted"
+  description: >-
+    The tmux bridge delivers every phase prompt as ONE bracketed paste
+    (go/internal/bridge/tmux.go:159 `paste-buffer ... -p -r`, called from
+    human_input.go:39 pastePrompt) and types nothing else. Claude Code wraps a
+    bracketed paste as pasted content, and its harness tells the model to
+    follow instructions inside pasted content only where the user's own
+    message asks — the turn has no user-authored text at all. The P3 identity
+    block (go/internal/bridge/phaseidentity/identity.go) is itself INSIDE the
+    paste, so it cannot vouch for the paste. Cycle 1734 triage (claude-tmux,
+    balanced, session n4): the agent read the prompt as "untrusted pasted text",
+    refused to write triage-report.md/triage-decision.json ("I'm not going to
+    write that deliverable"), refused the one-shot nudge the same way, and sat
+    idle until exit 81 artifact_timeout at 900s (triage-escalation-report.json
+    final_pane). Scout (same driver, same cycle) and this retrospective accepted
+    the same shape, so the refusal is a stochastic model judgment, not a
+    deterministic block: any claude-tmux phase can lose 15 minutes to it. The
+    wrong assumption: "a prompt that states who the agent is will be read as
+    the operator's request". Authority has to come from outside the paste.
+    A second wrong assumption: an idle pane after a refusal was treated as a
+    stall (two 300s windows plus a nudge) instead of a recognisable terminal
+    state that should fail over at once.
+  confidence: 0.6
+  source: >-
+    cycle-1734/sizeratchet-shrink-skillcheck
+    (.evolve/runs/cycle-1734/triage-escalation-report.json final_pane;
+    triage-interactions.ndjson nudge result=no_effect latency 604954ms;
+    signals.ndjson seq 26 BRIDGE_EXIT_ARTIFACT_TIMEOUT exit=81;
+    go/internal/bridge/tmux.go:159; go/internal/bridge/human_input.go:39-66;
+    go/internal/bridge/phaseidentity/identity.go)
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1734
+    task: "sizeratchet-shrink-skillcheck"
+    errorCategory: "integration"
+    failedStep: "scout"
+    auditVerdict: "FAIL"
+    auditDefects: ["triage-refusal"]
+  preventiveAction: >-
+    In the claude-tmux driver, after the bracketed paste settles and before
+    Enter, type (send-keys, not paste) one short, fixed, user-authored line
+    such as "This is my evolve-loop <phase> prompt for cycle <N>; carry it out
+    and write the deliverable." so the turn carries a user message that asks
+    for the pasted instructions. Pin it with a driver test asserting the typed
+    line follows the paste and names the phase and cycle. Add a pane classifier
+    for refusal text ("not going to write", "pasted in by mistake", "untrusted
+    pasted") that ends the attempt at once as a walkable refusal (fail over to
+    the next CLI) instead of waiting out artifact_timeout.
+  relatedInstincts: ["inst-L1687a", "inst-L1687b"]
+  contradicts: []

@@ -1,0 +1,116 @@
+- id: inst-L1549b
+  pattern: "third-occurrence-bug-reproduction-corrects-the-builders-fiction-inside-the-graded-file-and-the-correction-is-the-only-red"
+  description: >-
+    SYSTEMIC — THIRD OCCURRENCE of the identical structure (cycle 1541 / inst-L1541a,
+    cycle 1546 / inst-L1546c, cycle 1549). The cures both prior lessons prescribed
+    were never implemented, so the class recurred at full strength.
+
+    Phase clock from workspace mtimes (.evolve/runs/cycle-1549):
+
+        23:24  build               <- LAST phase with write authority; delivered GREEN
+        23:27  error-handling-scan  PASS
+        23:32  coverage-gate        SKIPPED
+        23:36  bug-reproduction    -> REWRITES go/internal/core/judgment_lesson_test.go
+                                     (the single top_n target file) into the honest
+                                     zero-diagnostic production shape; verifies it RED
+        23:43  audit               -> FAIL, EGPS red_count=1, defect H1 == the repro
+
+    `routing-decision-9.json` goes bug-reproduction -> audit (`reason: spine:audit`).
+    Nothing between them may write a line.
+
+    WHAT IS NEW AND WORSE THAN 1541/1546. In 1541 and 1546 bug-reproduction MINTED
+    A NEW red predicate beside the delivered work. Here it went further: it EDITED
+    THE DELIVERED WORK ITSELF, deleting the Builder's injected
+    `Diagnostics: []Diagnostic{{Severity:"error", Message: parsed.Failure.Defects[0]}}`
+    and leaving a comment explaining why ("injecting parsed.Failure as an error
+    would make this test falsely green and hide the missing lesson rationale").
+    That edit was CORRECT — see inst-L1549a; the Builder's green was a fiction and
+    bug-reproduction is the phase that caught it. The phase performed the honest
+    audit of its own lane and was charged the entire cycle for it.
+
+    THE ASSUMPTION THAT IS WRONG, STATED PRECISELY: that a red predicate is
+    evidence about the lane's WORK, so `red_count` may be a flat count over the
+    graded set. It is not. `red_count` conflates two disjoint things — "the lane
+    shipped something broken" and "the lane discovered something broken" — and the
+    EGPS floor `red_count == 0` punishes both identically. Under that floor the
+    incentive gradient is exactly inverted: a bug-reproduction phase that finds
+    nothing leaves the suite green and the cycle ships; a bug-reproduction phase
+    that does its job perfectly guarantees FAIL. Three cycles have now paid that
+    price, and cycle 1549 paid it for CATCHING A FABRICATED GREEN — the single
+    most valuable thing any phase did this cycle.
+
+    THE COLLATERAL DAMAGE IS ALSO STRUCTURAL, NOT INCIDENTAL. Because build exited
+    at 23:24 and the file changed at 23:36, `build-report.md`'s entire
+    Self-Verification block ("acs suite PASS red=0", "core+specrunner 2/2 PASS",
+    "4/4 PASS", confidence 0.97) describes bytes that no longer exist. Those claims
+    were TRUE WHEN WRITTEN. No amount of persist-before-quote discipline
+    (inst-L1548c) can save a claim that a LATER phase invalidates — the report has
+    no way to know. The auditor correctly recorded it as M1 claim-discrepancy, but
+    the Builder did not lie; the pipeline let a stale truth stand unflagged as a
+    current one. THAT is the missing mechanism: no artifact in the workspace
+    records that a graded file's hash changed after the phase that vouched for it.
+  confidence: 0.97
+  source: "cycle-1549 audit-report.md#H1,#M1 + Reflection ('a later phase changed the deliverable and nothing re-graded it'); routing-decision-9.json reason=spine:audit; workspace mtimes build-report.md 23:24 vs judgment_lesson_test.go 23:36:37; audit-fail-reason.json 'EGPS: red_count=1 [objection_reaches_next_cycle_planner_context]'; bug-reproduction-report.md repro.failing=true; prior: inst-L1541a, inst-L1546c"
+  type: "failure-lesson"
+  category: "structural"
+  pattern_systemic: true
+  systemic: true
+  applies_to:
+    - "go/internal/acssuite/"
+    - "go/internal/phases/audit/"
+    - "go/internal/core/"
+    - ".evolve/phases/bug-reproduction/phase.json"
+    - "agents/evolve-bug-reproduction.md"
+  failureContext:
+    cycle: 1549
+    task: "premise-challenge-learning-real-path"
+    errorCategory: "integration"
+    failedStep: "audit"
+    auditVerdict: "FAIL"
+    systemic: true
+    priorOccurrences: ["cycle-1541", "cycle-1546"]
+    auditDefects:
+      - "H1 (HIGH): delivered tree RED, ACS red_count=1, AC2 undelivered — the red is the post-build reproducer"
+      - "M1 (MEDIUM): build-report.md self-verification describes a file rewritten 12 minutes after the report was written"
+    upstreamSignals:
+      - "inst-L1541a preventive action (1) 'score post-build predicates in their own bucket' — filed, never implemented"
+      - "inst-L1546c preventive action (2) 'bug-reproduction MUST write its reproducer to a quarantined build-tagged path the EGPS red_count does not grade' — filed, never implemented"
+      - "the router skipped pre-audit-evidence-check, whose own when_to_use names this exact trigger: 'when recent cycles FAILed audit on ... EGPS red_count rather than on code quality'"
+  preventiveAction: >-
+    (1) PROVENANCE-SCOPED red_count (escalated third filing of inst-L1541a(1)).
+    Stamp every predicate/test result in `acs-verdict.json` with the phase that
+    authored the file, and compute the EGPS floor over BUILD-TIME predicates only.
+    Post-build reds become `carried_findings` in the verdict — surfaced loudly,
+    carried to the next cycle, but NOT the ship floor. A cycle whose only red was
+    minted after its last writer exited is a cycle that FOUND a defect, not one
+    that SHIPPED one; the verdict must be able to say so.
+    (2) HASH-FENCE THE SELF-VERIFICATION BLOCK. On build completion, record
+    `sha256` of every top_n target file. Any later phase that changes one MUST
+    invalidate `build-report.md`'s Self-Verification block (rewrite it to
+    "STALE — <file> changed at <ts> by <phase>") and re-run the cycle's ACS slice,
+    stamping the new result. One hash per target file; catches the whole
+    stale-vouching class that no persist-before-quote rule can reach.
+    (3) GIVE THE LOOP A REPAIR RUNG AFTER bug-reproduction. When
+    `repro.failing == true` AND the reproducer touches a top_n target file, route
+    to a bounded build-repair attempt (or `merge-to-main-gate`'s sibling) BEFORE
+    audit, instead of the unconditional `spine:audit` hop. Absent that rung, the
+    third-best outcome (find + fix) is unreachable and the loop can only choose
+    between blind-green and honest-red.
+    (4) EVALUATE THE OPTIONAL-PHASE when_to_use TEXT AT THE SPINE HOP.
+    `pre-audit-evidence-check`'s selection criterion already matches this cycle
+    verbatim and the router skipped it as `spine:audit`. A spine transition must
+    still evaluate optional-phase predicates, or those descriptors are decoration.
+    TESTS: (a) a red authored after the build phase's completion timestamp ->
+    EGPS reports `carried_findings=1, red_count=0`; (b) a post-build write to a
+    top_n file -> build-report self-verification is rewritten STALE and named;
+    (c) repro.failing on a top_n file -> routing emits a repair phase, not
+    `spine:audit`; (d) an optional phase whose when_to_use matches at a spine hop
+    is offered, not silently skipped.
+  relatedInstincts:
+    - "inst-L1541a"
+    - "inst-L1546c"
+    - "inst-L1544b"
+    - "inst-L1548c"
+    - "inst-L1549a"
+    - "inst-L1549c"
+  contradicts: []

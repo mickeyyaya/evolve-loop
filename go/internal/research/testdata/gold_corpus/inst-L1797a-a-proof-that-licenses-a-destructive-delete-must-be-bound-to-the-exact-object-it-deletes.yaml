@@ -1,0 +1,49 @@
+- id: inst-L1797a
+  pattern: "a-proof-that-licenses-a-destructive-delete-must-be-bound-to-the-exact-object-it-deletes"
+  description: >-
+    In round 1, `evolve worktree cleanup --dev` used `git branch -D` and
+    justified the delete with "gh reports a merged PR for <branch-name>"
+    (`gh pr list --head <b> --state merged --json number --jq length` > 0).
+    That proof is about the NAME, not the COMMIT. A branch with a commit made
+    after the squash merge, or new work under a reused branch name, passed the
+    proof. The tree was then removed and the commit was left in no ref. The
+    auditor reproduced this with an overlay probe (exit 0, refs containing the
+    commit: ""). The explanation document also called the name-keyed proof
+    "the stricter check" than `branch -d`. For that input it was weaker. The
+    ACS predicates missed it because the fake gh emitted only a count and no
+    fixture held a commit past the merged PR. The round-2 fix was correct:
+    the proof must have headRefOid == local head, and the delete runs
+    `git update-ref -d refs/heads/<b> <head>`, a compare-and-swap on the
+    proven head.
+  confidence: 0.8
+  source: >-
+    cycle-1797/cli-worktree-dev
+    (.evolve/runs/cycle-1797/audit-report.md H1/H2;
+    .evolve/runs/cycle-1797/defect-ledger.json;
+    .evolve/runs/cycle-1797/test-red-output.round2.txt TestC1797_013_;
+    go/cmd/evolve/cmd_worktree_dev.go:173-191 and :147-150 in the round-2 tree)
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1797
+    task: "cli-worktree-dev"
+    errorCategory: "reasoning"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "H1: cleanup --dev merge proof keyed on the branch name, not bound to the local head; git branch -D deletes unmerged post-merge work"
+      - "H2: explanation doc called the unbound proof 'the stricter check' and omitted the data-loss gap"
+  preventiveAction: >-
+    Builder: before any force or destructive operation (branch -D, worktree
+    remove --force, rm -rf, ref delete, reset --hard), write down which object
+    the safety proof is about and which object the operation destroys. They
+    must be the same object, identified by SHA or content hash, never by name.
+    Perform the delete as a compare-and-swap on that identity
+    (`git update-ref -d <ref> <proven-sha>`), so a change made between proof
+    and delete makes it fail. TDD: every fake external oracle (gh, an API)
+    must return the identity field (headRefOid), and every destructive verb
+    needs a predicate where the oracle says "yes" for the name and the object
+    has diverged. Auditor: for any destructive verb, probe the
+    name-matches/object-differs input.
+  relatedInstincts: []
+  contradicts: []

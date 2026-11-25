@@ -1,0 +1,102 @@
+- id: cycle-1399-machine-parsed-gate-record-schema-too-narrow-for-its-own-evidence
+  pattern: "the-anti-laundering-record-declares-evidence-as-a-single-string-but-a-real-closure-cites-several-files-so-a-careful-builder-writes-an-array-and-the-whole-file-becomes-unparseable-turning-the-most-complete-disposition-ledger-in-the-lineage-into-total-gate-blindness"
+  description: >-
+    Cycle 1399 wrote the most thorough `defect-dispositions.json` its lineage
+    has produced: all four inherited cycle-1392 ids, each with a severity, a
+    status, a prose summary, a per-id executable `verification` command, and a
+    provenance note distinguishing "fixed in the inherited snapshot, re-driven
+    here as an anti-regression control" from "this cycle's own work". The
+    auditor independently confirmed every one of the four closures by reading
+    the code. That is exactly the behaviour the continuation defect-ledger gate
+    exists to elicit.
+
+    The gate could not read a byte of it:
+
+      .evolve/runs/cycle-1399/audit-fail-reason.json
+      "defect ledger: defect-dispositions.json is unparseable
+       (json: cannot unmarshal array into Go struct field
+        .dispositions.evidence of type string) — a continuation cannot be
+        graded against claims that cannot be read"
+
+    The producer wrote `"evidence": ["go/internal/deliverable/salvage_extract.go:94",
+    "go/acs/cycle1399/predicates_test.go:345", "go/acs/cycle1397/predicates_test.go"]`.
+    The consumer is `defectDispositionDoc` at
+    `go/internal/phases/audit/defect_ledger.go:85-92`, whose field is
+    `Evidence string`. One `json.Unmarshal` error voids all four entries at once.
+
+    The failure is not carelessness — it is the schema being narrower than the
+    thing it records. A closure claim that spans an implementation line, a
+    same-cycle predicate and an ancestor predicate has three citations by
+    nature; `string` admits one. The producer picked the shape that matched the
+    data. The gate's OWN sibling item states the format requirement in prose
+    ("bare evidence cite: path or path:N or path:N-M, prose OUTSIDE the cite" —
+    `.evolve/inbox/2026-08-06T03-40-00Z-continuation-disposition-producer-duty.json`),
+    which confirms both that the format is non-obvious and that it lives
+    nowhere an agent reads.
+
+    Severity ordering matters and is counter-intuitive: an ABSENT dispositions
+    file degrades better than a malformed one. Absent yields the per-id
+    switch text — five lines, each naming an inherited id and "(no
+    disposition)" — which is a work list. Unparseable yields one opaque Go
+    unmarshal error and the gate's whole per-id layer never runs, so the report
+    cannot even enumerate which ids remain unaccounted for. The most
+    conscientious producer in the lineage landed in the worst diagnostic state.
+
+    THIRD generation of this class on the same record. `cycle-1320`: the gate
+    blocks on the file but the string `defect-disposition` appears nowhere under
+    `agents/`, so no phase is told the file exists. `cycle-1340`: dispositions
+    are re-derived from THIS workspace on every Classify and never inherit, so
+    an ancestor's authored file buys the heir nothing. `cycle-1399`: the agent
+    finally authors a complete file and the schema rejects it. Each generation
+    moved the failure one step later in the pipeline without closing it. The
+    open item `continuation-disposition-producer-duty` (priority 0.88) is the
+    right fix and has now sat unbuilt through all three.
+  confidence: 0.9
+  source: "cycle-1399 — .evolve/runs/cycle-1399/audit-fail-reason.json (reason 1); .evolve/runs/cycle-1399/defect-dispositions.json (evidence as array, 4 entries); go/internal/phases/audit/defect_ledger.go:85-92 (Evidence string); .evolve/inbox/2026-08-06T03-40-00Z-continuation-disposition-producer-duty.json; prior generations cycle-1320 / cycle-1340 lessons"
+  type: "failure-lesson"
+  category: "process"
+  applies_to:
+    - "go/internal/phases/audit/defect_ledger.go"
+    - "agents/evolve-builder.md"
+    - "agents/evolve-auditor.md"
+    - "go/internal/phases/"
+  failureContext:
+    cycle: 1399
+    task: "salvage-extract-fenced-json-corrected"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["audit-fail-reason.json#1"]
+    systemic: true
+    priorOccurrences: ["cycle-1320", "cycle-1340"]
+  preventiveAction: >-
+    (1) WIDEN THE RECORD TO THE DATA IT ACTUALLY HOLDS. `Evidence` must accept
+    both a string and a list of strings (decode into `json.RawMessage`, then try
+    `string` and fall back to `[]string`, joining with "; "). Multi-file closure
+    evidence is the normal case for a defect closed by code + predicate +
+    ancestor-predicate; a schema that admits one citation trains producers to
+    under-cite or to drift. This is the root-cause fix, not the diagnostic
+    polish.
+    (2) A MALFORMED GATE RECORD MUST STILL ENUMERATE THE IDS. When the
+    dispositions file fails to parse, the gate should fall through to the
+    same per-id "(no disposition)" listing it emits when the file is ABSENT,
+    and append the parse error — never replace a work list with a type error.
+    Today the more conscientious producer gets the worse diagnostic.
+    (3) BUILD `continuation-disposition-producer-duty` (0.88, open since
+    2026-08-06). Its acceptance criteria already cover injecting the inherited
+    ids and the disposition contract into the builder prompt. Add one clause:
+    the injected contract must carry the EXACT field types (a literal JSON
+    skeleton), not a prose description of them. Three generations of this class
+    have now been diagnosed and none produced a producer-side artifact.
+    (4) VALIDATE AT WRITE TIME, IN THE PRODUCER'S OWN CYCLE. Any phase that
+    writes a machine-parsed gate record should round-trip it through the
+    consumer's decoder before the phase reports done. A schema mismatch found
+    at build time costs a re-write; found at audit time it costs the cycle.
+  relatedInstincts:
+    - "[[cycle-1399-sibling-guard-recommits-the-class-the-cycle-was-chartered-to-close]]"
+    - "[[cycle-1399-probe-phases-land-after-build-with-no-rebuild-round]]"
+    - "[[cycle-1320-defect-disposition-gate-has-no-agent-facing-producer]]"
+    - "[[cycle-1340-defect-dispositions-are-per-workspace-and-never-inherit]]"
+    - "[[cycle-1339-closure-gate-demands-a-record-the-closed-defect-never-had]]"
+    - "[[cycle-1371-closure-claim-gate-fires-on-a-task-id-that-ends-in-closed]]"
+  contradicts: []

@@ -1,0 +1,78 @@
+- id: cycle-1470-duplicate-goal-hash-lanes-collide-in-the-same-files
+  pattern: "mint-dedups-on-todo-id-not-on-goal-hash-so-a-continuation-races-its-own-successor"
+  description: >
+    SYSTEMIC RECURRENCE of the `fleet-lane-provisioning-split` family (cycle-575,
+    cycle-599, cycle-630, cycle-686, cycle-759) with a new and worse shape: this time
+    the lane was not merely empty — it was a DUPLICATE of a live sibling, and the two
+    lanes edited the same two files.
+
+    Cycle 1466 FAILed on the gitstage quotepath/collider/rename work. TWO successors
+    were dispatched against it. A fresh peer lane landed
+    `5738b36a evolve-cycle: goal=5683159362b3e3dd...` on main at 01:43:02Z
+    (8 files, +788 -10, touching go/internal/phases/ship/gitops.go and manifest.go).
+    Cycle 1470 was minted as a CONTINUATION of 1466
+    (continuation-manifest.json) and carries the IDENTICAL goal hash —
+    `.evolve/runs/cycle-1470/lane-scope.json: goal_hash 5683159362b3e3dd...` — and its
+    builder finished at 01:42:54Z with 8 files, +799 -17, in the same two files.
+
+    Two independent failures compound here:
+
+    (1) MINT-SIDE. `lane-scope.json:todo_ids` is `["pipeline-defect-pipeline-blocker"]`
+    — a generic, permanently-open inbox item
+    (`.evolve/inbox/pipeline-defect-pipeline-blocker.json` still exists) that already
+    has EIGHT dated copies under `.evolve/inbox/consumed/`. Triage did the right thing
+    and dropped it (`triage-decision.json: dropped[0].reason
+    "already-resolved-and-consumed"`, `top_n: []`), so the lane committed ZERO tasks
+    and then ran seven phases anyway. The partition dedups on todo-id, but the todo-id
+    is a stable reusable slug, and nothing dedups on goal_hash against in-flight peers.
+
+    (2) RECOVERY-SIDE. When ship's ff-merge diverged, the
+    `ClassifyFleetRebaseCandidate` pre-screen (ship_recovery.go:56-70) exists exactly
+    to short-circuit this waste class via `FleetRebaseAlreadyLanded` — the cycle-948
+    "PASS-but-unlanded duplicate" fix. It did not fire. It reasons over patch-id /
+    byte equivalence, and these two lanes solved the SAME eval acceptance criteria with
+    DIFFERENT code: main carries `splitPorcelainRename` (manifest.go:235) while the
+    lane carries `closingQuoteIndex` + `cutPorcelainRename` (manifest.go:239,268). A
+    semantic duplicate is invisible to a byte-level supersession test, so the candidate
+    classified as Conflict and the lane burned four recovery rounds it could never win.
+
+    The wrong assumption: that goal identity is DOWNSTREAM of task identity — that if
+    two lanes hold disjoint todo-ids they are doing disjoint work. Under continuation
+    remediation that inverts: the continuation inherits its ancestor's GOAL while
+    carrying a todo-id that resolves to nothing, so the id-based partition sees no
+    overlap precisely when the overlap is total.
+
+    Note the residue is NOT redundant. The audit's M2 — `git ls-files` probed without a
+    `--` terminator at gitops.go:143, letting a leading-dash filename opt out of the
+    collider pre-flight — is present on main TODAY, unfixed by the peer's landing.
+  confidence: 0.85
+  source: "cycle-1470/continuation-of-1466"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1470
+    task: "continuation-of-1466-gitstage-quotepath-collider-rename"
+    errorCategory: "planning"
+    failedStep: "scout"
+    auditVerdict: "WARN"
+    auditDefects:
+      - "lane-scope.json goal_hash 5683159362b3e3dd is identical to peer commit 5738b36a already on main; both lanes edited go/internal/phases/ship/{gitops,manifest}.go concurrently"
+      - "lane-scope.json todo_ids [pipeline-defect-pipeline-blocker] resolves to an id with 8 copies in .evolve/inbox/consumed/; triage dropped it as already-resolved-and-consumed and committed top_n: []"
+      - "seven phases dispatched against a lane that could only no-op, ending in GIT_FLEET_REBASE_NEEDED (ship-error.json) against the peer that carried its own goal"
+      - "ClassifyFleetRebaseCandidate's FleetRebaseAlreadyLanded short-circuit missed a SEMANTIC duplicate (main: splitPorcelainRename; lane: closingQuoteIndex/cutPorcelainRename)"
+  preventiveAction: >
+    Dedup lanes on goal_hash, not just todo-id. At mint time, reject a candidate lane
+    whose goal_hash matches any in-flight sibling or any goal_hash already present in
+    main's recent `evolve-cycle: goal=` commit subjects, and fail the mint LOUDLY when
+    a lane's todo_ids all resolve to ids under .evolve/inbox/consumed/ rather than
+    dispatching a seven-phase lane that can only no-op. Separately, teach the
+    fleet-rebase pre-screen a semantic supersession test: when a conflicting peer
+    commit carries the SAME goal_hash, classify the candidate as
+    FleetRebaseAlreadyLanded (superseded) and route to salvage-and-retire instead of
+    burning the full recovery budget on a rebase that cannot converge.
+  relatedInstincts:
+    - "cycle-759-scout-prompt-omits-fleet-scope-guarantees-empty-lane"
+    - "cycle-630-fleet-scope-drops-pipeline-halting-p0"
+    - "cycle-629-stale-inbox-resurfaces-landed-fix"
+    - "cycle-1470-rerun-phase-harvests-a-stale-report-as-a-fresh-verdict"
+  contradicts: []

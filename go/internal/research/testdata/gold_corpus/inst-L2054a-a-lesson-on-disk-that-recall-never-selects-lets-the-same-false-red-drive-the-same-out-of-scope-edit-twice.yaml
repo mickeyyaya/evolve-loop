@@ -1,0 +1,41 @@
+- id: inst-L2054a
+  pattern: "a-lesson-on-disk-that-recall-never-selects-lets-the-same-false-red-drive-the-same-out-of-scope-edit-twice"
+  description: >-
+    Cycle 2054 (latency-gates-t5-ci-trend-gate) repeated cycle 2045 step for step. The first
+    build handoff floor reported the repo-contract scanner pack RED on TestInnerRunCycleErrorF4,
+    the printed inner fixture of TestRunCycle_OrchestratorErrorFailsTheScenarioWithTheCause
+    (go/internal/routingtest/engine_backfill_f4_test.go) inside a package that passes. The one
+    correction (agy family) again changed runCycle, initScenarioRepo, seedWorkspace and
+    readRoutingDecisions in go/internal/routingtest/engine.go and fakes.go from *testing.T to
+    testing.TB and rewrote the fixture. The explanation floor then refused the build because
+    docs/explain/builds/cycle-2054-01m5y4bp3yabhky0hyvyxaderb.md Changed Areas did not name
+    the two new material paths. No correction was left. The task work itself (internal/citrend
+    at 100% cover, ACS 289/289 PASS) was correct. Lesson inst-L2045a describes this exact trap
+    and its remedy, but recalled-lessons.json of cycle 2054 did not include it, and the pipeline
+    fix (inbox item repocontract-nested-fixture-false-red, P1 console) was still open. So every
+    lane cycle whose floor runs the pack before that fix lands meets the same false red.
+  confidence: 0.9
+  source: "cycle-2054/latency-gates-t5-ci-trend-gate"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 2054
+    task: "latency-gates-t5-ci-trend-gate"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "build handoff floor round 1: repo-contract scanner pack RED TestInnerRunCycleErrorF4 (nested fixture of a passing package)"
+      - "build handoff floor round 2: Changed Areas does not explain material path go/internal/routingtest/engine.go"
+      - "build handoff floor round 2: Changed Areas does not explain material path go/internal/routingtest/fakes.go"
+  preventiveAction: >-
+    Pipeline (console): land repocontract-nested-fixture-false-red (count a test fail only when
+    its package ends fail) before more lane cycles run, and give each lane item that is open
+    behind it a deps edge to it. Recall: when the floor names a test, recall lessons whose text
+    names that test (inst-L2045a, inst-L2054a) into the correction prompt. Builder: when the
+    floor names TestInnerRunCycleErrorF4 (grep "func TestInnerRunCycleErrorF4" finds nothing),
+    do not edit go/internal/routingtest. Record it as a pipeline false red in build-report.md.
+    If a correction edits any file that is not in the explanation document, add that file to
+    Changed Areas in the same correction and run evolve phase verify build again.
+  relatedInstincts: ["inst-L2045a", "inst-L2055a", "inst-L2041a"]
+  contradicts: []

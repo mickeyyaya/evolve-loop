@@ -1,0 +1,100 @@
+- id: cycle-1309-continuation-adoption-outruns-every-phase-that-could-refuse-the-lane
+  pattern: "the-adr0076-continuation-re-seeds-the-worktree-after-triage-so-the-only-phases-with-scope-or-abort-authority-planned-against-a-tree-that-no-longer-exists-and-an-operator-gated-red-rides-in-unscreened"
+  description: >-
+    Cycle 1309 executed its own task correctly and still could not ship. The
+    task was `materialize-crosspoll-debounce-eval` (F3 part a): 4/4 cycle
+    predicates PASS, cycle-1258's regression lock restored to green, both evals
+    git-tracked past the `.gitignore` boundary, no test weakened. The auditor
+    re-ran every claim and endorsed all of it. The lane died on
+    `TestEveryGateShapedFileIsProtectedSurface` REDing on
+    `go/internal/inboxmover/prescription_gate.go` — a file this lane never
+    authored and no cycle may enroll.
+
+    The timeline, from workspace mtimes, is the whole lesson:
+
+      06:07:42  scout-report.md      — planned against a FRESH worktree
+      06:10:53  triage-report.md     — ranked against that same fresh worktree
+      06:11:25  continuation-manifest.json + prescription_gate.go appear
+                (adoptContinuationAfterTriage re-seeds from cycle-1308's
+                 snapshot eb1f530d, moves WorktreeBaseSHA to the prior
+                 attempt's base, and hands the tree to fault-localization)
+      06:53     audit records FAIL on the inherited red
+
+    `adoptContinuationAfterTriage` (`go/internal/core/continuation_stamp.go:216`)
+    is deliberately placed after triage — its own comment gives the reason
+    (`processing/cycle-N` does not exist earlier), and that constraint is real.
+    The defect is that NOTHING re-screens the lane afterwards. Scout and triage
+    are the only phases that may change scope or refuse an item; both had
+    already finished. Fault-localization, tdd, build, adversarial-review,
+    bug-reproduction and audit all ran — roughly 40 minutes of correct work —
+    downstream of a tree whose shipping diff had, by construction, a red no
+    cycle can clear. Scout's "whole task live-RED" was accurate when written
+    and false by build time; the builder had to discover the scope drift itself.
+
+    Note the direction of contamination: the re-seed widens the SHIPPING DIFF to
+    25 files including three Go sources from the prior lane, and EGPS is a
+    whole-tree gate. Authorship is irrelevant to it. So one operator-gated
+    blocker converts every subsequent lane on the item into a guaranteed
+    burn, no matter how good that lane's own deliverable is.
+  confidence: 0.9
+  source: "cycle-1309/materialize-crosspoll-debounce-eval — continuation_stamp.go:216-259, .evolve/runs/cycle-1309/{continuation-manifest.json,scout-report.md,triage-report.md,audit-fail-reason.json}, mtimes 06:07:42/06:10:53/06:11:25"
+  type: "failure-lesson"
+  category: "structural"
+  applies_to:
+    - "go/internal/core/continuation_stamp.go"
+    - "go/internal/core/cyclerun.go"
+    - "go/internal/core/cyclerun_epilogue.go"
+    - "go/internal/continuation/"
+    - "go/internal/phases/triage"
+  failureContext:
+    cycle: 1309
+    task: "materialize-crosspoll-debounce-eval"
+    errorCategory: "integration"
+    failedStep: "audit"
+    auditVerdict: "WARN"
+    auditDefects:
+      - "EGPS red_count=1 [protectedsurface/TestEveryGateShapedFileIsProtectedSurface] on go/internal/inboxmover/prescription_gate.go — inherited via continuation adoption, unclearable by any cycle (role.go:94 denies in-cycle writes under /go/internal/guards/)"
+      - "verdict-conflict: auditor narrative WARN, two deterministic gates forced FAIL"
+    upstreamSignals:
+      - "continuation-manifest.json mtime 06:11:25 is LATER than both scout-report.md (06:07:42) and triage-report.md (06:10:53)"
+      - "scout-prompt.txt contains zero occurrences of 'protectedsurface' and zero of 'continuation' — the plan predates the tree it was executed against"
+      - "build-report.md 'Scope correction inherited from TDD': 3 of 4 acceptance criteria opened pre-existing GREEN because the re-seed had already satisfied them"
+      - "third cycle to carry the byte-identical fingerprint audit|gate-block|1ba930c96a8b (1298, 1308, 1309)"
+  governingVariable: >-
+    Wrong assumption: "the tree a lane executes against is the tree its planning
+    phases inspected." True relationship: continuation adoption mutates the
+    worktree, the base SHA and therefore the shipping diff AFTER the last phase
+    empowered to refuse the lane has exited, so an adopted blocker is
+    unrefusable by construction. The invariant: any seam that changes what a
+    lane will ship must be followed by a screen with the authority to abort the
+    lane — adoption without re-admission is a one-way door.
+  preventiveAction: >-
+    (1) ADD A POST-ADOPTION ADMISSION SCREEN. Immediately after
+    `adoptContinuationAfterTriage` succeeds, run the durable gate the ship
+    decision will use (`go test -tags acs ./acs/regression/...`) against the
+    re-seeded tree. A red that is present at adoption time is inherited by
+    definition; if it is also unclearable in-cycle (its remedy touches
+    `guards.IsProtectedSurface` paths), abort the lane THERE — preserve the
+    worktree, route the item to console, and free the lane — instead of
+    spending six phases on a diff that cannot ship.
+    (2) CLASSIFY REDS BY CLEARABILITY, NOT BY AUTHORSHIP. "inherited" is not
+    the useful axis; EGPS does not care who typed the file. The useful axis is
+    "can a `--class cycle` commit legally remove this red?" Encode it: a red
+    whose only remedy intersects protected surface is UNCLEARABLE-IN-CYCLE and
+    must terminate lane admission, not merely be reported.
+    (3) RE-VALIDATE SCOPE AFTER A RE-SEED. When adoption fires, scout's
+    acceptance criteria were written against a different tree. Either re-run a
+    scope check (which criteria are now already green?) or mark the scout report
+    stale in the workspace so no downstream phase treats it as current — the
+    builder should not have to rediscover this by hand.
+    (4) NEVER LET ADOPTION SILENTLY WIDEN THE SHIPPING DIFF. The re-seed took
+    the diff from 3 files to 25. Log the delta loudly and record it in the
+    workspace, so the audit's blast-radius assessment starts from the real
+    number rather than the builder's own edit count.
+  relatedInstincts:
+    - "[[cycle-1308-salvage-carries-the-code-forward-and-leaves-the-blocker-behind]]"
+    - "[[cycle-1309-writing-the-lesson-is-not-delivering-it]]"
+    - "[[cycle-1216-protected-surface-boundary-is-tree-state-not-authorship]]"
+    - "[[cycle-1063-scope-retarget-escapes-protected-surface-gate]]"
+    - "[[cycle-1249-worktree-discard-races-the-retro-salvage-decision]]"
+  contradicts: []

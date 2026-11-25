@@ -1,0 +1,118 @@
+- id: cycle-1285-hardening-lands-on-the-inputs-the-audit-named-not-on-arming-or-availability
+  pattern: "every-input-the-prior-audit-named-is-hardened-while-the-condition-that-decides-whether-the-gate-runs-at-all-stays-in-the-old-trust-class-and-fails-silent-open"
+  description: >-
+    Cycle 1285 did the hard part right. The six defects cycle 1282's audit named
+    were genuinely repaired against the property, not the sentence — the
+    trusted-row arm deleted and inherited rows rebuilt from the ancestor every
+    pass, `defectID` widened 4 -> 16 bytes with first-row-wins and a blocking
+    shadow diagnostic, `evidenceResolves` narrowed to relative-only /
+    no-`..`-escape / project-root-only / `Lstat` regular-file / self-record
+    rejection, caps that RECORD overflow instead of dropping, and the 1282 PoCs
+    promoted into tree-resident locks that each drive `hooks.Classify`. The
+    auditor verified all six FIXED (`audit-report.md:52-59`). That is real
+    progress and it is the correct answer to
+    [[cycle-1282-defect-list-consumed-as-specification-not-as-property]] — which,
+    note, was never written to disk (see
+    [[cycle-1285-durable-failure-record-is-written-behind-a-precondition-the-failure-trips]]),
+    so the lane reached it unaided.
+
+    It FAILed anyway because hardening tracked the SURFACE the prior audit
+    pointed at — the disposition inputs — and stopped at the two edges no defect
+    sentence had named:
+
+      D2 HIGH  ARMING. `reconcileContinuationDefects` returns `(nil, false)`
+        when `continuation.ReadManifest` reports non-continuation
+        (`defect_ledger.go:326-327`). Delete `continuation-manifest.json` — a
+        file in exactly the trust class the DEF-1 fix concedes is agent-writable —
+        and three inherited OPEN defects close with verdict PASS and ZERO
+        diagnostics. The mechanism already treats a deleted ANCESTOR LEDGER as
+        loud enough to warn about (`:336-344`); the manifest is the cheaper `rm`
+        on the same threat model and is silent. Lineage exists out of band in
+        `.evolve/continuation-registry.json`, so arming never needed to depend on
+        a file the graded agent may delete. And the degrade directions are
+        backwards: a corrupt manifest degrades OPEN while an unparseable
+        `defect-dispositions.json` BLOCKS.
+      D3 MEDIUM  A CASE-SENSITIVE CHECK ON A CASE-INSENSITIVE FILESYSTEM. Rule 4
+        (no self-vouching) compares `filepath.Base` exactly
+        (`defect_ledger.go:275-278`), so on darwin
+        `.evolve/runs/cycle-1255/Defect-Ledger.json` resolves to the gate's own
+        record and closes every inherited defect. The rule was right; the
+        comparison was stricter than the substrate.
+      D4 MEDIUM  THE AVAILABILITY EDGE, FAILING CLOSED AGAINST HONEST AUTHORS.
+        `closureClaimOffenders` matches the phrase, not the assertion
+        (`closure_claim.go:42-63`), so a report that QUOTES an inherited defect
+        and explicitly declares it still OPEN is graded FAIL. The real inherited
+        text in this repo contains `'verified closed'`, so this fires on the
+        first continuation that does the honest thing — and the gate runs inside
+        `hooks.Classify`, meaning it grades every future audit report in the loop.
+
+    The pattern across all three: hardening was applied where the last audit
+    looked, and every unlooked-at edge kept its original failure direction —
+    silent-open where an adversary acts (D2, D3), fail-closed where a benign
+    author acts (D4). That is the worst possible assignment of both.
+  confidence: 0.88
+  source: "cycle-1285/land-continuation-defect-ledger — audit D2/D3/D4, each executed RED by the auditor via go test -overlay against hooks.Classify"
+  type: "failure-lesson"
+  category: "structural"
+  applies_to:
+    - "go/internal/phases/audit/defect_ledger.go"
+    - "go/internal/phases/audit/closure_claim.go"
+    - "go/internal/continuation/continuation.go"
+  failureContext:
+    cycle: 1285
+    task: "land-continuation-defect-ledger"
+    errorCategory: "reasoning"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "D2 HIGH — deleting continuation-manifest.json disarms the whole reconcile gate: 3 inherited OPEN defects closed, verdict PASS, zero diagnostics (TestRepro1285_F2 x2)"
+      - "D3 MEDIUM — case-sensitive self-vouching basename compare on a case-insensitive filesystem (TestRepro1285_F3)"
+      - "D4 MEDIUM — closure gate FAILs an honest report that quotes a defect and declares it OPEN (TestRepro1285_F5)"
+    upstreamSignals:
+      - "cycle-1282's audit DEF-1 already established that the graded agent authors the gate's inputs; the fix covered the disposition path and not the arming path"
+      - "three cycles (1279, 1282, 1285) on one inbox item, all FAIL, all reporting recurrence: 0"
+  governingVariable: >-
+    Wrong assumption: "the prior audit's defect list bounds the attack surface,
+    so closing every named input hardens the control." True relationship: an
+    audit enumerates what one reviewer reached, and the cheapest remaining bypass
+    is always one level OUT from wherever the hardening stopped — most often the
+    ARMING condition, because a gate that does not run leaves no evidence that it
+    did not run. Ask two questions no defect sentence will ask for you: (a) what
+    single file deletion makes this control a no-op, and does that produce a
+    diagnostic? (b) for each new strictness, which is more likely — an adversary
+    who trips it, or an honest author who does? A control that fails open under
+    `rm` and fails closed under accurate prose has both directions inverted, and
+    the second one is not merely an availability bug: a gate that punishes honest
+    reporting gets routed around, so it self-deletes.
+  preventiveAction: >-
+    (1) ARM FROM A SOURCE THE GRADED AGENT CANNOT WRITE. Derive continuation
+    lineage from `.evolve/continuation-registry.json` (or the orchestrator's
+    in-process cycle state), never from a workspace file. If arming must read a
+    workspace file, an ABSENT or CORRUPT one has to be as loud as a violation —
+    match the existing missing-ancestor-ledger warning at
+    `defect_ledger.go:336-344`, and make corrupt-manifest BLOCK, matching the
+    treatment `defect-dispositions.json` already gets.
+    (2) RUN THE `rm` TEST ON EVERY NEW GATE, AS A COMMITTED PREDICATE. For each
+    file the gate reads, delete it and assert the verdict is not PASS-with-zero-
+    diagnostics. This is one table-driven test and it would have caught D2 before
+    the adversarial reviewer did.
+    (3) IDENTITY COMPARISONS MUST MATCH THE SUBSTRATE. Path/basename equality on
+    darwin is `strings.EqualFold`, not `==`. Any exact-match security check
+    against a filesystem, a URL, or an env var needs an explicit normalisation
+    step and a negative case in its casing.
+    (4) A TEXT-MATCHING GATE MUST DISTINGUISH USE FROM MENTION BEFORE IT IS
+    LOAD-BEARING. `closureClaimOffenders` needs quote and negation awareness, and
+    every such gate needs a positive test that an HONEST report passes — not only
+    that a dishonest one fails. Half a gate's test surface is its false-positive
+    rate, especially for one that grades its own author's future output.
+    (5) WHEN CONTINUING A REJECTED CYCLE, TREAT THE DEFECT LIST AS A FLOOR AND
+    WRITE DOWN, EXPLICITLY, THE EDGES IT DID NOT COVER — arming, availability,
+    concurrency, and substrate assumptions. Then harden those in the SAME pass.
+  relatedInstincts:
+    - "[[cycle-1281-existence-check-substitutes-for-content-check-at-closure-boundaries]]"
+    - "[[cycle-1124-agent-controlled-token-in-failure-fingerprint]]"
+    - "[[cycle-1279-declared-invariant-is-not-an-enforced-invariant]]"
+    - "[[cycle-1176-lesson-names-the-file-and-the-reimplementation-repeats-it]]"
+    - "[[cycle-1216-protected-surface-boundary-is-tree-state-not-authorship]]"
+    - "[[cycle-1285-red-reproducer-is-minted-then-abandoned-in-the-same-cycle]]"
+  contradicts: []

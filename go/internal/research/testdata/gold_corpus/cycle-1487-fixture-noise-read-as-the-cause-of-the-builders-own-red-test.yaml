@@ -1,0 +1,104 @@
+- id: cycle-1487-fixture-noise-read-as-the-cause-of-the-builders-own-red-test
+  pattern: "builder-attributes-a-red-test-in-a-package-it-edited-to-unrelated-diagnostic-noise-that-the-gate-printed-alongside-it-and-defers-instead-of-running-the-package-test-directly"
+  description: >-
+    The cycle-1487 Builder edited `go/internal/core/phase_test.go` (adding a `peak_tokens`
+    assertion to `TestPhaseResponse_JSONShape`) and `go/internal/core/phase.go`. Its own
+    Self-Verification table records `Full Go suite — FAIL — internal/core` and
+    `evolve selfcheck build — FAIL — exit 1 after 2 attempts`, so the red was seen.
+
+    The build handoff floor printed the failure with unrelated temp-worktree fixture
+    diagnostics interleaved ahead of it:
+
+        enforced package tests FAIL (coverage run doubles as their selfcheck):
+        ok  .../internal/adapters/bridge  coverage: 98.9%
+        ok  .../internal/bridge           coverage: 93.1%
+        ok  .../internal/contextfill      coverage: 100.0%
+        fatal: not a git repository (or any of the parent directories): .git
+        [orchestrator] WARN worktree provisioning failed ...TestPhaseBoundaryCheckpointer...
+
+    The `fatal: not a git repository` line is emitted by `TestPhaseBoundaryCheckpointer_*`
+    fixtures that provision temp repositories; those tests PASS. It is benign, load-bearing-free
+    noise. The Builder read it as the cause, and every downstream artifact records that
+    misattribution as fact: `build-selfcheck-failure.md:6` ("`internal/core` exits FAIL after
+    temp-worktree fixtures emit `fatal: not a git repository`"), `builder-notes.md` ("package
+    tests emit megabytes of temp-repository diagnostics... making selfcheck remediation
+    non-local"), `build-report.md` "If Failed" ("the remaining failure occurs in core
+    temp-worktree fixtures and cannot be localized from truncated gate output"), and
+    `failure-digest.json` pre-classified the cycle `infra-error`.
+
+    None of that is true. The single real failure is the Builder's own assertion:
+
+        go test ./internal/core/ -run TestPhaseResponse_JSONShape -v
+        phase_test.go:66: missing "\"peak_tokens\":{\"input\":700,\"cache_read\":100}" in:
+          {... "peak_tokens":{"input":700,"output":0,"cache_read":100,"cache_write":0} ...}
+
+    That command runs in 0.2s, names the file and line, and needs no gate, no coverage run,
+    and no un-truncated output. The Builder never ran it. It instead spent its retry budget
+    concluding the failure was unattributable, filed a `high`-severity Discovery asking the
+    BUILD PHASE to "emit failing test names before bounded output truncation", and deferred
+    the repair to a future cycle — a request for the gate to hand it information it could
+    have obtained itself with one direct invocation of the same test binary.
+
+    Cost accounting: 17 of the 18 changed files are green (verified post-hoc — tokenusage,
+    contextfill, policy, bridge, adapters/bridge, recovery, phases/runner all `ok`), and
+    `internal/core` on the base SHA `d3c69cd2` is `ok` too, so the red is wholly
+    cycle-introduced and one string literal wide. A complete, correct, two-task
+    implementation was blocked and routed to retrospective by a defect its author could
+    have localized in a single command.
+  confidence: 0.9
+  source: "cycle-1487 — audit-fail-reason.json (gate output with interleaved fixture noise), build-selfcheck-failure.md:6, builder-notes.md (File Fragility), build-report.md (If Failed / Discoveries #2 / Deferred), failure-digest.json (pre_class=infra-error), phase_test.go:66 (the real assertion), base-SHA d3c69cd2 internal/core = ok"
+  type: "failure-lesson"
+  category: "structural"
+  applies_to:
+    - "agents/evolve-builder.md"
+    - "go/internal/phases/build/"
+  failureContext:
+    cycle: 1487
+    task: "context-fill-peak-occupancy + context-fill-stage-dial"
+    errorCategory: "tool-use"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "build handoff floor blocked the deliverable after 3 corrections: enforced package tests FAIL in internal/core"
+      - "the sole real failure is TestPhaseResponse_JSONShape (phase_test.go:66), an assertion this cycle wrote"
+      - "build-selfcheck-failure.md, builder-notes.md and build-report.md all attribute the failure to temp-worktree fixture noise that belongs to passing tests"
+      - "failure-digest.json pre-classified the cycle infra-error while build-report.md's own verdict block says code-build-fail"
+    upstreamSignals:
+      - "the gate prints benign `fatal: not a git repository` fixture chatter immediately before the real failure, and it is the most alarming-looking line in the buffer"
+      - "the Builder had `go test ./internal/core/ -run <Test> -v` available the whole time; the gate is not the only view of the failure"
+      - "a red test inside a package the cycle edited is cycle-caused until a base-SHA run proves otherwise"
+    preventiveActionOwner: "builder"
+  governingVariable: >-
+    Wrong assumption: "the gate's output is my only view of the failure, so if the gate truncates
+    or buries the assertion, the failure is unattributable." True relationship: the gate runs the
+    same `go test` binary the Builder can run directly and unaided; gate output is a convenience
+    view, never the authority on WHICH test failed. The corollary the Builder also missed:
+    alarming-looking stderr from a PASSING test is noise, and severity of wording is not evidence
+    of causation — only a `--- FAIL: <Name>` line (with its `(0.00s)` duration suffix, which
+    distinguishes a real result line from a stubbed fixture string echoed to stdout) names a real
+    failure. Attributing a red to "infra" without a base-SHA control run converts a one-line
+    repair into a lost cycle and mislabels the failure class for every downstream consumer.
+  preventiveAction: >-
+    (1) BUILDER — NEVER CONCLUDE "UNATTRIBUTABLE" FROM GATE OUTPUT. If a gate reports a package
+    test failure, re-run that package directly before writing any diagnosis:
+    `go test ./internal/<pkg>/ 2>&1 | grep -E '^--- FAIL: [A-Za-z_]+ \('`. The trailing
+    ` (` filters out fixture strings that merely contain the text `--- FAIL:`. Then re-run the
+    named test with `-run '<Name>' -v` for the assertion and line. Two commands, no gate.
+    (2) BUILDER — PROVE PRE-EXISTENCE BEFORE BLAMING INFRA. A red in a package this cycle edited
+    is cycle-caused by default. To claim otherwise, run the same package at
+    `worktree_base_sha` (`run.json`) and paste both results. "Temp fixtures are noisy" is a
+    hypothesis, not evidence; `fatal: ...` text emitted by a test that reports `ok` is noise.
+    (3) BUILDER — DO NOT FILE A TOOLING DEFECT AS A SUBSTITUTE FOR DIAGNOSIS. Before filing a
+    Discovery that asks a gate to surface more information, demonstrate that the information is
+    unavailable by any direct command. A `high`-severity request for failing-test names is not
+    admissible while `go test -v` is runnable.
+    (4) PIPELINE (secondary, real but non-blocking) — the build handoff floor should print the
+    `--- FAIL:` lines from the enforced-package run ahead of, not behind, coverage chatter and
+    subprocess stderr, so the failing test name survives output bounding.
+  relatedInstincts:
+    - "[[cycle-1483-builder-verified-the-acs-suite-not-the-package-it-edited]]"
+    - "[[cycle-1481-phase-declares-absent-what-sits-in-its-own-cwd]]"
+    - "[[cycle-1203-acs-compile-failure-surfaces-as-a-missing-file-not-a-reason]]"
+    - "[[cycle-1424-optional-phase-infra-timeout-outranks-and-masks-a-critical-verdict]]"
+    - "[[cycle-1487-omitempty-on-a-struct-field-is-inert-so-no-data-semantics-never-reach-json]]"
+  contradicts: []

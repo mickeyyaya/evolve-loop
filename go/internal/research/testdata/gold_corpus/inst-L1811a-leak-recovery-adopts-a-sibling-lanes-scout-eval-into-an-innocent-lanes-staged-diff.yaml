@@ -1,0 +1,46 @@
+- id: inst-L1811a
+  pattern: "main-tree-leak-recovery-has-no-authorship-so-a-sibling-lanes-scout-eval-is-relocated-and-staged-into-an-innocent-lane"
+  description: >-
+    Cycle 1811 (lane router-silent-errors) passed every code predicate yet failed audit H1, because its staged
+    diff carried .evolve/evals/phasespec-roots-silent-policy-error.md, the eval of sibling lane 1812's item
+    (lane-scope.json for 1811 lists only router-silent-errors). Neither 1811's scout nor its triage ever
+    touched that path (scout-events.ndjson and triage-events.ndjson name only evals/router-silent-errors.md).
+    Lane 1812's scout wrote it into .evolve/runs/cycle-1812/.evolve/evals/ at 21:28:08. The 1811 worktree copy
+    has the same sha1 (ef944560), the same mtime to the second, and an inode 13 above the 1812 file
+    (790833725 vs 790833738). That points to a copy into the shared main tree, followed by a rename
+    (inode kept) into the 1811 worktree. The likely path is core.recoverBuildLeak (leak_recovery.go:36-140):
+    it subtracts a per-lane, cycle-start dirty baseline from `git status -uall` of the ONE shared projectRoot,
+    relocates every new untracked path into THIS lane's worktree and runs `git add -f`. It has no notion of
+    who wrote the path. This is the same disease as inst-L1537a (where the same attribution gap aborted
+    a lane instead of adopting the file). It is the 6th+ instance of shared-tree attribution with zero
+    authorship. Corrective check: before you relocate or stage any main-tree path into a lane, match it
+    against that lane's provenance (lane-scope todo_ids, or a writer-populated registry like mintregistry).
+    For an .evolve/evals/<slug>.md, the slug must be in the lane's own todo_ids or scout Selected Tasks.
+    Leave a foreign slug's eval alone.
+  confidence: 0.85
+  source: >-
+    cycle-1811/router-silent-errors (audit-report.md H1; build-report.md Correction 2 mtime note;
+    stat of .evolve/runs/cycle-1812/.evolve/evals/phasespec-roots-silent-policy-error.md vs the 1811 worktree copy;
+    git show --stat 5d3f42ef5 = lane 1812's ship with the 49-line version)
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1811
+    task: "router-silent-errors"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "H1: lane stages another inbox item's eval, a 5-line version that differs from main's 49-line 5d3f42ef5 version; the lane's only overlap with main"
+  preventiveAction: >-
+    In go/internal/core/leak_recovery.go recoverBuildLeak (and the scout eval carve-out isScoutEvalMaterialization),
+    refuse to relocate or `git add` an .evolve/evals/<slug>.md whose slug is not in the lane's lane-scope.json todo_ids.
+    Leave it in the main tree for its owning lane. Add a table-driven test: lane A has todo_ids [a] and the main tree
+    gains .evolve/evals/b.md mid-phase. Assert that b.md is not moved into A's worktree and not staged there. Longer
+    term, build the lane/actor-owned-paths registry already filed in
+    .evolve/inbox/2026-07-20T06-42-00Z-treediff-worktree-crosslane-residual.json. Builder/Auditor: if a lane diff
+    holds an eval for a slug outside todo_ids, report it as pipeline contamination (console). Do not treat it as
+    a builder defect to repair in-lane.
+  relatedInstincts:
+    - "inst-L1537a"
+  contradicts: []

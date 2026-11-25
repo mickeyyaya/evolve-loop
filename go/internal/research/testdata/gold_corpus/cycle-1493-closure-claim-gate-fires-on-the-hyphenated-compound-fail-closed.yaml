@@ -1,0 +1,156 @@
+- id: cycle-1493-closure-claim-gate-fires-on-the-hyphenated-compound-fail-closed
+  pattern: "the-closure-claim-gates-landed-word-boundary-fix-used-plain-b-instead-of-the-hyphen-excluding-form-its-own-lesson-prescribed-so-closed-still-matches-inside-fail-closed-and-the-weak-rungs-cycle-reference-discriminator-is-satisfied-by-the-reports-own-workspace-path-making-every-audit-line-that-discusses-fail-closed-branches-an-offender"
+  description: >-
+    FIFTH RECORDED FIRING of the closure-claim false-positive class
+    (1339, 1371, 1428, 1431, 1493) — and the first AFTER a fix landed.
+
+    `.evolve/runs/cycle-1493/audit-fail-reason.json` records two blocking
+    reasons. The second quotes defect row H3
+    (`audit-report.md:36`), whose text is:
+
+      "Inherited defect `d8e3cdca...` is reproduced, **not fixed**: the coverage
+       gate FAILs at 75.6% ... The uncovered lines remain the **fail-closed**
+       error branches this feature's safety argument rests on. Root cause: the
+       **fail-closed** branches (`retire.go:144-161`, `dispatchgate.go:58-72`)
+       are reachable only through store-write failure and are not exercised by
+       any test."
+
+    That sentence is the exact OPPOSITE of a closure claim. It declares an
+    inherited defect reproduced and open, and it is the honest reporting the
+    ledger gate exists to reward.
+
+    MECHANICAL REPRODUCTION (the current matchers replayed over the report):
+      line 36  strong=false weak=TRUE cited=false
+               closedTokens = ["fail-closed", "fail-closed"]
+               cycleRefs    = ["cycle-1493"]
+      line 108 same shape (the evolve-verdict comment block)
+    The ONLY "closed" token on the offending line is inside the hyphenated
+    compound **fail-closed**, and the ONLY cycle reference is **cycle-1493** —
+    the report's OWN cycle, harvested from its own workspace path
+    `.evolve/runs/cycle-1493/coverage-gate-report.md:32-36`.
+
+    WHY THE LANDED FIX DID NOT CLOSE IT.
+    cycle-1431's preventiveAction (1) prescribed a specific regex:
+
+      (?i)(?:^|[^a-z-])closed(?:[^a-z-]|$)      <- EXCLUDES the hyphen
+
+    What shipped at go/internal/phases/audit/closure_claim.go:36 is:
+
+      closureClosedTokenRE = regexp.MustCompile(`\bclosed\b`)
+
+    In RE2 `-` is a NON-word character, so `\b` treats `fail-closed` as the
+    word `closed` preceded by a boundary. The prescription's whole point was
+    the hyphen class — it was written to kill cycle-1371's shape, the task id
+    `chain-boundary-binary-refresh-verify-closed`. Replaying the PRESCRIBED
+    regex over both offending lines yields `prescribedWouldMatch=false`. The
+    fix landed the half that stops `disclosed` (cycle-1431) and dropped the
+    half that stops `*-closed` (cycle-1371). Two shapes, one edit, one
+    delivered.
+
+    THE SECOND, UNADDRESSED HALF: THE CYCLE-REFERENCE DISCRIMINATOR IS INERT.
+    closure_claim.go:52-54 justifies the weak rung on the grounds that a
+    same-line cycle reference distinguishes a real bookkeeping claim from prose
+    like "the file handle is closed in the deferred cleanup". In an audit
+    report EVERY evidence-bearing line carries `.evolve/runs/cycle-<N>/...`, so
+    `closureCycleRef` matches on essentially every line the gate reads. The
+    discriminator does not discriminate. Worse, the gate's own premise is a
+    claim about a **prior** cycle's defect; a SELF-referential path
+    (cycle-1493 inside cycle-1493's report) can never be that, yet it is what
+    armed the rung here.
+
+    NET EFFECT AND WHY IT WAS NOT CAUGHT SOONER: `fail-closed` is standing
+    repository vocabulary — fail-closed design is a stated principle and the
+    term appears across evals, gates and personas. Any audit line that names a
+    fail-closed branch and cites a workspace path is now an offender. This
+    cycle the gate did NOT decide the verdict (EGPS red_count=1 was independent
+    and real, see
+    [[cycle-1493-amplification-meta-test-guesses-predicate-names-behind-its-own-anti-bias-blindfold]]),
+    so the blast radius was bounded exactly as in cycle-1428 — the same luck,
+    twice, and cycle-1431 is the recorded case of the luck running out.
+  confidence: 0.95
+  source: >-
+    cycle-1493/carryover-lane-retirement-verifiableby —
+    .evolve/runs/cycle-1493/audit-fail-reason.json reasons[1] (the quoted H3
+    offender);
+    .evolve/runs/cycle-1493/audit-report.md:36 (the offending line, whose only
+    'closed' tokens are two instances of 'fail-closed' and whose only cycle ref
+    is its own cycle-1493 workspace path);
+    go/internal/phases/audit/closure_claim.go:36 (`\bclosed\b` — the landed
+    fix), :26 (closureCycleRef), :52-54 (the cycle-reference rationale),
+    :66-67 (the weak rung);
+    reproduction: the four matcher regexes replayed verbatim over
+    audit-report.md report weak=true / cited=false on lines 36 and 108, while
+    cycle-1431's prescribed hyphen-excluding regex reports no match on either;
+    .evolve/instincts/lessons/cycle-1431-closure-claim-gate-fires-on-closed-inside-the-word-disclosed.yaml
+    preventiveAction (1) (the regex that was prescribed and not landed)
+  type: "failure-lesson"
+  category: "structural"
+  systemic: true
+  applies_to:
+    - "go/internal/phases/audit/closure_claim.go"
+    - "go/internal/core/bookkeeping_regrade.go"
+    - "agents/evolve-auditor.md"
+  failureContext:
+    cycle: 1493
+    task: "carryover-lane-retirement-verifiableby"
+    errorCategory: "tool-use"
+    failedStep: "audit"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "closure claim without a citation, fired on audit-report.md:36 — a line that says an inherited defect is 'reproduced, not fixed' and whose only 'closed' tokens are the compound 'fail-closed'"
+    priorOccurrences: ["cycle-1339", "cycle-1371", "cycle-1428", "cycle-1431"]
+    upstreamSignals:
+      - "cycle-1431's lesson shipped the exact remedial regex, hyphen class included; the landed code substituted plain \\b and therefore re-opened cycle-1371's hyphenated shape"
+      - "cycle-1431's regression prescription (pin all four recorded firings as table-driven cases) would have caught the substitution at review time; no such table exists for the hyphen shape"
+      - "the gate's own header comment reasons at length about which SPAN to scan and about quoting, and never about hyphenation or about self-referential cycle paths"
+  governingVariable: >-
+    Wrong assumption: "a word-boundary match is the lexical fix, so `\\bclosed\\b`
+    implements the prescription." True relationship: `\\b` is defined against
+    the WORD-CHARACTER class, and the compounds this gate must survive are
+    hyphenated (`fail-closed`, `*-verify-closed`), where the hyphen IS a
+    boundary. The prescription named a hyphen-excluding class precisely because
+    plain `\\b` is insufficient; implementing the intent instead of the literal
+    regex silently dropped one of the two shapes it was written to cover. The
+    deeper pattern is the one cycle-1431 already named: every remedy in this
+    file has been a patch on a predicate that does no lexical analysis, and the
+    weak rung's second conjunct — a same-line cycle reference — was never
+    validated against the fact that audit reports cite their own workspace
+    path on every evidence line, so it contributes no discrimination at all.
+  preventiveAction: >-
+    (1) LAND THE REGEX AS PRESCRIBED, HYPHEN CLASS INCLUDED. Replace
+    go/internal/phases/audit/closure_claim.go:36 `\bclosed\b` with
+    `(?i)(?:^|[^a-z-])closed(?:[^a-z-]|$)` and apply the same class to the
+    strong rung's "verified closed". Do not paraphrase a prescribed pattern
+    into a shorter one that looks equivalent — `\b` and `[^a-z-]` differ on
+    exactly the character these five firings turn on.
+    (2) THE CYCLE REFERENCE MUST BE A *PRIOR* CYCLE, IN PROSE. Exclude the
+    report's own cycle number and exclude matches that occur inside a path
+    span (`.evolve/runs/cycle-N/...`, `go/acs/cycleN/...`). A gate whose premise
+    is "asserts a PRIOR cycle's defect is closed" must not arm on a
+    self-referential artifact path — today that path is on nearly every
+    evidence line, so the weak rung's discriminator is effectively always true.
+    (3) PIN ALL FIVE FIRINGS AS TABLE-DRIVEN REGRESSION CASES fed VERBATIM to
+    `closureClaimOffenders`, asserting ZERO offenders: cycle-1339's shape,
+    cycle-1371 audit-report.md:22, cycle-1428 audit-report.md:39, cycle-1431
+    audit-report.md:60, and cycle-1493 audit-report.md:36. Keep the
+    cycle-1255-shaped TRUE positive flagged in the same table so the change is
+    provably a precision fix. cycle-1431 asked for this table for four firings
+    and it does not exist; the fifth firing is the cost.
+    (4) ADD A VOCABULARY GUARD FOR DOMAIN COMPOUNDS. `fail-closed` is standing
+    repo vocabulary for a safety property. Whatever form the matcher takes, a
+    dedicated case must assert that a line containing only `fail-closed`
+    produces no offender.
+    (5) OWNERSHIP UNCHANGED: audit-gate code is pipeline-integrity,
+    console-owned (`feedback_pipeline_fixes_console_first`). The lane graded BY
+    this gate must not be the lane that edits it — which is why 1371/1428/1431
+    and now 1493 have produced five lessons and one incomplete edit.
+  relatedInstincts:
+    - "[[cycle-1431-closure-claim-gate-fires-on-closed-inside-the-word-disclosed]]"
+    - "[[cycle-1428-closure-claim-gate-flags-the-heading-that-denies-closure]]"
+    - "[[cycle-1371-closure-claim-gate-fires-on-a-task-id-that-ends-in-closed]]"
+    - "[[cycle-1339-closure-gate-demands-a-record-the-closed-defect-never-had]]"
+    - "[[cycle-1493-amplification-meta-test-guesses-predicate-names-behind-its-own-anti-bias-blindfold]]"
+    - "[[lesson_to_action_gap]]"
+  contradicts:
+    - "closure_claim.go:28-33's comment that the matchers are 'word-bounded so \"disclosed\"/\"foreclosed\" never match' — true for those two, false for the hyphenated compounds `fail-closed` and `*-verify-closed`, which `\\b` admits. Confidence in the landed matcher as sufficient 0.9 -> 0.2."
+    - "closure_claim.go:52-54's position that a same-line cycle reference separates a bookkeeping claim from ordinary prose. In audit reports the cycle reference is supplied by the report's own workspace path on nearly every line, so the conjunct adds no discrimination. Confidence 0.8 -> 0.15."

@@ -1,0 +1,59 @@
+- id: inst-L1685b
+  pattern: "salvage-uniqueness-guard-cannot-tell-the-audit-sentinel-from-the-ledger-entry"
+  description: >-
+    salvageVerdictWith's ambiguity guard is `candidateCount(res.Content) > 1`
+    (go/internal/deliverable/salvage_extract.go:296) — it refuses when there are
+    TWO verdict-bearing JSON objects and repairs when there is exactly one. It
+    has no notion of WHICH object is the phase's verdict. The audit persona's
+    output template (agents/evolve-auditor-reference.md:233) ends the report with
+    a `### Ledger Entry` JSON that carries its own top-level "verdict" key, and
+    repairVerdict/sentinelLine carry the payload across VERBATIM by design
+    ("Salvage relocates the agent's bytes; it does not re-author them",
+    salvage_extract.go:398).
+    In cycle 1685 the auditor fenced its Ledger Entry instead of emitting the
+    required sentinel. That fenced object was the ONLY verdict-bearing candidate,
+    so the uniqueness guard was satisfied by the WRONG object, and salvage minted
+    `<!-- evolve-verdict: {"verdict": "PASS", "green": 196, "red": 0, "skip": 53,
+    "total": 249} -->` as the audit's verdict sentinel — a PASS, over a report
+    whose `## Verdict` prose said WARN and whose Explanation Documentation review
+    said NEEDS_CORRECTION. The ACS suite's PASS was laundered into an audit
+    judgment of PASS.
+    Exposure is bounded but real. Ship and composition readers require
+    `sentinel.Phase == "audit"` (go/cmd/evolve/cmd_composition_wiring.go:212-215,
+    phases/ship/audit.go) and the minted sentinel has NO phase key, so they
+    reject it. audit.extractAuditVerdict (go/internal/phases/audit/audit.go:230)
+    has NO such check — it calls phasecontract.ParseVerdictSentinel and takes the
+    verdict whatever phase it claims. A re-classification of this cycle
+    (evolve loop --resume) therefore reads PASS off a report the auditor wrote as
+    WARN. The uniqueness guard's own comment calls refusal "the item's explicit
+    hard constraint"; it is not a constraint the guard can actually express.
+  confidence: 0.85
+  source: "cycle-1685/evalgate-selectedslugs-nil-blindness"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1685
+    task: "evalgate-selectedslugs-nil-blindness"
+    errorCategory: "integration"
+    failedStep: "audit"
+    auditVerdict: "FAIL"
+    auditDefects: ["salvage-applied.jsonl#fenced-json"]
+  preventiveAction: >-
+    Two changes, both narrow and both testable. (1) Make the salvage candidate
+    PHASE-AWARE: a payload is a salvage candidate only when it carries a
+    "phase" key equal to the phase under repair, or when the phase's contract
+    declares no other verdict-bearing block; a bare {"verdict":...} object
+    sharing a document with a known ledger-entry template is ambiguous by
+    construction, and salvage's own rule is to refuse on ambiguity. (2) Make
+    audit.extractAuditVerdict apply the same `sentinel.Phase == "audit"` check
+    that cmd_composition_wiring.go:212 and phases/ship/audit.go already apply —
+    the classifier is currently the most permissive reader of the three, which
+    is exactly backwards. Guard with a go/internal/deliverable table test
+    asserting a report whose only verdict-bearing JSON is a Ledger Entry is
+    REFUSED (not repaired), and a go/internal/phases/audit test asserting a
+    phase-less sentinel does not satisfy extractAuditVerdict. Separately: when
+    auditing or retro-ing any cycle, never read a verdict off an
+    evolve-verdict sentinel without checking its "phase" key — in this repo the
+    same marker name is used by at least two different producers.
+  relatedInstincts: ["inst-L1685a", "inst-L1516a"]
+  contradicts: []

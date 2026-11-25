@@ -1,0 +1,17 @@
+- id: inst-L1825a
+  pattern: "a-rebase-carry-binds-the-pre-consume-tree-so-ship-own-inbox-moves-void-it"
+  description: "Ship's audit-binding rule (go/internal/phases/ship/worktree_integrity.go:64 auditBindingSatisfied) has two independent escapes: an identical-rebase carry that must name the staged tree EXACTLY (carry.go:52-54), or drift from the AUDIT-BOUND tree made only of the ship's own sanctioned inbox-consume moves (consume.go:397). It never composes them. The carry records tree1 from `git write-tree` at rebase time (core/identity_carry_forward.go:39), BEFORE ship stages its inbox consume renames (consume.go:244), so any inbox-driven lane whose first ff-merge loses a race to a peer (SHIP_GIT_FLEET_REBASE_NEEDED) re-ships with tree = carry tree + consume moves: the carry check fails on exact equality, the consumption check diffs against the OLD-base audit tree and names the peer cycle's files as unsanctioned drift, and an audit-PASS change is refused as INTEGRITY_TREE_DRIFT. When two binding escapes exist, check that a legitimate ship can need BOTH at once."
+  confidence: 0.8
+  source: "cycle-1825/seal-breaks-live-only-verify-and-carry+durable-atomic-write-single-implementation"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1825
+    task: "seal-breaks-live-only-verify-and-carry"
+    errorCategory: "integration"
+    failedStep: "audit"
+    auditVerdict: "SHIP_GATE_DENIED"
+    auditDefects: ["SHIP_INTEGRITY_TREE_DRIFT", "SHIP_CARRY_NOT_REPROVEN"]
+  preventiveAction: "In auditBindingSatisfied, when a carry record is found whose TreeStateSHA differs from the actual tree, run treeDriftExplainedByConsumption(rec.TreeStateSHA, actual) and accept (after reProveCarry against rec.TreeStateSHA) when every differing path is in opts.internalConsumedPaths. Pin it with a ship test: audited tree on base0, peer commit moves main, identity carry recorded, ship consumes 2 inbox items, re-ship must PASS; and a negative twin where one extra non-consume path is staged must still refuse. Fail-closed otherwise."
+  relatedInstincts: []
+  contradicts: []

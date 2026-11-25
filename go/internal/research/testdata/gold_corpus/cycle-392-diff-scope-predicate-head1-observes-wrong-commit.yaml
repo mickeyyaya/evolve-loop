@@ -1,0 +1,100 @@
+- id: cycle-392-diff-scope-predicate-head1-observes-wrong-commit
+  pattern: "this-cycle-diff-scope-predicate-asserts-HEAD1..HEAD-and-observes-prior-commit"
+  description: >
+    When a TDD-phase author writes a "diff-scope" acceptance predicate that
+    asserts the cycle touched exactly the intended deliverable file(s), do NOT
+    assert against `git diff --name-only HEAD~1..HEAD`. That range observes the
+    LAST COMMIT's delta, which at EGPS-gate evaluation time is the PREVIOUS
+    cycle's commit — the current cycle's change is still STAGED/working-tree, not
+    committed. In cycle 392, `TestC392_006_DiffScopeRespected` asserted
+    `git diff --name-only HEAD~1..HEAD == ["agents/evolve-reflector.md"]`, but at
+    gate time HEAD was cycle-391's commit `a3f8a0c1`, so the range returned
+    `[agents/evolve-intent.md, go/acs/cycle391/predicates_test.go]` (2 files,
+    the prior deliverable + the prior cycle's own predicate scaffold). The
+    cycle's REAL change was `git diff --name-only HEAD` =
+    `[agents/evolve-reflector.md, go/acs/cycle392/predicates_test.go]`. The
+    assertion was therefore false at gate-eval time and could not be made true
+    by the cycle's own work — its result depends entirely on the SHAPE of the
+    previous cycle's commit, which this cycle does not control.
+
+    This is doubly unsatisfiable: even AFTER the cycle ship-commits, the evolve
+    cycle commit BUNDLES the deliverable file together with this cycle's
+    `go/acs/cycleN/predicates_test.go` scaffold (cycle-391's commit is exactly
+    2 files for this reason). So `len(changed) == 1` can NEVER hold for a
+    properly-structured cycle, before OR after commit. The builder even labeled
+    it "Expected RED before cycle ship commit ... Will turn GREEN after cycle
+    ship commits" — but the EGPS gate (`acs-verdict.json`) is computed at the
+    pre-commit RED moment and is never re-derived post-commit, and the
+    post-commit state is itself 2 files. Any predicate whose own RED-rationale
+    says "RED until the cycle commits" is, by construction, RED when the gate
+    evaluates it.
+
+    Because `TestC392_006` is a THIS-CYCLE predicate (is_regression=false), its
+    single RED is blocking: `acs-verdict.json` computed `red_count: 1`,
+    `verdict: "FAIL"`, `ship_eligible: false`. The Auditor independently
+    ground-truthed the change (sole production file = agents/evolve-reflector.md,
+    zero control-plane edits), correctly classified the RED as ENVIRONMENTAL_RED,
+    and wrote `Verdict: PASS (0.9)` — but that adjudication lives only in
+    narrative prose with no machine path into the EGPS verdict. A correct,
+    fully-verified, behavior-safe markdown-slimming cycle was discarded. This
+    template was inherited across cycles 387-391 (identical `HEAD~1..HEAD`
+    assertion in TestC391_005 etc.) and shipped only by commit-timing luck.
+  confidence: 0.85
+  source: >
+    .evolve/runs/cycle-392/acs-verdict.json (red_count=1, verdict=FAIL,
+      ship_eligible=false; red_ids=["cycle392/TestC392_006_DiffScopeRespected"];
+      evidence_excerpt: "got [agents/evolve-intent.md go/acs/cycle391/predicates_test.go]")
+    + go/acs/cycle392/predicates_test.go:TestC392_006_DiffScopeRespected
+      (asserts `git diff --name-only HEAD~1..HEAD` len==1)
+    + go/acs/cycle391/predicates_test.go:TestC391_005_OnlyIntentFileChanged
+      (identical inherited template — shipped only by timing luck)
+    + .evolve/runs/cycle-392/build-report.md:55-60 ("Expected RED before cycle
+      ship commit ... Will turn GREEN after cycle ship commits")
+    + .evolve/runs/cycle-392/audit-report.md (Verdict PASS 0.9; RED Predicate
+      Classification: ENVIRONMENTAL_RED; Predicate Quality: "TestC392_006 as
+      written can never be GREEN for a properly-structured cycle")
+    + git show --stat a3f8a0c1 (cycle-391 ship commit = 2 files: deliverable +
+      go/acs/cycle391/predicates_test.go)
+    + [[cycle-352-egps-cannot-honor-auditor-false-red-adjudication]]
+    + [[cycle-87-audit-vs-egps-verdict-divergence]]
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 392
+    task: "reduce-reflector-prompt-redundancy"
+    errorCategory: "reasoning"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["TestC392_006_DiffScopeRespected (false-red, gate-blocking)"]
+    egpsRedIds:
+      - "cycle392/TestC392_006_DiffScopeRespected (this-cycle, is_regression=false, blocking)"
+    auditorVerdictNarrative: "PASS 0.9 (ENVIRONMENTAL_RED) — diverges from machine EGPS FAIL"
+    systemic: true
+  preventiveAction: >
+    (1) TDD/predicate authors writing a diff-scope (touched-exactly-these-files)
+        check MUST assert against `git diff --name-only HEAD` (working tree +
+        staged vs current HEAD), which observes the CURRENT cycle's change at
+        gate-eval time — NOT `HEAD~1..HEAD`, which observes the prior cycle's
+        commit. The expected set MUST also EXCLUDE the cycle's own
+        `go/acs/cycleN/predicates_test.go` scaffold (filter it out before the
+        len/equality check), since every evolve cycle commit bundles it.
+    (2) The TDD eval-quality pre-flight (`evolve eval quality-check`) MUST reject
+        any THIS-CYCLE predicate whose stated GREEN condition depends on a future
+        commit — i.e. any predicate whose own comment says it is "RED until the
+        cycle commits". Such a predicate is RED at the exact moment the EGPS gate
+        computes acs-verdict.json, so it cannot be a legitimate this-cycle AC.
+    (3) Land the long-prescribed cycle-87 reconciliation gate so an Auditor's
+        documented false-red adjudication (ENVIRONMENTAL_RED) can flow into the
+        EGPS verdict — otherwise a correct cycle with an auditor PASS keeps being
+        discarded by a single un-GREEN-able this-cycle predicate (3rd recurrence:
+        cycle-87, cycle-352, cycle-392). Raise confidence on the two divergence
+        lessons accordingly.
+    (4) Backfill: audit the cycles 387-391 diff-scope predicates (TestC*_005/006)
+        which used the same HEAD~1..HEAD template and shipped only by timing luck;
+        fix the campaign predicate template at source, not per-cycle.
+  relatedInstincts:
+    - "[[cycle-352-egps-cannot-honor-auditor-false-red-adjudication]]"
+    - "[[cycle-352-filecontains-misused-as-absence-check]]"
+    - "[[cycle-87-audit-vs-egps-verdict-divergence]]"
+    - "[[cycle-91-trim-broke-prior-regression-predicates]]"
+  contradicts: []

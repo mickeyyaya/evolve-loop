@@ -1,0 +1,17 @@
+- id: inst-L1603a
+  pattern: "repair-generations-must-reset-audit-state"
+  description: "Start a new audit provenance generation after every intervening TDD or Build repair; preserve repair-authored tests, reseal the current diff, and regenerate verdict artifacts before classifying the next audit."
+  confidence: 0.99
+  source: "cycle-1603/tokenopt-handoff-digests"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1603
+    task: "tokenopt-handoff-digests"
+    errorCategory: "integration"
+    failedStep: "audit"
+    auditVerdict: "FAIL"
+    auditDefects: ["D2", "D3"]
+  preventiveAction: "Make repair generation identity explicit in audit orchestration: reset probe-quarantine authorship after TDD/Build, invalidate the prior acs-verdict.json, and add a composed Audit -> TDD/Build -> Audit test proving a staged repair regression survives while a new auditor probe is quarantined and the regenerated verdict binds the repaired tree."
+  relatedInstincts: []
+  contradicts: []

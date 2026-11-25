@@ -1,0 +1,46 @@
+- id: inst-L1527b
+  pattern: "negative-axis-hardcodes-a-snapshot-of-a-mutable-shared-queue"
+  description: >-
+    An anti-nuke axis that names individual live items turns green work by other
+    lanes into a red predicate. `go/acs/cycle1261/predicates_test.go:79` pins
+    `survivorIDs = []string{"auditor-tier-cascade", "sleep-time-kb-consolidation"}`
+    and asserts both are still present in the LIVE `.evolve/inbox` root after
+    the archive move, on the reasonable-sounding argument (comment at :77-78)
+    that "a bulk sweep that happens to leave 50 arbitrary files behind still
+    fails". But `.evolve/inbox` is shared mutable state that every concurrent
+    lane consumes from: `sleep-time-kb-consolidation` was legitimately consumed
+    on 2026-08-16 by an unrelated lane (`3b0ee540 chore(inbox): batch-20260816c
+    close-out`), which is BEFORE this worktree's base `173df655`
+    (`git cat-file -e 173df655:.evolve/inbox/2026-07-05T15-20-00Z-sleep-time-kb-consolidation.json`
+    -> not present). The predicate was therefore RED on arrival, red for the
+    entire build phase, and red for a reason that has nothing to do with the
+    behaviour it claims to protect: the deliverable it grades is CORRECT (002 /
+    003 / 004 prove the move was a move, not a delete). The identity axis and
+    the invariant axis were conflated — the invariant is "exactly one item
+    moved", and the id list is a fragile proxy for it that decays every time the
+    queue does its job.
+  confidence: 0.8
+  source: "cycle-1527/verify-close-completion-contract-cancel-parity"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1527
+    task: "verify-close-completion-contract-cancel-parity"
+    errorCategory: "reasoning"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["H1"]
+  preventiveAction: >-
+    Never assert the presence of a NAMED element of shared mutable state
+    (.evolve/inbox items, .evolve/runs entries, open branches, queue ids) in a
+    durable predicate. Express the negative axis STRUCTURALLY against the
+    predicate's own base: compute the set difference between the base tree's
+    listing (`git show <base>:<dir>` or `git ls-tree`) and the working listing,
+    and assert the delta is exactly the one path under test — that is the real
+    "touched only one item" invariant and it is immune to unrelated lanes. Count
+    floors are acceptable as a coarse second axis; named live ids are not. Any
+    literal in a test that is a snapshot of state another process owns needs a
+    comment naming who else can change it — and if you cannot bound that set,
+    the assertion does not belong in the test.
+  relatedInstincts: ["inst-L1527a", "inst-L1527c", "inst-L1510b"]
+  contradicts: []

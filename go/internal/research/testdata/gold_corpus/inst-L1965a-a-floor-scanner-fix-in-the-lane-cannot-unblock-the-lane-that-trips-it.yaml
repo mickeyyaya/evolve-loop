@@ -1,0 +1,41 @@
+- id: inst-L1965a
+  pattern: "a-floor-scanner-fix-in-the-lane-cannot-unblock-the-lane-that-trips-it"
+  description: >-
+    SYSTEMIC (third case of a gate compiled into the host binary that grades
+    the lane which repairs it: cycle-1340, inst-L1841a, 1965). Cycle 1965 TDD
+    added the fixture go/internal/handoff/request/testdata/cycle1950/predicates_test.go
+    (a verbatim copy of the cycle 1950 ACS predicates, `//go:build acs`) as data
+    for request.TDDBuild. The build handoff floor derives "added test packages"
+    with addedtests.Groups. That function selects every added go/**/_test.go
+    file and does not skip testdata directories. Thus the floor ran
+    `go test -tags acs ./internal/handoff/request/testdata/cycle1950`, and the
+    fixture predicates failed (commitsFullyLanded, clearActiveWorktree at 0.0%).
+    `go test ./...` skips testdata, so every lane-side check was green. Build
+    correction 2 fixed addedtests.go (isTestdata, line 145) in the worktree. The
+    floor runs in the orchestrator process from go/bin/evolve, built at
+    2026-10-19 14:36 before the cycle, so the fix could not change the result.
+    The second rejection used up the correction budget. Wrong assumption: a
+    lane can repair the floor that grades it in the same cycle.
+  confidence: 0.9
+  source: "cycle-1965/handoff-h2-request-builders — audit-fail-reason.json reasons[0]; build-interactions.ndjson correction_redispatch rejected_again; build-report.md Correction 2; go/internal/addedtests/addedtests.go:27"
+  type: "failure-lesson"
+  category: "structural"
+  failureContext:
+    cycle: 1965
+    task: "handoff-h2-request-builders"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["build-floor: ./internal/handoff/request/testdata/cycle1950 (-tags acs) unit tests FAIL"]
+  preventiveAction: >-
+    Pipeline: ship the addedtests testdata skip (go/internal/addedtests/addedtests.go,
+    isTestdata) as its own lane that adds no testdata test file, before you
+    requeue handoff-h2-request-builders. TDD: until that fix is on main and in
+    the host binary, do not add a fixture file named *_test.go under testdata;
+    name it predicates_test.go.txt (or similar) and let the code under test
+    read that name. Build: when a floor failure is in floor code (addedtests,
+    changedpkgs, repocontract), fixing that code in the lane does not clear the
+    floor. Change the lane input instead (rename the fixture), and write the
+    floor fix as a separate inbox item.
+  relatedInstincts: ["cycle-1340-in-binary-gate-fix-cannot-grade-the-cycle-that-authors-it", "inst-L1841a"]
+  contradicts: []

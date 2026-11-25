@@ -1,0 +1,71 @@
+- id: inst-L1554d
+  pattern: "reproducer-greps-for-hardcoded-test-file-paths-and-literal-strings-so-a-behaviourally-correct-deliverable-leaves-it-permanently-red"
+  description: >-
+    Cycle 1554's bug-reproduction phase produced
+    `.evolve/runs/cycle-1554/reproduce_production_seam_gap.sh`. It does not
+    execute anything under test. It runs five `rg --fixed-strings` probes
+    against two HARD-CODED paths that did not yet exist:
+
+      go/internal/core/cyclerun_review_materialization_prodseam_test.go
+      go/internal/phases/audit/ciparity_integration_test.go
+
+    The TDD phase then wrote the coverage at
+      go/internal/core/materialization_correction_delivery_test.go
+      go/internal/phases/audit/integration_tier_orchestration_test.go
+    and it is GOOD coverage: the core test drives the real
+    `evalgate.NewReviewer(config.StageEnforce)` through
+    `core.NewOrchestrator(..., core.WithReviewer(reviewer))` (:88-89) and both
+    files pass. Run today, the reproducer still exits 1 and reports all five
+    probes "absent", including "Task 1 production-seam test using
+    evalgate.NewReviewer is absent" — while that exact symbol sits on line 88
+    of the delivered file.
+
+    A red-first artifact is supposed to be the objective witness that the fix
+    landed. Keyed on filenames and on literal strings the author guessed the
+    implementer would use ("integration-tier.log", "contention flake
+    absorbed"), it is instead a witness that only the ONE anticipated
+    implementation exists. It cannot go green for a correct alternative and
+    cannot go red for a wrong implementation at the right path — it measures
+    naming, not behaviour. That leaves an unclearable red in the run directory
+    for any later phase or forensic reader that runs it, and it makes the
+    reproduction phase's output unfalsifiable in the direction that matters.
+
+    This cycle was not failed by the reproducer (the build floor got there
+    first), which is exactly why it must be recorded now: it is a live,
+    latent, unclearable red sitting in a shipped run directory.
+  confidence: 0.9
+  source: "cycle-1554/scout-eval-materialization-correction-delivery"
+  type: "failure-lesson"
+  category: "process"
+  failureContext:
+    cycle: 1554
+    task: "scout-eval-materialization-correction-delivery; integration-tier-contention-retake-accountability"
+    errorCategory: "planning"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "reproduce_production_seam_gap.sh pins two test FILE PATHS that the TDD phase did not use"
+      - "the script exits 1 today and claims 'evalgate.NewReviewer is absent' while that symbol is at materialization_correction_delivery_test.go:88"
+      - "two of its five probes assert literal log strings ('integration-tier.log', 'contention flake absorbed') the implementer had no contract to emit"
+      - "both delivered tests pass by name (core 0.76s, audit 0.40s) — behaviour is satisfied, the witness is not"
+    preventiveActionOwner: "builder"
+  preventiveAction: >-
+    A reproducer must FAIL FOR THE DEFECT and pass for ANY correct fix. Never
+    assert on file paths, test-function names, or guessed log literals — those
+    are implementation choices the next phase owns. Instead: (1) invoke the
+    production seam directly (a `go test -run` against a behaviour assertion,
+    or a small program driving the real entry point) so the script observes the
+    BUG, not the presence of a file; (2) if a coverage gap genuinely is the
+    defect, express it as a coverage/behaviour query over the PACKAGE (e.g.
+    "no test in ./internal/core exercises evalgate.NewReviewer through
+    RunCycle") rather than over a filename; (3) as a bug-reproduction author,
+    ask "would this go green if the builder solved it differently and better?"
+    — if the answer is no, the script is a naming assertion in disguise.
+    As a reader: a reproducer that reports a symbol absent should be checked
+    against `grep` before it is believed.
+  relatedInstincts:
+    - "inst-L1549b"
+    - "inst-L1546c"
+    - "inst-L1546b"
+    - "inst-L1554c"
+  contradicts: []

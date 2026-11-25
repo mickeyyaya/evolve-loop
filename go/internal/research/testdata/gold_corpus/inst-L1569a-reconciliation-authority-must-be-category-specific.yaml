@@ -1,0 +1,33 @@
+- id: inst-L1569a
+  pattern: "reconciliation-authority-must-be-category-specific"
+  description: >-
+    Treat each SystemFailure category as a separate authority domain. Never clear
+    an existing floor signal merely because the audit/ACS verdict-incoherence
+    predicate reconciled: first prove the signal being cleared is itself
+    `verdict-incoherence`, then re-evaluate every independent floor source that
+    the earlier signal may have short-circuited. Cycle 1569 made a narrow
+    audit-artifact predicate decisive over the whole `SystemFailure` value, so
+    green audit bytes could erase an `infra-systemic` halt the predicate never
+    observed.
+  confidence: 0.93
+  source: "cycle-1569/verdict-reconciliation-production-wiring"
+  type: "failure-lesson"
+  category: "episodic"
+  systemic: true
+  failureContext:
+    cycle: 1569
+    task: "verdict-reconciliation-production-wiring"
+    errorCategory: "reasoning"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["H1", "M2", "L1"]
+  preventiveAction: >-
+    Gate verdict reconciliation on
+    `result.SystemFailure.Category == "verdict-incoherence"` (or no committed
+    signal), and after a reconcile re-run the remaining failure-decision/dossier
+    floors before clearing the halt. Add a negative production-path test whose
+    workspace has fully verifying green audit artifacts plus an
+    `infra-systemic` failure-decision and assert the final result remains a
+    halting `infra-systemic` SystemFailure.
+  relatedInstincts: ["inst-L1507b", "inst-L1539a", "inst-L1508a"]
+  contradicts: []

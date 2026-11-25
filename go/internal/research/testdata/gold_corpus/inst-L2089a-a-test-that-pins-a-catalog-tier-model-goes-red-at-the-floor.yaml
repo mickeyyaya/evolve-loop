@@ -1,0 +1,35 @@
+- id: inst-L2089a
+  pattern: "a-test-that-pins-a-catalog-tier-model-passes-in-the-cell-and-goes-red-at-the-floor"
+  description: >-
+    Cycle 2089. ACS predicate TestC2089_002 and the unit test
+    TestDeepProbeArgs_TheFastModelOfTheManifestReachesTheHeadlessProbes
+    (go/internal/bridge/doctor_argv_literal_test.go:74) assert that the claude-p probe
+    argv carries the fast model of the claude-p manifest. The claude-p repo manifest has
+    no fast model. bridge.LoadManifest gets it only from the host model catalog overlay
+    (go/internal/bridge/catalog_overlay.go:29), and the overlay finds the catalog through
+    EVOLVE_PROJECT_ROOT. The phase cell sets that variable, so the Builder saw both tests
+    pass. The build handoff floor runs without it, so both tests failed. Reproduced:
+    `env -u EVOLVE_PROJECT_ROOT go test -tags acs ./acs/cycle2089` gives
+    "manifest claude-p declares no fast model" (predicates_test.go:108), and the unit test
+    gives `want -p prompt --model ""`. Same class as cycle 1254 (ambient EVOLVE_FLEET).
+  confidence: 0.8
+  source: "cycle-2089/bridge-factory-f2-probe-through-driver"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 2089
+    task: "bridge-factory-f2-probe-through-driver"
+    errorCategory: "context"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "audit-fail-reason.json: ./acs/cycle2089 (-tags acs) unit tests FAIL"
+      - "audit-fail-reason.json: enforced package tests FAIL (internal/bridge)"
+  preventiveAction: >-
+    A test or ACS predicate that reads a model of a manifest tier must not depend on the
+    host catalog. Either load a hermetic catalog fixture into the test, or assert only on
+    a manifest that declares the tier in its repo JSON (agy declares fast; claude-p does
+    not). Before handoff, run each new test also with `env -u EVOLVE_PROJECT_ROOT
+    -u EVOLVE_PHASE -u EVOLVE_DISPATCH_DEPTH` and treat a difference as a defect.
+  relatedInstincts: ["cycle-1254-driver-tests-inherit-ambient-fleet-env-gate-only-red", "inst-L2090b"]
+  contradicts: []

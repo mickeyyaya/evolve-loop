@@ -1,0 +1,93 @@
+- id: inst-L1537a
+  pattern: "tree-diff-exemptions-key-on-THIS-lanes-current-phase-name-so-a-CONCURRENT-lanes-contracted-main-tree-write-classifies-as-this-lanes-deliverable-leak-and-aborts-a-green-cycle"
+  description: >
+    Cycle 1537 was aborted with
+    `tree-diff guard: phase "premise-challenge" wrote to the main tree outside its
+    worktree - leaked paths: [.evolve/evals/agy-exhaustion-demotion.md
+    .evolve/evals/integration-tier-bridge-socket-exclusion.md
+    .evolve/evals/transient-timeout-shortcircuit.md]`
+    (audit-fail-reason.json, premise-challenge-usage.json abort_reason).
+    premise-challenge is a READ-ONLY gate; its own report opens with
+    "Read-only; no source was modified" and its worktree
+    (.evolve/worktrees/cycle-42824668-1537) is clean (`git status --porcelain -uall`
+    empty after the abort).
+    PROOF OF THE ACTUAL AUTHOR - the three slugs are lane 1539's, not 1537's:
+    (1) all three exist as .evolve/evals/<slug>.md under
+    .evolve/runs/cycle-1539/.evolve/evals/ and .evolve/worktrees/cycle-42824668-1539/;
+    (2) none exists under .evolve/runs/cycle-1537/.evolve/evals/;
+    (3) they are disjoint from this lane's lane-scope.json todo_ids
+    (["judgment-phase-semantic-verdict-never-read"]) and from triage-report.md's
+    top_n (judgment-verdict-shadow-classifier, judgment-phase-shadow-config);
+    (4) lane 1539 ran concurrently in the same wave (both started_at
+    2026-08-22T06:47:44Z; 1539 scout 06:51:49Z-07:01:35Z, then tdd from 07:06:35Z)
+    while 1537's premise-challenge window was 07:10:31Z-07:16:49Z.
+    MECHANISM: treediff.Guard.Check is a pure set difference of
+    `git status --porcelain -uall` over the ONE SHARED cr.req.ProjectRoot, with a
+    PER-LANE beforeDirty baseline snapshotted immediately before this lane's phase
+    (cyclerun_dispatch.go:96). It has no notion of authorship. The one exemption that
+    covers eval materialization, isScoutEvalMaterialization (cycle_outcome.go:22),
+    reads `phase == PhaseScout && strings.HasPrefix(p, ".evolve/evals/") &&
+    strings.HasSuffix(p, ".md")` - it keys on THE DIFFING LANE'S CURRENT PHASE, not on
+    who wrote the path. So the identical contracted write is exempt when my own scout
+    makes it and a hard abort when a sibling lane's scout makes it while I am in any
+    other phase. leak_recovery.go:300-305 seals it: .evolve/ paths are legitimate
+    runtime state EXCEPT isEvolveDeliverablePath, and .evolve/evals/ is a deliverable
+    prefix.
+    THE CURE ALREADY EXISTS ONE CLASSIFIER OVER: isActiveMintPhasePath
+    (mint_exemption.go:41) fixed the byte-identical cycle-967 false-abort by consulting
+    a shared PROVENANCE REGISTRY (mintregistry) that the writer populates BEFORE
+    writing. Eval materialization has no such registry, so it stayed on the broken
+    wall-clock attribution model.
+    SYSTEMIC - this is the 5th+ recorded instance of one disease (shared-tree
+    attribution with zero authorship): cycle-365 (scout leaked tracked file),
+    cycle-762 (staged-ADD abort, fleet-wide), cycle-967 (concurrent-lane mint),
+    cycle-1011 (operator write charged to retro), cycle-1149 (concurrent console
+    session), cycle-1212 (non-source-writer leak never remediated), now cycle-1537.
+    The general cure has been filed and unbuilt since 2026-07-20:
+    .evolve/inbox/2026-07-20T06-42-00Z-treediff-worktree-crosslane-residual.json
+    (weight_hint 0.9) asks for exactly a lane/actor-owned-paths registry.
+  confidence: 0.95
+  source: "cycle-1537/judgment-verdict-shadow-classifier (aborted post-premise-challenge; phase report complete, worktree clean)"
+  type: "failure-lesson"
+  category: "episodic"
+  pattern_systemic: true
+  systemic: true
+  failureContext:
+    cycle: 1537
+    task: "judgment-verdict-shadow-classifier"
+    errorCategory: "integration"
+    failedStep: "audit"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "D1: three .evolve/evals/*.md paths authored by concurrent lane 1539 were charged to lane 1537's read-only premise-challenge phase and aborted the cycle (audit-fail-reason.json; the same three files are present under .evolve/runs/cycle-1539/.evolve/evals/ and absent under .evolve/runs/cycle-1537/.evolve/evals/)"
+      - "D2: isScoutEvalMaterialization gates on the DIFFING lane's current phase (cycle_outcome.go:22 `phase == PhaseScout`), so an identical contracted write is exempt or fatal depending only on which lane happens to be between snapshots"
+      - "D3: an exact, already-materialized discriminator went unused - the leaked slugs are disjoint from lane-scope.json todo_ids and from triage-report.md top_n"
+      - "D4: the provenance-registry cure already shipped for the twin case (isActiveMintPhasePath + mintregistry, cycle-967) but eval materialization was never migrated onto it (mint_exemption.go:41 vs cycle_outcome.go:22)"
+      - "D5 (systemic): 5th+ instance of the shared-tree zero-authorship attribution class (365/762/967/1011/1149/1212/1537); the filed general cure treediff-guard-worktree-phase-crosslane-residual has been open since 2026-07-20 at weight 0.9"
+  preventiveAction: >
+    ROOT-CAUSE FIX, not a sixth shape exemption. Give eval materialization the same
+    provenance registry the mint case already has: have internal/evalgate/materialization.go
+    record {slug -> owning cycle/lane, ts} into a shared, flock-guarded registry
+    (mirror mintregistry: record BEFORE the write, TTL-fresh entries only) and add
+    isActiveEvalMaterialization(registry, p) to filterRealLeaks
+    (cyclerun_review.go:457) beside isActiveMintPhasePath. A .evolve/evals/<slug>.md
+    owned by ANOTHER active lane is that lane's contracted write, never this phase's
+    leak; an UNREGISTERED eval path still aborts (fail-safe direction preserved, exactly
+    as the mint clamp does). Then delete the phase-keyed isScoutEvalMaterialization
+    special case so one vocabulary governs both. TESTS (go/internal/core, beside
+    treediff_crosslane_mint_test.go): (a) lane B in premise-challenge, lane A's scout
+    registers + writes .evolve/evals/x.md -> WARN and CONTINUE, no abort; (b) negative
+    control - an UNREGISTERED .evolve/evals/x.md still aborts; (c) a registered slug
+    whose companion payload is a non-.md file under .evolve/evals/ still aborts.
+    DO NOT accept mtime windows or quiesce re-snapshots - they narrow the race without
+    removing it and add a timing dependency to a correctness gate.
+    ALSO, standing read-discipline: when abort_reason names a guard, read the phase
+    deliverables BEFORE reading the cycle verdict as evidence about the task - here
+    every phase artifact was complete and the worktree was clean.
+  relatedInstincts:
+    - "[[cycle-1149-treediff-attributes-concurrent-console-writes]]"
+    - "[[cycle-1212-nonsourcewriter-leak-is-never-remediated-only-aborted]]"
+    - "[[cycle-762-leakrecover-staged-add-checkout-head-false-abort]]"
+    - "[[cycle-365-scout-generate-leaks-tracked-file-to-main-tree]]"
+    - "[[cycle-1212-recurrence-counter-is-structurally-zero]]"
+  contradicts: []

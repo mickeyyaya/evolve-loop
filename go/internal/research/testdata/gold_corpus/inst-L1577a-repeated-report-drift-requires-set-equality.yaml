@@ -1,0 +1,17 @@
+- id: inst-L1577a
+  pattern: "repeated-report-drift-requires-set-equality"
+  description: "Escalate repeated Build Report drift from prose guidance to mechanical set equality: generate the declared Changes paths from the final staged tree and reject the handoff when the sets differ."
+  confidence: 0.95
+  source: "cycle-1577/retro-prompt-delivery-stall"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1577
+    task: "retro-prompt-delivery-stall"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["H1", "M2"]
+  preventiveAction: "Before Build handoff, parse `git status --porcelain=v1 -z` and the report's Changes rows into path sets and fail unless they are equal; run this after the report is written so the check cannot certify a pre-write snapshot."
+  relatedInstincts: ["inst-L1563c", "inst-L1570c", "inst-L1574a", "inst-L1576c"]
+  contradicts: []

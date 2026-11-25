@@ -1,0 +1,135 @@
+- id: cycle-1497-build-floor-truncates-go-test-output-to-a-head-that-carries-no-failure
+  pattern: "the-build-handoff-floor-reports-tests-fail-and-quotes-the-first-600-characters-of-go-test-output-but-go-test-writes-passing-packages-and-log-noise-first-and-its-fail-lines-last-so-the-rejection-message-names-no-test-no-package-and-no-file-and-three-correction-redispatches-burn-against-evidence-that-literally-shows-ok"
+  description: >-
+    Cycle 1497's build phase was rejected three times by the review gate. The
+    rejection text handed to the Builder each time, verbatim from
+    `audit-fail-reason.json` and `build-usage.json.abort_reason`, was:
+
+        enforced package tests FAIL (coverage run doubles as their selfcheck):
+        ok  github.com/mickeyyaya/evolve-loop/go/internal/bridge  1.412s  coverage: 93.1% of statements
+        fatal: not a git repository (or any of the parent directories): .git
+        [orchestrator] WARN worktree provisioning failed ... TestPhaseBoundaryCheckpointer_FiresDuringRunCycle...
+        fatal: not a git repository ...
+        fata…
+
+    The message asserts FAIL and then quotes an `ok`, a coverage percentage, and
+    a stack of `fatal: not a git repository` lines that are ORDINARY LOG NOISE
+    deliberately emitted by a passing `internal/core` test into its own temp
+    dir. It names no failing test, no failing package, and no file to edit.
+
+    THE MECHANISM IS A BLIND HEAD SLICE.
+    `go/internal/core/build_floor_reviewer.go:304-308` does:
+    `head := testOut; if len(head) > 600 { head = head[:600] + "…" }`. But
+    `scopedCoverFunc` (:357) runs ONE `go test` over ALL enforced changed
+    packages, and `go test` streams results in COMPLETION order with each
+    package's `--- FAIL:` detail and the terminal `FAIL <pkg>` summary at the
+    END. The fastest package here was `internal/bridge` at 1.4s — and it
+    PASSED. So the first 600 bytes are structurally guaranteed to be the
+    fastest-passing package plus whatever chatter slower tests write to stderr.
+    The failure information is always past the cut. The truncation does not
+    shorten the evidence; it deletes all of it and keeps only the noise.
+
+    VERIFIED BY RE-RUNNING THE EXACT COMMAND. `go test -count=1 ./internal/core/
+    ./internal/phases/runner/ ./internal/bridge/` in the preserved worktree
+    reports precisely three real failures, every one of them past byte 600:
+    `TestRunCycle_WritesLatestBriefJSON_BoundedAndValid`,
+    `TestRunCycle_LatestBriefJSON_OverwritesAcrossCycles` (both
+    `internal/core`, from `next_cycle_brief_test.go`) and
+    `TestRun_ScoutPhase_ValidBrief_PromptCarriesWarmStartSection`
+    (`internal/phases/runner`, from `runner_warmstartbrief_test.go`). All three
+    are the TDD phase's intended RED tests. A message naming those three test
+    functions would have been immediately actionable; the message actually sent
+    was unactionable by construction.
+
+    THE COST IS MEASURED, NOT ESTIMATED. `build-interactions.ndjson` records one
+    `salvage` and three `correction_redispatch` entries, every one carrying the
+    same evidence-free payload and every one returning `rejected_again`, at
+    68987ms + 90439ms + 65525ms. Three full re-dispatches of a `balanced`-tier
+    Builder spent on a message that shows `ok`.
+
+    A SECOND, INDEPENDENT TRUNCATION SITS BEHIND IT. The interaction ledger
+    stores `Payload` through `neutralize`
+    (`go/internal/interaction/interaction.go:180-193`), which calls
+    `panetrust.Digest` — a TAIL digest capped at 200 chars. So the ledger's
+    record of why build failed four times is the tail of the already-truncated
+    head: `"\nfatal: not a git repository (or any of the parent directories):
+    .git\nfata…"`. Head-truncate to 600, then tail-truncate to 200: the two cuts
+    compose to retain precisely the middle noise and discard both the `ok` and
+    the `FAIL`. Forensics on this cycle from the ledger alone is impossible.
+
+    NOTE THE NEAR-MISS THAT MAKES THIS SPECIFICALLY DANGEROUS. `fatal: not a git
+    repository` reads exactly like a real infra fault, and the cycle's
+    `failure-digest.json` duly classified the whole cycle
+    `"pre_class": "infra-error"` with fingerprint
+    `build|infra-error|b7caff24ef79`. The truncation did not merely hide the
+    cause — it manufactured a plausible WRONG one and propagated it into the
+    loop's failure identity, where the recurrence ladder and the failure adapter
+    both key on it.
+  confidence: 0.9
+  source: "cycle-1497 — go/internal/core/build_floor_reviewer.go:304-308 (head[:600]) and :357 (single go test over all enforced pkgs); go/internal/interaction/interaction.go:180-193 (tail digest, 200-char cap); build-interactions.ndjson (1 salvage + 3 correction_redispatch, all rejected_again, all identical evidence-free payload); audit-fail-reason.json; build-usage.json.abort_reason; failure-digest.json pre_class=infra-error; verified by re-running the enforced package set in the preserved worktree"
+  type: "failure-lesson"
+  category: "structural"
+  pattern_systemic: true
+  systemic: true
+  applies_to:
+    - "go/internal/core/build_floor_reviewer.go"
+    - "go/internal/core/cyclerun_review.go"
+    - "go/internal/interaction"
+  failureContext:
+    cycle: 1497
+    task: "sleep-time-kb-consolidation"
+    errorCategory: "tool-use"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "D2 (HIGH): build handoff floor rejected the deliverable 3x with a message that quotes a passing package and unrelated log noise while omitting all three real --- FAIL lines, which sit past the 600-char head cut"
+      - "D4 (MEDIUM): the interaction ledger tail-digests the already-head-truncated reason to 200 chars, so the durable record of four rejections names no test, package, or file"
+    upstreamSignals:
+      - "build-interactions.ndjson: three consecutive correction_redispatch entries all return rejected_again with a byte-identical payload — an unchanging rejection payload across retries is itself proof the message carries no actionable delta"
+      - "the quoted evidence contains the literal token `ok` and a 93.1% coverage figure directly beneath the words `tests FAIL` — a self-contradicting message that no reader could act on"
+  governingVariable: >-
+    Wrong assumption: "the head of a tool's output is a representative sample of
+    its outcome." True relationship: `go test` is a STREAMING, COMPLETION-ORDERED
+    reporter whose verdict lines are emitted LAST and whose early bytes are
+    dominated by whichever package finished fastest — which, in any run that
+    contains a passing package, is a PASSING one. Head-truncation of `go test`
+    output is not lossy sampling, it is systematic selection FOR the non-failing
+    portion. Evidence must be EXTRACTED by matching the reporter's failure
+    grammar (`--- FAIL:`, `FAIL\t<pkg>`, `panic:`, `[build failed]`), never
+    sliced by offset.
+  preventiveAction: >-
+    (1) EXTRACT, DO NOT SLICE. In `go/internal/core/build_floor_reviewer.go`,
+    replace the `head[:600]` cut at :304-308 with a filter that collects every
+    line matching `--- FAIL:`, `^FAIL\t`, `^panic:`, `[build failed]` and
+    `^\s+\S+_test\.go:\d+:` (the assertion detail lines), and quotes THOSE —
+    with a trailing `(N more)` count if the set is large. Cap by LINE COUNT of
+    matched failure lines, never by byte offset into raw output. Regression test
+    feeding a fixture where a passing package and 600+ bytes of stderr noise
+    precede the real `--- FAIL`, asserting the failing test NAME appears in the
+    floor reason.
+    (2) NEVER BYTE-TRUNCATE ANY AGENT-FACING REJECTION REASON. Sweep for the
+    `if len(x) > N { x = x[:N] + "…" }` shape on tool output across the review
+    and floor paths; each site must either extract by grammar or truncate from
+    the END (where verdicts live), not the head.
+    (3) FIX THE LEDGER'S FORENSIC VALUE. `interaction.neutralize` tail-digests
+    to 200 chars, which is correct for untrusted PANE text but destroys
+    closed-vocabulary floor reasons. Record structured failure identity
+    (failing package + test names) as its own field rather than relying on a
+    prose payload that two independent truncations have already gutted.
+    (4) TREAT AN UNCHANGING REJECTION PAYLOAD AS A HARD STOP. If two consecutive
+    `correction_redispatch` entries carry a byte-identical payload and both
+    return `rejected_again`, the correction loop is provably not transmitting
+    actionable information — abort the ladder and escalate to console rather
+    than spending the third redispatch.
+    (5) AS RETRO/AUDITOR: never accept a floor message as the cause. RE-RUN the
+    enforced command in the preserved worktree and read the real failures. This
+    cycle's `pre_class: infra-error` and fingerprint
+    `build|infra-error|b7caff24ef79` are both artifacts of the truncation, not
+    of any infra fault.
+  relatedInstincts:
+    - "[[cycle-1497-triage-decomposes-the-lane-id-into-child-slugs-and-empties-the-builders-authorized-set]]"
+    - "[[cycle-1068-gate-evidence-source-narrowed-to-one-prose-channel]]"
+    - "[[cycle-1320-continuation-hands-the-lane-a-truncated-summary-and-grades-it-on-the-full-ledger]]"
+    - "[[cycle-1176-narrow-struct-roundtrip-destroys-unmodelled-decision-keys]]"
+    - "[[cycle-1492-recurrence-is-pinned-at-zero-so-every-failure-is-a-first-occurrence]]"
+  contradicts: []

@@ -1,0 +1,71 @@
+- id: inst-L1543b
+  pattern: "a-continuation-lane-carries-TWO-authorities-on-what-it-is-working-on-the-lane-scope-pin-and-the-continuation-manifest-and-because-no-rule-says-which-wins-the-outcome-is-arbitrary-per-cycle-1536-let-the-manifest-win-and-stole-two-other-lanes-eval-files-1543-let-the-pin-win-and-delivered-nothing"
+  description: >
+    Cycle 1543's workspace contains both scope authorities, and they disagree:
+      lane-scope.json      -> todo_ids = ["pipeline-defect-infra-systemic"]   (resolved by the agents to a CONSUMED namesake -> ineligible)
+      continuation-manifest.json -> cycle-1539 worktree, snapshot 52b662ed, findings_path
+                                    .evolve/runs/cycle-1539/audit-fail-reason.json
+    The manifest is the one carrying REAL, OPEN, addressable work: ten staged files and four
+    OPEN inherited defects (dfc8b8ef autorespond transient branch missing its three guards;
+    d175885c bridgeSocketActive os.TempDir no-op; d9ab20e7 transient=true coverage zero;
+    de8cb6ff silent integration-tier drop), all four re-confirmed still-open by this cycle's
+    own auditor and dispositioned 4/4 DEFERRED. Cycle-1539's disposition had already routed
+    exactly this work `routing: carryover` with `salvage.worktree_has_value: true`.
+    NO PHASE COULD CLAIM IT. Builder states the rule it obeyed verbatim
+    (build-report.md, Build Steps #2): "Inherited open defects are explicitly unclaimed by
+    this lane and cannot override top_n." Triage: "no substitute can be selected". So the
+    lane held a valid worktree full of authorized carryover work and a scope pin that
+    forbade touching it, and shipped nothing.
+    THE SAME DIVERGENCE RESOLVED THE OPPOSITE WAY FOUR CYCLES EARLIER AND WAS WORSE.
+    Inbox item `lane-scope-overridden-by-continuation-binding` (weight 0.95, filed
+    2026-08-22T08:45Z — 3h46m BEFORE this cycle started): cycle-1536's lane-scope.json also
+    said todo_ids=["pipeline-defect-infra-systemic"], but its continuation manifest bound it
+    to cycle-1532's worktree; there the MANIFEST won, the lane silently retargeted onto
+    cycle-1535's task, shipped adcbddb2 containing two other lanes' eval files, and destroyed
+    cycle-1535's PASS landing. Same fault line, opposite winner, both destructive. The id
+    `pipeline-defect-infra-systemic` has been the pinned lane scope for cycles 1532, 1536,
+    1539, 1540 and 1543 — it never retires, because the ADR-0072 auto-filer re-mints it.
+  confidence: 0.93
+  source: "cycle-1543/pipeline-defect-infra-systemic (lane-scope.json vs continuation-manifest.json; inbox item lane-scope-overridden-by-continuation-binding w=0.95)"
+  type: "failure-lesson"
+  category: "episodic"
+  pattern_systemic: true
+  systemic: true
+  failureContext:
+    cycle: 1543
+    task: "pipeline-defect-infra-systemic"
+    errorCategory: "planning"
+    failedStep: "scout"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "H1: zero deliverable while the continuation manifest pointed at a worktree holding four OPEN defects that cycle-1539's disposition had already routed `carryover` with salvage.worktree_has_value=true"
+      - "H2/M1/M2: all three inherited defects re-confirmed OPEN and dispositioned DEFERRED for the stated reason 'not selected by cycle-1543 top_n' (defect-dispositions.json)"
+      - "Prior inversion: cycle-1536 let the manifest win over the same pin and destroyed cycle-1535's landing (inbox lane-scope-overridden-by-continuation-binding)"
+  preventiveAction: >
+    Make the two authorities ONE, and make disagreement fatal rather than arbitrary.
+    (1) DEFINE THE PRECEDENCE IN CODE, NOT PER-AGENT: at continuation adoption
+    (go/internal/core/continuation_stamp.go registerLaneScopeBinding / adoption), assert the
+    continuation-bound task is a MEMBER of the lane's own lane-scope.todo_ids. If it is not,
+    REFUSE THE BINDING LOUDLY (abort_reason, lane re-provisioned) — never silently retarget
+    (the 1536 direction) and never silently strand it (the 1543 direction).
+    (2) A CONTINUATION MANIFEST WHOSE ANCESTOR DISPOSITION SAYS routing=carryover WITH
+    salvage.worktree_has_value=true IS ITSELF AN AUTHORIZATION: triage must be permitted to
+    commit the named inherited defect ids into top_n, and the empty-top_n branch must first
+    check for adoptable carryover before concluding "no eligible task". Cycle-1539's
+    disposition named the exact remaining work ("H2 is a one-line constant swap to
+    swarm.tmuxSocketDir()'s /tmp fallback and H1 is adding the three guards from
+    autorespond.go:400-427") and no phase in cycle-1543 was allowed to read it as a task.
+    (3) The fleet partition must compute overlap from the EFFECTIVE scope (continuation
+    resolved), not the declared pin.
+    TESTS: (a) manifest task NOT in lane-scope.todo_ids -> adoption returns a refusal with
+    both values named, lane does not run; (b) ancestor disposition routing=carryover +
+    worktree_has_value=true -> the inherited defect ids appear in the triage candidate set and
+    an empty top_n is a hard error; (c) negative control: manifest task IS in todo_ids ->
+    adoption unchanged.
+  relatedInstincts:
+    - "[[inst-L1543a]]"
+    - "[[inst-L1543c]]"
+    - "[[cycle-1309-continuation-adoption-outruns-every-phase-that-could-refuse-the-lane]]"
+    - "[[cycle-1470-duplicate-goal-hash-lanes-collide-in-the-same-files]]"
+    - "[[cycle-1340-defect-dispositions-are-per-workspace-and-never-inherit]]"
+  contradicts: []

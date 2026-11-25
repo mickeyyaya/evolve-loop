@@ -1,0 +1,72 @@
+- id: inst-L1517a
+  pattern: "warn-has-no-machine-representation-so-it-ships-or-hard-fails-by-accident"
+  description: >-
+    The Auditor persona (agents/evolve-auditor.md:152) makes WARN a first-class
+    verdict — "MEDIUM issues but all evals pass (WARN blocks shipping)". The EGPS
+    gate has no WARN. go/internal/phases/audit/audit.go:256-291 reads exactly two
+    fields out of acs-verdict.json (readACSVerdict, audit.go:626-647): red_count
+    and ship_eligible. There is NO branch anywhere that reads
+    acs-verdict.json's own `verdict` string — grep the package, a WARN there is
+    inert bytes. So a narrative WARN reaches the machine ONLY if the auditor
+    volunteers `ship_eligible: false`, a key that appears in ZERO persona and
+    ZERO skill file (`grep -rn ship_eligible agents/ skills/` → no matches); it
+    is documented only in docs/architecture/adr/0042 and egps-v10.md, which the
+    auditor is never given. The outcome is decided by whether an LLM happened to
+    type an optional undocumented key: across 10 cycles that wrote
+    verdict="WARN" with red_count==0, EIGHT omitted ship_eligible → nil →
+    audit.go:279's explicit back-compat branch is skipped → NO block → the cycle
+    SHIPPED over its own auditor's "WARN blocks shipping" (1433, 1440, 1446,
+    1454, 1494, 1498 wrote no audit-fail-reason.json at all; 1494 and 1498 are
+    in the confirmed PASS-ship ledger of
+    docs/incidents/2026-08-17-failure-rate-review-1481-1503.md). The other TWO
+    (1481, 1517) wrote ship_eligible:false and were hard gate-blocked to FAIL
+    with the byte-identical fingerprint audit|gate-block|3ddf55464363, 36 cycles
+    apart. Same verdict word, opposite ship outcomes, and the fail-OPEN side is
+    the majority. Worse, audit.go:279's comment calls the field "the
+    authoritative acssuite SSOT" while its own text concedes it may be "a
+    pre-staged/agent-written verdict" — the generator (genVerdict) runs only
+    when the file is ABSENT, so an agent-authored file is never machine-derived.
+    That provenance error mints a spurious record: audit-fail-reason.json
+    reason 2 says "auditor narrative=WARN but 1 deterministic gate(s) forced
+    FAIL ... both readings are recorded so the disagreement is weighable" — but
+    there is no disagreement and no second opinion. One LLM wrote both channels
+    and said the same thing twice; the code treats its own author's echo as an
+    independent deterministic gate. SYSTEMIC — this is the same disease as
+    inst-L1516a (a verdict channel the classifier never reads), here in both
+    directions at once: the field that carries meaning is undocumented, and the
+    field the persona documents is unread.
+  confidence: 0.95
+  source: "cycle-1517/cap-audit-report-length"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1517
+    task: "cap-build-report-length + cap-audit-report-length"
+    errorCategory: "integration"
+    failedStep: "audit"
+    auditVerdict: "WARN"
+    auditDefects: ["M1", "M2", "M3", "L1"]
+  preventiveAction: >-
+    Do not fix this by telling the auditor to stop writing ship_eligible — the
+    fail-OPEN majority proves the field is the only channel that works. Make the
+    machine own the ship decision and make WARN representable, in this order:
+    (1) go/internal/phases/audit/audit.go readACSVerdict must ALSO read
+    acs-verdict.json's `verdict` string and treat verdict=="WARN" as
+    ship-blocking, so the persona's documented rule reaches a consumer — with a
+    table test over {verdict, red_count, ship_eligible} covering the nil case
+    that shipped six cycles; (2) delete the "authoritative acssuite SSOT"
+    claim from audit.go:279 and stop labelling an agent-written field a
+    "deterministic gate" in the verdict-conflict reason — record it as
+    "auditor self-declared do-not-ship", so the conflict record stops
+    manufacturing a disagreement between one author and itself; (3) add
+    ship_eligible + the WARN mapping to agents/evolve-auditor.md's
+    acs-verdict.json contract (the block at :107-131 documents only
+    predicate_quality), and to the EGPS reference, so the auditor stops
+    inferring it; (4) give WARN a distinct recorded outcome from FAIL so a
+    MEDIUM-only cycle is not fingerprinted, retro-burned and worktree-discarded
+    as if it were a CRITICAL. ALWAYS: before asserting a field is a
+    "deterministic gate" or an "SSOT", trace who WROTE the bytes — if the same
+    agent authored both the narrative and the field, they are one opinion, not
+    two.
+  relatedInstincts: ["inst-L1516a", "inst-L1517b", "inst-L1517c", "inst-L1508a"]
+  contradicts: []

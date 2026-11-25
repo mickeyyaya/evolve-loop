@@ -1,0 +1,879 @@
+{
+  "queries": [
+    {
+      "id": "q-01",
+      "plan": "cycle-1249",
+      "query": {
+        "source": "audit",
+        "failure_mode": "egps red count 1 debouncereachablefromproductionwaitloop auditor narrative warn deterministic gate forced fail",
+        "consequence": "gate-block",
+        "keywords": [
+          "egps",
+          "ships",
+          "only",
+          "when",
+          "narrative",
+          "deterministic",
+          "forced"
+        ]
+      },
+      "relevant": [
+        "cycle-1249-vacuity-guard-red-recurs-because-fix-was-lesson-only"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1249 failed on EGPS red_count=1 for DebounceReachableFromProductionWaitLoop; cycle-1249-vacuity-guard-red-recurs-because-fix-was-lesson-only diagnoses that recurring vacuity-guard failure in the production wait loop."
+    },
+    {
+      "id": "q-02",
+      "plan": "cycle-1285",
+      "query": {
+        "source": "audit",
+        "failure_mode": "faillearn writer go writes the inbox before the retrospective and aborts",
+        "consequence": "verdict-fail",
+        "keywords": [
+          "audit",
+          "verdict",
+          "retro",
+          "defect",
+          "inbox",
+          "retrospective",
+          "aborts"
+        ]
+      },
+      "relevant": [
+        "cycle-1285-hardening-lands-on-the-inputs-the-audit-named-not-on-arming-or-availability"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1285 failed audit when faillearn/writer.go wrote the inbox before the retrospective and aborted; cycle-1285-hardening-lands-on-the-inputs-the-audit-named-not-on-arming-or-availability records the root cause in that cycle's defect ledger and faillearn path."
+    },
+    {
+      "id": "q-03",
+      "plan": "cycle-1309",
+      "query": {
+        "source": "audit",
+        "failure_mode": "protectedsurface testeverygateshapedfileisprotectedsurface acs durable gate would fail",
+        "consequence": "gate-block",
+        "keywords": [
+          "egps",
+          "protectedsurface",
+          "durable",
+          "flag",
+          "registry",
+          "ceiling",
+          "skills",
+          "drift"
+        ]
+      },
+      "relevant": [
+        "cycle-1309-continuation-adoption-outruns-every-phase-that-could-refuse-the-lane",
+        "inst-L1933a"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1309 failed EGPS and acs-durable on TestEveryGateShapedFileIsProtectedSurface; cycle-1309-continuation-adoption-outruns-every-phase-that-could-refuse-the-lane explains why the protected-surface check slipped past continuation adoption, and inst-L1933a covers protected-surface checks before freezing predicates."
+    },
+    {
+      "id": "q-04",
+      "plan": "cycle-1320",
+      "query": {
+        "source": "audit",
+        "failure_mode": "defect ledger 5 defect s inherited from cycle 1317 are unaccounted for",
+        "consequence": "unknown",
+        "keywords": [
+          "defect",
+          "ledger",
+          "inherited",
+          "unaccounted",
+          "disposition",
+          "cycle",
+          "1317"
+        ]
+      },
+      "relevant": [
+        "cycle-1340-defect-dispositions-are-per-workspace-and-never-inherit",
+        "cycle-1285-hardening-lands-on-the-inputs-the-audit-named-not-on-arming-or-availability"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1320 failed with 5 inherited defects from cycle-1317 marked no disposition; cycle-1340-defect-dispositions-are-per-workspace-and-never-inherit explains per-workspace disposition derivation, and cycle-1285-hardening-lands-on-the-inputs-the-audit-named-not-on-arming-or-availability covers continuation defect-ledger arming."
+    },
+    {
+      "id": "q-05",
+      "plan": "cycle-1340",
+      "query": {
+        "source": "audit",
+        "failure_mode": "inherited from cycle 1330 are unaccounted for continuation defect ledger",
+        "consequence": "verdict-fail",
+        "keywords": [
+          "defect",
+          "ledger",
+          "inherited",
+          "unaccounted",
+          "disposition",
+          "continuation",
+          "forced"
+        ]
+      },
+      "relevant": [
+        "cycle-1340-defect-dispositions-are-per-workspace-and-never-inherit"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1340 failed the continuation defect-ledger gate with 4 inherited defects lacking dispositions; cycle-1340-defect-dispositions-are-per-workspace-and-never-inherit documents why inherited rows are rebuilt per workspace."
+    },
+    {
+      "id": "q-06",
+      "plan": "cycle-1351",
+      "query": {
+        "source": "audit",
+        "failure_mode": "disposition preflight missing this workspace holds no defect dispositions json at all",
+        "consequence": "unknown",
+        "keywords": [
+          "defect",
+          "ledger",
+          "disposition",
+          "preflight",
+          "missing",
+          "workspace",
+          "inherited",
+          "unaccounted"
+        ]
+      },
+      "relevant": [
+        "cycle-1340-defect-dispositions-are-per-workspace-and-never-inherit",
+        "inst-L1574a"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1351 failed disposition-preflight because defect-dispositions.json was absent for 4 inherited defects; cycle-1340-defect-dispositions-are-per-workspace-and-never-inherit and inst-L1574a both govern continuation disposition accounting."
+    },
+    {
+      "id": "q-07",
+      "plan": "cycle-1363",
+      "query": {
+        "source": "audit",
+        "failure_mode": "ship time repo contract pack runs go test internal gitignoreresidual",
+        "consequence": "gate-block",
+        "keywords": [
+          "repo",
+          "contract",
+          "pack",
+          "gitignoreresidual",
+          "test",
+          "audit",
+          "defect"
+        ]
+      },
+      "relevant": [
+        "cycle-1363-tdd-named-the-missing-test-and-no-grader-covered-it"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1363 failed audit on repo-contract running ./internal/gitignoreresidual/... where the required package test was missing; cycle-1363-tdd-named-the-missing-test-and-no-grader-covered-it diagnoses how prose requirements in TDD were dropped."
+    },
+    {
+      "id": "q-08",
+      "plan": "cycle-1385",
+      "query": {
+        "source": "audit",
+        "failure_mode": "closure claim without a citation already fully closed out fix shipped cycle 1312",
+        "consequence": "verdict-fail",
+        "keywords": [
+          "closure",
+          "claim",
+          "citation",
+          "report",
+          "prior",
+          "defect",
+          "closed",
+          "narrative"
+        ]
+      },
+      "relevant": [
+        "cycle-1428-closure-claim-gate-flags-the-heading-that-denies-closure",
+        "inst-L1592a"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1385 failed on closure-claim citation when narrative PASS asserted a prior defect was closed without per-defect citations; cycle-1428-closure-claim-gate-flags-the-heading-that-denies-closure and inst-L1592a cover closure-claim gating and evidence binding."
+    },
+    {
+      "id": "q-09",
+      "plan": "cycle-1397",
+      "query": {
+        "source": "audit",
+        "failure_mode": "workspace holds no defect dispositions json closure claim without a citation",
+        "consequence": "verdict-fail",
+        "keywords": [
+          "defect",
+          "ledger",
+          "disposition",
+          "preflight",
+          "missing",
+          "closure",
+          "claim",
+          "citation"
+        ]
+      },
+      "relevant": [
+        "cycle-1340-defect-dispositions-are-per-workspace-and-never-inherit",
+        "cycle-1428-closure-claim-gate-flags-the-heading-that-denies-closure"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1397 failed both continuation defect-ledger preflight and closure-claim citation gates; cycle-1340-defect-dispositions-are-per-workspace-and-never-inherit addresses missing dispositions and cycle-1428-closure-claim-gate-flags-the-heading-that-denies-closure addresses closure-claim scans."
+    },
+    {
+      "id": "q-10",
+      "plan": "cycle-1399",
+      "query": {
+        "source": "audit",
+        "failure_mode": "cannot unmarshal array into go struct field dispositions evidence of type string",
+        "consequence": "unknown",
+        "keywords": [
+          "defect",
+          "dispositions",
+          "json",
+          "unparseable",
+          "unmarshal",
+          "evidence",
+          "continuation"
+        ]
+      },
+      "relevant": [
+        "cycle-1399-machine-parsed-gate-record-schema-too-narrow-for-its-own-evidence",
+        "cycle-1340-defect-dispositions-are-per-workspace-and-never-inherit"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1399 failed because defect-dispositions.json held an array in evidence; cycle-1399-machine-parsed-gate-record-schema-too-narrow-for-its-own-evidence diagnoses the schema mismatch and cycle-1340-defect-dispositions-are-per-workspace-and-never-inherit governs defect-dispositions.json parsing."
+    },
+    {
+      "id": "q-11",
+      "plan": "cycle-1406",
+      "query": {
+        "source": "audit",
+        "failure_mode": "contract gate bypass repairverdict salvage extract go repairs the first sentinel",
+        "consequence": "verdict-fail",
+        "keywords": [
+          "contract",
+          "gate",
+          "bypass",
+          "repairverdict",
+          "salvage",
+          "extract",
+          "sentinel",
+          "critical"
+        ]
+      },
+      "relevant": [
+        "inst-L1685b"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1406 failed on salvage_extract.go sentinel repair selecting the wrong JSON verdict object; inst-L1685b diagnoses phase-aware candidate selection in salvage_extract.go."
+    },
+    {
+      "id": "q-12",
+      "plan": "cycle-1413",
+      "query": {
+        "source": "audit",
+        "failure_mode": "scoped inbox item repocontract gate false red swallowed diag is not retired",
+        "consequence": "verdict-fail",
+        "keywords": [
+          "triage",
+          "decision",
+          "inbox",
+          "item",
+          "retired",
+          "critical",
+          "audit",
+          "queued"
+        ]
+      },
+      "relevant": [
+        "cycle-1413-agent-authored-companion-silently-shadows-the-report-section-that-carries-the-decision"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1413 failed audit because scoped inbox item repocontract-gate-false-red-swallowed-diag was not retired; cycle-1413-agent-authored-companion-silently-shadows-the-report-section-that-carries-the-decision explains why triage-decision.json shadowed the superseded block."
+    },
+    {
+      "id": "q-13",
+      "plan": "cycle-1424",
+      "query": {
+        "source": "audit",
+        "failure_mode": "one unpaired quote in prose flips candidatecount to 0 making ambiguity guard vacuous",
+        "consequence": "verdict-fail",
+        "keywords": [
+          "unpaired",
+          "quote",
+          "candidatecount",
+          "ambiguity",
+          "guard",
+          "vacuous",
+          "critical"
+        ]
+      },
+      "relevant": [
+        "inst-L1685b"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1424 failed when candidateCount dropped to 0 and defeated the salvage ambiguity guard; inst-L1685b addresses salvageVerdictWith candidateCount and phase-aware salvage extraction."
+    },
+    {
+      "id": "q-14",
+      "plan": "cycle-1425",
+      "query": {
+        "source": "audit",
+        "failure_mode": "the finality concession is reachable only from the ctx cancel branch withfinalpoll",
+        "consequence": "verdict-fail",
+        "keywords": [
+          "finality",
+          "concession",
+          "reachable",
+          "cancel",
+          "branch",
+          "withfinalpoll",
+          "caller"
+        ]
+      },
+      "relevant": [
+        "cycle-1425-conjunctive-liveness-gate-amplifies-the-failure-it-was-built-to-absorb"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1425 failed on withFinalPoll finality concession reachability in the completion detector; cycle-1425-conjunctive-liveness-gate-amplifies-the-failure-it-was-built-to-absorb analyzes that completion detector change."
+    },
+    {
+      "id": "q-15",
+      "plan": "cycle-1428",
+      "query": {
+        "source": "audit",
+        "failure_mode": "closure claim without a citation the ambiguity guard is still silenceable",
+        "consequence": "unknown",
+        "keywords": [
+          "closure",
+          "claim",
+          "citation",
+          "disposition",
+          "preflight",
+          "missing",
+          "ambiguity",
+          "guard"
+        ]
+      },
+      "relevant": [
+        "cycle-1428-closure-claim-gate-flags-the-heading-that-denies-closure",
+        "cycle-1340-defect-dispositions-are-per-workspace-and-never-inherit"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1428 failed on both a negated closure claim without citation and missing defect-dispositions.json; cycle-1428-closure-claim-gate-flags-the-heading-that-denies-closure and cycle-1340-defect-dispositions-are-per-workspace-and-never-inherit cover those two gates."
+    },
+    {
+      "id": "q-16",
+      "plan": "cycle-1441",
+      "query": {
+        "source": "audit",
+        "failure_mode": "salvageverdictwith go internal deliverable salvage extract go approves on repaired",
+        "consequence": "verdict-fail",
+        "keywords": [
+          "salvageverdictwith",
+          "deliverable",
+          "salvage",
+          "extract",
+          "approves",
+          "repaired"
+        ]
+      },
+      "relevant": [
+        "inst-L1685b"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1441 failed on salvageVerdictWith in go/internal/deliverable/salvage_extract.go; inst-L1685b directly analyzes salvageVerdictWith and phase-aware salvage validation."
+    },
+    {
+      "id": "q-17",
+      "plan": "cycle-1443",
+      "query": {
+        "source": "audit",
+        "failure_mode": "integration tier go test tags integration reported 13 offender testfleetsoak tmux repl",
+        "consequence": "infra-error",
+        "keywords": [
+          "integration",
+          "tier",
+          "offender",
+          "testfleetsoak",
+          "tmux",
+          "repl",
+          "interactive",
+          "exit"
+        ]
+      },
+      "relevant": [
+        "cycle-1443-ci-parity-gate-reason-becomes-the-sole-recorded-failure-identity"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1443 failed when the integration tier reported 13 offenders including tmux_repl_interactive_test.go; cycle-1443-ci-parity-gate-reason-becomes-the-sole-recorded-failure-identity documents how that CI parity failure reason masked the audit failure."
+    },
+    {
+      "id": "q-18",
+      "plan": "cycle-1470",
+      "query": {
+        "source": "ship",
+        "failure_mode": "ship fleet ff merge cycle 42824668 1470 into main diverged",
+        "consequence": "unknown",
+        "keywords": [
+          "ship",
+          "native",
+          "fleet",
+          "rebase",
+          "needed",
+          "merge",
+          "diverged",
+          "pipeline"
+        ]
+      },
+      "relevant": [
+        "cycle-1470-duplicate-goal-hash-lanes-collide-in-the-same-files",
+        "inst-L2097a"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1470 failed ship with GIT_FLEET_REBASE_NEEDED when fleet ff-merge diverged against main; cycle-1470-duplicate-goal-hash-lanes-collide-in-the-same-files explains the colliding sibling lane and inst-L2097a governs GIT_FLEET_REBASE_NEEDED recovery."
+    },
+    {
+      "id": "q-19",
+      "plan": "cycle-1471",
+      "query": {
+        "source": "scout",
+        "failure_mode": "scout did not materialize evals for selected slug anchor exhaustion scan",
+        "consequence": "gate-block",
+        "keywords": [
+          "review",
+          "gate",
+          "scout",
+          "deliverable",
+          "rejected",
+          "materialize",
+          "evals",
+          "selected"
+        ]
+      },
+      "relevant": [
+        "inst-L1540b"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1471 scout deliverable was rejected because scout did not materialize evals for its selected slug; inst-L1540b directly diagnoses scout failing to materialize sidecar eval files."
+    },
+    {
+      "id": "q-20",
+      "plan": "cycle-1480",
+      "query": {
+        "source": "audit",
+        "failure_mode": "top n item 2 dead api sweep entirely undelivered phase judge unchanged",
+        "consequence": "verdict-fail",
+        "keywords": [
+          "top",
+          "item",
+          "dead",
+          "api",
+          "sweep",
+          "undelivered",
+          "phase",
+          "judge"
+        ]
+      },
+      "relevant": [
+        "cycle-1480-multi-slug-topn-reds-the-cycle-sixteen-cycles-after-1464",
+        "inst-L1589a"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1480 failed audit because the second top_n item was undelivered; cycle-1480-multi-slug-topn-reds-the-cycle-sixteen-cycles-after-1464 and inst-L1589a both govern multi-slug top_n commitment and delivery."
+    },
+    {
+      "id": "q-21",
+      "plan": "cycle-1483",
+      "query": {
+        "source": "build",
+        "failure_mode": "build handoff floor 1 deterministic check failure enforced package tests fail",
+        "consequence": "gate-block",
+        "keywords": [
+          "review",
+          "gate",
+          "build",
+          "deliverable",
+          "rejected",
+          "handoff",
+          "floor",
+          "enforced"
+        ]
+      },
+      "relevant": [
+        "cycle-1483-builder-verified-the-acs-suite-not-the-package-it-edited"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1483 failed the build handoff floor on enforced package tests; cycle-1483-builder-verified-the-acs-suite-not-the-package-it-edited diagnoses why the builder missed the edited package's unit tests."
+    },
+    {
+      "id": "q-22",
+      "plan": "cycle-1493",
+      "query": {
+        "source": "audit",
+        "failure_mode": "inherited defect reproduced not fixed the coverage gate fails at 75",
+        "consequence": "gate-block",
+        "keywords": [
+          "closure",
+          "claim",
+          "citation",
+          "inherited",
+          "defect",
+          "reproduced",
+          "coverage",
+          "floor"
+        ]
+      },
+      "relevant": [
+        "cycle-1493-closure-claim-gate-fires-on-the-hyphenated-compound-fail-closed",
+        "cycle-1428-closure-claim-gate-flags-the-heading-that-denies-closure"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1493 failed the closure-claim gate on a defect row stating the defect was reproduced and not fixed; cycle-1493-closure-claim-gate-fires-on-the-hyphenated-compound-fail-closed and cycle-1428-closure-claim-gate-flags-the-heading-that-denies-closure explain closure-claim false positives."
+    },
+    {
+      "id": "q-23",
+      "plan": "cycle-1497",
+      "query": {
+        "source": "build",
+        "failure_mode": "deliverable rejected after 3 correction build handoff floor enforced package tests",
+        "consequence": "infra-error",
+        "keywords": [
+          "review",
+          "gate",
+          "build",
+          "correction",
+          "handoff",
+          "floor",
+          "enforced",
+          "package"
+        ]
+      },
+      "relevant": [
+        "cycle-1497-build-floor-truncates-go-test-output-to-a-head-that-carries-no-failure",
+        "cycle-1483-builder-verified-the-acs-suite-not-the-package-it-edited"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1497 failed build 3 times on enforced package tests at the handoff floor; cycle-1497-build-floor-truncates-go-test-output-to-a-head-that-carries-no-failure explains the truncated rejection output and cycle-1483-builder-verified-the-acs-suite-not-the-package-it-edited addresses running package tests before handoff."
+    },
+    {
+      "id": "q-24",
+      "plan": "cycle-1501",
+      "query": {
+        "source": "audit",
+        "failure_mode": "egps red count 2 deadcodenonseamcountcutbysixtypercent everyremainingclusterisdispositionedinthebuildreport",
+        "consequence": "gate-block",
+        "keywords": [
+          "egps",
+          "red",
+          "ships",
+          "only",
+          "when",
+          "build",
+          "token",
+          "usage"
+        ]
+      },
+      "relevant": [
+        "cycle-1501-the-slugs-only-machine-memory-is-an-eval-reauthored-per-attempt-in-a-worktree-that-never-lands"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1501 failed EGPS on two eval predicates for its slug; cycle-1501-the-slugs-only-machine-memory-is-an-eval-reauthored-per-attempt-in-a-worktree-that-never-lands diagnoses eval drift across attempts for that slug."
+    },
+    {
+      "id": "q-25",
+      "plan": "cycle-1508",
+      "query": {
+        "source": "audit",
+        "failure_mode": "cyclerun review go 310 gates the no rewrite skip on rr blocks",
+        "consequence": "verdict-fail",
+        "keywords": [
+          "cyclerun",
+          "review",
+          "gates",
+          "rewrite",
+          "skip",
+          "blocks",
+          "reviewer",
+          "defect"
+        ]
+      },
+      "relevant": [
+        "inst-L1508c"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1508 failed audit on cyclerun_review.go:310 gating no-rewrite skip on rr.Blocks > 0; inst-L1508c analyzes that exact shared-counter bug in cyclerun_review.go."
+    },
+    {
+      "id": "q-26",
+      "plan": "cycle-1531",
+      "query": {
+        "source": "scout",
+        "failure_mode": "scout did not materialize evals for selected slug judgment phase shadow",
+        "consequence": "gate-block",
+        "keywords": [
+          "review",
+          "gate",
+          "scout",
+          "deliverable",
+          "rejected",
+          "materialize",
+          "evals",
+          "shadow"
+        ]
+      },
+      "relevant": [
+        "inst-L1540b"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1531 scout was rejected for failing to materialize evals for its selected slugs; inst-L1540b diagnoses that recurring scout eval-materialization failure."
+    },
+    {
+      "id": "q-27",
+      "plan": "cycle-1532",
+      "query": {
+        "source": "audit",
+        "failure_mode": "egps red count 1 transientrecognitionismanifestscopednothardcoded cycle ships only when",
+        "consequence": "gate-block",
+        "keywords": [
+          "egps",
+          "transientrecognitionismanifestscopednothardcoded",
+          "verify",
+          "pipeline",
+          "transient",
+          "artifact",
+          "timeout"
+        ]
+      },
+      "relevant": [
+        "inst-L1532c"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1532 failed EGPS on TransientRecognitionIsManifestScopedNotHardCoded; inst-L1532c explains how missing or misnamed test references in eval contracts cause permanent EGPS mismatches."
+    },
+    {
+      "id": "q-28",
+      "plan": "cycle-1540",
+      "query": {
+        "source": "scout",
+        "failure_mode": "scout deliverable rejected after 2 correction scout did not materialize evals",
+        "consequence": "gate-block",
+        "keywords": [
+          "review",
+          "gate",
+          "scout",
+          "selected",
+          "slug",
+          "integration",
+          "tier",
+          "exclusion"
+        ]
+      },
+      "relevant": [
+        "inst-L1540b"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1540 scout failed after 2 corrections without materializing evals for integration-tier-exclusion-observability; inst-L1540b records the structural fix moving eval existence checks into scout self-verify."
+    },
+    {
+      "id": "q-29",
+      "plan": "cycle-1564",
+      "query": {
+        "source": "audit",
+        "failure_mode": "dead end plumbing bridgeresponse sessionid has one reader runner go 1218 and zero writers",
+        "consequence": "infra-error",
+        "keywords": [
+          "dead",
+          "end",
+          "plumbing",
+          "bridgeresponse",
+          "sessionid",
+          "reader",
+          "runner",
+          "writers"
+        ]
+      },
+      "relevant": [
+        "inst-L1564a"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1564 failed audit on dead-end plumbing in BridgeResponse.SessionID with no terminal writer; inst-L1564a diagnoses that exact BridgeResponse.SessionID plumbing failure."
+    },
+    {
+      "id": "q-30",
+      "plan": "cycle-1592",
+      "query": {
+        "source": "audit",
+        "failure_mode": "acs verdict json ship eligible false the authoritative acssuite ssot rejects",
+        "consequence": "gate-block",
+        "keywords": [
+          "egps",
+          "acs",
+          "verdict",
+          "ship",
+          "eligible",
+          "authoritative",
+          "acssuite",
+          "narrative"
+        ]
+      },
+      "relevant": [
+        "inst-L1592a",
+        "inst-L1517a"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1592 failed EGPS because acs-verdict.json had ship_eligible=false despite red_count==0 and narrative WARN; inst-L1592a and inst-L1517a both address acs-verdict.json ship_eligible and WARN/FAIL reconciliation."
+    },
+    {
+      "id": "q-31",
+      "plan": "cycle-1598",
+      "query": {
+        "source": "triage",
+        "failure_mode": "bridge launch exit 81 artifact timeout phase triage waited 300s liveness idle",
+        "consequence": "infra-error",
+        "keywords": [
+          "triage",
+          "bridge",
+          "launch",
+          "exit",
+          "artifact",
+          "timeout",
+          "liveness",
+          "idle"
+        ]
+      },
+      "relevant": [
+        "inst-L1598a",
+        "inst-L1657a",
+        "inst-L1734a"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1598 triage timed out at exit=81 idle at REPL; inst-L1598a diagnoses the workspace-trust interstitial blocking REPL readiness, while inst-L1657a and inst-L1734a cover sibling bridge launch idle/paste stalls."
+    },
+    {
+      "id": "q-32",
+      "plan": "cycle-1605",
+      "query": {
+        "source": "audit",
+        "failure_mode": "explanation documentation gate build explanation json diff sha256 does not match",
+        "consequence": "gate-block",
+        "keywords": [
+          "explanation",
+          "review",
+          "evidence",
+          "decisionsample",
+          "sampler",
+          "apicover",
+          "enforce",
+          "content"
+        ]
+      },
+      "relevant": [
+        "inst-L1605c",
+        "inst-L1763a"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1605 failed the explanation documentation gate on diff SHA256 mismatch and apicover; inst-L1605c diagnoses binding explanation claims and staging to one base-bound snapshot, and inst-L1763a covers explanation Changed Areas updates after corrections."
+    },
+    {
+      "id": "q-33",
+      "plan": "cycle-1652",
+      "query": {
+        "source": "audit",
+        "failure_mode": "bridge launch exit 81 artifact timeout cause review pause no output during",
+        "consequence": "infra-error",
+        "keywords": [
+          "audit",
+          "bridge",
+          "launch",
+          "exit",
+          "artifact",
+          "timeout",
+          "stalled",
+          "pause"
+        ]
+      },
+      "relevant": [
+        "inst-L1657a",
+        "inst-L1598a",
+        "cycle-603-audit-agent-stalled-without-running-phase-verify-completion"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1652 audit stalled with exit=81 artifact-timeout and no output; inst-L1657a diagnoses the claude-tmux terminal stall, inst-L1598a covers boot interstitial stalls, and cycle-603-audit-agent-stalled-without-running-phase-verify-completion covers stalled audit agents."
+    },
+    {
+      "id": "q-34",
+      "plan": "cycle-1763",
+      "query": {
+        "source": "build",
+        "failure_mode": "build handoff floor 1 deterministic check failure explanation documentation changed",
+        "consequence": "gate-block",
+        "keywords": [
+          "review",
+          "gate",
+          "build",
+          "deliverable",
+          "rejected",
+          "handoff",
+          "explanation",
+          "documentation"
+        ]
+      },
+      "relevant": [
+        "inst-L1763a",
+        "inst-L1605c"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 1763 build was rejected at the handoff floor on Explanation Documentation Changed Areas; inst-L1763a diagnoses the exact Changed Areas correction miss and inst-L1605c covers base-bound explanation generation."
+    },
+    {
+      "id": "q-35",
+      "plan": "cycle-2122",
+      "query": {
+        "source": "build",
+        "failure_mode": "build deliverable rejected after 1 correction build handoff floor tests changed packages",
+        "consequence": "gate-block",
+        "keywords": [
+          "review",
+          "gate",
+          "build",
+          "handoff",
+          "floor",
+          "deterministic",
+          "tests",
+          "changed"
+        ]
+      },
+      "relevant": [
+        "inst-L2122a",
+        "inst-L2097a",
+        "cycle-1483-builder-verified-the-acs-suite-not-the-package-it-edited"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 2122 failed the build handoff floor on changed-package tests after fleet divergence; inst-L2122a diagnoses stale-base failures after GIT_FLEET_REBASE_NEEDED, inst-L2097a covers fleet rebase recovery, and cycle-1483-builder-verified-the-acs-suite-not-the-package-it-edited covers changed-package verification."
+    },
+    {
+      "id": "q-36",
+      "plan": "cycle-2593",
+      "query": {
+        "source": "ship",
+        "failure_mode": "git fleet rebase needed transient fleet ff merge into main diverged",
+        "consequence": "unknown",
+        "keywords": [
+          "ship",
+          "native",
+          "fleet",
+          "rebase",
+          "merge",
+          "main",
+          "diverged",
+          "pipeline"
+        ]
+      },
+      "relevant": [
+        "inst-L2097a",
+        "inst-L2122a",
+        "cycle-1470-duplicate-goal-hash-lanes-collide-in-the-same-files"
+      ],
+      "labeller": "evolve-reviewer-c2632",
+      "rationale": "Cycle 2593 failed ship with GIT_FLEET_REBASE_NEEDED when fleet ff-merge into main diverged mid-pipeline; inst-L2097a and inst-L2122a govern fleet rebase recovery, and cycle-1470-duplicate-goal-hash-lanes-collide-in-the-same-files covers concurrent lane collisions."
+    }
+  ]
+}

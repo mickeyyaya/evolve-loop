@@ -1,0 +1,105 @@
+- id: cycle-1432-acs-predicates-use-tracked-coverage-profiles-as-scratch-so-a-failed-run-truncates-them-into-the-ship-diff
+  pattern: "acs-predicates-regenerate-tracked-repo-files-in-place-as-a-side-effect-of-running-so-any-cycle-that-merely-executes-the-regression-suite-rewrites-artifacts-it-never-touched-and-when-the-instrumented-run-produces-no-coverage-the-tracked-profile-is-truncated-to-its-header-and-staged-into-a-shipping-diff-that-declares-removals-none"
+  description: >-
+    Cycle 1432's shipping diff carries changes to three tracked files no phase
+    of the cycle intended to touch and no report mentions:
+
+        go/coverage.router480.txt          568 lines -> 1 line (`mode: set`)
+        go/coverage.fleetpolicy464.txt     -881/+352 churn
+        go/coverage.fleetpolicy464.func.txt   92 lines churned
+
+    `build-report.md`'s `## Changes` table lists eight paths, none of these, and
+    states "**Removals:** none" with `{"removedPaths": []}`. The staged diff
+    deletes 568 lines from a tracked file.
+
+    MECHANISM, NOT MYSTERY. The ACS predicates themselves write these paths as a
+    side effect of executing. `go/acs/cycle480/predicates_test.go:139-143` shells:
+
+        go test -coverprofile=coverage.router480.txt ./internal/router/ && \
+        go tool cover -func=coverage.router480.txt > coverage.router480.func.txt && \
+        bin/apicover -enforce -cover coverage.router480.func.txt ...
+
+    with the working directory set to the repo's `go/` root — so the profile is
+    not a temp file, it is a TRACKED repo artifact used as scratch space.
+    `go/acs/cycle464/predicates_test.go:136` does the same for the fleetpolicy
+    pair. Running the regression suite therefore mutates the tree, and every
+    cycle that runs `go test -tags acs ./acs/...` inherits the churn. The
+    router480 case is the damaging one: that run produced NO coverage rows, so
+    the profile was truncated to its `mode: set` header — the checked-in coverage
+    baseline for `internal/router` was destroyed and staged.
+
+    THE STAGING IS WHAT MAKES IT SHIP-RELEVANT. The builder attested to
+    git-tracking with explicit paths ("no `git add -A`") and that attestation is
+    honest — but these files were ALREADY tracked and already dirty, so they ride
+    the cycle diff regardless of how carefully the builder stages. Nothing in the
+    build's self-check compares the staged diff against the reported `## Changes`
+    table, so an unreported deletion of 568 tracked lines reached audit
+    undetected by the phase that produced it. The auditor caught it as MEDIUM M1
+    by diffing rather than by reading the report.
+
+    WHY THIS OUTRANKS ITS SEVERITY LABEL. It is a silent-corruption channel with
+    no adversary and no defect in the code under test: any cycle, on any lane,
+    that happens to execute these suites can quietly degrade a tracked coverage
+    baseline that later `apicover -enforce` runs read as ground truth. The
+    failure is invisible in every report and only visible in the diff.
+  confidence: 0.9
+  source: "cycle-1432/schema-aligned-salvage-layer — .evolve/runs/cycle-1432/audit-report.md M1; git diff --cached --stat on the lane worktree (coverage.router480.txt -568, coverage.fleetpolicy464.txt -881/+352, .func.txt 92 churned); go/coverage.router480.txt now contains only `mode: set`; go/acs/cycle480/predicates_test.go:139-143; go/acs/cycle464/predicates_test.go:136; build-report.md:31-48 (Changes table, 'Removals: none', removedPaths: [])"
+  type: "failure-lesson"
+  category: "tooling"
+  systemic: true
+  applies_to:
+    - "go/acs/"
+    - "go/acs/cycle464/predicates_test.go"
+    - "go/acs/cycle480/predicates_test.go"
+    - "go/coverage.*.txt"
+    - "agents/evolve-builder.md"
+    - "go/internal/phases/ship/"
+  failureContext:
+    cycle: 1432
+    task: "schema-aligned-salvage-layer"
+    errorCategory: "tool-use"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "MEDIUM M1: unrelated tracked artifacts clobbered inside the shipping diff — go/coverage.router480.txt reduced from 568 lines to the single line 'mode: set' and go/coverage.fleetpolicy464.{txt,func.txt} churned (-881/+352) as side-effect writes from go/acs/cycle464 and go/acs/cycle480 predicates, none listed in build-report.md's Changes table which asserts 'Removals: none'"
+    priorOccurrences: []
+    upstreamSignals:
+      - "the truncated profile contains ONLY `mode: set` — a zero-row coverage profile is self-evidently a failed instrumented run, and nothing inspects that"
+      - "the build's `## Changes` table and the actual staged diff are never mechanically compared; the discrepancy is only discoverable by an auditor who diffs"
+      - "the git-tracking attestation checks that delivered paths ARE tracked, which is orthogonal to whether UNDELIVERED tracked paths became dirty"
+  governingVariable: >-
+    Wrong assumption: "a test run does not change the repository, so the diff
+    contains what the builder wrote." True relationship: a predicate that shells
+    a build/coverage pipeline with the repo root as its working directory is a
+    WRITER, and when its output path is tracked, executing the regression suite
+    is a mutation of the shipping tree. Careful staging cannot exclude it —
+    already-tracked, already-dirty files ride the cycle diff. The invariant that
+    actually holds the line is: TEST ARTIFACTS MUST NOT BE TRACKED PATHS, and
+    the reported change set must be reconciled against the staged diff by a
+    machine rather than by narration.
+  preventiveAction: >-
+    (1) MOVE THE PROFILES OUT OF THE TRACKED TREE. `go/acs/cycle464` and
+    `go/acs/cycle480` must write coverage profiles to `t.TempDir()` (or
+    `$TMPDIR`) and pass that path to `go tool cover` / `apicover`. No predicate
+    may name a tracked path as an output. Then untrack `go/coverage.*.txt` /
+    `go/coverage.*.func.txt` via `git rm --cached` and gitignore them, unless a
+    baseline is genuinely needed — in which case it gets a distinct name that no
+    test writes.
+    (2) RECONCILE THE REPORTED CHANGE SET AGAINST THE STAGED DIFF MECHANICALLY.
+    A build-floor check should compare `git diff --cached --name-status` to the
+    build report's `## Changes` table + `removedPaths`, and fail the handoff on
+    any path present in the diff and absent from the report. "Removals: none"
+    beside a −568-line deletion is exactly the claim discrepancy this catches,
+    and it is a pure string comparison.
+    (3) RESTORE THE TRUNCATED BASELINE BEFORE THE NEXT SHIP.
+    `go/coverage.router480.txt` currently holds only `mode: set`; regenerate it
+    from a real `internal/router` coverage run (or restore from
+    `origin/main`) rather than shipping the truncation.
+    (4) A ZERO-ROW COVERAGE PROFILE IS AN ERROR, NOT A RESULT. Any predicate
+    that produces a profile whose body is empty must fail loudly at that point
+    instead of feeding it onward to `apicover -enforce`, where "no rows" reads
+    as "nothing to enforce".
+  relatedInstincts:
+    - "[[cycle-1432-documentation-edit-lands-after-the-test-sweep-and-reds-the-diffs-own-predicate]]"
+    - "[[cycle-1432-three-readings-over-one-recogniser-is-still-one-recogniser]]"
+  contradicts: []

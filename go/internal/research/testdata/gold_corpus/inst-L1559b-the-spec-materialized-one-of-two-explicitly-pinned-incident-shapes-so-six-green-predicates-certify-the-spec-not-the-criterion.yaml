@@ -1,0 +1,95 @@
+- id: inst-L1559b
+  pattern: "an-acceptance-criterion-quantified-over-named-occurrences-is-materialized-as-one-predicate-so-a-fully-green-suite-proves-only-that-the-spec-was-satisfied-not-that-the-incident-class-is-closed"
+  description: >-
+    Cycle 1559 finished with acs-verdict.json reporting 6 green predicates, 0
+    red, every one classified BEHAVIORAL with has_subprocess_invocation true and
+    zero grep-only — a textbook-clean predicate suite — and the cycle still
+    FAILed on three HIGH defects. The predicates are not the problem. The SPEC
+    they faithfully encode is.
+
+    THE CRITERION WAS QUANTIFIED; THE SPEC WAS NOT. Scout's AC1
+    (scout-report.md, task `ship-added-red-test-guard`) reads: "A newly added
+    failing test matching EACH pinned incident shape blocks the ship before
+    bind/push." The live inbox record names both shapes explicitly —
+    dcab9337 (cycle-1538, an UNTAGGED internal/core test) and 25040cea
+    (cycle-1547, a `//go:build integration` test in internal/phases/ship) — and
+    its acceptance line says "Pinned against BOTH real occurrences' shapes."
+
+    test-report.md's AC-Materialization table then maps AC1 to exactly ONE
+    predicate: TestRepoContractGate_AddedFailingTestBlocksShip, which builds
+    the untagged shape. The 1:1 enforcement checklist passed —
+    "[x] Every AC (4) has exactly one row above" — because the checklist counts
+    ACs, and AC1 is one AC. Nothing in the contract notices that the AC ranges
+    over a named set of size 2 and the spec covers 1 of them. Shape 2 could
+    therefore never fail any predicate, and did not: TestC1559_001 went green
+    against an implementation that returns nil for it.
+
+    THE TDD PHASE ALSO INHERITED, WHICH HID THE GAP FURTHER. Five of the six
+    predicates wrap tests authored by ancestor cycle-1555 and re-verified
+    "intact and unmodified"; only AC3's was new this cycle. Inheriting a
+    prior cycle's RED corpus is right, but it converts "is this AC fully
+    materialized?" into "did the ancestor's tests still exist?" — a question
+    with a reassuring answer that is not the same question.
+
+    WHY THE OTHER CHANNELS COULD NOT CATCH IT. The ship package suite is `ok`;
+    gofmt and vet are clean; the ACS suite is `ok` under `-tags acs`. Every
+    green in this cycle is a green over the same under-materialized spec. The
+    defect only became visible when the AUDIT ran the production gate's own
+    command against the incident-2 shape and got `gate err = <nil>`. Green
+    predicates over an incomplete spec is the checks-at-the-wrong-abstraction-
+    level class: the suite grades fidelity-to-spec, and nothing grades
+    fidelity-of-spec-to-criterion.
+  confidence: 0.85
+  source: "cycle-1559/red-first-deliverable-reds-main"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1559
+    task: "red-first-deliverable-reds-main"
+    errorCategory: "planning"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "H1 HIGH: incident shape 2 (//go:build integration, 25040cea) is not covered by any predicate; the audit's overlay probe returns gate err = <nil> while TestC1559_001 is green"
+      - "audit-chain: specification-fidelity | incoherent | covering-tests.md:6 — AC1 requires BOTH pinned shapes; the spec materializes only the untagged one"
+      - "M3 MEDIUM: neither scout-selected slug has an eval file under its own name in .evolve/evals/"
+  preventiveAction: >-
+    MAKE THE QUANTIFIER LOAD-BEARING IN THE SPEC.
+
+    (1) ONE PREDICATE PER NAMED OCCURRENCE. When an acceptance criterion
+    quantifies over a named set ("each pinned incident shape", "both
+    occurrences", "every listed CLI"), the TDD phase MUST emit one predicate
+    per element, keyed to the element's own identifier — here
+    TestC1559_001a_Shape_dcab9337 and TestC1559_001b_Shape_25040cea, each
+    naming the incident SHA. An unmaterialized element then fails the SPEC
+    rather than passing silently.
+
+    (2) UPGRADE THE 1:1 CHECKLIST TO N:1. The AC-Materialization table's
+    enforcement line currently asserts "every AC has exactly one row". Change
+    it to: every AC has at least one row, AND an AC whose text contains a
+    quantifier over named elements has one row per element, with the element's
+    identifier quoted in the row. Red-first: a spec fixture whose AC says
+    "each of A, B" with one predicate must be REJECTED by the TDD handoff
+    check; today it passes.
+
+    (3) NEVER LET INHERITED COVERAGE ANSWER A COVERAGE QUESTION. When a cycle
+    re-uses an ancestor's predicates, re-derive materialization from the CURRENT
+    AC text, not from the ancestor's table. Record for each inherited predicate
+    which element of the current AC it covers; an element with no owner is a
+    gap even when every inherited test is intact.
+
+    (4) KEEP EVAL FILENAMES EQUAL TO THE SCOUT SLUG (M3, cycle-916 class
+    recurring). Scout declared `ship-added-red-test-guard` and
+    `bug-reproduction-skip-until-green-contract`; the delivered evals are
+    `ship-added-test-{red-gate,production-proof,env-exclusive-backstop}.md`.
+    The evals are real and their ACs are materialized, so this is traceability
+    debt, not fabrication — but the slug is the join key between scout, evals
+    and triage, so an eval MUST be named for the task slug it grades, with
+    per-criterion files as suffixes of that slug.
+  relatedInstincts:
+    - "[[inst-L1559a]]"
+    - "[[inst-L1546b-inherited-acceptance-binds-by-exact-test-name-and-no-lane-ever-runs-it-again]]"
+    - "[[inst-L1557c-the-regression-slice-cites-a-suite-run-whose-scope-structurally-excludes-the-cycles-own-changes]]"
+    - "[[cycle-1388-fixture-omits-the-property-that-decides-the-outcome]]"
+    - "[[cycle-1363-registered-suite-asserts-on-fixtures-not-the-repo]]"
+  contradicts: []

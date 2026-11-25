@@ -1,0 +1,51 @@
+- id: inst-L1598a
+  pattern: "trust-dialog-layout-must-precede-repl-readiness"
+  description: >-
+    Treat a single-character REPL prompt marker as ambiguous until every visible
+    boot interstitial has been classified and cleared. Cycle 1598's Claude
+    workspace-trust chooser rendered the same `❯` glyph as the real input line,
+    but used an unnumbered layout with `No, exit` selected. The manifest matched
+    only the older numbered, default-Yes layout, so the bridge declared readiness,
+    pressed Enter into the chooser, exited Claude, and later delivered its nudge
+    to zsh. Future bridge changes must bind readiness to CLI state, not to a glyph
+    whose surrounding menu layout can drift.
+  confidence: 0.9
+  source: "cycle-1598/tokenopt-handoff-digests"
+  type: "failure-lesson"
+  category: "episodic"
+  systemic: true
+  applies_to:
+    - "go/internal/bridge/manifests/claude-tmux.json"
+    - "go/internal/bridge/driver_tmux_repl.go"
+    - "go/internal/bridge/driver_claudetmux_test.go"
+  failureContext:
+    cycle: 1598
+    task: "tokenopt-handoff-digests"
+    errorCategory: "integration"
+    failedStep: "scout"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "D1: Claude trust-dialog layout drift was misclassified as REPL readiness, causing two triage transport timeouts before Build"
+    priorOccurrences:
+      - "cycle-121: Codex trust-modal selection glyph collided with its REPL marker"
+      - "commit 724026bb: Claude v2.1.193 numbered trust dialog caused rc=81 until boot-time autoresponse was added"
+    upstreamSignals:
+      - "triage-escalation-report.json:10 shows the unnumbered chooser with `No, exit` selected"
+      - "tmux-final-scrollback.txt:21-22 shows the deliverable nudge executing in zsh after Claude exited"
+      - "llm-calls.ndjson:4-5 records two zero-token claude-tmux attempts ending at exit 81"
+  governingVariable: >-
+    Wrong assumption: the trust dialog's text, numbering, and default selection
+    remain stable enough for one regex plus Enter to distinguish it from a real
+    REPL. True relationship: the prompt-marker glyph is shared UI chrome, while
+    the surrounding modal state is versioned external input and must be handled
+    before readiness is accepted.
+  preventiveAction: >-
+    Add the exact cycle-1598 unnumbered/default-No pane as a regression fixture;
+    select `Yes, I trust this folder` deterministically for each supported layout;
+    re-poll until a clean Claude input line appears; and assert that neither the
+    phase prompt nor a completion nudge can be pasted while trust chrome or a
+    foreground shell is visible. Run the resulting boot smoke against a fresh,
+    untrusted worktree before accepting a Claude CLI layout update.
+  relatedInstincts:
+    - "cycle-1203-repl-newline-submit-runs-a-phase-agent-on-its-prompt-preamble"
+  contradicts: []

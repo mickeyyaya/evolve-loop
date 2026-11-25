@@ -1,0 +1,72 @@
+- id: cycle-1483-builder-verified-the-acs-suite-not-the-package-it-edited
+  pattern: "builder-self-verification-scoped-to-the-cycle-predicates-by--run-filter-so-the-tracked-tests-of-the-edited-package-are-never-executed-until-the-handoff-floor-runs-them"
+  description: >-
+    The cycle-1483 Builder modified two production files —
+    `go/internal/phasecontract/render.go` (both `RenderContractBlockStage` and `RenderContractTail`)
+    and `go/internal/deliverable/deliverable.go` (`verifyJSON`). Its Self-Verification block
+    (`build-report.md:38-42`) lists exactly two commands:
+
+        go test -tags acs -count=1 -run 'TestC1483_001|TestC1483_002' ./acs/cycle1483
+        evolve phase verify build --workspace .evolve/runs/cycle-1483
+
+    Neither executes `./internal/phasecontract` or `./internal/deliverable`. The `-run` filter is
+    the mechanism: it is applied to make the cycle predicates fast to iterate on, and its side
+    effect is that the tracked tests of the packages being edited are excluded from every command
+    the Builder runs. `render_test.go:108` `TestRenderContractTail_JSON_IncludesVerdictSentinel`
+    was green before the edit (proven by `TestC1483_003`'s package sweep passing in the tdd RED
+    run, test-report.md:125-127) and red after it, and the Builder never saw it — the build handoff
+    floor did, and blocked the deliverable after 2 corrections
+    (`audit-fail-reason.json`).
+
+    The floor worked exactly as designed; the cost is that the signal arrived after the coding
+    round instead of during it, so the Builder spent its attempts defending an approach an
+    already-red test had refuted. Compounding it: the same information was available inside the
+    frozen suite the Builder was working against — `TestC1483_003` shells out to
+    `go test -race ./internal/phasecontract`, so running the acs suite WITHOUT a `-run` filter
+    would have surfaced the regression on the first try.
+  confidence: 0.85
+  source: "cycle-1483 — build-report.md:38-42 (two-command self-verification, -run filtered), audit-fail-reason.json (handoff floor names render_test.go:112), test-report.md:125-127 (TestC1483_003 green pre-change, covering ./internal/phasecontract)"
+  type: "failure-lesson"
+  category: "structural"
+  applies_to:
+    - "agents/evolve-builder.md"
+    - "go/internal/phases/build/"
+  failureContext:
+    cycle: 1483
+    task: "minted-verdict-contract-salvage"
+    errorCategory: "tool-use"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "build handoff floor: enforced package tests FAIL — TestRenderContractTail_JSON_IncludesVerdictSentinel (render_test.go:112), a test in a package the Builder edited and never ran"
+      - "Self-Verification (build-report.md:38-42) contains no command covering ./internal/phasecontract or ./internal/deliverable despite both being modified"
+      - "build-report.md:19-20 left POSTHOC commit sha and files-changed as the literal string `pending`"
+    upstreamSignals:
+      - "the -run filter that scopes to cycle predicates also excludes every tracked test of the edited package"
+      - "TestC1483_003 inside the frozen suite already runs the affected package; an unfiltered acs run would have caught it"
+    preventiveActionOwner: "builder"
+  governingVariable: >-
+    Wrong assumption: "the cycle's predicates are the tests that grade this change." True
+    relationship: the change is graded by every tracked test that imports the edited symbols, and
+    the cycle predicates are a strict subset of that set — usually a disjoint one, since predicates
+    live in `go/acs/` and the regressions live in the package's own `_test.go`. A `-run` filter is
+    an iteration convenience that silently converts the self-verification section from "what proves
+    this change is safe" into "what proves this change addresses the ticket".
+  preventiveAction: >-
+    (1) BUILDER — EVERY PACKAGE WITH A DIFF HUNK GETS AN UNFILTERED RUN IN SELF-VERIFICATION.
+    Derive the list mechanically: `git diff --name-only | xargs -n1 dirname | sort -u`, then one
+    `go test -count=1 ./<pkg>` row per entry, no `-run`. The cycle predicates are an ADDITIONAL
+    row, never a substitute. A Self-Verification table whose package set is not a superset of the
+    diff's package set is incomplete by construction.
+    (2) BUILDER — RUN THE FROZEN SUITE UNFILTERED AT LEAST ONCE BEFORE HANDOFF. Filters are for
+    the inner loop; the final pre-handoff run must be `go test -tags acs -count=1 ./acs/cycleN`
+    with no `-run`, because predicates that shell out to package sweeps (a common regression-guard
+    shape) are invisible under a filter.
+    (3) BUILDER — SUBSTITUTE THE POSTHOC PLACEHOLDERS. `pending` in the Commit and Files-changed
+    rows is not a valid handoff value even on a FAIL report; emit `git rev-parse HEAD` and
+    `git diff --name-only` output so the retro and salvage paths have a real pointer.
+  relatedInstincts:
+    - "[[cycle-1483-round-trip-predicate-hardcodes-the-artifact-it-claims-to-derive]]"
+    - "[[cycle-1363-tdd-named-the-missing-test-and-no-grader-covered-it]]"
+    - "[[cycle-93-build-report-commit-sha-fabrication]]"
+  contradicts: []

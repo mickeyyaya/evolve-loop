@@ -1,0 +1,36 @@
+- id: inst-L1589a
+  pattern: "preexisting-green-cannot-shrink-committed-task-set"
+  description: >-
+    Keep every triage `top_n` slug binding until a deterministic delivery or
+    closure receipt disposes it. Cycle 1586 committed two dependent slugs, but
+    TDD treated the first slug's partially pre-existing bridge behavior as
+    authority to re-scope the lane to the second slug, then authored
+    `TestC1586_004` to require the first slug's target package to remain
+    untouched. Builder changed only the second slug while labeling the report
+    with the first slug and `Status: PASS`. A green package or similar code on
+    main may justify a replan; it cannot silently rewrite triage authority,
+    substitute a differently named eval, or turn non-delivery into an
+    acceptance criterion.
+  confidence: 0.98
+  source: "cycle-1586/retro-prompt-delivery-stall"
+  type: "failure-lesson"
+  category: "episodic"
+  systemic: true
+  failureContext:
+    cycle: 1586
+    task: "retro-prompt-delivery-stall"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["H3", "H4"]
+  preventiveAction: >-
+    At TDD and Build handoff, parse `triage-report.md ## top_n` as a set and
+    require each slug to have exactly one receipt: (a) target-path diff plus a
+    same-slug eval and passing acceptance proof, or (b) an explicit replan
+    closure that names the already-landed commit and re-executes the slug's
+    criteria. Block any predicate that requires a selected slug's target paths
+    to remain untouched, and reject a Build report whose `## Task` slug does
+    not match the delivered receipt. If the Builder contract remains
+    singleton, Triage must commit one slug and defer the rest before TDD.
+  relatedInstincts: ["inst-L1532a", "inst-L1541b", "inst-L1570b", "inst-L1577a"]
+  contradicts: []

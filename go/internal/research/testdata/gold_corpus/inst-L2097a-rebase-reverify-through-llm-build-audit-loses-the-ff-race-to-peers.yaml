@@ -1,0 +1,17 @@
+- id: inst-L2097a
+  pattern: "rebase-reverify-through-llm-build-audit-loses-the-ff-race-to-peers"
+  description: "A PASS cycle whose ship gets GIT_FLEET_REBASE_NEEDED is sent back through a full LLM Build plus Audit round (about 35-45 min). Peers ship more often than that, so each re-ship finds main moved again. Cycle 2097 passed audit 6 times and ship diverged 6 times. When ship reports GIT_FLEET_REBASE_NEEDED, first compare the peer delta with the cycle diff. If they share no path, re-verify deterministically inside the ship step and retry the ff-merge. Do not start another LLM round."
+  confidence: 0.6
+  source: "cycle-2097/cli-loop-dry-run-wave-plan-console"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 2097
+    task: "cli-loop-dry-run-wave-plan-console"
+    errorCategory: "integration"
+    failedStep: "audit"
+    auditVerdict: "SHIP_GATE_DENIED"
+    auditDefects: ["GIT_FLEET_REBASE_NEEDED x6"]
+  preventiveAction: "Ship recovery for GIT_FLEET_REBASE_NEEDED must (1) compute git diff --name-only old_base..new_main against the cycle diff, (2) on an empty intersection, rebase, run the deterministic gates (build, ACS suite, repo-contract) and retry the ff-merge in the same critical section, (3) after 2 divergences, queue the commit for serialized merge or route it to the console. A test must simulate a peer move during re-verify and assert that the cycle lands without a new Build dispatch."
+  relatedInstincts: ["inst-L1584a", "inst-L1707b", "inst-L1825a", "inst-L1830a"]
+  contradicts: []

@@ -1,0 +1,17 @@
+- id: inst-L1592a
+  pattern: "posthoc-resolution-must-be-machine-bound"
+  description: "Treat POSTHOC placeholders as an unfinished two-phase protocol: after runner-owned metrics exist, deterministically execute and record every sentinel before audit closure, and reject any disposition that claims verification without matching artifact evidence."
+  confidence: 0.95
+  source: "cycle-1592/remediation-correction-identity-binding"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1592
+    task: "remediation-correction-identity-binding"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["M1", "L1"]
+  preventiveAction: "Future cycles MUST run a deterministic build-closeout step after usage and Git metrics exist that resolves every POSTHOC sentinel, reconciles the Changes list with the final diff, and refuses FIXED or DEFERRED claims whose cited evidence does not contain the asserted measurements."
+  relatedInstincts: ["inst-L1589e"]
+  contradicts: []

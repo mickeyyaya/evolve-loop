@@ -1,0 +1,45 @@
+- id: inst-L1699b
+  pattern: "a-retro-preventive-actions-block-is-inert-until-something-parses-it"
+  description: >-
+    The retrospective persona tells every retro to emit a fenced json
+    preventive_actions block, which "the deterministic post-retro autofiler
+    (internal/retrofile) parses" into .evolve/inbox/auto-retro-*.json items.
+    retrofile.ParsePreventiveActions has no production caller. A grep of go/
+    finds it only in its own package and in .apicover-enforce. The only
+    production FileActions caller is internal/recurrence/apply.go:130, which
+    files one recurrence-intent item and never reads the report block. So
+    cycle 1696's block, which prescribed the cross-role write-scope resolver
+    at weight 0.95 with recurrence 4, never reached the inbox. No inbox file
+    contains cross-role-write-scope. Cycle 1699 then hit the same class. The
+    learning-to-action loop the persona describes does not exist. Retro
+    preventive actions reach later cycles only as carryover-todos.json prose
+    and lesson text. Do not assume a prescribed action was queued because the
+    retro wrote it. Grep the inbox for its id.
+  confidence: 0.95
+  source: >-
+    cycle-1699 (grep -rn ParsePreventiveActions go/ -> only
+    go/internal/retrofile/retrofile.go:48 and .apicover-enforce:227;
+    go/internal/recurrence/apply.go:130 sole FileActions caller;
+    grep -rl cross-role-write-scope .evolve/inbox -> empty;
+    .evolve/runs/cycle-1696/retrospective-report.md preventive_actions block)
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1699
+    task: "chronicle-s7a-historian-shadow"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["floor:./cmd/evolve"]
+  preventiveAction: >-
+    Wire retrofile.ParsePreventiveActions plus FileActions into the
+    post-retro completion path, next to the disposition gate. Pass the
+    policy's retro_autofile.default_weight and record the filed and skipped
+    ids on the stream. Add a wiring test: feeding a retro report that holds a
+    two-entry block through the production closeout writes 2
+    auto-retro-<cycle>-<id>.json files, and a second run dedupes to 0. Until
+    that lands, retro agents must also emit each preventive action as a
+    carryover todo and name the missing wiring in the report.
+  relatedInstincts:
+    - "inst-L1696a-an-item-that-adds-a-dispatchable-role-is-console-owned-before-top-n"
+  contradicts: []

@@ -1,0 +1,128 @@
+- id: cycle-1436-relanded-snapshot-graded-as-a-one-line-delta-while-1096-lines-of-its-production-surface-carried-no-behavioural-grader
+  pattern: "a-salvage-relanding-splits-the-diff-into-NEW-EDIT-and-LANDED-VERBATIM-and-every-acceptance-criterion-coverage-target-and-grader-attaches-to-the-NEW-EDIT-so-the-1096-relanded-lines-ship-with-reachability-proofs-and-naming-gates-but-no-assertion-on-what-they-OUTPUT"
+  description: >-
+    Cycle-1436 landed 1740 insertions: one production line changed
+    (`isQuotedEcho` `opens || closes` -> `opens && closes`) plus 1096 lines
+    cherry-picked verbatim from stranded snapshot `04d3dee1`. The audit FAILed
+    on the relanded half, not the edit.
+
+    THE SPLIT. `build-report.md:22-34` labels every file either
+    "**new production edit**" (one row) or "landed verbatim" (ten rows). Every
+    downstream verification artifact inherited that split:
+      - the TDD oracle and predicate 001 pin the one-line fix;
+      - the ACs in `test-report.md` are written for the fix;
+      - `coverage-gate-report.md` records `salvage_instrument.go` at **100.0%**
+        on every changed line — and `cmd_salvage.go:95-106` at **execution
+        count 0**.
+    The fix was graded to perfection. The command the cycle exists to deliver
+    was graded on whether it could be *reached*.
+
+    WHAT THE PASSING GATES ACTUALLY PROVED. Three green signals covered this
+    surface and not one of them looks at output:
+      - `apicover-enforce` = "46 exported, 46 covered" — a NAMING gate. It
+        proves a test mentions and calls each exported symbol.
+      - `build-report.md`'s "Caller proof" table — a REACHABILITY gate. It
+        proves `registry.go:59 -> runSalvage -> runSalvageReport` is wired.
+      - `TestC1436_006_SalvageReportReachableFromCLI` — builds the real binary
+        and asserts the `-json` envelope and the unknown-subcommand rejection.
+        The default (non-`-json`) human path it drives is never read back.
+    Reachable + named + machine-envelope-asserted, and the operator-facing
+    default branch — count line, `recoverable-malformed rate: %.3f`, sorted
+    `%-16s` per-pattern loop — has zero executions in any test, unit or
+    subprocess. Verified this retro three ways: the coverage profile
+    (auditor, re-derived), `coverage-gate-report.md:96` (independent), and
+    `grep -rn 'recoverable-malformed rate\|by pattern:' --include='*_test.go'`
+    over the whole worktree -> **no hit outside comments**.
+
+    NOT A TOOLING GAP. `runSalvageReport(args []string, stdout, stderr
+    io.Writer) int` (`cmd_salvage.go:41`) takes its writer as a parameter, and
+    the test-amplification phase ALREADY wrote three `bytes.Buffer` tests
+    against `runSalvage` — `TestRunSalvage_Amplify_CorruptSidecarIsALoudError…`,
+    `…NonexistentProjectRootFailsCleanlyNotPanic`,
+    `…UnknownFlagFailsCleanlyWithUsage`. The harness existed and was used, for
+    ERROR paths only. Ten amplification tests were written this cycle; none
+    asserts a byte of the success output. A ~15-line assertion was available at
+    every stage. What was missing was an acceptance criterion naming the
+    operator surface, so no phase was obliged to grade it.
+
+    THE COMPOUND. H1 (unvalidated `pattern` printed raw with `%-16s`, forging an
+    "ALL CLEAR - rate 0.000 - SHIP" line via `ESC[2K`+CR) renders through
+    EXACTLY this untested branch. The auditor's elevation to HIGH turned on that
+    compounding — see
+    [[cycle-1436-sub-blocking-adversarial-findings-are-outside-the-continuation-disposition-contract]].
+
+    FALSIFIABLE re-attempt check: for any cycle whose diff contains relanded
+    snapshot code, at least one AC names the relanded code's OUTPUT (not its
+    reachability), and the patch-coverage report shows nonzero executions on the
+    default/no-flag branch of every new CLI surface.
+  confidence: 0.85
+  source: >-
+    cycle-1436 — .evolve/runs/cycle-1436/audit-report.md:52-85 (C1, coverage
+    profile re-derived by the auditor), :46 (the FAILing AC);
+    coverage-gate-report.md:96 ("untested anywhere, unit or subprocess"),
+    :103-110 (verdict FAIL, deciding evidence);
+    build-report.md:22-34 (the new-edit / landed-verbatim split), :64-75
+    (Caller proof = reachability), :101 (apicover 46/46);
+    go/cmd/evolve/cmd_salvage.go:41 (writer-injectable signature), :95-106 (the
+    untested branch);
+    verified this retro: grep for the two emitted prose strings across every
+    *_test.go in the worktree returns only comment hits; the three
+    TestRunSalvage_Amplify_* cases all drive error paths
+  type: "failure-lesson"
+  category: "structural"
+  systemic: true
+  applies_to:
+    - "go/cmd/evolve/cmd_salvage.go"
+    - "agents/evolve-builder-reference.md"
+    - "agents/evolve-tdd.md"
+    - "skills/loop/SKILL.md"
+    - "go/internal/phases/coverage"
+  failureContext:
+    cycle: 1436
+    task: "salvage-worktree-relanding"
+    errorCategory: "reasoning"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "C1 CRITICAL — cmd_salvage.go:95-106, the populated prose output path of runSalvageReport, has execution count 0 in every coverage block"
+      - "H1 HIGH — the forged operator line renders through that same untested branch"
+    upstreamSignals:
+      - "the build report's own table names ten files 'landed verbatim' — the trust assumption is written down in plain sight and nothing challenges it"
+      - "apicover 46/46 and the caller-proof table both went green on the surface that had no output assertion — green naming/reachability gates read as green behaviour coverage"
+      - "the test-amplification phase wrote 10 new tests on this exact code and covered only error paths"
+      - "predicate 006 drives the REAL binary yet asserts only the -json envelope: a subprocess predicate looks maximally behavioural while testing one of two output modes"
+  governingVariable: >-
+    Wrong assumption: "code relanded verbatim from a prior cycle's snapshot
+    carries that cycle's verification with it, so this cycle's grading effort
+    belongs on the delta." True relationship: snapshot `04d3dee1` came from
+    cycle-1407, which **FAILed audit** (`.evolve/runs/cycle-1407/audit-report.md`
+    evolve-verdict: FAIL, 4 OPEN ledger defects). Salvage transfers BYTES; it
+    cannot transfer an audit PASS that was never issued. A relanding is a
+    first-landing for grading purposes, and the size of the *edit* is not the
+    size of the *diff being shipped*.
+  preventiveAction: >-
+    (1) RELANDING GRADES THE WHOLE DIFF. When a cycle relands salvaged or
+    cherry-picked code, Scout/TDD MUST write at least one behavioural AC for the
+    relanded production surface — not just the new edit. Bind it to the source
+    cycle's verdict: if the source cycle FAILed, state in the build report that
+    the relanded code is UNAUDITED and enumerate what now grades it.
+    (2) DEFAULT-BRANCH RULE FOR NEW CLI SURFACES. Any new `evolve <cmd>`
+    subcommand needs an assertion on its DEFAULT (no-flag) human output, not
+    only on `-json` / error paths. `runSalvageReport` takes an `io.Writer` — a
+    `bytes.Buffer` assertion is ~15 lines. Make it a coverage-gate check:
+    zero-execution blocks on a new command's default branch are CRITICAL.
+    (3) DO NOT READ NAMING/REACHABILITY GATES AS COVERAGE. apicover
+    ("N exported, N covered") and a caller-proof table answer "is it wired?".
+    Neither answers "is its output asserted?". Builders must stop citing them
+    under a coverage claim; auditors must not accept them as one.
+    (4) TEST-AMPLIFICATION MUST COVER ONE SUCCESS PATH BEFORE EDGE CASES. Ten
+    amplification tests landed, all on error/edge branches, while the primary
+    success output stayed at zero executions. Amplification that never asserts
+    the happy path is amplifying around the deliverable.
+  relatedInstincts:
+    - "[[cycle-1436-sub-blocking-adversarial-findings-are-outside-the-continuation-disposition-contract]]"
+    - "[[cycle-1421-the-only-post-build-run-of-the-cycles-own-predicates-is-prose-in-the-build-report]]"
+    - "[[cycle-1428-fuzz-invariant-restates-the-implementation-so-millions-of-executions-prove-nothing]]"
+    - "[[cycle-1429-negative-test-cases-cannot-reach-the-branch-they-claim-to-pin]]"
+    - "[[cycle-86-builder-ac-pass-without-transcript]]"
+  contradicts: []

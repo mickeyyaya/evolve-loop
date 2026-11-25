@@ -1,0 +1,42 @@
+- id: inst-L2004a
+  pattern: "a-continuation-reads-only-the-last-floor-rejection-and-resumes-a-lane-whose-real-blocker-is-a-protected-path"
+  description: >-
+    SYSTEMIC (the third run of retro-minting-files-through-inbox-add-lane:
+    cycles 1983, 2001 and 2004 all failed because the floor-minted remediation item
+    is built in protected go/internal/core/failurelearning/remediation.go). Cycle 2004
+    was a continuation of cycle 2001. Its continuation-manifest.json pointed at
+    cycle-2001/audit-fail-reason.json, and that file records only the LAST floor
+    rejection (the Changed Areas line about remediation.go). The protected-path
+    refusals of the earlier correction rounds are in signals.ndjson only. The scout
+    then wrote "its build failed only the explanation-documentation floor", and the
+    plan was "restore the snapshot and fix Changed Areas". The inbox item was still
+    route=lane, deps=null, so the cycle-2001 remedy (deps on the console sibling)
+    never took effect. The build restored the four protected paths (ADR-0064). The
+    new writer refuses items without summary/fix, so the floor files nothing, and the
+    lane's own ACS predicates TestC2004_007 and TestC2004_009 went red. The
+    rejection is legit. The explanation document also claimed "ACS green, 001 to 015
+    green" while 007/009 were red.
+  confidence: 0.9
+  source: "cycle-2004/retro-minting-files-through-inbox-add-lane"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 2004
+    task: "retro-minting-files-through-inbox-add-lane"
+    errorCategory: "planning"
+    failedStep: "scout"
+    auditVerdict: "FAIL"
+    auditDefects: ["build handoff floor: ./acs/cycle2004 TestC2004_007 (0 inbox files after 8 concurrent mints, want 2) and TestC2004_009 (floor filed 0 items, want 2) FAIL", "protected control-plane paths failurelearning/floor_test.go, remediation.go and testdata/inbox-*.golden.json refused in correction 1", "explanation ## Verification claimed ACS green and TestC2004_001-015 green while 007/009 are red"]
+  preventiveAction: >-
+    A continuation must read every refusal of the prior cycle, not only
+    audit-fail-reason.json: before planning, Scout greps the prior cycle's
+    signals.ndjson for ORCHESTRATOR_GATE_CORRECTION and "protected control-plane
+    path". If any acceptance predicate needs a protected path, the item is
+    console-owned: defer it with "waits for <console sibling id>". Do not resume the
+    snapshot. The runtime should add every correction-round reason to
+    audit-fail-reason.json (or to the continuation manifest). An item that failed
+    twice on the same protected wall must be routed to console by the inbox edit
+    verb, not by a carryover todo. Builder: the explanation's Verification section
+    states the final ACS result, never the result of an earlier round.
+  relatedInstincts: ["inst-L2001a", "inst-L1983a", "inst-L1946a", "inst-L1966a", "inst-L1814b", "inst-L1972a"]
+  contradicts: []

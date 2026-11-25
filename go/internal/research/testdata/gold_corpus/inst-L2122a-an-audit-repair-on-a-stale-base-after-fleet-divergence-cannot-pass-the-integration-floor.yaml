@@ -1,0 +1,17 @@
+- id: inst-L2122a
+  pattern: "an-audit-repair-on-a-stale-base-after-fleet-divergence-cannot-pass-the-integration-floor"
+  description: "Cycle 2122 (cli-cycle-models-console) passed the feature with ACS 5/5. Ship returned GIT_FLEET_REBASE_NEEDED, and the integration tier failed TestPRRefresh_TheRealGeneratorsOfACloneCommitOnlyTheStaleIndex on base 3491a4878. The repair round did not rebase. Round 3 relaxed that test and deleted a valid research-index row (audit H1, H2). Round 4 reverted both edits correctly, but the build handoff floor ran all of go/cmd/evolve under -tags integration inside the phase cell. TestPRRefresh is red on the stale base, and the Inbox*, ApplySandboxOff and ProcessStartTime tests fail with 'refused inside a phase'. No failing test touched the diff, so no lane edit could pass. This is the fourth cycle with this base-red offender (2111, 2113, 2121, 2122)."
+  confidence: 0.85
+  source: "cycle-2122 (ship-error.json; audit-report.md#Issues; audit-fail-reason.json; build-report.md#Handoff Floor Finding)"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 2122
+    task: "cli-cycle-models-console"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["H1 relaxed out-of-scope TestPRRefresh precondition", "H2 deleted a valid research-index row", "repair build rejected by the integration handoff floor on base-red and phase-refused tests"]
+  preventiveAction: "Rebase the lane onto main before a repair round after GIT_FLEET_REBASE_NEEDED. Make the cover-changed integration floor subtract the tests that are red on base and the tests that fail with 'refused inside a phase'. When the only red is a base-red offender, salvage the worktree to the console. Do not dispatch another Build."
+  relatedInstincts: ["inst-L2121a", "inst-L2070a", "inst-L2097a", "inst-L2111a", "inst-L2113a"]
+  contradicts: []

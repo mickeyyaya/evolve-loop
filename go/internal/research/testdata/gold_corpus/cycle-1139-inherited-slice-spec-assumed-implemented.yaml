@@ -1,0 +1,154 @@
+- id: cycle-1139-inherited-slice-spec-assumed-implemented
+  pattern: "resumed-worktree-green-tests-read-as-spec-conformance-so-the-dependency-slice-gap-is-never-checked"
+  description: >
+    Cycle-1139 resumed a preserved worktree (ADR-0076 continuation) whose HEAD already
+    carried the S5 production wiring written by the killed cycle-1137/attempt-2 run. The
+    builder ran "verification-first triage", found the wiring live and the tests green,
+    and explicitly narrowed scope: "closed the three remaining gaps rather than rebuilding
+    what existed" (build-report.md:20-22). What it never did was diff the INHERITED code
+    against the plan the inherited code was supposed to implement.
+    The plan (docs/plans/workspace-hygiene-2026-07.md:40, S4 bullet) specifies
+    `WorktreesPolicy{KeepRecent(2), MinAgeMinutes(15 — wider than 10-min lease TTL,
+    covers create→lease window)}` embedded as `gc.Policy.Worktrees` "+ withDefaults()".
+    S4 landed the STRUCT but not the DEFAULTING: `gc.go:72-86` withDefaults() populates
+    Runs.KeepFull / SalvageTTLDays / LogsTTLDays / TrackerTTLDays and never touches
+    Worktrees. S5 then wired the engine assuming the grace existed, and passed the loaded
+    policy RAW at both new call sites (`cmd_loop_outcome.go:129`, `cmd_gc.go:129` —
+    `Policy: gcPol.Worktrees`), so even a fixed withDefaults() would not reach them.
+    Shipped values: KeepRecent=0, MinAgeMinutes=0 — both grace checks
+    (`worktrees.go:334`, `worktrees.go:342`) are dead code. bug-reproduction executed this
+    against the real binary (repro/repro_f1.sh): a worktree created THAT INSTANT was
+    WOULD-REMOVE'd and applied, branch deleted. Audit D1, CRITICAL.
+    The same substitution of design-intent for implementation-state ran through every
+    other layer of the diff:
+    - DOCS (D2, CRITICAL): runtime-reference.md, added by this diff, asserts live lanes are
+      protected by a "triple shield (lease-before-state ordering + MinAgeMinutes + a
+      per-item TOCTOU re-check)" so a mid-sweep lane is "never" collected. MinAgeMinutes is
+      0 in every shipped config; the diff's OWN source comment contradicts it
+      (`gc.go:54` — "Zero value = no KeepRecent/MinAge grace"). The doc was written from
+      the plan's safety model, not from the source. The drain runbook in the same diff tells
+      the operator to arm `enforce` on the strength of that sentence.
+    - TESTS (D3, HIGH): 6/6 ACS predicates + 8/8 hook tests green, and genuinely
+      non-degenerate (EffectiveMode tables, manifest atomicity, hook invocation,
+      finalize→hook ordering, dry-run zero-mutation; the enforce test's two arms kill both
+      no-op and delete-everything implementations). But the predicate set was authored from
+      the S5 spec's named tests, which are all about WIRING; not one pins a non-zero grace
+      VALUE. "20/20 PASS, no regression" is accurate and simultaneously uninformative about
+      the single property that matters for a default-on destructive sweep.
+    - PLAN STATUS (D6, MEDIUM): the same diff edits the plan to read "S5 … — LANDED
+      (cycle-1139)" in the past tense while the slice is uncommitted (ship correctly refused
+      with AUDIT_BINDING_HEAD_MOVED), unaudited, and now carrying a confirmed CRITICAL. The
+      plan doc is what the NEXT scout reads to decide the work is done — intent written as
+      fact, one step from a replicated false belief.
+    ROOT CAUSE: green tests on inherited code certify that the code does what ITS OWN TESTS
+    say. They say nothing about what the PLAN said the code must do. Treating a resumed
+    worktree's green suite as a conformance check silently converts every unimplemented
+    spec clause in the dependency slice into a shipped default — and because the builder
+    then writes the docs and the plan status from the same design document, the gap is
+    papered over in prose at exactly the moment it becomes reachable in production.
+  confidence: 0.88
+  source: >
+    .evolve/runs/cycle-1139/audit-report.md D1 (CRITICAL), D2 (CRITICAL), D3 (HIGH),
+      D6 (MEDIUM) — each re-derived from source by the auditor, not inherited
+    .evolve/runs/cycle-1139/bug-reproduction-report.md — repro/repro_f1.sh drives the real
+      binary; verbatim "BUG CONFIRMED … was REMOVED although it was created less than a
+      second ago" / "branch … was DELETED"; repro.failing=true
+    .evolve/runs/cycle-1139/adversarial-review-report.md F1 (HIGH), F6 (LOW)
+    .evolve/runs/cycle-1139/build-report.md:15-22 — the "resumed … closed the three
+      remaining gaps rather than rebuilding what existed" scoping decision
+    docs/plans/workspace-hygiene-2026-07.md:40 — the KeepRecent(2)/MinAgeMinutes(15)
+      "via withDefaults()" clause S4 never implemented
+    go/internal/gc/gc.go:54,72-86 · go/cmd/evolve/cmd_loop_outcome.go:129 ·
+      go/cmd/evolve/cmd_gc.go:129 · go/internal/gc/worktrees.go:334,342
+  type: "failure-lesson"
+  category: "structural"
+  applies_to:
+    - "agents/evolve-scout.md"
+    - "agents/evolve-builder.md"
+    - "agents/evolve-tdd-engineer.md"
+    - "agents/evolve-auditor.md"
+  failureContext:
+    cycle: 1139
+    task: "wire-planworktrees-into-rungchook-shadow-default"
+    errorCategory: "reasoning"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "D1 CRITICAL: gc.Policy.Worktrees grace never defaulted (withDefaults skips it; both new call sites pass gcPol.Worktrees raw) — KeepRecent=0/MinAgeMinutes=0 ship; a zero-age worktree+branch destroyed under gc.mode=enforce, reproduced end-to-end"
+      - "D2 CRITICAL: runtime-reference.md added by this diff claims a 'triple shield … + MinAgeMinutes' the binary does not implement, contradicted by the diff's own gc.go:54 comment; the drain runbook arms enforce on that sentence"
+      - "D3 HIGH: 6/6 ACS predicates and 8/8 hook tests are green AROUND the defect — no predicate pins a non-zero grace window"
+      - "D6 MEDIUM: plan doc edited to 'S5 … LANDED (cycle-1139)' while the slice is uncommitted, unaudited and CRITICAL-carrying"
+  observed:
+    - "Builder resumed a preserved worktree and scoped to 'remaining gaps', trusting inherited wiring because its tests were green"
+    - "The plan's S4 bullet named the grace values; S4 shipped the struct without the defaulting; nobody re-read the bullet against the shipped code"
+    - "Both new call sites bypass every defaulting layer, so fixing withDefaults() alone would still ship zero grace"
+    - "Docs and plan-status were authored from the design document rather than from the source, in the same diff"
+    - "The acceptance suite mirrored the spec's named WIRING tests and pinned no VALUE"
+  rule: >
+    When a slice consumes a dependency slice's types (inherited worktree, adjacent
+    already-landed slice, or resumed attempt), the plan clauses describing that
+    dependency's CONFIGURED VALUES are part of this slice's acceptance surface, not
+    background. Before claiming green:
+    (a) Re-read the dependency slice's plan bullet and grep the tree for each named
+        constant/default it promises. Zero production assignments for a named default
+        (`grep KeepRecent --include=*.go | grep -v _test.go` → nothing) is a RED finding,
+        not a housekeeping note.
+    (b) Pin the default at the CALL SITE, not in the defaulting function. A test that
+        asserts `withDefaults()` returns 15 proves nothing if the caller never calls it.
+    (c) Documentation added in the same diff must be written from the SOURCE. Every safety
+        noun in a new doc sentence ("MinAgeMinutes", "triple shield", "never") needs a
+        named test or a source line behind it, or the sentence does not ship.
+    (d) Never write a plan/status doc in the past tense ("LANDED") from inside the cycle
+        that is producing the work. LANDED is a post-ship, post-audit fact written by the
+        landing, not a builder's intent.
+  why: >
+    This slice flips a git-MUTATING sweep to default-on. Under the old `off` default every
+    zero-value field in WorktreesPolicy was inert and harmless; the wiring is exactly the
+    event that promotes them to shipped policy. The blast radius at the moment of the
+    verdict: the main repo carries 10 worktrees and 12 cycle-* branches, 8 merged, and
+    KeepRecent=0 makes a single enforce run act on the whole eligible set. This is the
+    preserveWorktree loss class the codebase has already paid for once
+    (cyclerun.go:442-447 — "Cycle 7 lost its entire PASS work to this prune"). The false
+    safety sentence is independently a blocker: it is the artifact on which an operator
+    decides to arm the destructive mode.
+  preventiveAction: >
+    Any slice that consumes a dependency slice's types (resumed worktree, inherited HEAD,
+    adjacent already-landed slice) MUST, before claiming green: (1) grep the tree for every
+    default VALUE the dependency's plan bullet names, excluding _test.go — zero production
+    assignments for a plan-named default is a RED finding
+    (`grep -rn 'KeepRecent\|MinAgeMinutes' go/ | grep -v _test.go` → empty was the tell
+    here); (2) assert the effective default AT THE CALL SITE, not in the defaulting
+    function — `gcWorktreeOptions(cfg, gc.Policy{}).Policy.MinAgeMinutes != 0` and the same
+    for `gcWorkspaceSweep`, because a call site that passes `gcPol.Worktrees` raw is immune
+    to any fix inside `withDefaults()`; (3) write every safety sentence in a doc added by
+    the same diff from the SOURCE, citing the line or test that enforces it — an unbacked
+    noun ("MinAgeMinutes", "triple shield", "never") does not ship, and a doc that
+    contradicts a source comment in its own diff is a blocker independent of the code
+    defect; (4) never edit a plan/status doc into the past tense ("LANDED") from inside the
+    cycle producing the work — LANDED is written by the landing, after ship and audit.
+  how_to_apply: >
+    1. Scout, on any slice whose scout-report cites a dependency slice as "already
+       shipped/present in-tree": add a Findings row per plan-named default of that
+       dependency, with the grep that proves it is assigned in non-test code. "S4 is
+       present" must mean "S4's values are present", not "S4's symbols are present".
+    2. TDD-engineer, for any slice that flips a default toward mutation: author a RED test
+       that constructs the ZERO-VALUE policy and asserts the effective value AT THE CALL
+       SITE (here: `gcWorktreeOptions(cfg, gc.Policy{}).Policy.MinAgeMinutes != 0` and the
+       same for `gcWorkspaceSweep`), before any wiring test.
+    3. Builder: when resuming a preserved worktree, the report must carry an explicit
+       "inherited surface re-verified against plan §<slice>" line enumerating what was
+       checked. A scope narrowing justified by "tests were already green" is invalid on
+       its own — say which SPEC CLAUSES were re-read.
+    4. Builder/Auditor doc check: for each safety claim added to docs in this diff, cite
+       the source line or test that enforces it. Unbacked claim → strike the sentence
+       before ship (do not ship the doc ahead of the code).
+    5. Auditor: treat a "LANDED"/past-tense plan-status edit inside an unshipped diff as a
+       standing MEDIUM defect — it is the seed of the replicated-belief failure class.
+  relatedInstincts:
+    - "[[cycle-1139-default-flip-promotes-dormant-zero-values-to-policy]]"
+    - "[[cycle-599-failopen-contract-untested-against-named-fault-modes]]"
+    - "[[cycle-100-challenged-premise-without-enforcement]]"
+    - "[[cycle-86-risk-flag-mitigation-not-binding]]"
+    - "[[cycle-93-worktree-branch-unmerged-but-build-reports-pass]]"
+    - "[[cycle-629-stale-inbox-resurfaces-landed-fix]]"
+  contradicts: []

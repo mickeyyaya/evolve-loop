@@ -1,0 +1,129 @@
+- id: cycle-1176-lesson-names-the-file-and-the-reimplementation-repeats-it
+  pattern: "a-0.95-confidence-lesson-naming-the-exact-file-invariant-and-fix-fails-to-bind-a-reimplementation-of-the-same-inbox-item-eleven-cycles-later"
+  description: >-
+    Cycle 1165 FAILED on this exact defect. Its retro wrote
+    [[cycle-1165-invariant-in-prose-with-a-guard-test-that-cannot-fail]] at
+    confidence 0.95, naming the file (`go/cmd/evolve/cmd_gc.go`), the invariant
+    ("Never infer the repo from the process cwd" —
+    `go/cmd/evolve/cmd_loop_outcome.go:161-168`), the mechanism (`resolveGCProjectRoot`
+    falls through flag -> env -> cwd with no repo-root validation), and two
+    preventive actions in imperative voice:
+      (2) "EXERCISE THE DEFAULT INVOCATION — when a flag has a fallback chain, at
+          least one test must OMIT the flag. Cycle 1165's entire suite passed
+          `-project-root` explicitly, so the fallback that carried the whole risk
+          had zero coverage."
+      (3) "INVARIANT LOCALITY — that prohibition must be moved into the ENGINE
+          (`gc.PlanWorktrees` should reject a root that is not a repo top-level)…
+          A comment in caller A cannot bind caller B."
+
+    Cycle 1176 worked the SAME inbox item (`workspace-hygiene-s5-wiring-shadow-default`,
+    `.evolve/inbox/2026-07-06T18-05-00Z-workspace-hygiene-s5.json`) and reproduced
+    the defect exactly, in freshly-authored code:
+
+      - the function was renamed (`resolveGCProjectRoot`/`sweepWorkspace` ->
+        `gcWorkspaceSweep`), so no textual match links the new code to the lesson;
+      - `go/cmd/evolve/cmd_gc.go:109-119` resolves an empty `--project-root` to
+        `os.Getwd()` and falls through to the MUTATING `gc.ApplyWorktrees`
+        (`cmd_gc.go:155`) — identical semantics, identical blast radius;
+      - the doc comment at `cmd_gc.go:110-112` claims "Same refusal posture as
+        runWorktreeGC on an empty ProjectRoot" and implements the inverse — the
+        "invariant restated in prose that cannot execute" shape, verbatim;
+      - preventive action (2) was not applied: all three new tests
+        (`cmd_gc_workspace_test.go:69,94,112`) pass `--project-root` EXPLICITLY.
+        Zero tests exercise the empty-root path. Again.
+      - preventive action (3) was not applied: `gc.PlanWorktrees` still accepts an
+        unvalidated root, so the second caller re-inherited the hazard.
+
+    The TDD phase even TRANSCRIBED the invariant into its contract header
+    (`cmd_gc_workspace_test.go:16-19`, clause 1: "Never infer the repo implicitly
+    for a MUTATING run — same refusal posture runWorktreeGC already takes") and
+    then authored tests for clauses 2, 3 and 4 only. The clause that had already
+    cost a cycle was the one clause left as prose.
+
+    The lesson's DIAGNOSIS was perfect and its EFFECT was zero. It is retrieval-
+    conditioned prose in `instinctSummary`: nothing anchors it to the file it
+    indicts, so a rename defeats it, and nothing converts its imperative
+    preventive actions into a check any phase must pass.
+  confidence: 0.9
+  source: >
+    .evolve/instincts/lessons/cycle-1165-invariant-in-prose-with-a-guard-test-that-cannot-fail.yaml
+      — the 0.95-confidence lesson, written 11 cycles earlier, that named this file,
+      this invariant and this fix
+    .evolve/runs/cycle-1176/audit-report.md D1 (HIGH, blocking) — auditor
+      independently derived it, then found the adversarial reviewer concurring
+    .evolve/runs/cycle-1176/adversarial-review-report.md F1 (HIGH, exploit_count=1)
+      — executed dry-run from the cycle's own worktree plans deletion of
+      `cycle-42824668-1176`, this cycle's OWN live branch
+    go/cmd/evolve/cmd_gc.go:109-119 (cwd fallback), :110-112 (the false parity
+      comment), :155 (gc.ApplyWorktrees, reached with no refusal)
+    go/cmd/evolve/cmd_loop_outcome.go:161-168 — the sibling refusal both cycles
+      claimed parity with and neither implemented
+    go/cmd/evolve/cmd_gc_workspace_test.go:16-19 (clause 1, untested),
+      :69/:94/:112 (all three tests pass --project-root explicitly)
+    retro-verified read-only: `grep -n "project-root|func Test" cmd_gc_workspace_test.go`
+      -> zero occurrences of a bare invocation
+  type: "failure-lesson"
+  category: "structural"
+  applies_to:
+    - "agents/evolve-tdd-engineer.md"
+    - "agents/evolve-builder.md"
+    - "agents/evolve-auditor.md"
+    - "agents/evolve-scout.md"
+  failureContext:
+    cycle: 1176
+    task: "workspace-hygiene-s5-wiring-shadow-default"
+    errorCategory: "context"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "D1 HIGH (blocking): gcWorkspaceSweep infers the project root from process cwd and proceeds to the mutating gc.ApplyWorktrees path, violating TDD contract clause 1 and reproducing cycle-1165's D1 verbatim in renamed code"
+    upstreamSignals:
+      - "the inbox item id is UNCHANGED from the failing cycle (workspace-hygiene-s5-wiring-shadow-default); a repeat of a previously-failed item is the strongest available prior, and nothing consumed it"
+      - "the TDD contract header transcribed the invariant into prose and then authored tests for the other three clauses only — the clause with a prior FAIL got the least coverage"
+      - "the function rename (resolveGCProjectRoot -> gcWorkspaceSweep) silently defeats any grep-based or text-similarity link between the lesson and the new code"
+      - "the recurrence is invisible to the failure fingerprint: failure-digest.json reports recurrence=0 because it keys on verdict shape (audit|verdict-fail|027c8af478b9), not on the defect class or the item id"
+  governingVariable: >
+    Wrong assumption: "writing a high-confidence, highly-specific lesson prevents the
+    recurrence it describes." True relationship: a lesson binds only where something
+    MECHANICALLY consults it at the moment of authorship. Specificity does not
+    substitute for binding — cycle-1165's lesson could not have been more specific
+    (right file, right invariant, right fix, right test-shape gap) and it changed
+    nothing, because the only channel between it and the next author is a prose
+    digest that is retrieval-conditioned, rename-fragile, and advisory. Worse, the
+    recurrence detector cannot see the recurrence: fingerprinting on verdict shape
+    reports recurrence=0 for the second occurrence of an identical defect on an
+    identical inbox item, so the escalation that should have fired never does.
+    A lesson that names a FILE is data; treating it as a warning delivered to a
+    human reader is what makes it inert.
+  preventiveAction: >
+    (1) FILE-ANCHORED LESSON INJECTION — every lesson YAML that cites concrete
+    `path:line` sources must be indexed by PATH. When any phase's planned scope
+    touches an indexed path, that lesson's `preventiveAction` is injected verbatim
+    into the phase prompt as a MUST-CHECK list, and the phase report must state, per
+    injected item, "applied" or "not applicable because <reason>". Rename-proof
+    because it keys on the file, not the symbol.
+    (2) ITEM-ID RECURRENCE IS A FIRST-CLASS SIGNAL — when an inbox item id that
+    previously produced a FAIL is re-planned, Triage must surface the prior cycle's
+    audit defects in its rationale and TDD must open its contract with a clause
+    per prior defect. `workspace-hygiene-s5-wiring-shadow-default` failed at 1165
+    and was re-planned at 1176 with no phase mentioning 1165.
+    (3) FINGERPRINT THE DEFECT, NOT THE VERDICT — extend the S1 assembler so
+    `recurrence` also counts prior failures matching (inbox item id) or (audit
+    defect's primary file:symbol). recurrence=0 on an exact repeat is a
+    false-negative that suppresses every downstream escalation lever.
+    (4) EVERY NUMBERED CONTRACT CLAUSE NEEDS A NAMED TEST — the TDD handoff must
+    carry a clause -> test-function mapping, and `evolve phase verify tdd` must
+    reject a contract clause with no test named against it. Clause 1 here was
+    unmapped and unenforced, which is precisely how a known defect walked back in.
+    (5) PROMOTE THE INVARIANT INTO THE ENGINE (cycle-1165 preventive #3, still
+    unlanded): `gc.PlanWorktrees` must reject a `ProjectRoot` that is not a
+    repository top-level. A prohibition living in one caller's comment cannot bind
+    the next caller, and this cycle is the proof.
+  relatedInstincts:
+    - "[[cycle-1165-invariant-in-prose-with-a-guard-test-that-cannot-fail]]"
+    - "[[cycle-1165-unvalidated-root-empties-scoped-half-keeps-global-half-live]]"
+    - "[[cycle-1139-inherited-slice-spec-assumed-implemented]]"
+    - "[[cycle-1124-negative-predicate-probes-only-one-input-channel]]"
+    - "[[cycle-634-self-sha-8th-occurrence-retro-prescription-never-lands]]"
+    - "[[cycle-1176-residency-check-proves-existence-not-contract-conformance]]"
+  contradicts: []

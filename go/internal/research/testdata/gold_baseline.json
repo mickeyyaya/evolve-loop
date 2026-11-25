@@ -1,0 +1,7 @@
+{
+  "ranker": "FileKB.Lookup",
+  "k": 5,
+  "queries": 36,
+  "recall_at_5": 0.5879629629629629,
+  "mrr": 0.6157407407407408
+}

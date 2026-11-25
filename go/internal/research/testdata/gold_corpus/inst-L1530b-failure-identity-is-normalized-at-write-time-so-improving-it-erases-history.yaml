@@ -1,0 +1,56 @@
+- id: inst-L1530b
+  pattern: "failure-identity-is-normalized-at-write-time-so-improving-it-erases-history"
+  description: >-
+    Recurrence detection in this repo is broken in two independent, compounding
+    ways, and cycle 1530 measured both on one defect. (1) NO PRODUCER. Every
+    recurrence count is read through recurrence.Load(".evolve/recurrence-ledger.json")
+    — six non-test call sites (core/failure_digest.go:240,
+    core/failure_learning.go:605, core/decision_branch.go:514,
+    core/cyclerun_chronicle.go:43, cmd_lessons.go:36, plus the chronicle path).
+    recurrence.Ledger.Save (internal/recurrence/ledger.go:227) has ZERO non-test
+    callers module-wide. The file therefore cannot ever exist — only a stale
+    .evolve/recurrence-ledger.json.LOCK from 2026-07-28 is on disk — so
+    rc is nil, Count() is 0, and "recurrence":0 is stamped into every
+    failure-digest.json forever. This is inst-L1517b's symptom with its actual
+    mechanism: not a deleted file, a missing writer.
+    (2) WRITE-TIME NORMALIZATION. fingerprint() folds reasons through
+    normalizeReasonForFingerprint (core/failure_digest.go:209-213) ONLY at
+    assembly time, and the stored fingerprint is the permanent identity. The
+    normalizer has grown over time (narrativeVerdictToken, then
+    goTestDurationToken at cycles 1146/1148, then cycleNumberToken at 1365/1440,
+    then attemptDenominatorToken). Replaying today's normalizer over the on-disk
+    audit-fail-reason.json of cycles 1267, 1278, 1280 and 1530 yields the
+    IDENTICAL fingerprint audit|infra-error|98ba8efed506 for all four — yet the
+    stored digests read b7f1e64393b3, 9500f1097efc, 13416e79294d and
+    98ba8efed506. blocker_breaker.go:325 counts recurrence by scanning those
+    STORED fingerprints across run dirs, so it sees four distinct identities and
+    count=1. Net effect: every normalizer improvement silently resets recurrence
+    to zero for all prior history, and the identical-fingerprint breaker
+    (ceiling 3) can never fire on any defect older than the last normalizer edit
+    — exactly the long-lived defects it exists to halt.
+  confidence: 0.9
+  source: "cycle-1530/observer-classify-delivery-failure"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1530
+    task: "observer-classify-delivery-failure"
+    errorCategory: "integration"
+    failedStep: "audit"
+    auditVerdict: "FAIL"
+    auditDefects: ["failure-digest.json recurrence=0 on a 5th occurrence"]
+  preventiveAction: >-
+    Treat a derived identity as a READ-TIME projection, never a stored constant.
+    (a) Wire a producer for .evolve/recurrence-ledger.json and key it by
+    FINGERPRINT (the namespace failure_digest.go looks up), not by lesson
+    pattern — the two namespaces are disjoint today, so merely creating the file
+    still yields 0. (b) Either recompute normalizeReasonForFingerprint over the
+    historical audit-fail-reason.json corpus when counting, or version the
+    normalizer and backfill .evolve/runs/*/failure-digest.json whenever the
+    version changes; add a regression asserting that adding a new normalizer
+    rule does not reduce the count for a fixture defect. (c) When a retro reads
+    "recurrence": 0, do not believe it — grep the prior run dirs for the same
+    offender/reason SHAPE before classifying a failure as novel. A dead
+    persistence seam is invisible precisely because it fails as a zero.
+  relatedInstincts: ["inst-L1517b", "inst-L1528c", "inst-L1530a", "inst-L1517c"]
+  contradicts: []

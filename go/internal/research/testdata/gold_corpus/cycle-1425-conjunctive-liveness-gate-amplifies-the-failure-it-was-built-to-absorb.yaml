@@ -1,0 +1,102 @@
+- id: cycle-1425-conjunctive-liveness-gate-amplifies-the-failure-it-was-built-to-absorb
+  pattern: "converting-an-advisory-postcondition-into-a-blocking-precondition-turns-a-previously-inert-agent-compliance-miss-into-a-timeout-that-destroys-the-work-that-did-arrive"
+  description: >-
+    The task was real: the completion detector watched exactly ONE path
+    (`cfg.Artifact`), so the tmux session was torn down the instant
+    `retrospective-report.md` settled and the retro's second contracted write,
+    `disposition.json`, was lost. Cycles 1382-1398 produced no disposition at all.
+    The fix made the detector wait for the WHOLE required set.
+
+    That change converts a liveness-NEUTRAL predicate (one file settled) into a
+    CONJUNCTIVE one (N files settled), and conjunctive predicates fail closed. Pre-
+    diff, an agent that skipped `disposition.json` cost nothing — the phase exited
+    OK with a partial deliverable. Post-diff the sibling is a hard liveness
+    dependency: `observeRequired` returns `whole=false` on every tick, the
+    stability window resets forever, the phase burns two 300 s review intervals
+    (`tmuxArtifactTimeoutS`, `driver_tmux_repl.go:41,431-433`), and exits 81 →
+    `VerdictFAIL` with the delivered report discarded unread. `ErrArtifactTimeout`
+    is retryable (`core/retry_backoff.go:62`), so wrapped call sites re-pay the
+    ~600 s, and repeated retro FAILs feed the standing 3-consecutive-FAIL HALT
+    rule.
+
+    The trigger does not require an attacker. Three ordinary events reach it: an
+    agent that skips the second write; an agent that writes it to the worktree root
+    instead of the workspace (`artifactLocate`'s fallback search is primary-only —
+    the builder itself flagged this as Discovery Scan #1, so a MISPLACED sibling is
+    indistinguishable from an absent one); or routing retro to a CLI family whose
+    persona never carried the write-order directive added in `3ea44496`. The design
+    DID have a degradation path — the finality short-circuit — and it was
+    unreachable from the give-up branch, which is what turned a designed-partial
+    into a guaranteed-total loss. Both reviewers reached the same summary
+    independently: this is strictly worse than the bug it fixes. The old bug lost
+    `disposition.json`; this loses the disposition, the report, and the cycle.
+  confidence: 0.85
+  source: >
+    .evolve/runs/cycle-1425/adversarial-review-report.md F1 (threat model rows T2/T4,
+      the five-step trigger, the cycle-283 cost precedent) and its Verdict
+    .evolve/runs/cycle-1425/audit-report.md D1 and "Blast Radius & Convergence" —
+      artifactDetector is the completion strategy for EVERY tmux-driven phase
+      (newCompletionDetector, completion.go:92-99); the empty-set path is provably
+      inert today, so D1's failure mode is inherited by any future phase that
+      declares a second deliverable
+    .evolve/runs/cycle-1425/build-report.md Discovery Scan #1 (fallback search is
+      primary-only) and #2 (audit already writes two deliverables and declares one —
+      the same generalization would inherit this failure mode)
+    .evolve/instincts/lessons/cycle-283-codex-usage-limit-stalls-phase-to-artifact-timeout.yaml
+      — the corroborating cost model (nudge → no_effect → interval x attempts → exit 81)
+  type: "failure-lesson"
+  category: "structural"
+  applies_to:
+    - "agents/evolve-builder.md"
+    - "agents/evolve-adversarial-reviewer.md"
+    - "agents/evolve-scout.md"
+  failureContext:
+    cycle: 1425
+    task: "retro-disposition-completion-cutoff"
+    errorCategory: "reasoning"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "HIGH D1: a missing contracted sibling now burns ~600s and terminates the phase with ExitArtifactTimeout, discarding a delivered report — the finality concession that was supposed to prevent this is unreachable from the give-up path"
+      - "MEDIUM D3: the ReviewPause nudge and both give-up diagnostics name only cfg.Artifact, so the phase's one self-heal attempt asks for a file already present and operator triage has no 'sibling missing' bucket"
+    upstreamSignals:
+      - "the build report's own Risk (b) named exactly this — 'a gate that never settles converts the teardown race into an artifact timeout on every retro' — and closed it by citing the finality short-circuit without checking that the give-up path reaches it"
+      - "Discovery Scan #1 identified that a misplaced sibling reads as permanently absent, and the risk was recorded as a follow-up rather than as a blocker on the gate being landed"
+  governingVariable: >
+    Wrong assumption: "making a missing deliverable detectable is strictly an
+    improvement, because before it was silently lost." True relationship: a
+    detector that BLOCKS is not a detector — it is a new liveness dependency on
+    whatever produces the thing detected, and its failure mode is the product of
+    two probabilities the old design never multiplied: P(producer misses) x
+    cost(blocked). When the producer is an LLM agent following a prompt directive,
+    P(miss) is not small and is not controlled by this codebase. The tell is that
+    the guard was justified entirely by the FAILURE it prevents (a lost file) and
+    never priced against the failure it CREATES (a stalled phase), and the
+    degradation path that would have equalized them existed but was proven on the
+    unit rather than on the path — see
+    [[cycle-1425-test-manufactures-the-precondition-so-the-producing-hop-is-never-executed]].
+  preventiveAction: >
+    (1) PRICE THE BLOCK BEFORE LANDING IT. Any change that adds a term to a
+    completion/readiness predicate must state, in the build report: what produces
+    the new term, what happens when it never arrives, how long that costs, and what
+    the operator sees. "It degrades gracefully" is a claim requiring the reachability
+    proof of preventive action (3) in the sibling lesson, not a sentence.
+    (2) DEGRADE, THEN ESCALATE. A conjunctive wait must have exactly one terminal
+    outcome for a missing non-primary term: complete with the primary and record the
+    miss loudly (partial deliverable + a WARN naming the absent file). Never a
+    timeout that discards what DID arrive. Delivered work is never destroyed by the
+    absence of an addendum.
+    (3) A GATE ON AGENT COMPLIANCE NEEDS A SELF-HEAL THAT NAMES THE MISS. If the
+    only remediation channel (the ReviewPause nudge) names the primary, the gate can
+    detect a state it cannot possibly repair. Thread the missing path's identity out
+    of the observer and into the nudge and both diagnostics before the gate blocks
+    on anything.
+    (4) BEFORE GENERALIZING, RE-PRICE. `audit` writes two deliverables and declares
+    one; extending `AdditionalArtifactNames` to it is a one-line change that
+    inherits this exact failure mode. Do not widen the declared set for any phase
+    until (2) and (3) hold.
+  relatedInstincts:
+    - "[[cycle-1425-test-manufactures-the-precondition-so-the-producing-hop-is-never-executed]]"
+    - "[[cycle-283-codex-usage-limit-stalls-phase-to-artifact-timeout]]"
+    - "[[cycle-1399-sibling-guard-recommits-the-class-the-cycle-was-chartered-to-close]]"
+  contradicts: []

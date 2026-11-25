@@ -1,0 +1,17 @@
+- id: inst-L2175a
+  pattern: "the-retro-preventive-actions-block-has-no-production-reader-so-a-p0-retro-action-never-reaches-the-inbox"
+  description: "The retrospective prompt says that a deterministic post-retro autofiler parses the preventive_actions block and files auto-retro inbox items. retrofile.ParsePreventiveActions (go/internal/retrofile/retrofile.go:29) has no production caller: git grep over *.go finds only its definition. The only production caller of retrofile.FileActions is go/internal/recurrence/apply.go:114, which files recurrence intents and does not read a retro report. Cycle 2172 wrote a P0 action, retire-audit-handoff-with-its-round, and no file under .evolve/inbox holds that id. Cycle 2175 then hit the same abort 69 minutes later. Do not assume that a preventive action in a retro report becomes work. Check that an inbox file exists for its id."
+  confidence: 0.85
+  source: "cycle-2175/token-turn-sidecar"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 2175
+    task: "token-turn-sidecar"
+    errorCategory: "integration"
+    failedStep: "audit"
+    auditVerdict: "SHIP_GATE_DENIED"
+    auditDefects: ["spine-gate-false-block-recurrence"]
+  preventiveAction: "Call retrofile.ParsePreventiveActions and retrofile.FileActions at the post-retro seam, with the default weight from policy. Add a wiring test that runs the retro completion path on a report with one preventive action and requires the file .evolve/inbox/auto-retro-<cycle>-<id>.json. A malformed block must signal loudly. Until this lands, a retro with routing console must state that the operator has to file the action."
+  relatedInstincts: ["inst-L2172a"]
+  contradicts: []

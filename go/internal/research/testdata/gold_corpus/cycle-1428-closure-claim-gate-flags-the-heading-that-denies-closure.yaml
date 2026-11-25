@@ -1,0 +1,116 @@
+- id: cycle-1428-closure-claim-gate-flags-the-heading-that-denies-closure
+  pattern: "the-closure-claim-gate-fired-on-the-auditors-heading-the-inherited-cycle-1424-critical-is-not-closed-because-negation-markers-were-deliberately-excluded-as-a-signal-so-the-report-that-blocks-a-laundered-closure-is-itself-recorded-as-an-uncited-closure-claim"
+  description: >-
+    The third blocking reason in `.evolve/runs/cycle-1428/audit-fail-reason.json`
+    is:
+
+      closure claim without a citation: "### D-1 — CRITICAL: the inherited
+      cycle-1424 CRITICAL is NOT closed; the ambiguity guard is still
+      silenceable" — a report may not assert a prior cycle's defect is closed
+      without naming the per-defect record on the same line.
+
+    The quoted line asserts the exact OPPOSITE of closure. It is the heading of
+    the auditor's CRITICAL finding — the sentence that BLOCKS the cycle. The
+    gate converted the strongest anti-laundering statement in the document into
+    an offender.
+
+    THIS IS BY DESIGN, AND THE DESIGN NOTE SAYS SO.
+    `go/internal/phases/audit/closure_claim.go:80-84`:
+
+      "Explicit negation markers ('still open', 'not closed') were considered
+       as a second signal and DELIBERATELY REJECTED — they would hand the gate a
+       bypass strictly cheaper than the citation it demands, since appending
+       'not closed' is one token and evidences nothing."
+
+    The reasoning is defensible in isolation and wrong in aggregate, because the
+    same file (:69-76) already records the symmetric failure it was built to
+    prevent: "substring matching therefore FAILED the auditor who correctly
+    reported that defect as still open, which is worse than useless." The
+    quote-stripping fix addressed the QUOTED form of that case and left the
+    UNQUOTED form — an auditor stating in its own voice that a defect is open —
+    firing exactly as before.
+
+    THIRD RECORDED FIRING OF THE FALSE-POSITIVE CLASS: cycle-1339 (demanded a
+    record the closed defect never had), cycle-1371 (fired on the backticked
+    task id `chain-boundary-binary-refresh-verify-closed` plus a `cycle-164`
+    precedent citation), cycle-1428 (fires on a negated closure statement).
+    Each produced a lesson; none produced a code change
+    ([[lesson_to_action_gap]]).
+
+    THE COMPLIANT EXITS ARE ALL BAD, WHICH IS THE DIAGNOSTIC. To report "the
+    inherited CRITICAL is not closed" without tripping the gate, an auditor must
+    (a) append `defect-dispositions.json` to the heading — the one-token
+    appeasement the design explicitly set out to prevent, and which here would
+    cite a file that DOES NOT EXIST in this workspace; (b) avoid naming the
+    ancestor cycle, destroying traceability; or (c) not say the defect is open.
+    A gate whose only compliant paths are appeasement, vagueness, or silence
+    selects against the reports it exists to protect.
+
+    BLAST RADIUS THIS CYCLE was bounded — the audit FAILed on its own merits
+    (D-1 is real and probe-confirmed), so the false positive added noise rather
+    than causing the verdict. That is luck, not containment: on a cycle whose
+    auditor correctly reports an inherited defect as still open while everything
+    else passes, this gate manufactures the block.
+  confidence: 0.85
+  source: "cycle-1428 — .evolve/runs/cycle-1428/audit-fail-reason.json reason 3 and cycle-state.json:audit_fail_reasons[2] (the quoted offender is audit-report.md:39, the D-1 heading); go/internal/phases/audit/closure_claim.go:69-84 (the deliberate rejection of negation markers), :93-115 (stripQuotedSpans), :137-152 (diagnostic text)"
+  type: "failure-lesson"
+  category: "structural"
+  systemic: true
+  applies_to:
+    - "go/internal/phases/audit/closure_claim.go"
+    - "agents/evolve-auditor.md"
+    - "skills/audit/SKILL.md"
+  failureContext:
+    cycle: 1428
+    task: "schema-aligned-salvage-layer-guard"
+    errorCategory: "tool-use"
+    failedStep: "audit"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "closure claim without a citation, fired on the D-1 heading '... is NOT closed ...' — a denial of closure recorded as an assertion of closure"
+    priorOccurrences: ["cycle-1339", "cycle-1371"]
+    upstreamSignals:
+      - "closure_claim.go:69-76 already documents this exact failure mode as the motivation for the previous fix; the fix covered the quoted form only"
+      - "the remedy the diagnostic names (defect-dispositions.json) did not exist in this workspace, so the prescribed compliant rewrite was unavailable"
+  governingVariable: >-
+    Wrong assumption: "a bypass-resistant gate may ignore negation, because
+    accepting negation as a signal is cheaper to forge than a citation." True
+    relationship: forgeability and correctness are different axes, and a
+    detector that cannot distinguish assertion from denial is not
+    bypass-resistant — it is simply wrong in both directions at once. The
+    honest resolution is not to accept "not closed" as an EXCUSE but to stop
+    classifying it as a CLAIM: a line whose closure token is syntactically
+    negated makes no closure assertion, so there is nothing for the citation
+    requirement to attach to. That change removes an offender; it grants no
+    bypass, because a laundering report that says "not closed" has laundered
+    nothing.
+  preventiveAction: >-
+    (1) NEGATED CLOSURE IS NOT A CLOSURE CLAIM. Treat `not closed`,
+    `is NOT closed`, `still open`, `remains open`, `never closed` as removing
+    the line from the CLAIM scan (not as satisfying the CITATION requirement).
+    Pin with the real cycle-1428 heading verbatim asserting zero offenders, plus
+    the cycle-1255-shaped true positive still flagged, so the change is not a
+    blanket weakening.
+    (2) LAND CYCLE-1371's PRESCRIPTION AT THE SAME TIME — strip backticked code
+    spans from the claim scan (keep them for the citation scan). Two recorded
+    false-positive shapes, one file, one edit window; fixing them separately has
+    already cost three cycles.
+    (3) WIDEN THE ACCEPTED CITATION SET as cycle-1339 prescribed (ACS predicate
+    names `TestC<cycle>_\d+`, `go/acs/cycle<N>/` paths, probe artifact paths
+    under `.evolve/runs/cycle-<N>/`). The cycle-1428 D-1 heading is followed
+    four lines later by exactly such a citation — the gate's line-locality is
+    what makes an honest report non-compliant.
+    (4) NEVER PRESCRIBE A REMEDY ARTIFACT WITHOUT CHECKING IT EXISTS. When
+    `defect-dispositions.json` is absent from the workspace, the closure-claim
+    diagnostic must say so rather than instructing the author to cite it; the
+    two diagnostics in this cycle's fail-reason contradict each other.
+    (5) OWNERSHIP: audit-gate code is pipeline-integrity, console-owned
+    (`feedback_pipeline_fixes_console_first`). The lane graded by this gate must
+    not be the lane that edits it.
+  relatedInstincts:
+    - "[[cycle-1371-closure-claim-gate-fires-on-a-task-id-that-ends-in-closed]]"
+    - "[[cycle-1339-closure-gate-demands-a-record-the-closed-defect-never-had]]"
+    - "[[cycle-1428-minted-phase-spec-lands-in-the-lane-worktree-while-the-planner-reads-the-project-root-catalog]]"
+    - "[[lesson_to_action_gap]]"
+  contradicts:
+    - "closure_claim.go:80-84's stated position that negation markers must be rejected as a signal — recommend superseding: negation removes a line from the CLAIM scan rather than satisfying the CITATION scan, which grants no bypass. Confidence in the original rationale 0.9 -> 0.4."

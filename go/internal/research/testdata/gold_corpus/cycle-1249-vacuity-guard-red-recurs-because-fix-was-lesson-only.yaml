@@ -1,0 +1,196 @@
+- id: cycle-1249-vacuity-guard-red-recurs-because-fix-was-lesson-only
+  pattern: "identical-nonhermetic-vacuity-guard-red-blocks-ship-again-because-the-prescribed-two-line-diagnostic-fix-was-only-written-to-a-lesson-and-the-recurrence-counter-keys-on-the-per-cycle-predicate-name"
+  description: >-
+    Cycle 1249 was blocked by EGPS `red_count=1` on
+    `cycle1249/TestC1249_002_DebounceReachableFromProductionWaitLoop`. The
+    inner failure is byte-for-byte the one that blocked cycle 1236 thirteen
+    cycles earlier:
+
+      completion_debounce_test.go:290: reviewer ran 0 time(s): the loop
+      completed before the artifact could churn, so this test did not exercise
+      what it claims
+
+    Same inner test (`TestRunTmuxREPL_ArtifactDebounceWiredIntoWaitLoop`), same
+    branch (the `rev.calls < 2` VACUITY GUARD, not the contract assert four
+    lines above it — `if code == ExitOK` did NOT fire, so the driver correctly
+    refused to complete a churning deliverable and the property under test
+    HELD), same `retry_outcome: "red-on-retry"` from a back-to-back retry under
+    the same contention, same ~0.46s predicate duration, same
+    non-reproducibility. See
+    [[cycle-1236-driver-contract-predicate-flakes-with-diagnostics-discarded]],
+    which diagnosed all of this already.
+
+    NOT REPRODUCIBLE, AGAIN. In this retrospective, in the cycle's own worktree
+    against the same tree the gate saw: the inner test alone 1/1 green; 6/6
+    green under 28 spinning `yes` processes on a 14-core host; the full
+    `go test -tags acs ./acs/cycle1249/` 3/3 green (002 at 0.83s) while six
+    concurrent full `./internal/bridge/` suites ran. 10/10 green, 0 red.
+
+    THREE THINGS ARE NEW AND ALL THREE ARE THE ACTIONABLE PART.
+
+    (1) THE FIX WAS PRESCRIBED AND NEVER LANDED. Cycle 1236's preventive action
+    (1) is a named two-line edit: make the `rev.calls < 2` `t.Fatalf` print
+    `code` and `stderr`, exactly as the contract assert above it already does.
+    That edit was written into a lesson YAML and nowhere else. Cycle 1249
+    TOUCHED that very file — `completion_debounce_test.go` is staged `A` in the
+    cycle diff — and line 290 still discards `code` and `stderr`. So the 1249
+    red is undiagnosable for precisely the reason 1236 said it would be. A
+    lesson is not a landed change; this is [[lesson_to_action_gap]] with a
+    thirteen-cycle, measured cost.
+
+    (2) THE RECURRENCE COUNTER CANNOT SEE THE RECURRENCE.
+    `failure-digest.json` reports `recurrence: 0` under fingerprint
+    `audit|gate-block|f578cacf9ed7`. It is a second occurrence of one
+    mechanism, but the fingerprint derives from the per-cycle ACS id
+    (`TestC1236_004_...` vs `TestC1249_002_...`), and every cycle mints fresh
+    predicate names by design. A defect class that re-appears behind a new
+    per-cycle name therefore reads as NOVEL forever, and no escalation rule
+    keyed on `recurrence` can ever fire for it. The counter is structurally
+    blind to exactly the class the escalation lever exists for.
+
+    (3) THE VERDICT CONFLICT WAS RECORDED AND OVERRULED CORRECTLY, AND STILL
+    COST THE CYCLE. `audit-fail-reason.json` states it plainly: "auditor
+    narrative=WARN but 1 deterministic gate(s) forced FAIL [EGPS red_count>0]".
+    The auditor independently re-executed everything (9/9 packages, 3/3 ACS
+    predicates, `red_count=0`), found the fix correct, graded it WARN with
+    "Ship is not blocked", and cited only two non-blocking doc/invariant
+    defects. The gate outranking the narrative is the right policy against a
+    captured auditor. But when the gate's red is a non-hermetic vacuity guard
+    that nobody can reproduce, the policy converts a correct WARN into a lost
+    cycle. The gate needs a way to say "red, but off-contention this is green"
+    WITHOUT weakening `red_count==0` — see
+    [[cycle-352-egps-cannot-honor-auditor-false-red-adjudication]].
+  confidence: 0.9
+  source: >-
+    .evolve/runs/cycle-1249/acs-verdict.json (green_count=150, red_count=1,
+      skip_count=53, verdict=FAIL, ship_eligible=false; results[] entry for
+      cycle1249/TestC1249_002: exit_code=1, duration_ms=460,
+      failing_tests=["TestRunTmuxREPL_ArtifactDebounceWiredIntoWaitLoop"],
+      retry_outcome="red-on-retry"; siblings 001 green 670ms, 003 green 490ms)
+    + .evolve/runs/cycle-1249/acs-red-evidence/cycle1249__TestC1249_002_DebounceReachableFromProductionWaitLoop.txt
+      (FIRST RUN + RETRY RUN, both with `reviewer ran 0 time(s)` as the ENTIRE
+      diagnostic — no exit code, no stderr)
+    + .evolve/runs/cycle-1249/audit-fail-reason.json (records the
+      WARN-narrative-vs-FAIL-gate conflict verbatim)
+    + .evolve/runs/cycle-1249/audit-report.md:19 (auditor's own
+      `go test -tags acs ./acs/cycle1249/` → 3/3 PASS, red_count=0) and :85
+      (confidence 0.76, WARN, "Ship is not blocked")
+    + .evolve/runs/cycle-1249/failure-digest.json
+      ({"fingerprint":"audit|gate-block|f578cacf9ed7","recurrence":0})
+    + cycle-42824668-1236:go/internal/bridge/completion_debounce_test.go:277-293
+      (assertion order unchanged since 1236; :290 still prints only rev.calls)
+    + cycle-42824668-1236:go/internal/bridge/driver_tmux_repl.go:562
+      (`for elapsed := 0; ; elapsed += 2` with Deps.Sleep stubbed by
+      runTmuxOnStopReview — the wait loop's clock is a VIRTUAL counter, so this
+      test is not wall-clock-starvable; the early exit is a control-flow branch,
+      not a timeout, which narrows the search to the pre-checkpoint returns at
+      driver_tmux_repl.go:686 (rc=85), :690 (rc=86) and the exhaustion fast-fail
+      — and is exactly the information the discarded `code` would have named)
+    + go/internal/acssuite/acssuite.go:269-304 (predicateEnv passes the
+      orchestrator's full os.Environ() plus EVOLVE_PROJECT_ROOT /
+      worktree-root / CHANGED_PACKAGES into the nested `go test`; a console
+      re-run does NOT carry that ambient environment, so "green on my re-run"
+      is not proof of "green under the gate")
+    + REPRODUCTION (this retrospective, cycle worktree, gate tree): 10/10 GREEN
+      — 1 inner-test idle, 6 inner-test under 28-way CPU load, 3 predicates via
+      the full `go test -tags acs ./acs/cycle1249/` alongside 6 concurrent
+      `./internal/bridge/` suites
+    + [[cycle-1236-driver-contract-predicate-flakes-with-diagnostics-discarded]]
+  type: "failure-lesson"
+  category: "structural"
+  applies_to:
+    - "go/internal/bridge/completion_debounce_test.go"
+    - "go/pkg/acsassert/"
+    - "go/internal/acssuite/acssuite.go"
+    - "go/internal/failuredigest/"
+  failureContext:
+    cycle: 1249
+    task: "artifact-ready-crosspoll-debounce"
+    errorCategory: "integration"
+    failedStep: "audit"
+    auditVerdict: "FAIL"
+    egpsVerdict: "FAIL"
+    shipEligible: false
+    auditDefects:
+      - "D1 WARN — stale ordering comment at completion.go:235-236 (doc-vs-code drift, genuine but non-blocking)"
+      - "D2 WARN — final-poll path relocates with zero stability observations; complete() re-resolves the artifact (both PRE-EXISTING, neither introduced by the diff)"
+      - "D3 INFO — pre-existing HIGH fallback-search/symlink surface, correctly scoped out"
+    egpsRedIds:
+      - "cycle1249/TestC1249_002_DebounceReachableFromProductionWaitLoop (inner TestRunTmuxREPL_ArtifactDebounceWiredIntoWaitLoop, vacuity guard rev.calls==0; 10/10 green on reproduction)"
+    upstreamSignals:
+      - "bug-reproduction PASS; adversarial-review WARN"
+      - "auditor independently re-executed: go build clean, go vet clean, gofmt empty, 9/9 packages ok, 3/3 ACS predicates green"
+      - "auditor confidence 0.76 → WARN, explicitly 'Ship is not blocked'"
+      - "the two blocking-adjacent defects the auditor cited are documentation/invariant-scope defects, not correctness defects"
+  pattern_systemic: true
+  governingVariable: >-
+    Wrong assumption: "recording a preventive action in a lesson YAML is
+    equivalent to preventing the failure." True relationship: a lesson changes
+    what an agent MIGHT recall; only a landed diff changes what the pipeline
+    DOES. Cycle 1236 identified a two-line edit, named the file and the line,
+    and cycle 1249 was blocked by that exact line while editing that exact
+    file. The corollary is that recurrence-detection must be keyed on the
+    MECHANISM (the inner test name + the failing assertion), never on the
+    per-cycle predicate id, because the pipeline mints a fresh predicate id
+    every cycle and therefore erases its own memory of the class.
+  preventiveAction: >-
+    (1) LAND THE 1236 TWO-LINE EDIT, NOW, AS A CONSOLE CHANGE — not as a queued
+    cycle. In `go/internal/bridge/completion_debounce_test.go:290` (live on
+    branch `cycle-42824668-1236`; this file is NOT in `main`) change
+      t.Fatalf("reviewer ran %d time(s): ...", rev.calls)
+    to also print `code` and `stderr`, exactly as the contract assert at :286
+    already does. Two occurrences of this class are now on record; the third
+    must be diagnosable on first sight.
+
+    (2) MAKE THE VACUITY GUARD A SKIP, NOT A RED. `rev.calls < 2` asserts "this
+    test got to exercise its claim", which is a statement about the RUN, not
+    about the code under test. When it fires and the contract assert did not,
+    the correct outcome is `t.Skipf` (surfaced as SKIP-with-warn in the ACS
+    verdict, already a first-class state — 53 skips this cycle) rather than a
+    ship-blocking FAIL. A test that admits it did not test anything must not be
+    allowed to claim the code is broken.
+
+    (3) FINGERPRINT THE MECHANISM, NOT THE PREDICATE NAME. The failure-digest
+    fingerprint must incorporate the inner failing test name and the failing
+    assertion text (both are present in `acs-red-evidence/*.txt`), so that
+    `TestC1236_004` and `TestC1249_002` failing on the SAME inner assertion
+    hash to the same fingerprint and `recurrence` reflects reality. Until this
+    lands, every recurrence-keyed escalation lever is inert for per-cycle
+    predicates.
+
+    (4) SPACE THE RETRY OR RUN IT OUTSIDE THE SWEEP. `retry_outcome:
+    "red-on-retry"` was produced back-to-back inside the same 204-predicate
+    sweep. That is not an independent trial and it is the second time it has
+    manufactured a confirming signal for an irreproducible red. Retries of
+    driver-level predicates must run after the sweep's load has drained.
+
+    (5) SPLIT HERMETIC FROM NON-HERMETIC PREDICATES (1236 PA-3, re-earned).
+    001 and 003 are green, in-process, deterministic. 002 is a single
+    full-driver reachability proof whose failure mode is indistinguishable from
+    host noise. Keep the un-gameable caller proof as EVIDENCE; stop letting it
+    spend the cycle's ship eligibility in the same `red_count`.
+
+    (6) DO NOT RE-RUN UNTIL GREEN. 10/10 reproduction is evidence the tree was
+    sound, not permission to reroll the gate.
+  relatedInstincts:
+    - "[[cycle-1236-driver-contract-predicate-flakes-with-diagnostics-discarded]]"
+    - "[[cycle-1236-audit-cited-a-red-the-gate-never-ran]]"
+    - "[[cycle-456-coverage-predicate-race-nonhermetic-flips-gating-verdict]]"
+    - "[[cycle-551-coverage-clear-predicate-nonhermetic-race-recurrence]]"
+    - "[[cycle-352-egps-cannot-honor-auditor-false-red-adjudication]]"
+    - "[[cycle-87-audit-vs-egps-verdict-divergence]]"
+    - "[[cycle-1249-worktree-discard-races-the-retro-salvage-decision]]"
+  contradicts: []
+  doubleLoopChange: >-
+    GOVERNING VALUE before cycle 1249: "The learning loop closes when the
+    retrospective names the root cause and prescribes the fix; filing it as a
+    durable lesson is the deliverable."
+
+    GOVERNING VALUE after cycle 1249: "A retrospective that prescribes a
+    two-line edit and does not cause that edit to LAND has not closed anything
+    — it has produced a record of a defect that will recur. For a fix small
+    enough to be described exactly (file, line, replacement), the retrospective
+    must route it to the console lane for immediate application, and the
+    recurrence counter must be able to recognise the class when it returns.
+    Otherwise the pipeline durably persists its diagnoses and durably repeats
+    its failures."

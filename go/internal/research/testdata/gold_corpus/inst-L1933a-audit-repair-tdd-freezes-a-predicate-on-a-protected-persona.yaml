@@ -1,0 +1,41 @@
+- id: inst-L1933a
+  pattern: "audit-repair-tdd-freezes-a-predicate-on-a-protected-persona-and-deadlocks-the-build-floor"
+  description: >-
+    SYSTEMIC — fourth observation (cycles 1063, 1216, 1426, 1933). Cycle 1933
+    (audit-eval-existence-path-convention) failed audit round 1 because the inbox
+    item names the auditor's Eval Existence rule (agents/evolve-auditor.md:53), a
+    protected control-plane path (guards integrity_surface.go:142, ADR-0064).
+    Scout and triage did not see that path. Triage wrote "no protected surface".
+    In the audit repair round the TDD phase took prescription (a) and froze
+    TestC1933_004 (go/acs/cycle1933/predicates_test.go:49-57). That predicate
+    passes only if agents/evolve-auditor.md changes. The build handoff floor
+    (go/internal/core/build_floor_reviewer.go:37-54) refuses any diff that
+    touches that path. The builder proved both sides: with the edit, ACS was
+    171/171 green and the floor refused the diff. Without the edit, ACS had 1
+    red. The two floor checks contradict each other by construction, so the
+    cycle burned 2 corrections and FAILed. The scout-gate half (path-naming
+    message, ledger decision) was green and shippable.
+    When an audit prescription names a protected path, the TDD phase must not
+    write a predicate that reads or grades that path. Split the item: the lane
+    delivers the non-protected half, and the protected edit goes to the console
+    as a queued note.
+  confidence: 0.9
+  source: "cycle-1933/audit-eval-existence-path-convention"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1933
+    task: "audit-eval-existence-path-convention"
+    errorCategory: "planning"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["H1", "M1", "build-floor-deadlock-TestC1933_004"]
+  preventiveAction: >-
+    Before TDD freezes an ACS predicate, check each file the predicate reads
+    against guards.ProtectedSurfaceManifest. If one matches, do not write the
+    predicate: record that AC as console work in test-report.md. Scout and
+    triage must also resolve each path named in the inbox item text (not only
+    the declared files list) against the manifest. If the fix surface is
+    protected, route the item to the console.
+  relatedInstincts: ["cycle-1426-committed-criteria-bound-to-files-the-lane-may-not-write", "cycle-1063-scope-retarget-escapes-protected-surface-gate", "cycle-1216-protected-surface-boundary-is-tree-state-not-authorship"]
+  contradicts: []

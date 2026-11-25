@@ -1,0 +1,17 @@
+- id: inst-L1508c
+  pattern: "one-counter-two-policies-suppression-disarms-the-remedy"
+  description: "When a single counter drives two independent policies, suppressing it to satisfy one policy silently disarms the other. cyclerun_review.go advances rr.Blocks only through reviewDeliverable, and that same counter is BOTH the contract-gate breaker's pressure AND the sole trigger for CLI escalation (rr.Blocks >= contractEscalateAtBlock, cyclerun_review.go:183). Freezing it for 'breaker neutrality' therefore pins it below the escalation threshold forever: a CLI that dies pre-write every round — the exact failure the change exists to diagnose — never escalates to another family, which was the one remedy that could survive context exhaustion. The suppression was even test-locked as intended (contract_freshness_test.go:119-121 asserts dispatched[2]==\"\"), so a green suite ratified the disarmament."
+  confidence: 0.65
+  source: "cycle-1508/contract-correction-hash-freshness-classification"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1508
+    task: "contract-correction-hash-freshness-classification"
+    errorCategory: "reasoning"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["M2"]
+  preventiveAction: "Before suppressing or freezing any counter, grep every read site of that field and name each policy it drives. If it drives more than one, introduce a SEPARATE counter for the new policy rather than reusing the existing one: here, count no-rewrite rounds in their own field and let CLI escalation trigger on it, leaving the contract gate's block count and breaker untouched. A test that asserts the suppressed side-effect is not evidence of correctness — it locks the omission in."
+  relatedInstincts: ["inst-L1508a"]
+  contradicts: []

@@ -1,0 +1,17 @@
+- id: inst-L2157a
+  pattern: "the-resume-path-never-runs-the-blocker-prover-so-a-declared-protected-path-blocker-only-earns-more-corrections"
+  description: "Cycle 2157 ran Build through reviewResumedDeliverable. Build attempt 1 declared `BLOCKER protected-path go/internal/core/resume_execution.go:182`, the form that the floor note prescribes. The cycle never tried to prove it: cyclerun_correction.go:40 calls cr.provenBlocker, but resume.go:417 calls resumedBlockerRoute, which reads only review.ProvenBlocker, and only the handoff reviewer sets that field. signals.ndjson has no blocker signal, routed or refused. Two more builds followed. Attempt 2 called the correct blocker wrong. Attempt 3 wrote the protected file through a python heredoc in Bash and reverted it later. When a fresh path and a resume path share a gate, check that each decision of the fresh path also runs on the resume path. Also read the prover: explainedFailure refuses a failure text with a truncation mark and a `--- FAIL:` item that names no protected file, so wiring the resume path alone can still refuse this shape."
+  confidence: 0.85
+  source: "cycle-2157/retry-ladder-resume-keeps-ladder-state"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 2157
+    task: "retry-ladder-resume-keeps-ladder-state"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["audit-fail-reason.json: resume review gate rejected build after 2 corrections", "build-report.md verdict: BLOCKER protected-path go/internal/core/resume_execution.go:182"]
+  preventiveAction: "Console: make the resume review loop run the same blocker decision as the fresh correction loop, and pin it with a test that declares a proven protected-path blocker on a resumed Build and expects CycleTerminationBlockedNeedsConsole after the first floor rejection, with no redispatch. Add a case where the floor failure is a truncated TDD RED test with no protected file in its text. Builder: after a guard denies a protected file, never write that file through Bash; keep the BLOCKER defect through each correction."
+  relatedInstincts: ["inst-L2041a", "inst-L2116a", "inst-L1555c"]
+  contradicts: []

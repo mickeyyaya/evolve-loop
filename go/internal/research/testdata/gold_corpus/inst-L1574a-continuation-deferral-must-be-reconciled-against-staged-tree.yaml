@@ -1,0 +1,35 @@
+- id: inst-L1574a
+  pattern: "continuation-deferral-must-be-reconciled-against-staged-tree"
+  description: >-
+    Treat a continuation's staged index as the delivery authority, even when the
+    selected task and the Builder's intent are narrower. Cycle 1574 marked the
+    inherited persona-less production-path-wiring-proof phase DEFERRED while its
+    phase.json remained staged, omitted that path from the Builder's Changes
+    manifest, and would have made internal/core red on main. Before Build exits,
+    reconcile every DEFERRED inherited defect and every declared changed path
+    against git diff --cached --name-status; restore, remediate, or reject every
+    staged path that is outside the selected scope or still carries the defect.
+  confidence: 0.99
+  source: "cycle-1574/retire-stale-retro-prompt-delivery-stall"
+  type: "failure-lesson"
+  category: "episodic"
+  systemic: true
+  failureContext:
+    cycle: 1574
+    task: "retire-stale-retro-prompt-delivery-stall"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["H1", "M1"]
+  preventiveAction: >-
+    Add a continuation build-floor test whose inherited index contains a path
+    named by a DEFERRED defect but excluded from top_n and the Builder Changes
+    manifest. The floor must fail with that path until it is restored to base,
+    untracked, or the defect is fixed; generate the Changes manifest from the
+    complete staged name-status set rather than from Builder intent.
+  relatedInstincts:
+    - "inst-L1572a"
+    - "inst-L1560a"
+    - "inst-L1546a"
+    - "inst-L1553c"
+  contradicts: []

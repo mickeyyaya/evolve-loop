@@ -8,10 +8,10 @@ import (
 )
 
 type Query struct {
-	Source      string
-	FailureMode string
-	Consequence string
-	Keywords    []string
+	Source      string   `json:"source,omitempty"`
+	FailureMode string   `json:"failure_mode,omitempty"`
+	Consequence string   `json:"consequence,omitempty"`
+	Keywords    []string `json:"keywords,omitempty"`
 }
 
 func (q Query) terms() []string {

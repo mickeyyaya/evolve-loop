@@ -1,0 +1,17 @@
+- id: inst-L2240a
+  pattern: "a-global-ratchet-red-on-main-is-charged-to-every-lane-so-repair-main-before-reshipping-salvaged-work"
+  description: "Cycle 2240 built a correct change (10/10 ACS, 283 green, 0 red, audit WARN) but ship refused it on TestTestDuplicates_TheCountOfCopiesEqualsTheBaseline: 335 copies against a baseline of 334. The new pair, acs/cycle2239/predicates_test.go:hasWords = internal/integration/ghci_test.go:has, came from base 7452aeec4, not from this diff. The testdup ratchet counts the whole repo, so a red on main reds every lane that rebases on it, and a re-audit cannot change it. When a ship gate reds on a global ratchet, filter the pair list for the files of the diff first. If no pair names a diff file, route the cycle to the console, salvage the tree, repair main, and then reship. Do not re-audit or rebuild the lane."
+  confidence: 0.75
+  source: "cycle-2240/convergence-policy-v11-inbox-item-rounds"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 2240
+    task: "convergence-policy-v11-inbox-item-rounds"
+    errorCategory: "integration"
+    failedStep: "audit"
+    auditVerdict: "SHIP_GATE_DENIED"
+    auditDefects: ["O1", "M1"]
+  preventiveAction: "Console: dedupe acs/cycle2239/predicates_test.go:hasWords on main (use strings.Contains or a shared helper) and confirm go test -count=1 -run TestTestDuplicates ./internal/repocontract/ is green at 334. Then reship the salvaged tree 852f5f60. Pipeline: run the global testdup ratchet on the rebased tree of the current main tip at ship, so two lanes that pass alone cannot land a combined count above the baseline. Add a classification step that marks a ratchet red as base-owned when no pair names a diff file."
+  relatedInstincts: ["inst-L2191a", "inst-L2201a"]
+  contradicts: []

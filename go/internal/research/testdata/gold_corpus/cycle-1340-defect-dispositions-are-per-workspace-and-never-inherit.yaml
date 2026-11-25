@@ -1,0 +1,82 @@
+- id: cycle-1340-defect-dispositions-are-per-workspace-and-never-inherit
+  pattern: "defect-dispositions-json-is-re-derived-from-this-cycles-workspace-on-every-classify-so-an-ancestors-authored-dispositions-buy-the-heir-nothing-and-with-no-producer-in-any-prompt-whether-a-lane-authors-the-file-at-all-is-a-coin-flip"
+  description: >-
+    `reconcileContinuationDefects` calls `readDispositions(req.Workspace, ...)`
+    (defect_ledger.go:451) and the comment two lines below is explicit: inherited
+    rows are rebuilt from the ANCESTOR every pass and "their status is derived
+    ONLY from defect-dispositions.json, never from the row already sitting in
+    this workspace." `req.Workspace` is THIS cycle's run dir. Nothing copies an
+    ancestor's dispositions forward. Every continuation must therefore
+    re-author a disposition for every inherited id, every cycle, forever — the
+    obligation does not shrink as ancestors discharge it.
+
+    Presence across the lineage is a coin flip, and the evidence is on disk:
+
+      cycle-1320  defect-dispositions.json ABSENT   -> 5x "(no disposition)"
+      cycle-1323  PRESENT (4924 bytes)              -> reached the evidence layer
+      cycle-1325  PRESENT (5689 bytes)              -> reached the evidence layer
+      cycle-1330  PRESENT (3697 bytes)              -> reached the evidence layer
+      cycle-1339  ABSENT                            -> blocked
+      cycle-1340  ABSENT                            -> 4x "(no disposition)"
+
+    Cycle 1330's file disposition'd `d095ee86...` as FIXED with a 400-word
+    verified reason. Cycle 1340 inherited that defect and none of that work: the
+    file lives at `.evolve/runs/cycle-1330/defect-dispositions.json` and the gate
+    never looks there. The lane regressed from layer 2 to layer 1 not by doing
+    anything wrong to the file, but by not writing one.
+
+    Why it is a coin flip is already diagnosed at confidence 0.9 in
+    `cycle-1320-defect-disposition-gate-has-no-agent-facing-producer`: the string
+    "disposition" appears nowhere in `agents/` and — re-verified for this cycle —
+    `grep -n 'disposition\|defect-ledger' .evolve/runs/cycle-1340/audit-prompt.txt`
+    returns ZERO hits. The auditor is graded to FAIL on an artifact its own
+    instructions never name. Three lanes passed layer 1 by inferring the schema
+    from a Go error string; two did not. That is the expected hit rate for an
+    artifact with no producer, and it will not improve by hardening the consumer
+    — which is precisely what cycle 1340 spent itself doing.
+
+    Twenty cycles after the 1320 diagnosis, `.evolve/inbox/` (open, processing,
+    processed, consumed) contains ZERO items matching disposition/defect-ledger.
+    The lesson was written, was right, and was never converted into a work unit.
+  confidence: 0.97
+  source: "cycle-1340 — go/internal/phases/audit/defect_ledger.go:451-467, on-disk presence audit of .evolve/runs/cycle-{1320,1323,1325,1330,1339,1340}/defect-dispositions.json, empty grep for 'disposition' over cycle-1340/audit-prompt.txt, empty grep over .evolve/inbox/**"
+  type: "failure-lesson"
+  category: "structural"
+  applies_to:
+    - "agents/evolve-auditor.md"
+    - "go/internal/phases/audit/defect_ledger.go"
+    - "go/internal/phaseprompt/"
+    - "docs/architecture/continuation-defect-ledger.md"
+  failureContext:
+    cycle: 1340
+    task: "defect-ledger-worktree-evidence-fallback"
+    errorCategory: "integration"
+    failedStep: "audit"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "4 inherited defects from cycle-1330, all '(no disposition)' — no defect-dispositions.json was written into the cycle-1340 workspace"
+    upstreamSignals:
+      - "cycle-1339 failed the same way one cycle earlier; the lineage had already regressed"
+      - "build-report.md:125-138 named the two undispositioned ids and the required remedy before audit ran"
+      - "audit-prompt.txt: zero occurrences of 'disposition'"
+  preventiveAction: >-
+    Two halves, and neither alone is sufficient. (1) BEHAVIOURAL, effective now:
+    an auditor of a continuation lane MUST write
+    `<workspace>/defect-dispositions.json` containing one entry per id listed in
+    the ancestor's `defect-ledger.json` — `{"dispositions":[{"id","status",
+    "evidence","reason"}]}`, status FIXED with a repo-relative evidence path that
+    exists, or DEFERRED with a non-empty reason — BEFORE emitting a verdict, and
+    must re-author it in full every cycle because ancestors' files are never
+    read. A PASS narrative that does not account for every inherited id is
+    unfinished work, not a disagreement with the gate. (2) STRUCTURAL, the actual
+    fix: inject the inherited-id list and this schema into the audit phase prompt
+    whenever a continuation manifest is present, and add a deliverable pre-flight
+    that fails the audit phase loudly when the artifact is absent or does not
+    cover every inherited id. Until (2) lands, (1) is a coin flip dressed as a
+    rule — the whole point of the 1320 lesson.
+  relatedInstincts:
+    - "cycle-1320-defect-disposition-gate-has-no-agent-facing-producer"
+    - "cycle-1339-declined-continuation-still-binds-the-defect-ledger-gate"
+    - "cycle-1340-gate-rejection-fixed-at-the-wrong-layer-of-a-two-layer-check"
+    - "cycle-1281-existence-check-substitutes-for-content-check-at-closure-boundaries"
+  contradicts: []

@@ -1,0 +1,29 @@
+- id: inst-L1605c
+  pattern: "delivery-claims-must-bind-the-staged-base-diff"
+  description: >-
+    Generate tracking attestations, explanation Changed Areas, and cross-artifact
+    citations from one final staged, base-bound snapshot. Cycle 1605's working
+    tree had green apicover tests that were absent from the index, while the
+    Build report claimed every path was staged and the explanation listed a test
+    absent from the base-bound diff. Working-tree success cannot establish what
+    the cycle will deliver.
+  confidence: 0.99
+  source: "cycle-1605/self-consistency-on-decision-phases"
+  type: "failure-lesson"
+  category: "episodic"
+  systemic: true
+  failureContext:
+    cycle: 1605
+    task: "self-consistency-on-decision-phases"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["M1", "M2", "L1"]
+  preventiveAction: >-
+    After the final mutation, stage the declared delivery set, verify every path
+    with git ls-files --error-unmatch, materialize and test the index, then
+    generate Build claims and the explanation handoff from that same base-bound
+    snapshot. Any later edit, path-set change, or stale cross-reference must
+    invalidate the snapshot and force resealing before Audit.
+  relatedInstincts: ["inst-L1595e", "inst-L1604c", "inst-L1576c"]
+  contradicts: []

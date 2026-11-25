@@ -1,0 +1,35 @@
+- id: inst-L1657a
+  pattern: "known-quota-wall-drift-must-block-same-family-redispatch"
+  description: >-
+    Treat an unresolved terminal-chrome mismatch as a transport prerequisite,
+    not advisory context. Cycle 1657 reused claude-tmux after cycle 1652 had
+    already proved that U+00A0 after the output glyph bypasses the ASCII-only
+    session-wall matcher; TDD therefore repeated the same 2,400-second exit-81
+    timeout before generating any test artifact. Repair and byte-test the known
+    wall shape, or bench that CLI family, before dispatching another phase to it.
+  confidence: 0.95
+  source: "cycle-1657/triage-empty-commitment-still-dispatches-spine"
+  type: "failure-lesson"
+  category: "episodic"
+  systemic: true
+  failureContext:
+    cycle: 1657
+    task: "triage-empty-commitment-still-dispatches-spine"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "D1: TDD's Claude pane rendered the known U+00A0 session wall, the ASCII-only exhausted regex missed it, and the bridge waited 2,400 seconds before exit 81 without test-report.md"
+  preventiveAction: >-
+    Before another claude-tmux TDD or Audit dispatch, widen only the
+    glyph-adjacent spacing class to accept U+00A0 and add a concatenation-safe
+    fixture preserving the exact Cycle 1657 bytes. Drive the fixture through
+    ClassifyExhausted and the persisted/corroborated responder path; require
+    exit 85 while prose, prompt-echo, diff-content, and transient-frame controls
+    remain non-walls. If that protected repair is not green, bench claude-tmux
+    and route the blocked lane to the console instead of retrying it.
+  relatedInstincts:
+    - "inst-L1652a"
+    - "inst-L1582a"
+    - "cycle-283-codex-usage-limit-stalls-phase-to-artifact-timeout"
+  contradicts: []

@@ -1,0 +1,34 @@
+- id: cycle-603-audit-agent-stalled-without-running-phase-verify-completion
+  pattern: "phase-agent-idles-at-repl-without-running-phase-verify"
+  description: >-
+    The audit agent (claude-tmux) wrote a correct PASS audit-report.md and then stalled at
+    the REPL idle prompt ("Lollygagging... 3m 5s", then a bare `>` prompt) WITHOUT running
+    the mandated completion step `evolve phase verify audit --workspace <dir>`. Because the
+    agent never emitted a clean completion signal, the phase runner fell back to scraping
+    the tmux scrollback for a verdict, which is what let a prompt-echoed FAIL example
+    sentinel win. The `evolve phase verify <phase>` step is not merely advisory hygiene: it
+    is the signal that anchors verdict classification to the deliverable file. An agent that
+    writes its deliverable and idles instead of running verify + exiting leaves the loop to
+    guess.
+  confidence: 0.5
+  source: "cycle-603/memo-phase-routing-fix"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 603
+    task: "memo-phase-routing-fix"
+    errorCategory: "tool-use"
+    failedStep: "audit"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "audit agent wrote audit-report.md then idled at REPL; no `evolve phase verify audit` invocation appears in audit-stdout.clean.txt or scrollback"
+      - "no escalation-report/launch-error for audit (it did not hit exhaustion) — it simply completed the Write and stopped short of the verify+exit completion step"
+  preventiveAction: >-
+    Every phase agent MUST run `evolve phase verify <phase> --workspace <dir>` after writing
+    its deliverable and MUST NOT declare done until it exits 0; the bridge/phase-runner
+    should treat a written-deliverable-but-no-verify state as incomplete and re-prompt (or
+    read the verdict from the deliverable file, never from scrollback). Retrospective and all
+    Evaluate-archetype phases should confirm the verify step ran before recording a verdict.
+  relatedInstincts:
+    - cycle-603-audit-verdict-classified-from-prompt-echoed-example-sentinel
+  contradicts: []

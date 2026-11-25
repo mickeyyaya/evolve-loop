@@ -1,0 +1,41 @@
+- id: inst-L1504a
+  pattern: "quiet-quota-abort-counted-as-correction-attempt"
+  description: >-
+    A phase re-dispatch that returns exit 0 but produced no model turn is NOT a
+    failed retry — it is a dispatch that never happened. The signature is
+    exit_code=0 AND source="none" AND tokens all zero AND duration below the
+    bridge's 60s tripwireSuccessThreshold. The correction ladder in
+    go/internal/core/cyclerun_review.go treats any non-error return from
+    runner.Run as a genuine re-attempt, records interaction result
+    "rejected_again", spends a correction from the budget, and then blocks the
+    cycle — asserting "the agent tried again and still failed" when the agent
+    was never reached. Before believing a rejected_again outcome, read
+    llm-calls.ndjson for that phase: if duration_ms < 60000 with zero tokens and
+    source=none, the correction was a no-op and the block is unearned.
+  confidence: 0.72
+  source: "cycle-1504/tokenopt-handoff-digests"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1504
+    task: "tokenopt-handoff-digests"
+    errorCategory: "integration"
+    failedStep: "scout"
+    auditVerdict: "FAIL"
+    auditDefects: ["evals-materialized gate block after 2 corrections"]
+  preventiveAction: >-
+    The bridge ALREADY computes this signature — bridge/engine.go:618 documents
+    that an exit-0 / source=none launch under tripwireSuccessThreshold (60s) is
+    "a quiet quota-abort", and only sets Tripwire=true above that floor. That
+    knowledge is currently telemetry-only. Propagate it into the dispatch
+    result the correction ladder consumes: a sub-threshold zero-token dispatch
+    MUST NOT decrement the correction budget and MUST NOT be recorded as
+    interaction result "rejected_again". It must instead surface as a distinct
+    "not-dispatched" outcome that either escalates to another CLI family
+    immediately or fails the cycle loudly as infra — never as a contract
+    verdict against the agent. Add a table-driven test over
+    (exit_code, source, tokens, duration_ms) asserting the ladder classifies
+    (0, "none", zero, <60s) as not-dispatched and (0, "none", zero, >60s) as a
+    real unmeasured attempt.
+  relatedInstincts: ["inst-L1504b"]
+  contradicts: []

@@ -1,0 +1,75 @@
+- id: inst-L1546a
+  pattern: "deferral-is-a-task-space-verb-but-the-commit-is-tree-space-so-a-deferred-id-ships-its-bytes-anyway"
+  description: >-
+    In cycle 1546 triage did the RIGHT thing: it read that
+    `lost-ship-closeout-universal-landing-witness` and `lost-ship-dossier-evidence` had
+    FAILed audit twice on the same witness-integrity class (cycle-1542, cycle-1544), and
+    deferred BOTH with an explicit split-first rationale, committing only the narrow
+    `continuation-create-reuse-snapshot-base-guard`. The builder built that one item well
+    — the auditor's own words: "If the diff contained only that work, this would be a PASS."
+
+    The cycle FAILed anyway, on the deferred code. `triage-report.md` removed the two ids
+    from `top_n`; it did not and could not remove their bytes. This lane runs in an
+    ADR-0076 REUSED continuation worktree (`continuation-manifest.json` -> cycle-1544,
+    snapshot ffd5b49a), so the prior attempt's implementation was already STAGED when the
+    builder arrived: `git status` shows `M go/internal/core/lost_landing_floor.go` (+92),
+    `A go/internal/dossier/landing_lost.go`, `M go/internal/dossier/render.go`,
+    `M schemas/cycle-dossier.schema.json`, `A docs/architecture/lost-landing-witness.md`
+    and both deferred evals — 24 of the 28 staged files belong to work nobody committed to.
+    The unfixed HIGH (`d22c33315a2f989a5457c7a39da147792`: `worktreeShipBinding` clears the
+    lost-landing floor on a bare `os.Stat` of an unvalidated `active_worktree`, contents
+    never read — see [[inst-L1544a]]) would have landed in main on this commit.
+
+    THE ASSUMPTION THAT IS WRONG: that `DEFERRED` is a statement about the delivery.
+    It is only a statement about ATTENTION. Triage, the builder's handoff, and
+    `defect-dispositions.json` all speak task-space ("outside top_n", "belongs to the
+    redesign"); the auditor, EGPS, and the ship gate all read tree-space (`git diff HEAD`).
+    In a fresh worktree those two spaces coincide and the vocabulary is honest. In a reused
+    one they diverge by the entire accumulated remainder, and every deferral silently
+    becomes a SHIP of unreviewed, known-defective code. The builder's own dispositions said
+    "DEFERRED outside top_n" for four ids while all four were in its staged diff — the
+    auditor had to re-author the file to say "not fixed; code ships anyway".
+
+    CORRECTIVE ACTION — do not defer, EXCISE. When a continuation worktree is reused and
+    triage defers an inherited id, the deferral is not discharged until the id's file
+    footprint is out of the index (`git restore --staged` / `git checkout <base> -- <paths>`),
+    or the disposition is re-stated as SHIPPING-UNFIXED with the HIGH re-raised. A HIGH
+    defect may be deferred only when its code is out of the delivered diff.
+  confidence: 0.9
+  source: "cycle-1546 — audit-report.md H2 + Continuation Dispositions table; triage-report.md deferred both ids; continuation-manifest.json (reuse of cycle-1544 worktree, snapshot ffd5b49a); git status (24/28 staged files outside top_n); defect-dispositions.json (auditor-reauthored)"
+  type: "failure-lesson"
+  category: "structural"
+  pattern_systemic: true
+  systemic: true
+  applies_to:
+    - "go/internal/core/cyclerun.go"
+    - "go/internal/core/worktree.go"
+    - "go/internal/phases/ship/manifest.go"
+    - "go/internal/phases/triage/"
+    - "agents/evolve-triage.md"
+    - "agents/evolve-builder.md"
+  failureContext:
+    cycle: 1546
+    task: "continuation-create-reuse-snapshot-base-guard"
+    errorCategory: "planning"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["H2", "L1"]
+    systemic: true
+    priorOccurrences: ["cycle-1542", "cycle-1544"]
+    upstreamSignals:
+      - "triage-report.md carryoverTodos warnings: '2 prior same-shaped audit FAILs ... recommend operator review / scope split' — the warning was correct and had no mechanical effect"
+      - "adversarial-review-report.md F1/F2 reached the same witness-integrity conclusion independently, before audit"
+  preventiveAction: >-
+    Add a ship-time / pre-audit SUBSET CHECK: the staged path set must be a subset of
+    (top_n declared footprint UNION the ship manifest). Emit a hard block naming each
+    staged path attributable to a DEFERRED or unselected id. Independently, teach the
+    disposition gate to reject `status: DEFERRED` for any defect id whose recorded file
+    footprint intersects `git diff --cached --name-only` — a deferral that ships is a
+    mislabelled delivery, and the vocabulary must be unable to express it.
+  relatedInstincts:
+    - "inst-L1544a"
+    - "inst-L1543b"
+    - "inst-L1542a"
+    - "inst-L1539a"
+  contradicts: []

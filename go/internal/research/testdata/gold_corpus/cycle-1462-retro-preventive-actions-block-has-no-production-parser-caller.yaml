@@ -1,0 +1,93 @@
+- id: cycle-1462-retro-preventive-actions-block-has-no-production-parser-caller
+  pattern: "the-retrospective-prompt-mandates-a-machine-readable-preventive-actions-json-block-and-documents-that-internal-retrofile-parses-it-into-inbox-items-but-retrofile-parsepreventiveactions-has-zero-production-callers-so-every-correctly-authored-block-is-dead-text-and-a-perfectly-diagnosed-fix-never-becomes-work"
+  description: >-
+    `retrofile.ParsePreventiveActions` (go/internal/retrofile/retrofile.go:48)
+    has ZERO non-test callers in the repository. The only production caller of
+    the package at all is `retrofile.FileActions` at
+    go/internal/recurrence/apply.go:130, which files contract-gate demotions and
+    constructs its `PreventiveAction` values in Go — it never reads a
+    retrospective report. So the retro agent's mandated
+
+      ## Recommended preventive actions
+      ```json
+      [ {"id": ..., "title": ..., "weight_hint": ...} ]
+      ```
+
+    block — the contract the retrospective prompt describes as "the deterministic
+    post-retro autofiler parses this block and files each entry as a weighted
+    .evolve/inbox/auto-retro-<cycle>-<slug>.json todo" — is parsed by nothing.
+
+    Proof on disk, cycle-1456 -> cycle-1462:
+
+      $ grep -rn 'retrofile\.\(Parse\|Extract\)' go/ --include='*.go'
+      (no output)                       # the parser has no caller, test or prod
+
+      $ find .evolve/inbox -name 'auto-retro-*'
+      .evolve/inbox/auto-retro-0-contract-gate-demoted-adversarial-review.json
+      .evolve/inbox/auto-retro-0-contract-gate-demoted-build.json
+      .evolve/inbox/auto-retro-0-contract-gate-demoted-flake-rerun-scan.json
+      # cycle "0" only — the recurrence/apply.go path. No auto-retro-1456-*,
+      # no auto-retro-<any real cycle>-*, anywhere in the inbox tree.
+
+      $ grep -rl 'ship-stage-ignored-tracked-partition' .evolve/inbox/
+      (no output)
+
+    Cycle-1456's retrospective did everything right: it wrote a well-formed
+    six-entry block whose first action —
+    `ship-stage-ignored-tracked-partition`, weight_hint 0.97, files
+    `go/internal/phases/ship/gitops.go` — is the EXACT fix for the defect that
+    then killed cycle-1462 six cycles later with a byte-identical fingerprint
+    (`ship|unknown|99c38818197c`). No inbox item was ever created, so Triage
+    never saw it, so no lane ever built it.
+
+    This is the `lesson_to_action_gap` meta-defect in its purest form: the
+    learning machinery's failure mode is not bad diagnosis, it is a correct
+    diagnosis written to a channel with no reader. A grader that only checks
+    "did the retro emit the block?" passes on 100% of these cycles.
+  confidence: 0.97
+  source: "cycle-1462 — go/internal/retrofile/retrofile.go:48 (ParsePreventiveActions, zero callers), go/internal/recurrence/apply.go:130 (only production FileActions caller), .evolve/runs/cycle-1456/retrospective-report.md (six-entry block, weight 0.97 head action), .evolve/inbox/ (no auto-retro-<cycle>-* for any real cycle), .evolve/runs/cycle-{1456,1462}/failure-digest.json (identical fingerprint 99c38818197c)"
+  type: "failure-lesson"
+  category: "structural"
+  applies_to:
+    - "go/internal/retrofile/"
+    - "go/internal/core/failure_learning.go"
+    - "agents/evolve-retrospective.md"
+    - ".evolve/inbox/"
+  failureContext:
+    cycle: 1462
+    task: "context-fill-warning-integrity + context-fill-correlation-resilience (continuation of cycle-1458)"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "SHIP_GATE_DENIED"
+    auditDefects:
+      - "ship: [GIT_STAGE_FAILED/precondition @atomic-ship] git add rc=1 'The following paths are ignored by one of your .gitignore files: .evolve/inbox/processed' — the cycle-1456 mechanism, unfixed"
+      - "audit-report.md verdict PASS confidence 0.90, EGPS red_count=0 green=9 — the lane's work was never the problem"
+    upstreamSignals:
+      - ".evolve/runs/cycle-1456/retrospective-report.md prescribed the exact fix (three-way partition in dropIgnoredPaths) with a machine-readable weight-0.97 action six cycles earlier"
+      - "lesson cycle-1456-lesson-without-autofiler-block-never-becomes-work already named the missing-block failure mode; cycle-1456 then WROTE the block and it still did not become work — the next joint in the chain is broken too"
+      - "no open inbox item names dropIgnoredPaths; the two nearest items (ship-staging-rename-pathspec w=0.8, gitstage-deterministic-classification w=0.74) are adjacent mechanisms, not this one"
+  preventiveAction: >-
+    WIRE THE PARSER. Call `retrofile.ParsePreventiveActions` on
+    `<workspace>/retrospective-report.md` at the deterministic retro-closeout
+    seam (`go/internal/core/failure_learning.go`, beside the existing
+    `retroRemediationItems` / `faillearn.WithInbox` call at :473-475, which
+    already owns the inbox-write boundary), then hand the result to
+    `retrofile.FileActions(inboxDir, cycle, actions, defaultWeight, now)`. Log
+    the filed paths into the cycle result so an operator can see the count.
+    GRADE THE OUTCOME, NOT THE EMISSION: the regression test must assert that a
+    fixture retrospective-report.md containing a two-entry block yields two
+    `.evolve/inbox/auto-retro-<cycle>-<slug>.json` files on disk with the
+    declared weights — asserting the block was *written* is exactly the vacuous
+    check that let this survive. Add a standing ACS predicate: for every cycle
+    whose retrospective-report.md contains a `preventive_actions` block, at
+    least one `auto-retro-<cycle>-*` item exists (or a recorded dedup hit
+    against an open/processed id explains its absence). BEHAVIOURAL: never
+    conclude a documented pipeline contract is live because the prompt describes
+    it and the package exists — `grep` for a production caller of the entry
+    point before trusting that a channel has a reader.
+  relatedInstincts:
+    - "cycle-1456-lesson-without-autofiler-block-never-becomes-work"
+    - "cycle-1456-tracked-under-ignored-dir-is-still-refused-by-git-add"
+    - "cycle-1462-recurrence-ledger-writer-and-reader-use-different-keys"
+    - "cycle-1348-ship-staging-diagnostics-are-discarded-on-the-failure-path"
+  contradicts: []

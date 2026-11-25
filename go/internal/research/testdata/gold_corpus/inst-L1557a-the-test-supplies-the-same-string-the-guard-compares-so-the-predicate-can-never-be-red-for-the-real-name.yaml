@@ -1,0 +1,120 @@
+- id: inst-L1557a
+  pattern: "a-new-predicate-is-authored-over-a-value-the-author-named-from-local-vocabulary-and-the-test-then-supplies-that-same-value-as-its-input-so-code-and-fixture-share-one-unverified-belief-and-the-red-green-cycle-can-never-falsify-it"
+  description: >-
+    Cycle 1557 shipped three tasks with a green package suite, clean gofmt and
+    clean go vet, and TWO of the three changed ZERO production behavior. Both
+    inert tasks failed the same way: the builder wrote a predicate over a value
+    it INFERRED from the local vocabulary, then wrote the test fixture from the
+    SAME inference. The fixture and the production code encode one belief, so
+    the test is a tautology — it proves the code handles the fixture, and the
+    fixture was manufactured from the code's own assumption.
+
+    H1 — THE DISPATCH NAME. driver_tmux_repl.go:609,886 gate on
+    `lp.name == "claude-tmux" && phaseName == "retro"`. But
+    `phaseName := orDefault(cfg.Agent, lp.name)` (driver_tmux_repl.go:188) is
+    the `--agent=` value (engine.go:401-402), and for the retro phase the
+    orchestrator emits `retrospective`, not `retro`:
+    core/phase_agent_names.go:31 reads `string(PhaseRetro): "retrospective"`,
+    and the profile on disk is `.evolve/profiles/retrospective.json` — there is
+    no retro.json. LIVE PROOF IN THE CYCLE'S OWN WORKSPACE:
+    .evolve/runs/cycle-1557/retrospective-interactions.ndjson:1 reads
+    `{"kind":"submit_verify","phase":"retrospective","cycle":1557,...}` — the
+    `phase` field there is written by `recordSubmitVerify(irec, phaseName, ...)`
+    at line 608, the SAME variable the new guard compares. The workspace is
+    dense with the misleading spelling (`retro-observer-events.ndjson`,
+    cycle-state.json `"phase":"retro"`, `"active_agent":"retro"`), which is
+    where the wrong side of a DELIBERATE routing/agent skew was picked up.
+    The test then passed the belief in as an argument:
+    `runSubmitVerifyAgent(t, fx, tm, "retro")`
+    (driver_tmux_repl_submitverify_test.go:274). Mutation to the real name reds
+    the builder's own P0 test at 307 polls against a bound of 4.
+
+    H2 — THE LOG SCHEMA. eventLogHasTokens (driver_tmux_submitverify.go:226-241)
+    unmarshals each line of `<phase>-events.ndjson` into
+    `struct{ Tokens int } with tag json:"tokens"`. The live envelope is schema v2.0:
+    `{"schema_version":"2.0","seq":..,"ts":..,"trace_id":..,"source":{..},
+    "kind":..,"severity":..,"data":{..}}`. VERIFIED: 0 of 2727 lines across
+    every *-events.ndjson in this workspace carry a top-level `tokens` key, and
+    every other `json:"tokens"` in the repo is a TokenUsage OBJECT
+    (core/phase.go:175, bridge/engine.go:625, cyclecost/cyclecost.go:169), never
+    an int — so even a real key would fail to unmarshal and be skipped. The
+    function is a constant false in production; `!eventLogHasTokens(...)` is a
+    constant true. The test hand-authored `{"type":"assistant","tokens":42}`.
+    The sibling clause `strings.Contains(lastGoodPane, resolvedPrompt)` requires
+    a ~27KB prompt byte-verbatim in a pane capture, which the SAME FILE's own
+    comment forbids: tmuxPastePlaceholderEcho (lines 50-55) documents that a
+    REPL collapsing a large paste into a chip never echoes the prompt's first
+    line. The file's established idioms for pane matching — normalizeWS,
+    promptSubmitEcho, firstNonEmptyLine — were all bypassed. The test
+    manufactured the pane by concatenating the whole prompt file.
+
+    THE GOAL TEXT NAMED THIS FAILURE MODE IN ADVANCE AND IT STAYED PROSE.
+    recent-outcomes.md carries, on every cycle from 1548 to 1557: "prove each
+    fix fires on the real production path, not only in unit tests." Scout
+    restated it (scout-report.md Research→Implementation Map: "wedged owned
+    prompt relaunches once"). Triage restated it ("feeding the same recovery
+    branch"). Nothing turned it into a check, so seven phases and three eval
+    files all graded the fixture.
+
+    THE REFUTATION IS SECONDS OF WORK. `grep -rn 'PhaseRetro' go/internal/core/`
+    prints "retrospective" on line 31. `head -1 build-events.ndjson` prints the
+    real envelope. `head -1 ../cycle-1554/retrospective-interactions.ndjson`
+    prints `"phase":"retrospective"`. The cost of NOT running them was two
+    inert tasks and a burned deep-tier lane.
+  confidence: 0.93
+  source: "cycle-1557/retro-submit-verify-relaunch"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1557
+    task: "retro-submit-verify-relaunch"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "H1 HIGH dead-production-path: driver_tmux_repl.go:609,886 gate on phaseName == \"retro\" while the orchestrator dispatches --agent=retrospective (core/phase_agent_names.go:31); mutation M1 reds the P0 test at 307 polls vs a bound of 4"
+      - "H2 HIGH fixture-only-classifier: eventLogHasTokens reads a top-level int `tokens` no producer emits (0 of 2727 live lines) and strings.Contains(lastGoodPane, resolvedPrompt) needs a ~27KB prompt verbatim in a pane the file's own tmuxPastePlaceholderEcho comment says never renders it"
+      - "L1 LOW dispatch vocabulary embedded as Go string literals at two driver sites with nothing single-sourcing them against phaseAgentName"
+  preventiveAction: >-
+    TWO RULES, BOTH MECHANICAL.
+
+    (1) NO PREDICATE MAY BE FED A VALUE THE AUTHOR TYPED. Any new comparison
+    against a dispatch name, phase name, agent name, CLI name or on-disk log
+    field must take its expected value from the PRODUCER, not from a literal:
+    import the producer's symbol, or read one real line out of the corpus. In
+    this repo, concretely: (a) EXPORT a single-source accessor for the
+    phase→agent table (core.phaseAgentName, core/phase_agent_names.go:24) and
+    have the bridge compare against it instead of "retro"/"claude-tmux" string
+    literals — the existing drift guard phase_agent_names_test.go proves the
+    table matches the profiles on disk, so the whole chain becomes checkable;
+    (b) any function reading `<phase>-events.ndjson` must decode the v2.0
+    envelope (`schema_version/seq/ts/trace_id/source/kind/severity/data`) and be
+    covered by a test whose input is a REAL LINE copied from a prior cycle's
+    workspace, not an authored literal — the same corpus-over-name rule as
+    [[cycle-1204-json-field-shape-inferred-from-name-not-corpus]].
+
+    (2) RED-FIRST IS NOT ENOUGH — ADD THE LITERAL-MUTATION STEP. Before a task
+    is claimed PASS, mutate each new literal/fixture value to the value
+    PRODUCTION emits and re-run the test. If the test stays green, the guard is
+    unreachable; if it reds, the fixture was lying. This is exactly the M1/M2/M3
+    probe the auditor ran in minutes with `go test -overlay`; running it in the
+    build phase converts a whole class of FAIL cycles into a caught mistake.
+    Red-first over a fabricated input is red for the wrong reason and proves
+    nothing about the dispatched path.
+
+    RED-FIRST TEST FOR THE FIX ITSELF: launch the submit-verify fixture with
+    `--agent=` set from core's phase→agent accessor (NOT the literal "retro")
+    and assert exactly one relaunch; assert the guard is also red when the agent
+    name is any OTHER dispatched phase name, so the scope claim in the build
+    report is proven rather than asserted.
+  relatedInstincts:
+    - "[[inst-L1557b]]"
+    - "[[inst-L1557c]]"
+    - "[[cycle-1425-test-manufactures-the-precondition-so-the-producing-hop-is-never-executed]]"
+    - "[[cycle-1374-every-eval-criterion-graded-through-a-faked-seam]]"
+    - "[[cycle-1496-an-ast-assertion-that-the-call-is-written-is-accepted-as-proof-that-it-runs]]"
+    - "[[cycle-1204-json-field-shape-inferred-from-name-not-corpus]]"
+    - "[[inst-L1534a-import-cycle-licenses-transcribing-the-producer-contract-into-an-authored-literal]]"
+    - "[[inst-L1507c-fixture-proves-the-mechanism-corpus-proves-the-blast-radius]]"
+    - "[[inst-L1545c-the-inbox-item-was-retired-on-a-landing-that-shipped-the-precondition-helper-and-declared-no-production-caller]]"
+  contradicts: []

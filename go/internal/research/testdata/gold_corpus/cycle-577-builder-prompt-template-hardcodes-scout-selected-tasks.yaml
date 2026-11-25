@@ -1,0 +1,83 @@
+- id: cycle-577-builder-prompt-template-hardcodes-scout-selected-tasks
+  pattern: "builder-prompt-template-binds-task-source-to-scout-selected-tasks-not-triage-topn"
+  description: >
+    SYSTEMIC RECURRENCE — 5th occurrence (282 -> 310 -> 522 -> 575 -> 577) of "an
+    execution phase binds to scout's `## Selected Tasks` instead of triage's committed
+    `## top_n`," and a NEAR-EXACT REPEAT of cycle 575 (same task: the tracked 18MB
+    `go/acs/cycle536/evolve` binary; same empty-`top_n` case; same Builder-builds-anyway
+    outcome). The prior lessons (cycle-522, cycle-575) diagnosed the Builder and
+    recommended, as their #1 preventive action, "the Builder prompt MUST open
+    `triage-report.md ## top_n` FIRST and bind to a committed slug; empty top_n = no-op;
+    never substitute scout `## Selected Tasks`." Cycle 577 exposes WHY that never worked:
+    the recommendation was only ever emitted as a failure-lesson into `instinctSummary`
+    CONTEXT — it was never applied to the actual Builder prompt TEMPLATE. The template
+    `agents/evolve-builder.md` still says the OPPOSITE, verbatim:
+      - line 24: "`task`: specific task to implement (from scout-report.md ...)"
+      - line 75: "Read task from `workspace/scout-report.md`"
+      - line 76: "The `## Task: <slug>` line ... MUST be the exact `Slug:` of the task you
+        implement, copied verbatim from the scout-report's `## Selected Tasks`."
+    The word `top_n` and the string `triage-report.md` appear NOWHERE in the build prompt
+    (verified: `grep -in 'top_n|triage-report' build-prompt.txt` -> only boilerplate).
+    So the 5 recurrences are the DETERMINISTIC output of a template that hard-codes the
+    wrong task authority — no amount of instinct-summary injection can override a prompt
+    that explicitly instructs "copy the slug verbatim from scout's Selected Tasks." In
+    cycle 577 triage committed EXACTLY ZERO tasks (this fleet lane's `fleet_scope` id
+    `builder-handoff-extinct-deterministic-changedpkgs` matched no scout candidate) and
+    explicitly DEFERRED `fix-tracked-binary-and-untrack-acs-artifact` with
+    `defer_reason=out of this lane's fleet_scope (another concurrent lane owns it; avoid
+    duplicate work)`. TDD correctly wrote zero predicates and `rm -rf`'d its draft
+    `go/acs/cycle577/` eval. The Builder, following its template, pulled the deferred slug
+    from scout's `## Selected Tasks` and built it. The code is genuinely good and self-
+    tested, but it ships bound to NO committed task, with NO `.evolve/evals/<slug>.md`, NO
+    committed regression predicate (TDD had deleted them), and it crosses fleet-lane
+    isolation (duplicate `git rm --cached` / `.gitignore` edit risk with the owning lane).
+    META-LESSON: a preventive action that requires a PROMPT/CONFIG or CODE change but is
+    delivered only as a soft instinct will recur indefinitely. The fix class is not "re-emit
+    the instinct a 5th time" — it is to EDIT THE TEMPLATE and BUILD THE GATE.
+    CHECK: The Builder's task authority is `triage-report.md ## top_n`, NOT scout
+    `## Selected Tasks`. Open `## top_n` FIRST. If it is empty, the build phase is a NO-OP —
+    do not pull from scout `## Selected Tasks` or triage `## deferred`. TDD's RED set is the
+    ground truth; an empty RED set == nothing to build this cycle.
+  confidence: 0.95
+  source: "cycle-577/fix-tracked-binary-and-untrack-acs-artifact"
+  type: "failure-lesson"
+  category: "episodic"
+  pattern_systemic: true
+  systemic: true
+  failureContext:
+    cycle: 577
+    task: "(triage top_n EMPTY, fleet_scope=builder-handoff-extinct-deterministic-changedpkgs) vs fix-tracked-binary-and-untrack-acs-artifact (built from scout Selected Tasks, triage-DEFERRED)"
+    errorCategory: "planning"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "Builder implemented triage-deferred, out-of-fleet-scope task; triage-report.md ## top_n committed ZERO tasks to this lane"
+      - "Shipped diff has no eval: .evolve/evals/fix-tracked-binary-and-untrack-acs-artifact.md does not exist"
+      - "No committed regression test: TDD deleted go/acs/cycle577/predicates_test.go (TestC577_*) per empty top_n; fix change is unguarded, violating tests-first standing rule"
+      - "Fleet-scope lane isolation crossed: triage deferred to a concurrent lane, risking merge conflict / double git-rm at land"
+  preventiveAction: >
+    STOP re-emitting the soft instinct (proven insufficient 5x). Two concrete, testable
+    implementation changes, both deferred by 522 and 575 and NEVER built:
+    (1) EDIT THE TEMPLATE (config, per phases_are_config_only / phase_settings_from_config_not_code):
+    In `agents/evolve-builder.md`, change the task-source binding at lines 24, 75, 76 so the
+    Builder reads its committed task from `triage-report.md ## top_n` FIRST (scout-report
+    remains the source of the task's DETAIL — eval graders, targetFiles — but triage `## top_n`
+    is the authority for WHICH slug is in scope this cycle). Add the explicit empty-top_n
+    contract: "If `## top_n` is empty, produce a no-op build-report; do NOT substitute scout
+    `## Selected Tasks` or triage `## deferred`." The auditor's eval/slug check keys off the
+    committed slug — with the fix, an in-scope slug always has a matching eval.
+    (2) BUILD THE DETERMINISTIC TASK-AUTHORITY GATE (the one 522 and 575 both asked for and
+    that was never built): at build-phase entry, compare the build-report `## Task:` slug
+    against triage `## top_n`; a slug absent from top_n (scout-only, triage-deferred, or ANY
+    slug when top_n is empty) is a hard commitment violation that BLOCKS before code is
+    written. Route empty `## top_n` to a clean NO-OP skip. Additionally: the coverage-gate/audit
+    already DETECTS the TDD-slug vs Builder-slug divergence but only WARNs — that divergence
+    must BLOCK. Treat "all execution phases bind to triage `## top_n`; empty == no-op" as a
+    hard, phase-agnostic invariant enforced in code, not prose.
+  relatedInstincts:
+    - "[[cycle-575-builder-builds-outside-empty-triage-topn]]"
+    - "[[cycle-522-builder-binds-scout-not-triage-topn]]"
+    - "[[cycle-282-tdd-materializes-full-scout-backlog-not-triage-topn]]"
+    - "[[cycle-310-tdd-scope-exceeds-triage-topn-recurrence]]"
+    - "[[fleet_width_always_respected]]"
+  contradicts: []

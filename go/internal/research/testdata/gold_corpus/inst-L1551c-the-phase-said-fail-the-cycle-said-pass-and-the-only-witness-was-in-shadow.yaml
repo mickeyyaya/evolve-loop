@@ -1,0 +1,17 @@
+- id: inst-L1551c
+  pattern: "a-phase-self-declaring-fail-in-its-own-verdict-block-still-routes-pass-because-the-only-sentinel-that-reads-it-is-in-shadow"
+  description: "adversarial-review-report.md closed with <!-- evolve-verdict: {\"phase\":\"adversarial-review\",\"verdict\":\"FAIL\"} --> on a HIGH attacker-reachable exploit (F1: the adopt limb fails OPEN on errUnresolvableSnapshotBase, yielding an empty audited diff that ships salvaged work unreviewed). The cycle routed PASS into bug-reproduction anyway. judgment-verdict-shadow-adversarial-review.json recorded structural_verdict PASS, sentinel_verdict FAIL, would_flip true — the witness existed, read the file correctly, and was staged shadow, so its correct answer changed nothing. When a phase report's own verdict block disagrees with the routed verdict, the phase report is the authority; do not treat a downstream PASS as evidence the finding was resolved."
+  confidence: 0.85
+  source: "cycle-1551/continuation-create-reuse-snapshot-base-guard"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1551
+    task: "continuation-create-reuse-snapshot-base-guard"
+    errorCategory: "integration"
+    failedStep: "audit"
+    auditVerdict: "FAIL"
+    auditDefects: ["D3"]
+  preventiveAction: "Promote the judgment-verdict sentinel from shadow to enforce for phases whose deliverable carries an evolve-verdict block, gated on a soak that counts would_flip occurrences; a shadow stage that has already logged would_flip:true on a HIGH exploit has finished its soak. Until then, any phase consuming a predecessor's report MUST parse the predecessor's evolve-verdict block and refuse to treat a FAIL as satisfied — bug-reproduction ran and PASSed on top of an unaddressed HIGH finding in this cycle."
+  relatedInstincts: ["inst-L1551a", "inst-L1551b"]
+  contradicts: []

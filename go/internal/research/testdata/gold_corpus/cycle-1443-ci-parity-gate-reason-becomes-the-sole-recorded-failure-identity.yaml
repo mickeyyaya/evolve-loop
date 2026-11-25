@@ -1,0 +1,116 @@
+- id: cycle-1443-ci-parity-gate-reason-becomes-the-sole-recorded-failure-identity
+  pattern: "an-infra-class-gate-reason-is-the-only-line-written-to-audit-fail-reason-json-so-the-auditors-agent-graded-defect-never-reaches-the-failure-fingerprint-and-the-cycle-is-remembered-as-first-occurrence-infra-error-while-its-real-defect-is-a-named-reproducible-three-string-fix"
+  description: >-
+    SECOND OCCURRENCE of the class proven in cycle-1424
+    ([[cycle-1424-optional-phase-infra-timeout-outranks-and-masks-a-critical-verdict]]).
+    Same shape, different gate, and the recurrence is what makes it systemic
+    rather than an accident.
+
+    WHAT THE AUDITOR CONCLUDED. `audit-report.md` returns
+    `<!-- evolve-verdict: {"phase":"audit","verdict":"FAIL",
+    "failure":{"class":"code-audit-fail","defects":["HIGH H1: …score_cap
+    evidence commands…match zero tests…"]}} -->` — one HIGH defect, reproduced
+    by commands the auditor ran, with a three-string prescription and the
+    sentence "Fix the three test-name strings … and this ships."
+
+    WHAT WAS RECORDED. `audit-fail-reason.json` contains exactly ONE reason and
+    it is the integration-tier gate's 13 tmux offenders. H1 is absent — not
+    truncated, absent. `failure-digest.json` is
+    `{"cycle":1443,"fingerprint":"audit|infra-error|23de5a6b79bd",
+    "pre_class":"infra-error","recurrence":0}`. Compare cycles 1436/1441/1442,
+    where no CI-parity gate fired: each recorded
+    `"phase audit verdict FAIL routed to retro (agent-graded; …) defect=H1 …"`
+    and fingerprinted as `audit|verdict-fail|…`. The gate reason does not merely
+    rank first — it is the whole record, and it changes the failure's CLASS.
+
+    THE CONSEQUENCE CHAIN, EACH LINK REAL. (a) The blocker breaker and the
+    identical-fingerprint reset path key on the fingerprint, so a recurrence of
+    the eval-vacuity defect will not accumulate against this cycle. (b)
+    `recent-outcomes.md` and next-cycle recall will present 1443 as an
+    infra-error, so a continuation lane is pointed at the tmux tier instead of
+    at three strings in one eval file. (c) The pre-class steers the failure
+    adapter and the S3 router toward infra handling for a cycle whose
+    substantive result is a task-level, one-file, fully-prescribed fix. (d) The
+    genuinely important observation — the eval-vacuity class recurring after
+    ADR-0084 — survives only because a retro read the audit report; nothing
+    machine-readable carries it forward.
+
+    MECHANISM. Both signals exist and both are already error-severity
+    diagnostics; they simply do not co-exist in the reasons list. The gate path
+    (`audit.go:321-347`, `applyCIGate` → `overrode(name)`) writes an error
+    diagnostic and overrides the verdict; the agent-graded path composes its own
+    reason via `core.agentGradedFailReason` (`failure_digest.go:419-427`), which
+    exists precisely to add a per-failure DISTINGUISHER because a constant
+    fallback once collided different tasks. When a gate overrides, that
+    distinguisher is never composed — the very defect identity the fingerprint
+    machinery was built to preserve is dropped at the one moment two failures
+    are in play. Note the code one layer down is already careful in the opposite
+    direction: `core.fingerprint` normalizes `narrative=<verdict>` out of the
+    hash so one defect cannot split into three buckets. The asymmetry is the
+    bug: identity is protected against SPLITTING and unprotected against
+    ERASURE.
+
+    WHY THIS ONE IS WORTH A DEDICATED LESSON RATHER THAN A NOTE. Cycle-1424's
+    prescription was written, filed, and the class recurred 19 cycles later
+    through a completely different gate. That is the signature of a defect in a
+    SHARED reason-recording seam, not in either gate.
+  confidence: 0.9
+  source: >
+    .evolve/runs/cycle-1443/audit-fail-reason.json — one reason, the tier gate;
+      H1 absent
+    .evolve/runs/cycle-1443/audit-report.md:189 — evolve-verdict sentinel,
+      class=code-audit-fail, defect H1 with prescription
+    .evolve/runs/cycle-1443/failure-digest.json — fingerprint
+      `audit|infra-error|23de5a6b79bd`, pre_class infra-error, recurrence 0
+    .evolve/runs/cycle-{1436,1441,1442}/audit-fail-reason.json — contrast: the
+      agent-graded reason IS recorded when no CI gate fires
+    go/internal/phases/audit/audit.go:321-347 (applyCIGate → overrode)
+    go/internal/core/failure_digest.go:372-427 (agentGradedRouterReason,
+      verdictFailDistinguisher, agentGradedFailReason)
+    .evolve/instincts/lessons/cycle-1424-optional-phase-infra-timeout-outranks-and-masks-a-critical-verdict.yaml
+      (first occurrence)
+  type: "failure-lesson"
+  category: "process"
+  failureContext:
+    cycle: 1443
+    task: "context-fill-report"
+    errorCategory: "integration"
+    failedStep: "audit"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "the auditor's own HIGH H1 does not appear in audit-fail-reason.json, so it is absent from the failure fingerprint and from every downstream consumer of it"
+    upstreamSignals:
+      - "cycle-1424 recorded the identical class (an infra reason became the sole identity, masking a probe-confirmed CRITICAL) and its lesson is on disk"
+  governingVariable: >
+    Wrong assumption: "the loudest blocking reason is the cycle's failure." True
+    relationship: BLOCKING and IDENTIFYING are different jobs, and a system that
+    conflates them will always record the wrong thing when two failures
+    co-occur, because the blocker that fires first is systematically the cheap
+    infra one (a gate subprocess) while the expensive, informative one is the
+    agent's graded judgement. Blocking must be a MAX over reasons; identity must
+    be a UNION of them. Wherever the two are computed by the same line, every
+    co-occurrence silently discards the more valuable half — and it discards it
+    in the same direction every time, so the corpus of remembered failures
+    drifts toward infra noise while real defect classes go uncounted and their
+    recurrence counters stay at zero.
+  preventiveAction: >
+    (1) `audit-fail-reason.json` must carry EVERY error-severity reason,
+    including the agent-graded verdict reason with its distinguisher, whenever
+    the auditor's own sentinel is FAIL — regardless of whether a CI-parity gate
+    also overrode. The gate reason may stay first (blocking order is fine); it
+    may not be alone. This is a union, not a ranking.
+    (2) The failure fingerprint must be computed from the reason set that
+    includes the agent-graded defect, so `pre_class` reflects the substantive
+    failure when one exists. A cycle that has BOTH an infra red and a graded
+    defect is not "infra-error, recurrence 0".
+    (3) Add a regression test at the composition point: audit returns a FAIL
+    sentinel with defects AND a CI-parity gate returns offenders ⇒ assert both
+    strings are present in the persisted reasons and that the digest's pre_class
+    is not `infra-error`. Cycle-1424 proved this class once; without a test it
+    will recur through whichever gate is added next.
+  relatedInstincts:
+    - "[[cycle-1424-optional-phase-infra-timeout-outranks-and-masks-a-critical-verdict]]"
+    - "[[cycle-1443-integration-tier-gate-reds-on-real-tmux-tests-that-ci-passes-at-the-identical-base]]"
+    - "[[cycle-1443-score-cap-evidence-commands-are-minted-before-the-tests-they-name-and-executed-by-no-phase]]"
+    - "[[cycle-641-infra-incident-classifier-matches-echoed-prompt-keywords]]"
+  contradicts: []

@@ -1,0 +1,35 @@
+- id: inst-L2043a
+  pattern: "the-mandatory-explanation-floor-short-circuits-the-composed-floor-so-one-correction-sees-a-partial-failure-list"
+  description: >-
+    Cycle 2043 (cycle-spend-limit-stop-and-handoff). mandatoryExplanationReviewer.Review
+    (go/internal/core/reviewer.go:68) returns the explanation floor rejection before it
+    runs the composed floor (size ratchet, apicover naming, repo contract). The first
+    rejection told the builder about 1 failure (Changed Areas did not explain doc.go).
+    The single correction (max=1) fixed only that. The re-review then ran the composed
+    floor and found 2 failures that were in the diff from the start: the size ratchet
+    on Policy.WorkflowConfig (82 > base 81) and 4 unnamed exports in internal/policy.
+    No correction budget was left, so the build aborted with a FAIL verdict. The
+    evolve selfcheck build probe uses WholeBuildHandoffFloor and reports all failures
+    together, so the live reviewer chain and the self-check disagree on the failure list.
+  confidence: 0.85
+  source: "cycle-2043/cycle-spend-limit-stop-and-handoff"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 2043
+    task: "cycle-spend-limit-stop-and-handoff"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "build handoff floor round 1: Explanation Documentation: Changed Areas does not explain material path go/internal/cyclespend/doc.go"
+      - "build handoff floor round 2: internal/policy.Policy.WorkflowConfig grew to 82 lines > allowance 81"
+      - "build handoff floor round 2: apicover UNCOVERED CycleSpendEnforce, CycleSpendOff, CycleSpendShadow, CycleSpendPolicy in internal/policy"
+  preventiveAction: >-
+    Pipeline (console): when the build is reviewed, run the mandatory explanation floor and
+    the composed floor together and give the builder the union of the failures in one
+    correction prompt (the same list as WholeBuildHandoffFloor in evolve selfcheck build).
+    Add a test in go/internal/core where both floors fail and the rejection reason names
+    both failures.
+  relatedInstincts: ["inst-L1761b", "inst-L1764b"]
+  contradicts: []

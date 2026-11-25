@@ -1,0 +1,42 @@
+- id: cycle-1465-console-routing-is-a-write-only-sink
+  pattern: "console-routing-is-a-write-only-sink"
+  description: >-
+    Setting disposition.json `routing: "console"` records an operator intent that
+    NOTHING reads. `dispositionrouter.RouteConsole` (go/internal/dispositionrouter/dispositionrouter.go:40)
+    has no production consumer that materialises an artifact, a queue entry, or a
+    notification; the only console-ish sink on disk, `.evolve/operator-salvage/`,
+    has held no new entry since 2026-06-14. Cycles 1456, 1462 and 1465 each
+    diagnosed the SAME P0 ship-killer correctly, each routed it `console`, and
+    zero repair work was ever dispatched. Worse, the premise for choosing console
+    is false for this class: `go/internal/guards/integrity_surface.go:64` states
+    that `phases/ship` is "otherwise legitimate cycle territory" and protects only
+    `binary_staging_guard.go` — so `go/internal/phases/ship/gitops.go` IS
+    lane-dispatchable. Route a lane-fixable pipeline defect to `inbox` with a
+    weight above the recurrence, and reserve `console` for genuinely
+    protected-surface or operator-credentialed work.
+  confidence: 0.9
+  source: "cycle-1465/align-contextfill-occupancy"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1465
+    task: "align-contextfill-occupancy"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "SHIP_GATE_DENIED"
+    auditDefects: ["M1", "M2", "L1"]
+  preventiveAction: >-
+    Before writing `routing: "console"` in disposition.json, PROVE the target is
+    not lane-fixable: grep the offending file's path against
+    go/internal/guards/integrity_surface.go's ProtectedSurfaceManifest. If no
+    Fragment matches, routing MUST be `inbox` with a concrete `proposed_item`
+    slug and a `weight_hint` above the class's observed recurrence — `console` on
+    a lane-fixable defect is equivalent to `drop`. If you do route `console`,
+    state in `justification` which on-disk artifact an operator will find, and
+    verify that artifact exists after the run.
+  relatedInstincts:
+    - cycle-1456-lesson-without-autofiler-block-never-becomes-work
+    - cycle-1462-retro-preventive-actions-block-has-no-production-parser-caller
+    - cycle-1462-recurrence-ledger-writer-and-reader-use-different-keys
+    - cycle-1465-consumption-rename-must-be-untracked-in-lane
+  contradicts: []

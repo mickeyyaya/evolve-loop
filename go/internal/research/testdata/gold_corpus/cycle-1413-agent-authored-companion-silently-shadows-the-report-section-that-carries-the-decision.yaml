@@ -1,0 +1,96 @@
+- id: cycle-1413-agent-authored-companion-silently-shadows-the-report-section-that-carries-the-decision
+  pattern: "triage-wrote-the-retirement-id-in-the-report-superseded-section-and-the-reader-preferred-the-agent-authored-json-companion-which-omitted-that-key-so-the-all-or-nothing-file-preference-discarded-the-strictly-richer-source"
+  description: >-
+    Cycle-1413's triage did NOT forget to retire the item. `triage-report.md:17-18`
+    declares the section verbatim:
+
+      ## superseded (retire an inbox item by id — work already shipped under another id)
+      - repocontract-gate-false-red-swallowed-diag: shipped as commit 1cf5bdaf (#413) …
+
+    The deterministic projector parses exactly that section into the array the
+    retirement path reads — `go/internal/triagecap/project.go:118-130`
+    (`supersededSectionRE` → `d.Superseded []string`). It never ran. Reason:
+    `go/internal/phases/ship/postship.go:240-245` (`triageDecisionBytes`) returns
+    the agent-authored `triage-decision.json` **the moment the file exists**, and
+    only falls through to `ProjectDecisionJSON` when it is ABSENT
+    (`postship.go:251`). The authored companion carried keys
+    `[committed_floors, cycle, deferred, deferred_floors, dropped, escalate_block,
+    phase_skip, skip_rejected, skip_shipped, top_n]` — no `superseded`.
+
+    So the preference is all-or-nothing on FILE PRESENCE, not per-key: writing
+    any companion silently deletes every fact the report expressed that the
+    companion omitted. Downstream, `inboxmover.SupersededInboxIDs` (inboxmover.go:472-491)
+    got nil, `ReconcileSuperseded` iterated an empty list, and
+    `inboxmover.CommittedIDs` (outcome.go:165-185) walks ONLY `top_n[].id` and
+    `skip_shipped[].task_id` — both `[]`. `dropped` has zero retirement readers
+    repo-wide. Verified end state: the item is still in `.evolve/inbox/` root and
+    in neither `consumed/` nor `processed/`.
+
+    Compounding deadlock (the reason this cannot self-clear): retirement lives in
+    the SHIP phase behind a landed-commit gate (`postship.go:141`,
+    `res.CommitSHA != "" && isLanded(...)`). Audit FAILed, so ship never ran, so
+    no retirement path executed at all. The lane fails BECAUSE the item is not
+    retired, and the FAIL is what prevents retiring it. Next cycle draws the
+    identical `lane-scope.json` and reproduces the cycle byte-for-byte — an
+    identical-fingerprint respin against the consecutive-failures ceiling (3,
+    landed `26690652`).
+
+    The irony is load-bearing: `inboxmover.go:466-467` states this machinery
+    exists "replacing the prose-only … carryover instruction that silently lapsed
+    for cycles 544..548." The prose was correct this time; the JSON seam ate it.
+  confidence: 0.9
+  source: "cycle-1413/repocontract-gate-false-red-swallowed-diag"
+  type: "failure-lesson"
+  category: "structural"
+  applies_to:
+    - "go/internal/phases/ship/postship.go"
+    - "go/internal/triagecap/project.go"
+    - "go/internal/inboxmover/"
+    - "agents/evolve-triage.md"
+  failureContext:
+    cycle: 1413
+    task: "repocontract-gate-false-red-swallowed-diag"
+    errorCategory: "integration"
+    failedStep: "audit"
+    auditVerdict: "FAIL"
+    auditDefects:
+      - "D-1 CRITICAL: scoped inbox item not retired — triage-decision.json omits `superseded`; top_n/skip_shipped empty; `dropped` has no retirement reader. Zero code change AND zero queue change."
+    upstreamSignals:
+      - "triage-report.md:17-18 DOES carry the `## superseded` section with the correct id — the prose channel was right"
+      - "premise-challenge Attack 4 falsified the retirement assumption pre-build and named the exact one-key fix (premise-challenge-report.md:148-188)"
+      - "premise-challenge already flagged the seam as a general class: 'the projection is all-or-nothing on file presence' (premise-challenge-report.md:216-220)"
+  governingVariable: >-
+    Wrong assumption: "two writers of the same fact are redundant — if either
+    channel carries it, the decision sees it." True relationship: when a reader
+    PREFERS one source whole-file over another, the preferred source's omissions
+    become deletions of the other source's content. Redundant channels are only
+    redundant under a MERGE; under a preference they are a single point of
+    failure whose silent mode is the richer source being discarded. The
+    invariant: a preference between two sources of the same decision must be
+    per-key with a divergence alarm, or one of the sources must not exist.
+  preventiveAction: >-
+    (1) MAKE THE PREFERENCE PER-KEY. `triageDecisionBytes` must project the
+    report FIRST and overlay the authored companion key-by-key, so an authored
+    file can add facts (`skip_shipped`, git-verified SHAs — the reason the
+    preference exists) but can never subtract a section the report stated.
+    Divergence between the two on a shared key must be logged loudly, not
+    silently resolved.
+    (2) CROSS-CHECK AT THE TRIAGE CONTRACT BOUNDARY. A `triage-decision.json`
+    whose report declares `## superseded` (or `## dropped` with
+    reason=already-shipped) while the JSON omits the corresponding
+    `superseded[]` entry must be REJECTED at the triage phase gate — the phase
+    that can still fix it — rather than discovered by audit three phases later.
+    (3) `dropped` MUST NOT READ AS RETIREMENT. It has zero retirement readers
+    repo-wide; any agent prose asserting that `dropped` retires an entry is
+    false. Either wire `dropped` + reason=already-shipped to retirement, or
+    forbid the claim in the triage contract.
+    (4) A ZERO-TASK CYCLE NEEDS A NON-SHIP RETIREMENT PATH. Retirement gated on
+    a landed ship commit is unreachable for a cycle whose only deliverable IS
+    the retirement and which therefore fails audit. Give queue-only closeout an
+    exit that does not route through ship (operator/console inbox retirement is
+    the current escape hatch — scout-report.md:88-90 recommended exactly this).
+  relatedInstincts:
+    - "[[cycle-1320-every-phase-flagged-the-lane-redundant-and-none-could-stop-it]]"
+    - "[[cycle-1413-only-audits-verdict-has-an-edge-so-every-other-gates-block-is-inert]]"
+    - "[[cycle-1241-failed-cycle-residue-outranks-its-lesson]]"
+  contradicts: []

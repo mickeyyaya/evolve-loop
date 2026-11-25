@@ -1,0 +1,64 @@
+- id: cycle-1456-lesson-without-autofiler-block-never-becomes-work
+  pattern: "a-retro-that-writes-a-perfect-lesson-yaml-but-omits-the-machine-readable-preventive-actions-json-block-produces-zero-queued-work-so-the-defect-recurs-verbatim-the-lesson-only-makes-the-recurrence-legible-not-preventable"
+  description: >-
+    Cycle-1348's retrospective diagnosed the ship-staging ignore mechanism
+    completely: the wrong source line (gitops.go check-ignore probe), the wrong
+    semantics (index-aware vs not), a live reproduction, and a two-part
+    prescription. It wrote that into
+    `.evolve/instincts/lessons/cycle-1348-check-ignore-probe-is-index-aware-but-git-add-is-not.yaml`
+    with confidence 0.88. Cycle-1456 died on the identical mechanism 108 cycles
+    later.
+
+    The gap is mechanical, not analytical. `grep -n "preventive_actions"
+    .evolve/runs/cycle-1348/retrospective-report.md` returns nothing: that retro
+    emitted only prose bullets under "## Recommended preventive actions", never
+    the fenced JSON block the deterministic autofiler (`internal/retrofile`)
+    parses. No `.evolve/inbox/auto-retro-1348-*.json` was ever filed;
+    `grep -rln "no-index\|dropIgnoredPaths" .evolve/inbox/*.json` returns nothing
+    to this day. A lesson YAML is only advisory context injected into a future
+    agent's `instinctSummary` — it competes with dozens of peers and binds no
+    one. The inbox is the only surface that becomes scheduled work.
+
+    Two independent counters were also blind, so nothing else caught the
+    recurrence: `failure-digest.json` hashes the fingerprint from the refused
+    PATHSPEC, so the same mechanism on a different path set produced
+    `99c38818197c` against 1348's `96f17cfe3dfe`, both with `recurrence: 0` and
+    `pre_class: "unknown"`. The two-strikes stage-refusal memo is workspace-scoped
+    by design (fleet isolation), so it cannot see a peer cycle either. Every
+    cross-cycle recurrence signal in the system reported "first occurrence".
+  confidence: 0.9
+  source: "cycle-1456 — .evolve/runs/cycle-1348/retrospective-report.md (no preventive_actions block), .evolve/instincts/lessons/cycle-1348-check-ignore-probe-is-index-aware-but-git-add-is-not.yaml, .evolve/runs/cycle-{1348,1456}/failure-digest.json, go/internal/phases/ship/gitops.go:826-860"
+  type: "failure-lesson"
+  category: "process"
+  applies_to:
+    - ".evolve/runs/cycle-*/retrospective-report.md"
+    - "go/internal/retrofile"
+    - "go/internal/phases/ship/gitops.go"
+  failureContext:
+    cycle: 1456
+    task: "retire-context-fill-telemetry-and-cap-inbox-item"
+    errorCategory: "planning"
+    failedStep: "build"
+    auditVerdict: "SHIP_GATE_DENIED"
+    auditDefects:
+      - "the cycle-1348 lesson prescribed the exact fix and the exact source line; no inbox item, no code change, verbatim recurrence in cycle-1456"
+    upstreamSignals:
+      - "the standing meta-defect project_lesson_to_action_gap_2026-07-10: 'retros diagnose, nothing queues fixes'"
+      - "cycle-1348's own lesson closes with 'That gap is the first thing the fix must remove' — the fix never existed to remove it"
+  preventiveAction: >-
+    Every retro whose root cause names a source file MUST emit the fenced
+    `preventive_actions` JSON block under "## Recommended preventive actions" with
+    a stable `id`, or the diagnosis is inert by construction. Treat a lesson YAML
+    without a paired inbox item as an unfiled bug, not as remediation. When a
+    retro finds a prior lesson describing the same mechanism, that is a
+    RECURRENCE regardless of what `failure-digest.json:recurrence` says — the
+    fingerprint hashes the pathspec, not the mechanism, so it under-reports
+    across cycles; escalate on the lesson-grep, and set `weight_hint` above the
+    autofiler default to reflect it. Structurally: give `failure-digest.json` a
+    mechanism-level identity (error code + git stderr shape) alongside the
+    pathspec hash so a repeat mechanism increments a counter something enforces.
+  relatedInstincts:
+    - "cycle-1456-tracked-under-ignored-dir-is-still-refused-by-git-add"
+    - "cycle-1348-check-ignore-probe-is-index-aware-but-git-add-is-not"
+    - "cycle-1348-ship-staging-diagnostics-are-discarded-on-the-failure-path"
+  contradicts: []

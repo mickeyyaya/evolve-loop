@@ -1,0 +1,53 @@
+- id: inst-L1763a
+  pattern: "a-correction-that-adds-a-material-path-must-add-its-changed-areas-bullet-selfcheck-cannot-see-it"
+  description: >-
+    Cycle 1763's second build-floor correction (acs/cycle1763 unit tests FAIL
+    at 120.421s) was fixed by a NEW code edit, go/internal/core/phase_bindings_selfcheck.go
+    (realGoUnitTestTagged -timeout 120s -> 480s). The Builder updated
+    build-report.md to say the change was cited in the explanation
+    document's "## Changed Areas", but never edited the document. The
+    document still had no bullet for that path, and its Compatibility section
+    still said "this cycle adds only test packages". The Builder's last check
+    was `evolve selfcheck build`, which printed GREEN. That check cannot see
+    this defect: go/cmd/evolve/cmd_selfcheck.go:32 runs
+    productionBuildFloorChecks (cmd_cycle_config.go:51-54), and that function
+    never composes the explanation floor (NewBuildExplanationReviewer,
+    go/internal/core/build_floor_reviewer.go:93-109). The explanation check
+    also needs ProjectRoot, Cycle, BaseSHA and ContractVersion, and selfcheck
+    passes only Worktree. The real floor rejected the tree on its third and
+    final attempt ("Changed Areas does not explain material path
+    go/internal/core/phase_bindings_selfcheck.go"), and the phase aborted
+    with verdict=PASS. The fence fix itself was correct. Correction 1 in the
+    same cycle had the same shape: the baseline.json bullet was missing.
+  confidence: 0.85
+  source: >-
+    cycle-1763/fence-kept-empty-macos-ci-flake
+    (.evolve/runs/cycle-1763/signals.ndjson seq 71/73/75;
+    .evolve/runs/cycle-1763/audit-fail-reason.json;
+    .evolve/runs/cycle-1763/tmux-final-scrollback.txt:277-282 selfcheck GREEN;
+    docs/explain/builds/cycle-1763-01m3q31knwn3r49p07v9y5ph2b.md:63-68,86-88;
+    go/cmd/evolve/cmd_selfcheck.go:32; go/cmd/evolve/cmd_cycle_config.go:51-54)
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 1763
+    task: "fence-kept-empty-macos-ci-flake"
+    errorCategory: "tool-use"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["explanation Changed Areas omits go/internal/core/phase_bindings_selfcheck.go", "build-report claims a citation the document lacks", "selfcheck GREEN vs floor RED"]
+  preventiveAction: >-
+    Builder: whenever a correction round adds or changes ANY file, first run
+    `git diff --name-only <worktree_base_sha>` and give every material path a
+    Changed Areas bullet in the same edit. Also re-read Compatibility and
+    Limitations for claims the new edit falsifies. Do not treat
+    `evolve selfcheck build` GREEN as proof that the explanation floor
+    passes. Console: make selfcheck build resolve the cycle binding
+    (base SHA, cycle, project root, contract version) from cycle-state.json
+    and compose the explanation floor. Add a test where a worktree with an
+    unexplained material path makes selfcheck exit 1.
+  relatedInstincts:
+    - "inst-L1764b"
+    - "inst-L1638a"
+    - "inst-L1707a"
+  contradicts: []

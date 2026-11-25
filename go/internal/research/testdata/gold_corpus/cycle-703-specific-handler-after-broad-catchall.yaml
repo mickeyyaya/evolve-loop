@@ -1,0 +1,38 @@
+- id: cycle-703-specific-handler-after-broad-catchall
+  pattern: specific-handler-placed-after-broad-catchall-in-same-ladder
+  description: >-
+    When you add a NEW, narrow error-handler to an existing sequential abort/dispatch
+    ladder, a pre-existing broad catch-all ordered ABOVE it can intercept the exact
+    error class your handler was built for, leaving your handler unreachable (dead code)
+    for that class. In cycle 703 the quota-defer branch (cyclerun_dispatch.go:309, keyed
+    on ErrAllFamiliesExhausted) was placed AFTER optionalInfraSkip (line 227), which
+    matches isTransientBridgeError(err) — a SUPERSET of ErrAllFamiliesExhausted (the
+    exhausted error double-wraps ErrTransientBridgeFailure). For any catalog-Optional
+    phase, optionalInfraSkip fires first, degrades to WARN, and the quota-defer
+    checkpoint/DEFERRED path never runs. Worse, if all remaining phases are Optional the
+    DEFERRED outcome marker is never written and the run misclassifies. CHECK before
+    inserting a handler into a ladder: enumerate every rung above it and verify none
+    matches a superset of your target predicate; if one does, reorder your handler above
+    it or add an errors.Is(err, <yourSentinel>) exclusion to the broad rung.
+  confidence: 0.75
+  source: "cycle-703/all-families-exhausted-checkpoint-defer"
+  type: "failure-lesson"
+  category: "episodic"
+  failureContext:
+    cycle: 703
+    task: "all-families-exhausted-checkpoint-defer"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "WARN"
+    auditDefects: ["D2-optional-skip-precedes-exhaustion-defer"]
+  preventiveAction: >-
+    Future cycles adding a branch to internal/core/cyclerun_dispatch.go's abort ladder
+    (or any ordered handler chain) MUST enumerate the predicates of all preceding rungs
+    and prove none subsumes the new branch's error class. Where a broad rung
+    (optionalInfraSkip via isTransientBridgeError) can match the narrow sentinel, add
+    errors.Is(err, ErrAllFamiliesExhausted) as an exclusion to the broad rung so the
+    specific handler wins. The pinned test contract MUST include an Optional-phase case,
+    not only the mandatory/default path — grep the new test file for "Optional" and
+    reject the contract if absent when the change is reachable from an Optional phase.
+  relatedInstincts: ["cycle-24-enforcement-step-before-producer-updated", "lesson_to_action_gap"]
+  contradicts: []

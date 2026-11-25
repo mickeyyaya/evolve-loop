@@ -1,0 +1,27 @@
+- id: inst-L1595d
+  pattern: "staged-runtime-artifacts-must-match-active-run"
+  description: >-
+    Bind every staged runtime artifact to the active cycle, run, goal, and
+    staged-tree identity before handoff. Cycle 1595 carried a dossier for a
+    different run and goal with a predeclared PASS through four audit passes;
+    trackedness and a matching cycle number did not establish lane ownership.
+  confidence: 0.99
+  source: "cycle-1595/pipeline-defect-pipeline-blocker-cycle1588"
+  type: "failure-lesson"
+  category: "episodic"
+  systemic: true
+  failureContext:
+    cycle: 1595
+    task: "pipeline-defect-pipeline-blocker-cycle1588"
+    errorCategory: "integration"
+    failedStep: "build"
+    auditVerdict: "FAIL"
+    auditDefects: ["H2", "L2"]
+  preventiveAction: >-
+    Replace unscoped staging with a declared cycle-owned manifest. Before Build
+    finalizes, parse every staged runtime artifact and reject it when embedded
+    cycle, run, goal, or verdict provenance disagrees with run.json,
+    lane-scope.json, or the authoritative current verdict; include generated
+    coverage files in the same declared-path check.
+  relatedInstincts: ["inst-L1592b", "inst-L1589e", "inst-L1553c"]
+  contradicts: []
