@@ -20,6 +20,7 @@
   - `AdaptersDir` and `CapabilityDir` are `<PluginRoot>/adapters`.
   - No environment variable overrides a directory (X18e, I-16). A test sets the roots `EVOLVE_PROJECT_ROOT` and `EVOLVE_PLUGIN_ROOT` instead.
 - **`Resolve` takes the env lookup and the cwd as parameters.** Production passes `os.Getenv`, or calls `ResolveFromEnv`. `ResolveFromEnv` resolves a failing `os.Getwd` to `""` to keep the signature pure. A caller that must surface a cwd failure calls `Resolve` with an explicit cwd.
+- **`BlockerRecordPath` sits beside `FailureDigestRecordPath`.** It gives `.evolve/failure-digests/cycle-<N>.blocker.json`, the record of [internal-cycleblocker](internal-cycleblocker.md). Pinned by `TestBlockerRecordPath_SitsBesideTheDigest`.
 - **Single homes.** `EvolveDirOf` is the intended home of the `<root>/.evolve` join. Other call sites in `cmd/` and `internal/` still spell the join inline. They migrate here when they are touched.
 - **`ProjectRootOf` is the inverse of `EvolveDirOf`.** It returns the parent of a directory that is named `.evolve`, and `("", false)` for any other path. It cleans the path first, so a trailing slash does not hide the name. `inboxmover` uses it for the root of an inbox. Other hand inversions of the join remain, and the follow-up item `every-evolve-dir-inversion-uses-projectrootof` moves them.
 - **`PolicyPath` and `LoopStopPath`.** `PolicyPath` is the home of the policy file, which the loop wave and chain engines read. `LoopStopPath` is the home of the brake marker that `evolve loop-stop` writes.

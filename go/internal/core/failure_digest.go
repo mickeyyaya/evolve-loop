@@ -70,8 +70,8 @@ func classifyPreClass(reasonLower string) string {
 }
 
 func AssembleFailureDigest(cycle int, workspace string, rc RecurrenceCounter) (FailureDigest, error) {
-	phase, reasons := readAuditFailReason(workspace)
-	reasons = withoutDetails(reasons)
+	phase, rawReasons := readAuditFailReason(workspace)
+	reasons := withoutDetails(rawReasons)
 	joined := strings.ToLower(strings.Join(reasons, "\n"))
 	preClass := classifyPreClass(joined)
 
@@ -86,7 +86,10 @@ func AssembleFailureDigest(cycle int, workspace string, rc RecurrenceCounter) (F
 		digest.Recurrence = rc.Count(digest.Fingerprint)
 	}
 	digest = withRecordedClass(workspace, digest)
-	return digest, persistFailureDigest(workspace, digest)
+	if err := persistFailureDigest(workspace, digest); err != nil {
+		return digest, err
+	}
+	return digest, writeBlockerRecord(workspace, blockerClass(phase, preClass), floorCheckTags(rawReasons))
 }
 
 func persistFailureDigest(workspace string, digest FailureDigest) error {
@@ -101,14 +104,22 @@ func persistFailureDigest(workspace string, digest FailureDigest) error {
 }
 
 func failureDigestRecordPath(workspace string) (string, bool) {
+	evolveDir, cycle, ok := harnessRecordHome(workspace)
+	if !ok {
+		return "", false
+	}
+	return paths.FailureDigestRecordPath(evolveDir, cycle), true
+}
+
+func harnessRecordHome(workspace string) (evolveDir string, cycle int, ok bool) {
 	ws := filepath.Clean(workspace)
 	runs := filepath.Dir(ws)
 	suffix, isCycle := strings.CutPrefix(filepath.Base(ws), "cycle-")
 	cycle, err := strconv.Atoi(suffix)
 	if err != nil || !isCycle || strconv.Itoa(cycle) != suffix || filepath.Base(runs) != "runs" || filepath.Base(filepath.Dir(runs)) != ".evolve" {
-		return "", false
+		return "", 0, false
 	}
-	return paths.FailureDigestRecordPath(filepath.Dir(runs), cycle), true
+	return filepath.Dir(runs), cycle, true
 }
 
 func writeFailureDigestRecord(workspace string, b []byte) error {
@@ -138,13 +149,15 @@ func readAuditFailReason(workspace string) (phase string, reasons []string) {
 	return a.Phase, a.Reasons
 }
 
+func failureClassName(phase, preClass string) string { return phase + "|" + preClass }
+
 func fingerprint(phase, preClass string, reasons []string) string {
 	normalized := make([]string, 0, len(reasons))
 	for _, r := range reasons {
 		normalized = append(normalized, normalizeReasonForFingerprint(r))
 	}
 	sum := sha256.Sum256([]byte(phase + "\x00" + preClass + "\x00" + strings.Join(normalized, "\x00")))
-	return phase + "|" + preClass + "|" + hex.EncodeToString(sum[:])[:12]
+	return failureClassName(phase, preClass) + "|" + hex.EncodeToString(sum[:])[:12]
 }
 
 var narrativeVerdictToken = regexp.MustCompile(`narrative=(?:PASS|FAIL|WARN|SKIPPED)\b`)
