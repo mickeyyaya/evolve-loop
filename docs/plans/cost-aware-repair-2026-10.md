@@ -130,7 +130,7 @@ The inbox items carry the full acceptance. The rank is the build order of §7.
 | 4 | `cycle-spend-limit-stop-and-handoff` | D8 | a cycle above `max_llm_minutes` at a phase boundary records `CYCLE_SPEND_LIMIT`; at `enforce` it stops with salvage | lane |
 | 5 | `vacuous-test-guard` | D11 | `func TestX(t *testing.T) {}` in a changed test file fails the guard | console-manual |
 | 6 | `audit-fix-rung-handler` | D5 to D7, through `core.RungHandler` | a chosen `audit_fix` applies a cited patch, dispatches a fresh review seat and runs the gates | lane |
-| 7 | `audit-reviews-the-final-diff` | D12 | the audit prompt carries the gate results as facts and the honesty question | console-manual |
+| 7 | `audit-reviews-the-final-diff` | D12 | the audit prompt carries the gate results as facts and the honesty question | console-manual (built as prompt data: the facts block and the rubric; the check of the two report sections is the follow-up `audit-facts-empty-tests`) |
 | 8 | `builder-selfcheck-before-close` | D10 | a build that closes with no GREEN self-check for its tree gets the findings in the same session | console-manual |
 | 9 | `cycle-stops-when-console-takes-its-item` | D13 | a console claim of the item of a live cycle stops the cycle at the next boundary with `superseded` | lane |
 | 10 | `lane-deadline-from-shipped-lanes` | D9 | the deadline from 3 shipped and 2 long failed lanes ignores the failed lanes at `shipped` | lane |

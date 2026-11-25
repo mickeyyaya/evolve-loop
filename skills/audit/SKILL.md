@@ -69,6 +69,10 @@ any `--class cycle` edit of a `guards.IsProtectedSurface` control-plane file.
 Verdict tokens: `PASS` | `FAIL` | `WARN` | `SKIPPED`.
 <!-- GENERATED:phase-facts END -->
 
+## Gate facts and final-diff review
+
+The host puts a `## Gate and Floor Facts` block into the audit prompt (below the cycle-context boundary) from its own records: the gate and floor results, the changed unprotected functions and the changed tests. The auditor does not argue these results. The report carries `## Final Diff Regression Review` and `## Guard Honesty Check`. The block and the rubric come from `go/internal/core/auditfacts`; the report check is a follow-up under its own shadow stage (ADR-0158 decisions 20 and 21).
+
 ## Composition
 
 Invoked by:

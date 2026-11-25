@@ -42,3 +42,4 @@ The build floor profiles only the changed packages that build a file under `Defa
 
 - **The first build had an allowance file** (2026-10-11). It listed the 192 gaps of the audit. Fix round 1 removed it, because it waived the operator rule for each lane that touched those functions.
 - **The fixtures package is not usable here.** `test/fixtures` imports `internal/core`, and `internal/core` imports this package. Thus the tests use a small local git fake.
+- **Changed function names.** `ChangedFuncNames(file, data, lines)` names the functions with a body whose span holds one of the given added lines. The audit facts block uses it. Pinned by `TestChangedFuncNames_NamesOnlyFunctionsWhoseSpanHoldsAChangedLine`.
