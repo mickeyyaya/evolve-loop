@@ -30,7 +30,7 @@ func Compile(p policy.Policy, cat Catalog, profs ProfileSource, opts ...CompileO
 		opt(c)
 	}
 	t := Table{pol: p, catalog: cat, floors: p.Floors(), overrides: c.overrides}
-	t.profiles = c.snapshotProfiles(profs)
+	t.profiles = c.snapshotProfiles(profs, t.floors)
 	if p.CLIRouting != nil {
 		c.block = *p.CLIRouting
 		t = c.compileDeclared(t)
@@ -79,7 +79,7 @@ func (c *compiler) add(severity Severity, key, format string, args ...any) {
 	}
 }
 
-func (c *compiler) snapshotProfiles(profs ProfileSource) map[string]loadedProfile {
+func (c *compiler) snapshotProfiles(profs ProfileSource, floors policy.Floors) map[string]loadedProfile {
 	snapshot := map[string]loadedProfile{}
 	if profs == nil {
 		c.add(SeverityError, "profiles", "no profile source was given, so no agent can be checked or resolved")
@@ -98,6 +98,9 @@ func (c *compiler) snapshotProfiles(profs ProfileSource) map[string]loadedProfil
 	c.names = names
 	for _, name := range names {
 		p, err := profs.Get(name)
+		if err == nil {
+			p = floors.Clamp(name, p)
+		}
 		snapshot[name] = loadedProfile{profile: p, err: err}
 		c.checkModelMismatchTrigger(name, p)
 	}
