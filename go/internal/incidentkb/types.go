@@ -5,7 +5,7 @@ package incidentkb
 const (
 	Schema       = "incident-record/1"
 	RelDir       = "docs/incidents"
-	LegacyCutoff = "2026-11-19"
+	LegacyCutoff = "2026-11-25"
 )
 
 var RequiredSections = []string{

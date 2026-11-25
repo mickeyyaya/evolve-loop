@@ -54,19 +54,13 @@ The session log has one table:
 | 2. Trim and redact | Keep 20 lines or fewer for each log block. Remove each token, key, password, account name, email address and person name. | No secret in the text. |
 | 3. Analyze | Run [issue-analyze](../issue-analyze/SKILL.md) on the evidence. | A causal chain, the escape and the class fix. |
 | 4. Fix | Write the regression test first and prove it red without the fix. Then fix the root cause through its owner: a PR, a lane item or an inbox item. | The test is red without the fix and green with it. |
-| 5. Write | Write the record with [docs-write](../docs-write/SKILL.md) and its §Incident template. Put the key logs in fenced blocks under the timeline. | The five sections exist. |
+| 5. Write | Copy the §Incident template of [docs-write](../docs-write/SKILL.md) to `docs/incidents/<id>.md`. Fill the frontmatter, and write the ten sections. Put the key logs in fenced blocks under `## Key logs`. | Each section has text, and the frontmatter holds each known fact. |
+| 5a. Render | Run `evolve issue render <id>`. It writes the status line, the actions table and the effectiveness block from the frontmatter. | The command prints `rendered <id>`. |
 | 6. Index | Add one row for each failure mode to [REGRESSION-COVERAGE-INDEX.md](../../docs/incidents/REGRESSION-COVERAGE-INDEX.md). Change the summary counts in the same edit. | The row names the pinning test, or ❌ and the item that tracks it. |
 | 7. Link | Name the self-heal incident id, the signal code, the PR and the inbox item in the record. | Each id is in the record. |
-| 8. Check | Run `evolve docs ste-lint --strict --changed refs/remotes/origin/main --added` and resolve each relative link. Then run the [docs-review](../docs-review/SKILL.md) pass. | 0 findings. |
+| 8. Check | Run `evolve issue check <id>`, and read its output. Run `evolve docs ste-lint --strict --changed refs/remotes/origin/main --added` and resolve each relative link. Then run the [docs-review](../docs-review/SKILL.md) pass. | `issue check` exits 0, and the lint has 0 findings. |
 
-The record holds these parts. The template of docs-write gives the section order.
-
-- **What happened:** the impact and the timeline, with the time of each event in UTC.
-- **Key logs:** the signal lines and the gate text, verbatim but trimmed.
-- **Results:** the measured effect: cycles lost, minutes, red runs, ships blocked.
-- **Root cause:** the causal chain from issue-analyze.
-- **Fix:** each change with its PR or commit, and its regression test.
-- **Lesson:** each lesson with the rule or the guard that it became.
+The record holds the ten sections of the template of docs-write, in its order. Give the time of each event in UTC. Keep the signal lines and the gate text verbatim but trimmed. Name each change with its PR or commit, and its regression test. Name each lesson with the rule or the guard that it became.
 
 ## The alert link
 
@@ -76,7 +70,7 @@ A WARN or INCIDENT event on the lossless channels `errors` and `selfheal.inciden
 evolve events watch --channel errors,selfheal.incident --filter 'severity>=WARN' --since new
 ```
 
-Start the skill for each new code and cycle pair. Do not start it again for a repeat of one code in one cycle. Add the new evidence to the open record instead. The later verb `evolve issue stub` (plan component K4) writes the header and the timeline from the signal. Until it exists, step 1 is by hand.
+Start the skill for each new code and cycle pair. Do not start it again for a repeat of one code in one cycle. Add the new evidence to the open record instead. The later verb `evolve issue open` (plan component I4) writes the header and the timeline from the signal. Until it exists, step 1 is by hand.
 
 ## Worked example: tests leaked ledgers under go/ (2026-11-16)
 
@@ -96,6 +90,7 @@ The record: [2026-11-16-tests-leak-evolve-ledgers-under-go.md](../../docs/incide
 4. **Analyze.** `inboxmover` resolved the ledger from an empty `ProjectRoot`. A test that named only the inbox wrote `.evolve/ledger.jsonl` in its package directory. The escape: CI runs `make test-integration`, which has no treewalk guard. Main stayed green.
 5. **Fix.** PR #1490 derives the root from `<root>/.evolve/inbox` (`planeRootOf`). The red-first test is `TestClaimPending_AnInboxOnlyCallerWritesTheClaimRowToThePlaneLedger`. The class fix is the inbox item `ci-test-integration-treewalk-parity`.
 6. **Index.** Two rows: the leak (✅) and the CI escape (❌ until the item lands).
+7. **Render and check.** A record written today runs `evolve issue render <id>` and then `evolve issue check <id>`. This 2026-11-16 record is older than the template, so the check lists it as legacy.
 
 ## Red flags
 

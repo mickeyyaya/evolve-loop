@@ -9,9 +9,9 @@
 ## Design
 
 - **Leaf package.** `internal/incidentkb` imports only the Go standard library. It parses the YAML frontmatter subset with stdlib code so no internal or third-party import enters the leaf.
-- **Renderer.** `Render` parses the frontmatter, validates fields, and fills the `status`, `actions`, and `effectiveness` marker pairs deterministically. Prose outside the markers stays unchanged, and a second call returns identical bytes.
+- **Renderer.** `Render` parses the frontmatter, validates fields, and fills the `status`, `actions`, and `effectiveness` marker pairs deterministically. Prose outside the markers stays unchanged, and a second call returns identical bytes. `RenderFor` takes the expected id, which is the file name, and refuses a record whose `id` differs. `evolve issue render <id>` calls `RenderFor` and writes the file only when the bytes change.
 - **Check.** `CheckBytes`, `Check`, and `CheckAll` validate frontmatter fields and verify that the filename matches `id`. They check the ten `## ` headings in order and compare each generated region against `Render`. Every failure names its field or section heading.
-- **Legacy rule.** Files without frontmatter that have no date prefix or a date before `2026-11-19` are legacy. `IsLegacy` reports them without failure. Files dated on or after `2026-11-19` without frontmatter fail. `IsSkipped` skips `REGRESSION-COVERAGE-INDEX.md` and `<yyyy-mm-dd>-session-log.md`.
+- **Legacy rule.** Files without frontmatter that have no date prefix or a date before `LegacyCutoff` (`2026-11-25`, the day the template and `issue render` are live) are legacy. `IsLegacy` reports them without failure. Files dated on or after `LegacyCutoff` without frontmatter fail. `IsSkipped` skips `REGRESSION-COVERAGE-INDEX.md` and `<yyyy-mm-dd>-session-log.md`.
 - **List.** `List` reads all record and legacy files, skips index and session-log files, and filters by `--status` and `--code`.
 
 ## Invariants

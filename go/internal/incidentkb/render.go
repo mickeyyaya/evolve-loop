@@ -37,11 +37,22 @@ func findMarkerSpan(doc, part string) (markerSpan, error) {
 }
 
 func Render(doc []byte) ([]byte, error) {
+	return renderExpecting("", doc)
+}
+
+func RenderFor(expectedID string, doc []byte) ([]byte, error) {
+	return renderExpecting(expectedID, doc)
+}
+
+func renderExpecting(expectedID string, doc []byte) ([]byte, error) {
 	rec, err := Parse(doc)
 	if err != nil {
 		return nil, err
 	}
-	if problems := validateFrontmatter(rec, rec.ID); len(problems) > 0 {
+	if expectedID == "" {
+		expectedID = rec.ID
+	}
+	if problems := validateFrontmatter(rec, expectedID); len(problems) > 0 {
 		return nil, fmt.Errorf("%s", strings.Join(problems, "; "))
 	}
 	text := string(doc)
