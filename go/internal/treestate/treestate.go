@@ -5,8 +5,6 @@ package treestate
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"strconv"
 	"strings"
 
@@ -22,18 +20,25 @@ func Between(ctx context.Context, run sysexec.RunFunc, dir string, env []string,
 }
 
 func diffSHA(ctx context.Context, run sysexec.RunFunc, dir string, env []string, revs ...string) (string, error) {
+	text, err := runDiff(ctx, run, dir, env, append([]string{"diff"}, revs...), RunError{Revs: revs})
+	if err != nil {
+		return "", err
+	}
+	return digest(text), nil
+}
+
+func runDiff(ctx context.Context, run sysexec.RunFunc, dir string, env, args []string, failure RunError) (string, error) {
 	var buf strings.Builder
 	var msg strings.Builder
-	exitCode, err := run(ctx, "git", dir, append([]string{"diff"}, revs...), env, nil, &buf, &msg)
-	if err != nil {
-		return "", &RunError{ExitCode: exitCode, Err: err, Revs: revs}
+	exitCode, err := run(ctx, "git", dir, args, env, nil, &buf, &msg)
+	if err == nil && exitCode <= 1 {
+		return buf.String(), nil
 	}
-	if exitCode > 1 {
-		return "", &RunError{ExitCode: exitCode, Stderr: strings.TrimSpace(msg.String()), Revs: revs}
+	failure.ExitCode, failure.Err = exitCode, err
+	if err == nil {
+		failure.Stderr = strings.TrimSpace(msg.String())
 	}
-	h := sha256.New()
-	_, _ = h.Write([]byte(buf.String()))
-	return hex.EncodeToString(h.Sum(nil)), nil
+	return "", &failure
 }
 
 type RunError struct {
@@ -41,9 +46,13 @@ type RunError struct {
 	Err      error
 	Stderr   string
 	Revs     []string
+	Args     []string
 }
 
 func (e *RunError) command() string {
+	if len(e.Args) > 0 {
+		return "git " + strings.Join(e.Args, " ")
+	}
 	if len(e.Revs) == 0 {
 		return "git diff HEAD"
 	}
