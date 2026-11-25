@@ -1,36 +1,43 @@
 package phaseintegrity
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseblock"
+	"github.com/mickeyyaya/evolve-loop/go/internal/testhost"
 )
 
 func TestSource_TreeSHA_RealGitWorktree(t *testing.T) {
+	testhost.Tool(t, "git")
 	dir := t.TempDir()
-	run := func(args ...string) error {
-		return exec.Command("git", append([]string{"-C", dir}, args...)...).Run()
+	run := func(args ...string) []byte {
+		out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).Output()
+		if err != nil {
+			t.Fatalf("git %v: %v", args, err)
+		}
+		return out
 	}
-	if err := run("init"); err != nil {
-		t.Skipf("git unavailable: %v", err)
-	}
+	run("init")
 	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := run("add", "-A"); err != nil {
-		t.Fatalf("git add: %v", err)
-	}
+	run("add", "-A")
 	got, err := (Source{WorktreePath: dir}).TreeSHA()
 	if err != nil {
 		t.Fatalf("TreeSHA real git: %v", err)
 	}
-	if len(got) != 40 && len(got) != 64 {
-		t.Errorf("write-tree sha = %q, want a 40/64-char hex oid", got)
+	listing := string(run("ls-tree", got))
+	blob := strings.TrimSpace(string(run("hash-object", "f.txt")))
+	if !strings.Contains(listing, blob) || !strings.Contains(listing, "f.txt") {
+		t.Errorf("tree %s lists %q, want f.txt at blob %s", got, listing, blob)
 	}
 }
 
@@ -52,7 +59,20 @@ func TestSource_ProfileSHA_SurfacesNonENOENTStatError(t *testing.T) {
 }
 
 func TestSource_ImplementsDigestSource(t *testing.T) {
-	var _ phaseblock.DigestSource = Source{}
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	if err := os.WriteFile(bin, []byte("binbytes"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var src phaseblock.DigestSource = Source{BinaryPath: bin, WorktreePath: dir, GitTree: func(string) (string, error) { return "tree-oid", nil }}
+	d, err := phaseblock.Compute("audit", "run-1", "now", "", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256([]byte("binbytes"))
+	if d.BinarySHA != hex.EncodeToString(sum[:]) || d.TreeSHA != "tree-oid" {
+		t.Errorf("digest through the interface = %+v, want the bytes of %s and tree-oid", d, bin)
+	}
 }
 
 func TestSource_BinarySHA_FromPathOrRunning(t *testing.T) {

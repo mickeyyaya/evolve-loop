@@ -25,8 +25,7 @@ func TestHelperLedgerAppender(t *testing.T) {
 	l := New(dir)
 	for i := 0; i < stressN; i++ {
 		if err := l.Append(context.Background(), stressEntry("stress-child", i)); err != nil {
-			fmt.Fprintf(os.Stderr, "child append %d: %v\n", i, err)
-			os.Exit(1)
+			t.Fatalf("child append %d: %v", i, err)
 		}
 	}
 }

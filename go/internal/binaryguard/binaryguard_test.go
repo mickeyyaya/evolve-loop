@@ -72,11 +72,14 @@ func TestHasExecutableMagic(t *testing.T) {
 }
 
 func TestOffender_RecordsPathAndSize(t *testing.T) {
-	off := Offender{Path: "go/acs/cycle536/evolve", Size: 18467058}
-	if off.Path != "go/acs/cycle536/evolve" {
-		t.Errorf("Offender.Path=%q want go/acs/cycle536/evolve", off.Path)
+	dir := t.TempDir()
+	writeFile(t, dir, "evolve", []byte{0x7f, 'E', 'L', 'F'}, 4096)
+	got, err := Scan(dir, []string{"evolve"}, 1024)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if off.Size != 18467058 {
-		t.Errorf("Offender.Size=%d want 18467058", off.Size)
+	want := []Offender{{Path: "evolve", Size: 4096}}
+	if len(got) != 1 || got[0] != want[0] {
+		t.Errorf("Scan = %+v, want %+v", got, want)
 	}
 }
