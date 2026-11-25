@@ -3,6 +3,7 @@ package setup
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -111,7 +112,7 @@ func TestSetupApply_RefusesAFloorPinThatNoWarningFlagged(t *testing.T) {
 	}
 	rep.Phases = phases
 	out, err := Apply(rep, builtinPresets, "recommended", nil, profiles.NewFromDir(profilesWithoutFloorCeilings(t)))
-	if err == nil || !strings.Contains(err.Error(), `emitted pin for "auditor" breaches floor`) {
+	if !errors.Is(err, ErrPinBreachesFloor) {
 		t.Fatalf("apply = %s, %v: a codex pin for the auditor must breach the claude floor", out, err)
 	}
 }

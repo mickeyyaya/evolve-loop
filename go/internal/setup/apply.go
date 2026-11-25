@@ -10,6 +10,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
+var ErrPinBreachesFloor = errors.New("emitted pin breaches floor")
+
 var ErrRoutingTableDeclared = errors.New("this project declares a cli_routing table, which owns every route, so setup presets do not apply: inspect the routes with `evolve cli-routing show` and change one with `evolve cli-routing set agents.<role> <clis> [--model <tier>]`")
 
 func Apply(rep DetectReport, cfg PresetConfig, presetName string, existingPolicyJSON []byte, profLoader *profiles.Loader) ([]byte, error) {
@@ -41,7 +43,7 @@ func Apply(rep DetectReport, cfg PresetConfig, presetName string, existingPolicy
 		}
 		pin := policy.Pin{CLI: a.CLI, Model: a.Tier}
 		if verr := policy.ValidatePin(a.Role, pin, &prof); verr != nil {
-			return nil, fmt.Errorf("setup apply: emitted pin for %q breaches floor: %w", a.Role, verr)
+			return nil, fmt.Errorf("setup apply: %w for %q: %w", ErrPinBreachesFloor, a.Role, verr)
 		}
 		pins[a.Role] = pin
 	}
