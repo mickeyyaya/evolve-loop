@@ -27,7 +27,7 @@ func TestWaveNext_RefusesBelowTheFreeSpaceFloorBeforeAnyStep(t *testing.T) {
 	if rc != cliExitRefused || e.Refused != waveRefusedDiskLow || e.Launched {
 		t.Fatalf("rc = %d envelope = %+v; want a %s refusal and no launch", rc, e, waveRefusedDiskLow)
 	}
-	for _, want := range []string{"273 MiB free", "2048 MiB floor", "preflight.min_free_gib", "evolve gc"} {
+	for _, want := range []string{"273 MiB free", "2048 MiB floor", "disk.floor_gb", "evolve gc"} {
 		if !strings.Contains(e.Error, want) {
 			t.Errorf("the refusal %q does not name %q", e.Error, want)
 		}

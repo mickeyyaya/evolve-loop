@@ -3,7 +3,10 @@
 // See docs/architecture/packages/internal-policy.md.
 package policy
 
-import "github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
+import (
+	"github.com/mickeyyaya/evolve-loop/go/internal/diskfloor"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
+)
 
 type Pin struct {
 	CLI   string `json:"cli,omitempty"`
@@ -26,6 +29,7 @@ type Policy struct {
 	Floor               []FloorGate          `json:"floor,omitempty"`
 	FailureFloor        *FailureFloor        `json:"failure_floor,omitempty"`
 	SystemFailurePolicy *SystemFailurePolicy `json:"failure_policy,omitempty"`
+	Disk                *diskfloor.Policy    `json:"disk,omitempty"`
 	GC                  *gcpolicy.Policy     `json:"gc,omitempty"`
 	Fanout              *FanoutPolicy        `json:"fanout,omitempty"`
 	Observer            *ObserverPolicy      `json:"observer,omitempty"`

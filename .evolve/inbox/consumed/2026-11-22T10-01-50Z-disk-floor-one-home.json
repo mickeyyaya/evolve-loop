@@ -5,13 +5,18 @@
     "Red first: setting two different values for the old and new keys is refused with an error that names both",
     "A guard test fails when a second reader of a disk floor appears outside the resolver"
   ],
+  "consumed": {
+    "at": "2026-11-25T06:36:32Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "continuation": {
-    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2609",
-    "branch": "cycle-cd3ae73e-2609",
-    "snapshot_sha": "c8e3e5067b919efe318ad769277de67707600003",
     "base_sha": "a099157d14664c4483d0db2009b6551b6ded79d6",
+    "branch": "cycle-cd3ae73e-2609",
+    "cycle": 2609,
     "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2609/audit-fail-reason.json",
-    "cycle": 2609
+    "snapshot_sha": "c8e3e5067b919efe318ad769277de67707600003",
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2609"
   },
   "created_at": "2026-11-22T10:01:50Z",
   "deps": [],
@@ -29,7 +34,7 @@
   "kind": "refactor",
   "last_failure_class": "capability",
   "last_failure_cycle": 2609,
-  "last_failure_findings": "review gate: phase \"build\" deliverable rejected after 2 correction(s): build handoff floor: 1 deterministic check failure(s) — fix these exactly before handoff:\n  repo-contract scanner pack RED: github.com/mickeyyaya/evolve-loop/go/internal/repocontract.TestPackages_HoldEveryTestThatReadsTheWholeTree — ship runs these repo-wide suites before it pushes and refuses a red one. Reproduce each from go/ with `go test -count=1 <package>` (for a named test add `-run '^<Test>$'`) and fix the change before handoff:\n=== RUN   TestPackages_HoldEveryTestThatReadsTheWholeTree\n    packages_test.go:25: internal/diskfloor.TestSingleReader_NoDiskFloorReaderLivesOutsideTheResolver reads the whole tree, so a lane that touches neither its package nor an importer can still break it; add it to TreeReadingTests() or put the package in Packages()\n--- FAIL: TestPackages_HoldEveryTestThatReadsTheWholeTree (2.68s)\n",
+  "last_failure_findings": "review gate: phase \"build\" deliverable rejected after 2 correction(s): build handoff floor: 1 deterministic check failure(s) — fix these exactly before handoff:\n  repo-contract scanner pack RED: github.com/mickeyyaya/evolve-loop/go/internal/repocontract.TestPackages_HoldEveryTestThatReadsTheWholeTree — ship runs these repo-wide suites before it pushes and refuses a red one. Reproduce each from go/ with `go test -count=1 \u003cpackage\u003e` (for a named test add `-run '^\u003cTest\u003e$'`) and fix the change before handoff:\n=== RUN   TestPackages_HoldEveryTestThatReadsTheWholeTree\n    packages_test.go:25: internal/diskfloor.TestSingleReader_NoDiskFloorReaderLivesOutsideTheResolver reads the whole tree, so a lane that touches neither its package nor an importer can still break it; add it to TreeReadingTests() or put the package in Packages()\n--- FAIL: TestPackages_HoldEveryTestThatReadsTheWholeTree (2.68s)\n",
   "last_failure_fingerprint": "text:1dfbbd6c208b",
   "last_failure_reason": "cycle-failure-release",
   "last_failure_rung": "R3",

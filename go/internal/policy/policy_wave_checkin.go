@@ -1,7 +1,5 @@
 package policy
 
-import "github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
-
 const (
 	defaultCheckinStallMinAgeMinutes   = 120
 	defaultCheckinStallMinLiveLanes    = 4
@@ -44,10 +42,7 @@ func (p Policy) WaveCheckinSettings() WaveCheckinConfig {
 	if p.Wave != nil && p.Wave.Checkin != nil {
 		block = *p.Wave.Checkin
 	}
-	var gc gcpolicy.Policy
-	if p.GC != nil {
-		gc = *p.GC
-	}
+	diskRes, _ := p.GCDiskFloor(nil)
 	return WaveCheckinConfig{
 		StallMinAgeMinutes:   positiveOr(block.StallMinAgeMinutes, defaultCheckinStallMinAgeMinutes),
 		StallMinLiveLanes:    positiveOr(block.StallMinLiveLanes, defaultCheckinStallMinLiveLanes),
@@ -58,7 +53,7 @@ func (p Policy) WaveCheckinSettings() WaveCheckinConfig {
 		LoadSustainedMinutes: positiveOr(block.LoadSustainedMinutes, defaultCheckinLoadSustainedMinutes),
 		StallWindowMinutes:   positiveOr(block.StallWindowMinutes, defaultCheckinStallWindowMinutes),
 		LoadPerCoreLimit:     positiveFloatOr(block.LoadPerCoreLimit, defaultCheckinLoadPerCoreLimit),
-		DiskFloorBytes:       gc.DiskFloorBytes(),
+		DiskFloorBytes:       diskRes.FloorBytes,
 	}
 }
 

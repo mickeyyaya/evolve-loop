@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
+	"github.com/mickeyyaya/evolve-loop/go/internal/diskfloor"
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -20,7 +21,15 @@ var runLoopPreflightFn = defaultLoopPreflight
 
 func loopPreflightOptions(cfg loopConfig, stderr io.Writer) looppreflight.Options {
 	layout := paths.ResolveFromEnv()
-	pol := policy.LoadOrDefaults(filepath.Join(cfg.ProjectRoot, ".evolve", "policy.json"), stderr)
+	policyPath := filepath.Join(cfg.ProjectRoot, ".evolve", "policy.json")
+	pol := policy.LoadOrDefaults(policyPath, stderr)
+	var diskFloorErr error
+	var minFreeBytes uint64
+	if _, err := policy.Load(policyPath); errors.Is(err, diskfloor.ErrConflict) {
+		diskFloorErr = err
+	} else if res, err := pol.DiskFloor(stderr); err == nil {
+		minFreeBytes = res.FloorBytes
+	}
 	return looppreflight.Options{
 		ProjectRoot:         cfg.ProjectRoot,
 		EvolveDir:           cfg.EvolveDir,
@@ -28,7 +37,8 @@ func loopPreflightOptions(cfg loopConfig, stderr io.Writer) looppreflight.Option
 		Stderr:              stderr,
 		SkipBoot:            cfg.SkipPreflightBoot,
 		NestedFallbackStage: parseGateStage(pol.SandboxConfig().NestedFallback),
-		MinFreeBytes:        pol.PreflightConfig().MinFreeBytes(),
+		MinFreeBytes:        minFreeBytes,
+		DiskFloorErr:        diskFloorErr,
 		LatestRelease:       looppreflight.DefaultLatestRelease,
 		ReleaseLag: looppreflight.ReleaseLagConfig{
 			Threshold: pol.PreflightConfig().ReleaseLagThreshold,

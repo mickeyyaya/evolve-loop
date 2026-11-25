@@ -11,7 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
+	"github.com/mickeyyaya/evolve-loop/go/internal/diskfloor"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 func TestDiskSignals_ATempDirThatIsTheProjectRootIsCheckedOnce(t *testing.T) {
@@ -21,10 +23,21 @@ func TestDiskSignals_ATempDirThatIsTheProjectRootIsCheckedOnce(t *testing.T) {
 	t.Cleanup(func() { gcDiskFreeBytes = prev })
 	var stdout, stderr bytes.Buffer
 
-	newGCRun(context.Background(), true, &stdout, &stderr).diskSignals(os.TempDir(), gc.Policy{})
+	newGCRun(context.Background(), true, &stdout, &stderr).diskSignals(os.TempDir(), policy.Policy{})
 
-	if calls != 1 || strings.Count(stderr.String(), "gc.disk_floor_gb") != 1 {
+	if calls != 1 || strings.Count(stderr.String(), "disk.floor_gb") != 1 {
 		t.Errorf("free disk read %d time(s), stderr %q; want one check of the shared path", calls, stderr.String())
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	conflictPol := policy.Policy{
+		Disk: &diskfloor.Policy{FloorGB: 8},
+		GC:   &gcpolicy.Policy{DiskFloorGB: 5},
+	}
+	newGCRun(context.Background(), true, &stdout, &stderr).diskSignals(t.TempDir(), conflictPol)
+	if !strings.Contains(stderr.String(), "WARN:") || !strings.Contains(stderr.String(), diskfloor.KeyFloorGB) || !strings.Contains(stderr.String(), diskfloor.OldKeyGCFloorGB) {
+		t.Errorf("conflict stderr %q; want WARN naming %s and %s", stderr.String(), diskfloor.KeyFloorGB, diskfloor.OldKeyGCFloorGB)
 	}
 }
 

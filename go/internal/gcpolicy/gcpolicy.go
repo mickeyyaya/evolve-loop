@@ -3,7 +3,11 @@
 // vocabulary, split from the engine itself (internal/gc).
 package gcpolicy
 
-import "time"
+import (
+	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/diskfloor"
+)
 
 type Policy struct {
 	Mode            string     `json:"mode,omitempty"`
@@ -82,22 +86,14 @@ func (p Policy) CacheTrimFreeBytes() uint64 {
 	return uint64(p.CacheTrimFreeGB) * uint64(bytesPerGB)
 }
 
-const defaultDiskFloorGB = 10
-
 func (p Policy) DiskFloorBytes() uint64 {
-	gb := p.DiskFloorGB
-	if gb <= 0 {
-		gb = defaultDiskFloorGB
-	}
-	return uint64(gb) * uint64(bytesPerGB)
+	res, _ := diskfloor.Resolve(nil, p, nil, diskfloor.DefaultGCFloorBytes, nil)
+	return res.FloorBytes
 }
 
 func (p Policy) DiskWarnBytes() uint64 {
-	floor := p.DiskFloorBytes()
-	if p.DiskWarnGB <= 0 {
-		return 2 * floor
-	}
-	return max(floor, uint64(p.DiskWarnGB)*uint64(bytesPerGB))
+	res, _ := diskfloor.Resolve(nil, p, nil, diskfloor.DefaultGCFloorBytes, nil)
+	return res.WarnBytes
 }
 
 const (

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/diskfloor"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
@@ -154,8 +155,15 @@ func (b *loopBatchCoordinator) interruptReturn(iteration int, when string) batch
 }
 
 func (b *loopBatchCoordinator) diskSpaceHalt(iteration int) (batchDecision, bool) {
-	pol := policy.LoadOrDefaults(filepath.Join(b.cfg.EvolveDir, "policy.json"), b.stderr)
-	check := looppreflight.CheckDiskSpace(b.cfg.EvolveDir, pol.PreflightConfig().MinFreeBytes(), looppreflight.DiskFreeBytes)
+	policyPath := filepath.Join(b.cfg.EvolveDir, "policy.json")
+	pol := policy.LoadOrDefaults(policyPath, b.stderr)
+	var check looppreflight.CheckResult
+	if _, err := policy.Load(policyPath); errors.Is(err, diskfloor.ErrConflict) {
+		check = looppreflight.CheckResult{Name: "disk-space", Level: looppreflight.LevelHalt, Message: err.Error(), Detail: fmt.Sprintf("set only %s in .evolve/policy.json", diskfloor.KeyFloorGB)}
+	} else {
+		res, _ := pol.DiskFloor(b.stderr)
+		check = looppreflight.CheckDiskSpace(b.cfg.EvolveDir, res.FloorBytes, looppreflight.DiskFreeBytes)
+	}
 	if check.Level != looppreflight.LevelHalt {
 		return batchDecision{}, false
 	}

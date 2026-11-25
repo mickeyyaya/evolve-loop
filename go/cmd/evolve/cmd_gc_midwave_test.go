@@ -307,7 +307,7 @@ func TestCacheScope_RunsExactlyTheStepsThatTheSentinelAnnounces(t *testing.T) {
 			ran = appendOnce(ran, "go_cache")
 		case strings.Contains(line, "pipeline temp"):
 			ran = appendOnce(ran, "pipeline_temp")
-		case strings.HasPrefix(line, "evolve gc: ") && !strings.Contains(line, "gc.disk_floor_gb"):
+		case strings.HasPrefix(line, "evolve gc: ") && !strings.Contains(line, "disk.floor_gb"):
 			t.Errorf("cache scope printed %q, a step that the sentinel does not announce in hostsentinel.Scopes", line)
 		}
 	}

@@ -204,9 +204,15 @@ func (b *loopBatchCoordinator) sentinelPortsFor(gcPol gcpolicy.Policy) sentinelP
 }
 
 func (b *loopBatchCoordinator) startSentinel(ctx context.Context) (*fleet.FloorHold, func()) {
-	gcPol := gcBlock(policy.LoadOrDefaults(filepath.Join(b.cfg.EvolveDir, "policy.json"), b.stderr))
+	pol := policy.LoadOrDefaults(filepath.Join(b.cfg.EvolveDir, "policy.json"), b.stderr)
+	gcPol := gcBlock(pol)
+	cfg := sentinelConfig(gcPol)
+	if res, err := pol.GCDiskFloor(b.stderr); err == nil {
+		cfg.FloorBytes = res.FloorBytes
+		cfg.WarnBytes = res.WarnBytes
+	}
 	s := &hostSentinel{
-		cfg:   sentinelConfig(gcPol),
+		cfg:   cfg,
 		mode:  hostsentinel.Mode{EnforceHold: gcPol.Sentinel.HoldEnforced(), EnforceRelease: gcPol.Sentinel.ReleaseEnforced()},
 		ports: b.sentinelPortsFor(gcPol), hold: fleet.NewFloorHold(),
 		publish: hostsentinel.Publish(b.deps.Signals.Emit), now: b.clock, warn: b.sentinelWarn,

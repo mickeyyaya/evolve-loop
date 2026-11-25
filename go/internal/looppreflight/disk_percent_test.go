@@ -186,3 +186,16 @@ func TestDiskStatus_MeasureReportsPausedFreePctThresholdAndPath(t *testing.T) {
 		t.Fatalf("Measure() at 50%% free = %+v, want %+v", st, want)
 	}
 }
+
+func TestDiskGuard_FloorBytesPausesEvenAbovePausePercent(t *testing.T) {
+	var warn bytes.Buffer
+	g := NewDiskGuard("/vol/work", DiskGuardConfig{FloorBytes: 50e9}, func(string) (DiskUsage, error) {
+		return DiskUsage{FreeBytes: 40e9, TotalBytes: 100e9}, nil
+	}, &warn)
+	if !g.Check() {
+		t.Fatal("Check() = false at 40 GB free below 50 GB floor, want true")
+	}
+	if !strings.Contains(warn.String(), "disk.floor_gb") {
+		t.Fatalf("warn = %q, want disk.floor_gb named", warn.String())
+	}
+}

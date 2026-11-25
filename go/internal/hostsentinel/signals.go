@@ -33,8 +33,8 @@ func init() {
 		code signalcenter.Code
 		doc  string
 	}{
-		{CodeDiskFloor, "the host sentinel read free disk under gc.disk_floor_gb during a wave; WARN. Fields: fields.free_bytes, floor_bytes, warn_bytes, path"},
-		{CodeDiskWarn, "the host sentinel read free disk under gc.disk_warn_gb and over the floor during a wave; INFO. Fields: fields.free_bytes, warn_bytes, path"},
+		{CodeDiskFloor, "the host sentinel read free disk under disk.floor_gb during a wave; WARN. Fields: fields.free_bytes, floor_bytes, warn_bytes, path"},
+		{CodeDiskWarn, "the host sentinel read free disk under disk.warn_gb and over the floor during a wave; INFO. Fields: fields.free_bytes, warn_bytes, path"},
 		{CodeGoCacheOver, "the host sentinel measured the go build cache over gc.go_cache_max_gb; WARN. Fields: fields.cache_bytes, limit_bytes"},
 		{CodeServersHigh, "the host sentinel counted more owner-dead tmux servers than gc.sentinel.orphan_servers_max; WARN. Fields: fields.count, limit"},
 		{CodeOrphansHigh, "the host sentinel counted more orphan processes of finished cycles than gc.sentinel.orphan_processes_max; WARN. Fields: fields.count, limit"},
@@ -42,7 +42,7 @@ func init() {
 		{CodeWouldRelease, "at gc.sentinel.release.stage shadow, the host sentinel records the mid-wave release that enforce starts; INFO. Fields: fields.scopes, free_bytes, cache_bytes"},
 		{CodeWouldHold, "at gc.sentinel.hold.stage shadow, the host sentinel records the hold on new lanes that enforce sets or clears; INFO. Fields: fields.would_hold (true or false), free_bytes, floor_bytes"},
 		{CodeReleaseSkipped, "the host sentinel skipped a mid-wave release; INFO. Fields: fields.reason (gc_lease_held or the failure)"},
-		{CodeLaneHold, "the host sentinel holds new lane starts because free disk is under gc.disk_floor_gb; running lanes continue; WARN. Fields: fields.free_bytes, floor_bytes"},
+		{CodeLaneHold, "the host sentinel holds new lane starts because free disk is under disk.floor_gb; running lanes continue; WARN. Fields: fields.free_bytes, floor_bytes"},
 		{CodeLaneHoldStuck, "the hold on new lanes lasted longer than gc.sentinel.hold_max_s and stays on; INCIDENT. Fields: fields.held_s, free_bytes"},
 		{CodeBlind, "the host sentinel could not read the host for " + strconv.Itoa(BlindAfter) + " samples in a row; WARN. Fields: fields.reason"},
 	} {

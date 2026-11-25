@@ -17,37 +17,44 @@ func Parse(raw []byte) (Policy, error) {
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return Policy{}, err
 	}
-	if err := p.Fleet.validateWindowStart(); err != nil {
-		return Policy{}, fmt.Errorf("fleet.orchestrator: %w", err)
-	}
-	if err := p.Workflow.validate(); err != nil {
-		return Policy{}, err
-	}
-	if err := p.Isolation.validate(); err != nil {
-		return Policy{}, err
-	}
-	if err := p.Boundary.validate(); err != nil {
-		return Policy{}, err
-	}
-	if err := p.Catalog.validate(); err != nil {
-		return Policy{}, err
-	}
-	if err := p.Overlays.validatePaths(); err != nil {
-		return Policy{}, err
-	}
-	if err := p.Healing.validate(); err != nil {
-		return Policy{}, fmt.Errorf("healing.%w", err)
-	}
-	if err := p.ExpectedSignal.validate(); err != nil {
-		return Policy{}, fmt.Errorf("expected_signal: %w", err)
-	}
-	if err := p.Preflight.validate(); err != nil {
-		return Policy{}, fmt.Errorf("preflight.%w", err)
-	}
-	if err := p.Telemetry.validate(); err != nil {
+	if err := p.validate(); err != nil {
 		return Policy{}, err
 	}
 	return p, nil
+}
+
+func (p Policy) validate() error {
+	if err := p.Fleet.validateWindowStart(); err != nil {
+		return fmt.Errorf("fleet.orchestrator: %w", err)
+	}
+	if err := p.Workflow.validate(); err != nil {
+		return err
+	}
+	if err := p.Isolation.validate(); err != nil {
+		return err
+	}
+	if err := p.Boundary.validate(); err != nil {
+		return err
+	}
+	if err := p.Catalog.validate(); err != nil {
+		return err
+	}
+	if err := p.Overlays.validatePaths(); err != nil {
+		return err
+	}
+	if err := p.Healing.validate(); err != nil {
+		return fmt.Errorf("healing.%w", err)
+	}
+	if err := p.ExpectedSignal.validate(); err != nil {
+		return fmt.Errorf("expected_signal: %w", err)
+	}
+	if err := p.Preflight.validate(); err != nil {
+		return fmt.Errorf("preflight.%w", err)
+	}
+	if err := p.validateDiskFloor(); err != nil {
+		return err
+	}
+	return p.Telemetry.validate()
 }
 
 func (i *IsolationPolicy) validate() error {

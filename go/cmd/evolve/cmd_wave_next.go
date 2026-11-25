@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/diskfloor"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gcpolicy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/goalhash"
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
@@ -230,8 +231,14 @@ func checkWaveIdle(env waveEnv, plan *wavePlan) error {
 }
 
 func checkWaveDisk(env waveEnv, plan *wavePlan, stderr io.Writer) error {
-	pol := policy.LoadOrDefaults(filepath.Join(plan.plane.evolveDir, "policy.json"), stderr)
-	check := looppreflight.CheckDiskSpace(plan.plane.evolveDir, pol.PreflightConfig().MinFreeBytes(), env.diskFree)
+	policyPath := filepath.Join(plan.plane.evolveDir, "policy.json")
+	pol := policy.LoadOrDefaults(policyPath, stderr)
+	if _, err := policy.Load(policyPath); errors.Is(err, diskfloor.ErrConflict) {
+		return &waveRefusal{code: waveRefusedDiskLow, err: err}
+	}
+	res, _ := pol.DiskFloor(nil)
+	plan.warnings = append(plan.warnings, res.Warnings...)
+	check := looppreflight.CheckDiskSpace(plan.plane.evolveDir, res.FloorBytes, env.diskFree)
 	if check.Level == looppreflight.LevelPass {
 		return nil
 	}

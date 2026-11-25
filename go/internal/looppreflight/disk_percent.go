@@ -3,6 +3,8 @@ package looppreflight
 import (
 	"fmt"
 	"io"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/diskfloor"
 )
 
 const (
@@ -13,6 +15,7 @@ const (
 type DiskGuardConfig struct {
 	WarnPercent  float64
 	PausePercent float64
+	FloorBytes   uint64
 }
 
 func DefaultDiskGuardConfig() DiskGuardConfig {
@@ -75,9 +78,15 @@ func (g *DiskGuard) probe() bool {
 	}
 	pct := (float64(u.FreeBytes) / float64(u.TotalBytes)) * 100
 	g.freePct = pct
-	if pct < g.cfg.PausePercent {
+	underFloor := g.cfg.FloorBytes > 0 && u.FreeBytes < g.cfg.FloorBytes
+	if pct < g.cfg.PausePercent || underFloor {
 		g.paused = true
-		fmt.Fprintf(g.warn, "[disk-guard] WARN: free disk space at %s is %.1f%% (below %.0f%% pause threshold) — pausing new dispatches\n", g.dir, pct, g.cfg.PausePercent)
+		if pct < g.cfg.PausePercent {
+			fmt.Fprintf(g.warn, "[disk-guard] WARN: free disk space at %s is %.1f%% (below %.0f%% pause threshold) — pausing new dispatches\n", g.dir, pct, g.cfg.PausePercent)
+		}
+		if underFloor {
+			fmt.Fprintf(g.warn, "[disk-guard] WARN: free disk space at %s is %.2f GB (below %.2f GB %s) — pausing new dispatches\n", g.dir, float64(u.FreeBytes)/float64(diskfloor.BytesPerGB), float64(g.cfg.FloorBytes)/float64(diskfloor.BytesPerGB), diskfloor.KeyFloorGB)
+		}
 		return true
 	}
 	g.paused = false

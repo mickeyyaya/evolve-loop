@@ -46,6 +46,7 @@ func buildCycleStartOptions(root, evolveDir string, warn io.Writer, hooks cycleS
 	if err != nil {
 		return looppreflight.CycleStartOptions{}, fmt.Errorf("%w: %w", errCycleStartPolicyRefused, err)
 	}
+	floorRes, _ := pol.DiskFloor(warn)
 	trim := hooks.trim
 	if trim == nil {
 		trim = cycleStartTrim(evolveDir, gcPolicyOf(pol))
@@ -54,9 +55,11 @@ func buildCycleStartOptions(root, evolveDir string, warn io.Writer, hooks cycleS
 	if usage == nil {
 		usage = cycleStartDiskUsageFn
 	}
+	guardCfg := looppreflight.DefaultDiskGuardConfig()
+	guardCfg.FloorBytes = floorRes.FloorBytes
 	return looppreflight.CycleStartOptions{
 		Trim:          trim,
-		Guard:         looppreflight.NewDiskGuard(root, looppreflight.DefaultDiskGuardConfig(), usage, warn),
+		Guard:         looppreflight.NewDiskGuard(root, guardCfg, usage, warn),
 		Wait:          hooks.wait,
 		Warn:          warn,
 		MaxPause:      pol.PreflightConfig().DiskPauseMax,

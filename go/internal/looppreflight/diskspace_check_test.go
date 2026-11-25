@@ -33,3 +33,21 @@ func TestCheckDiskSpace_ComparesFreeWithTheFloor(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckDiskSpace_DiskFloorErrHaltsPreflight(t *testing.T) {
+	opts := diskOpts(t, 50<<30, 1<<30)
+	opts.DiskFloorErr = errors.New("conflicting disk floor")
+	res, err := Run(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range res.Checks {
+		if c.Name == "disk-space" {
+			if c.Level != LevelHalt || !strings.Contains(c.Message, "conflicting disk floor") {
+				t.Fatalf("disk-space check = %+v, want halt with error message", c)
+			}
+			return
+		}
+	}
+	t.Fatal("missing disk-space check")
+}

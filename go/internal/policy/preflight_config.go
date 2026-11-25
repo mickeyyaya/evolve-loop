@@ -2,11 +2,13 @@ package policy
 
 import (
 	"errors"
+	"io"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/diskfloor"
 )
 
 const (
-	defaultPreflightMinFreeGiB         = 1.0
 	defaultPreflightReleaseLagPatches  = 2
 	defaultPreflightReleaseCheckTTLHrs = 24.0
 	defaultDiskGuardMaxPauseSeconds    = 1800
@@ -35,6 +37,7 @@ func (p *PreflightPolicy) validate() error {
 
 type PreflightConfig struct {
 	MinFreeGiB          float64
+	resolvedFloorBytes  uint64
 	ReleaseLagThreshold int
 	ReleaseCheckTTL     time.Duration
 	DiskPauseMax        time.Duration
@@ -42,16 +45,15 @@ type PreflightConfig struct {
 
 func (p Policy) PreflightConfig() PreflightConfig {
 	c := PreflightConfig{
-		MinFreeGiB:          defaultPreflightMinFreeGiB,
 		ReleaseLagThreshold: defaultPreflightReleaseLagPatches,
 		ReleaseCheckTTL:     hoursToDuration(defaultPreflightReleaseCheckTTLHrs),
 		DiskPauseMax:        defaultDiskGuardMaxPauseSeconds * time.Second,
 	}
+	if n, err := diskfloor.ApplyToPreflight(p.Disk, p.GC, p.Preflight, &c, nil); err == nil {
+		c.resolvedFloorBytes = n
+	}
 	if p.Preflight == nil {
 		return c
-	}
-	if p.Preflight.MinFreeGiB > 0 {
-		c.MinFreeGiB = p.Preflight.MinFreeGiB
 	}
 	if p.Preflight.ReleaseLagThreshold > 0 {
 		c.ReleaseLagThreshold = p.Preflight.ReleaseLagThreshold
@@ -65,10 +67,26 @@ func (p Policy) PreflightConfig() PreflightConfig {
 	return c
 }
 
+func (p Policy) DiskFloor(warn io.Writer) (diskfloor.Resolution, error) {
+	return diskfloor.Resolve(p.Disk, p.GC, p.Preflight, diskfloor.DefaultPreflightFloorBytes, warn)
+}
+
+func (p Policy) GCDiskFloor(warn io.Writer) (diskfloor.Resolution, error) {
+	return diskfloor.Resolve(p.Disk, p.GC, p.Preflight, diskfloor.DefaultGCFloorBytes, warn)
+}
+
+func (p Policy) validateDiskFloor() error {
+	_, err := p.DiskFloor(nil)
+	return err
+}
+
 func hoursToDuration(h float64) time.Duration {
 	return time.Duration(h * float64(time.Hour))
 }
 
 func (c PreflightConfig) MinFreeBytes() uint64 {
-	return uint64(c.MinFreeGiB * (1 << 30))
+	if c.resolvedFloorBytes > 0 {
+		return c.resolvedFloorBytes
+	}
+	return diskfloor.PreflightBytes(c)
 }

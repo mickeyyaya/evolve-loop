@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/diskfloor"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
@@ -242,7 +243,7 @@ func (r gcRun) project(projectRoot string) int {
 	opts := worktreeGCOptions(projectRoot, evolveDir, gcPol.Worktrees, r.stdout)
 	opts.BranchScope = gc.BranchScopeAll
 	opts.EndedAfter = gcPol.DevWorktrees.ArchiveAfter()
-	r.diskSignals(projectRoot, gcPol)
+	r.diskSignals(projectRoot, pol)
 	before, freeErr := looppreflight.DiskFreeBytes(projectRoot)
 	ageOf := continuationAge{maxAge: pol.ContinuationConfig().MaxAgeCycles, loaded: loaded}
 	steps := []func(gcRun) bool{
@@ -277,9 +278,9 @@ func (r gcRun) project(projectRoot string) int {
 	return 0
 }
 
-func (r gcRun) loadPolicy(projectRoot string) (string, gc.Policy, bool) {
+func (r gcRun) loadPolicy(projectRoot string) (string, policy.Policy, bool) {
 	projectRoot, pol, _, ok := r.loadFullPolicy(projectRoot)
-	return projectRoot, gcBlock(pol), ok
+	return projectRoot, pol, ok
 }
 
 func (r gcRun) loadFullPolicy(projectRoot string) (string, policy.Policy, bool, bool) {
@@ -290,6 +291,10 @@ func (r gcRun) loadFullPolicy(projectRoot string) (string, policy.Policy, bool, 
 	}
 	pol, err := policy.Load(filepath.Join(projectRoot, ".evolve", "policy.json"))
 	if err != nil {
+		if errors.Is(err, diskfloor.ErrConflict) {
+			fmt.Fprintf(r.stderr, "evolve gc: %v\n", err)
+			return "", policy.Policy{}, false, false
+		}
 		fmt.Fprintf(r.stderr, "evolve gc: WARN: policy load failed: %v; using zero-value gc policy\n", err)
 	}
 	return projectRoot, pol, err == nil, true
@@ -432,7 +437,7 @@ func (r gcRun) goCache(pol gc.Policy) bool {
 	}
 	r.summary("%d go build cache file(s) would be trimmed to fit the %s cap (%s, least recently used first); %s would remain", "trimmed %d go build cache file(s) to fit the %s cap (%s, least recently used first); %s remains", rep.CapFiles, gcSize(capBytes), gcSize(rep.CapBytes), gcSize(rep.RemainingBytes))
 	if rep.RemainingBytes > capBytes {
-		fmt.Fprintf(r.stderr, "evolve gc: WARN: go build cache still holds %s, over its %s cap: the cap never trims an entry whose mtime is under %s old (the go command refreshes an entry's mtime once it is an hour old, so this covers every entry looked up within about the last hour, plus a one-hour hold)\n", gcSize(rep.RemainingBytes), gcSize(capBytes), gc.GoCacheInUseWindow)
+		fmt.Fprintf(r.stderr, "evolve gc: WARN: go build cache still holds %s, over its %s cap: the cap never trims an entry whose mtime is younger than %s (the go command refreshes an entry's mtime once it is an hour old, so this covers every entry looked up within about the last hour, plus a one-hour hold)\n", gcSize(rep.RemainingBytes), gcSize(capBytes), gc.GoCacheInUseWindow)
 	}
 	for _, e := range rep.Errors {
 		fmt.Fprintf(r.stderr, "evolve gc: go build cache error: %s\n", e)

@@ -915,3 +915,4 @@
 ./internal/heldaudit
 # the gate and floor facts block and the final-diff rubric of the audit prompt (ADR-0158 decisions 20 and 21). 100% API + 100% line coverage gated.
 ./internal/core/auditfacts
+./internal/diskfloor

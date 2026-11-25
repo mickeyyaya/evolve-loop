@@ -33,15 +33,16 @@ func (r gcRun) cacheScope(projectRoot string) int {
 		return 1
 	}
 	r.diskSignals(projectRoot, pol)
-	if r.diskFreeAboveTrim(projectRoot, pol) {
+	gcPol := gcBlock(pol)
+	if r.diskFreeAboveTrim(projectRoot, gcPol) {
 		return 0
 	}
-	failed := r.step(func(s gcRun) bool { return s.goCache(pol) })
+	failed := r.step(func(s gcRun) bool { return s.goCache(gcPol) })
 	if r.stopped() {
 		fmt.Fprintf(r.stderr, "evolve gc: stopped between the cache steps: the temp sweep did not run\n")
 		return 1
 	}
-	failed = r.step(func(s gcRun) bool { return s.pipelineTemp(pol.TempTTLHours) }) || failed
+	failed = r.step(func(s gcRun) bool { return s.pipelineTemp(gcPol.TempTTLHours) }) || failed
 	if failed {
 		return 1
 	}
@@ -72,7 +73,8 @@ func (r gcRun) salvageScope(projectRoot string) int {
 	if !ok {
 		return 1
 	}
-	opts := worktreeGCOptions(projectRoot, filepath.Join(projectRoot, ".evolve"), pol.Worktrees, r.stdout)
+	gcPol := gcBlock(pol)
+	opts := worktreeGCOptions(projectRoot, filepath.Join(projectRoot, ".evolve"), gcPol.Worktrees, r.stdout)
 	opts.Exec = r.exec
 	items, err := gc.PlanSalvageRepack(opts)
 	if err != nil {

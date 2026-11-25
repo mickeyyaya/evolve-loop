@@ -88,6 +88,7 @@ type Options struct {
 	DirWritable   func(dir string) bool
 	DiskFreeBytes func(path string) (uint64, error)
 	MinFreeBytes  uint64
+	DiskFloorErr  error
 	OrphanKill    swarm.TmuxKiller
 
 	NestedFallbackStage config.Stage
@@ -330,7 +331,7 @@ func Run(opts Options) (Result, error) {
 		checkBaseDivergence(o),
 		checkLLMCLIStatus(o),
 		checkHostCapabilities(o),
-		checkDiskSpace(o, opts.MinFreeBytes),
+		checkDiskSpace(o, opts.MinFreeBytes, opts.DiskFloorErr),
 		checkCLIVersionFreeze(o),
 		checkCLIHealth(o),
 		checkCLIVersionDrift(o),
