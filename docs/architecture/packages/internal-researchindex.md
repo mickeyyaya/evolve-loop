@@ -20,6 +20,11 @@
 - **A hand edit in the region is stale.** Pinned by `TestCheck_AHandEditInsideTheRegionIsStale`.
 - **Two entry PRs merge in either order to one index with no hand merge.** The conflict lies inside the region, so `derived.IsDerivedConflict` is true. Pinned by `TestTwoEntryPRs_MergeInEitherOrderToOneIndexWithNoHandMerge`.
 
+## The gate
+
+- **The floor and ship name a broken entry.** `readEntries` refuses an entry that does not start with a `## ` heading line, and the error names the file. The build floor and the ship gate run `evolve docs index check` when the diff touches `docs/research-index/` or the index. A failure goes into the correction line with the output of the check, so the line names the entry file. Ship runs the check after the audit binding and refuses a tree that fails it with `DERIVED_STALE`. Pinned by `TestShip_CycleRefusesAResearchEntryThatStartsWithABlankLine`, `TestShip_TheRealGeneratorRefusesABlankLeadingEntryOfACloneAndPassesACleanOne` and `TestDerivedFloor_ABrokenResearchEntryNamesTheInputTheCheckReports`.
+- **A valid new entry with a stale index is regenerated, not refused, in a lane.** The normalizer regenerates the index before the floor and the audit. Ship refuses only a stale index that appears after the audit. Pinned by `TestShip_CycleRefusesAValidNewEntryWithAStaleIndexAndNamesTheGenerateVerb`.
+
 ## Limits
 
 - GitHub does not apply a merge driver of `.gitattributes` to a PR merge ([rubocop #3594](https://github.com/rubocop-hq/rubocop/pull/3594), 2016). Thus the second PR still shows a conflict on GitHub. `evolve pr refresh` resolves it with no hand merge. The operator accepted this form of the acceptance on 2026-10-21 (plan D12).
