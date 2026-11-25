@@ -57,6 +57,9 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `AUDIT_LEDGER_PROMPT_DEGRADED` | while composing the audit prompt the continuation manifest (fields.reason=manifest; fallback = registry | none) or the ancestor ledger (fields.reason=ledger, op = read | parse) could not be read, so the auditor was NOT told its inherited ids; stream-only — the same fault blocks at Classify under its own WARN code; fields.step=prompt, path |
 | `AUDIT_LEDGER_UNREADABLE` | the ancestor's or this cycle's own defect-ledger.json is present but unreadable (fields.which = ancestor | own, op = read | parse); the continuation is blocked — repair the file named by fields.path; fields.step=grade, ancestor_cycle |
 | `AUDIT_LEDGER_WRITEBACK_FAILED` | the reconciled ledger could not be written back into the workspace; an invisible disposition is not a disposition, so the cycle is blocked; fields.step=grade, path |
+| `AUDIT_REREVIEW_FILE_FAILED` | at enforce, a late audit finding was not filed as a follow-up, or the landing note was not written. fields.round, fields.reason names the failure |
+| `AUDIT_REREVIEW_NO_SCOPE` | an audit round from 2 on has no repair-diff scope, so it ran as a full audit and nothing was filed (ADR-0168 D3). fields.round, fields.reason names the missing input |
+| `AUDIT_REREVIEW_SHADOW` | from audit round 2, the host measured the repair-diff re-review (ADR-0168). fields.stage is shadow (prompt and verdict unchanged) or enforce. fields.round, hunks, late, would_file (late, below the late-file bar of the audit-repair loop), would_block (late, at or above that bar), reworded (new ids at the location of an open previous finding), filed (follow-ups made at enforce) and verdict |
 
 ### bridge
 

@@ -182,3 +182,8 @@
 - **Family.** A family is the manifest `binary` of the driver of a row. The report (plan T7) maps a row to its family through the bridge manifest. `TokenWeightsFor` of any other name wraps `ErrUnknownKey`. The message says the family has no weight. Then `withRebuildRemedy` adds the rebuild hint when an older binary meets a newer family.
 - **Fence.** No file on the integrity fence changes.
 - Pinned by `token_weights_load_test.go` and `token_weights_test.go`. The last test checks that the policy-config section lists the families and the defaults.
+## workflow.convergence.audit_rereview (ADR-0168)
+
+- **Stage.** `workflow.convergence.audit_rereview.stage` is `shadow` by default. It has its own named type, `AuditRereviewStage`, and its own signal `AUDIT_REREVIEW_SHADOW`. A flip of `workflow.convergence.stage` never moves it.
+- **One home.** `ConvergencePolicy.AuditRereview` holds the key, because the strict policy refuses an unknown key. An unknown word warns and resolves to `shadow`.
+- **Pinned by** `TestAuditRereviewStage_DefaultsToShadowAndNeverFollowsTheConvergenceStage` and `TestAuditRereviewStage_ItsOwnKeyFlipsItAlone`.
