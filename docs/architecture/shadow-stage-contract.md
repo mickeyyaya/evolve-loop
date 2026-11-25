@@ -590,8 +590,8 @@ The operator's order: keep the evidence and the contract intact, and make both v
 
 **E3 Scoring is reproducible.**
 - The verdict of a stage is a pure function of the chained evidence plus the chained cycle outcomes. It reads no signal file and no other input.
-- `evolve stage verify <key>` recomputes the verdict from the chain alone. It prints the evidence range (first and last cycle) and the digest that it verified.
-- It also prints the counts: decisions, false stops, escapes, conflicts and incomplete cycles. It lists each counted case with its cycle and sequence number.
+- `evolve stage verify <key>` recomputes the verdict from the chain alone. It prints the evidence range (first and last scope id) and the digest that it verified.
+- It also prints the counts: decisions, false stops, escapes, conflicts and incomplete scopes. It lists each counted case with its scope and sequence number.
 - A broken chain gives the verdict `not ready` and a typed error. It never gives a partial verdict.
 - Tests: `TestVerdictRecomputesFromFixtureChain` recomputes the verdict from a fixture chain and compares it with a golden. `TestScorerMutationChangesGolden` changes the scorer and expects the golden to fail.
 
@@ -646,6 +646,6 @@ Stage `regression_tia.stage`, cycle 2400, two decisions.
 - `evolve docs ste-lint --strict` reports 0 findings on this revision.
 - The chain proves that evidence did not change after it was written. It does not prove that the decision function was right when it wrote the record. S2 and the scorer tests cover that.
 - A party that can rewrite the whole chain and the head anchor can forge evidence. The hash chain detects an edit by a party that cannot do this. The protected paths (C1) and the ship gate limit who can.
-- The file:line cites of §10 were read at HEAD `64bcd83c4`. The recorder, the seal writer and the ledger reader exist as packages from K2a and K2b. The wiring of the recorder into the cycle, the default reader of `evolve stage report` and the verbs `evolve stage status`, `evolve stage flip` and `evolve stage migrate` do not exist yet.
+- The file:line cites of §10 were read at HEAD `64bcd83c4`. The recorder, the seal writer and the ledger reader exist as packages from K2a and K2b. K2c to K2e wire the recorder into the cycle and make the ledger reader the default of `evolve stage report`. They also record the retry ladder and the held proposals. The orphan seal (K2f) and the verbs `evolve stage status`, `evolve stage flip` and `evolve stage migrate` do not exist yet.
 - A scorer proves a stage only for the cases that the data holds. A rare failure can stay unseen until the flip. The stop-and-revert path of each enforce branch is the second defense.
 - The description of the Go test cache in §7 F2 comes from the research notes of 2026-11-15 and not from a test run.
