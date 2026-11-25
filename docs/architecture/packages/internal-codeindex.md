@@ -13,7 +13,7 @@
 - **One interface.** `Backend` has `Name`, `Capabilities` and one method for each query. Each method returns `([]Hit, error)`.
 - **Declared capabilities.** `Capabilities` says which queries a backend serves. A call graph serves `callers`. A text search serves `find` only. `Serves` answers for one query.
 - **Three typed errors.** `ErrNotFound` means that the query ran and found nothing. `ErrAbsent` means that the index or the engine is missing. `ErrUnsupported` means that no backend serves the query. The commands map them to the exit codes 1, 2 and 3.
-- **A chain, not one engine.** `Backends` is an ordered set. `For` returns the first backend that serves a query. `Search` asks that backend only. A `ErrNotFound` from the first backend does not go to the next one, because the operator puts the best engine for each query first. This is the Chain of Responsibility pattern over the Strategy interface.
+- **A chain, not one engine.** `Backends` is an ordered set, and `For` returns the first backend that serves a query. `Search` and `SearchServed` ask that backend only by default. With `WithAbsentFallThrough`, `SearchServed` skips a backend that returns `ErrAbsent` and tries the next capable backend. A `ErrNotFound` or other error never falls through. This is the Chain of Responsibility pattern over the Strategy interface.
 - **No registry.** The set is built and passed in. There is no `init()` and no global. `New` takes the names from the policy list and a map of `Factory` functions. It fails on an empty list, on a duplicate name and on an unknown name. The unknown-name message lists the known names.
 - **`Dispatch`.** It calls the method of a backend that matches a `Request`. `Search` and the conformance suite share it.
 
@@ -49,6 +49,6 @@ A backend is done when it passes `Run`. The trail adapter runs the suite with a 
 
 ## Wiring
 
-`go/cmd/evolve/cmd_code.go` builds the `Backends` set from the policy block `code_index` (`internal/policy`, `CodeIndexConfig`) and maps the errors to exit codes. It appends one record to the usage log for each call through [`internal/codeindex/usagelog`](internal-codeindex-usagelog.md).
+`go/cmd/evolve/cmd_code.go` builds the `Backends` set from the policy block `code_index` (`internal/policy`, `CodeIndexConfig`), passes `WithAbsentFallThrough` when `on_absent` is `next`, and maps the errors to exit codes. It appends one record to the usage log for each call through [`internal/codeindex/usagelog`](internal-codeindex-usagelog.md).
 
 `go/cmd/evolve/cmd_code_freshness.go` compares the index `HEAD` with the local `origin/main` ref before each query. It warns on stderr when they differ, or refuses with exit 21 when `code_index.stale` is `refuse`. `go/cmd/evolve/cmd_code_refresh.go` moves the index worktree to `origin/main` and calls `Backends.Refresh`. `evolve sync-main` and `evolve code refresh` run it. The spec is [code-index-cli.md](../code-index-cli.md), section 4.

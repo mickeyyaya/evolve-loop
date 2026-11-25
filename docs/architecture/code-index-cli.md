@@ -88,10 +88,11 @@ The wiring reads the block `code_index` of `.evolve/policy.json`. The decode is 
 
 | Key | Default | Meaning |
 |---|---|---|
-| `backends` | `["trail"]` | the ordered list of backend names. It is a capability route: the first backend that serves a query answers it. There is no failover when that backend is absent. |
+| `backends` | `["trail"]` | the ordered list of backend names. The first backend that serves a query answers it. `on_absent` sets what happens when that backend is absent. |
 | `index_dir` | `dev/code-index` | the index worktree |
 | `trail_bin` | `dev/.tools/trail/node_modules/.bin/trail` | the trail-code binary |
 | `stale` | `warn` | what a query does when the index is not at `origin/main`: `warn` prints a warning and answers, `refuse` exits 21 (section 4). Another word is a policy error. |
+| `on_absent` | `refuse` | what a query does when the chosen backend returns `ErrAbsent`: `refuse` exits 2, `next` tries the next capable backend. Another word is a policy error. |
 
 The exit code 2 is the case of a host with no Node, no binary or no index worktree. The command stops with a clear message and does not guess (plan section 9). No query command writes to the repository, to the index or to the cycle worktree. Only `evolve code refresh` and `evolve sync-main` write the index worktree.
 
@@ -133,7 +134,7 @@ On 2026-10-17 the operator asked: "build the cli layer as abstract layer which c
 2. **Declared capabilities.** Each backend says which of the four queries it serves (`Capabilities()`). A call graph serves `callers`. A text or embedding search serves `find` only. A command that no backend serves exits 3 with the message "no backend serves `<command>`".
 3. **A backend set, chosen by config.** `main` builds a `Backends` set from the policy key `code_index.backends`, an ordered list such as `["trail"]`. `codeindex.New` builds it from a map of factory functions and fails on an unknown name. For each query, the first backend in the list that serves it answers. This is the Chain of Responsibility pattern over the Strategy interface. There is no `init()` registry: the set is built and injected, as ADR-0137 asks for the bridge.
 
-   The list is a capability route and not a failover chain. When the chosen backend is absent, the command exits 2 and does not ask the next backend. An absent backend is an operator fix. A silent switch to another backend hides the fault and changes the answer.
+   By default, `code_index.on_absent` is `refuse`: when the chosen backend is absent, the command exits 2. Set `on_absent` to `next` to ask the next capable backend on `ErrAbsent` and log the backend that answered. `ErrNotFound` never falls through. A stale index stays under `code_index.stale` (exit 21 under `refuse`).
 4. **One conformance suite.** The shared suite `codeindextest.Run` runs the same cases on every backend. A new backend is done when it passes the suite. It runs on the fake and on the trail adapter.
 
    The cases are a known caller, a known file API, a query with no answer (`ErrNotFound`) and an absent index (`ErrAbsent`). A query that the backend does not serve must give `ErrUnsupported`.

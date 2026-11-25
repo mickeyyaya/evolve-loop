@@ -280,6 +280,7 @@ type codeIndexLocation struct {
 	backends           []string
 	indexDir, trailBin string
 	stale              string
+	onAbsent           string
 }
 
 func loadCodeIndexLocation(projectRoot string) (codeIndexLocation, error) {
@@ -295,11 +296,15 @@ func loadCodeIndexLocation(projectRoot string) (codeIndexLocation, error) {
 	if err != nil {
 		return codeIndexLocation{}, err
 	}
-	return codeIndexLocation{backends: cfg.Backends, indexDir: indexDir, trailBin: trailBin, stale: cfg.Stale}, nil
+	return codeIndexLocation{backends: cfg.Backends, indexDir: indexDir, trailBin: trailBin, stale: cfg.Stale, onAbsent: cfg.OnAbsent}, nil
 }
 
 func newCodeBackends(loc codeIndexLocation, run sysexec.RunFunc, env []string) (codeindex.Backends, error) {
-	return codeindex.New(loc.backends, codeBackendFactories(loc, run, env))
+	var opts []codeindex.Option
+	if loc.onAbsent == policy.CodeIndexOnAbsentNext {
+		opts = append(opts, codeindex.WithAbsentFallThrough())
+	}
+	return codeindex.New(loc.backends, codeBackendFactories(loc, run, env), opts...)
 }
 
 func codeBackendFactories(loc codeIndexLocation, run sysexec.RunFunc, env []string) map[string]codeindex.Factory {

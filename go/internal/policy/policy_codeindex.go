@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -13,13 +14,19 @@ const (
 
 	CodeIndexStaleWarn   = "warn"
 	CodeIndexStaleRefuse = "refuse"
+
+	CodeIndexOnAbsentRefuse = "refuse"
+	CodeIndexOnAbsentNext   = "next"
 )
+
+var ErrCodeIndexOnAbsent = errors.New("policy: code_index.on_absent")
 
 type CodeIndexPolicy struct {
 	Backends []string `json:"backends,omitempty"`
 	IndexDir *string  `json:"index_dir,omitempty"`
 	TrailBin *string  `json:"trail_bin,omitempty"`
 	Stale    *string  `json:"stale,omitempty"`
+	OnAbsent *string  `json:"on_absent,omitempty"`
 }
 
 type CodeIndexSettings struct {
@@ -27,10 +34,11 @@ type CodeIndexSettings struct {
 	IndexDir string
 	TrailBin string
 	Stale    string
+	OnAbsent string
 }
 
 func (p Policy) CodeIndexConfig() (CodeIndexSettings, error) {
-	out := CodeIndexSettings{Backends: []string{defaultCodeIndexBackend}, IndexDir: defaultCodeIndexDir, TrailBin: defaultCodeIndexTrail, Stale: CodeIndexStaleWarn}
+	out := CodeIndexSettings{Backends: []string{defaultCodeIndexBackend}, IndexDir: defaultCodeIndexDir, TrailBin: defaultCodeIndexTrail, Stale: CodeIndexStaleWarn, OnAbsent: CodeIndexOnAbsentRefuse}
 	c := p.CodeIndex
 	if c == nil {
 		return out, nil
@@ -51,7 +59,20 @@ func (p Policy) CodeIndexConfig() (CodeIndexSettings, error) {
 	if out.Stale, err = codeIndexStale(c.Stale); err != nil {
 		return CodeIndexSettings{}, err
 	}
+	if out.OnAbsent, err = codeIndexOnAbsent(c.OnAbsent); err != nil {
+		return CodeIndexSettings{}, err
+	}
 	return out, nil
+}
+
+func codeIndexOnAbsent(set *string) (string, error) {
+	if set == nil {
+		return CodeIndexOnAbsentRefuse, nil
+	}
+	if *set != CodeIndexOnAbsentRefuse && *set != CodeIndexOnAbsentNext {
+		return "", fmt.Errorf("%w %q: want %s|%s", ErrCodeIndexOnAbsent, *set, CodeIndexOnAbsentRefuse, CodeIndexOnAbsentNext)
+	}
+	return *set, nil
 }
 
 func codeIndexStale(set *string) (string, error) {

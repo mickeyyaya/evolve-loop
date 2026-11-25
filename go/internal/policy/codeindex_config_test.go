@@ -12,7 +12,7 @@ func TestCodeIndexConfig_AbsentBlockResolvesTheCompiledDefaults(t *testing.T) {
 
 	cfg, err := loadCIWatchPolicy(t, `{}`).CodeIndexConfig()
 
-	want := CodeIndexSettings{Backends: []string{"trail"}, IndexDir: "dev/code-index", TrailBin: "dev/.tools/trail/node_modules/.bin/trail", Stale: CodeIndexStaleWarn}
+	want := CodeIndexSettings{Backends: []string{"trail"}, IndexDir: "dev/code-index", TrailBin: "dev/.tools/trail/node_modules/.bin/trail", Stale: CodeIndexStaleWarn, OnAbsent: CodeIndexOnAbsentRefuse}
 	if err != nil {
 		t.Fatalf("CodeIndexConfig: %v", err)
 	}

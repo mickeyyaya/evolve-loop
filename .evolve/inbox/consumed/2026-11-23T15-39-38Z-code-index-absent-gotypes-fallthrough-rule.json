@@ -3,6 +3,11 @@
     "Policy data states what evolve code does when the gotypes index is absent or stale for a callers or api query: refuse with a typed reason, or route to the next backend, as one rule with one home.",
     "The spec (no failover) and the plan (fall to trail) agree after the change, and a test pins the chosen rule."
   ],
+  "consumed": {
+    "at": "2026-11-25T08:55:42Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-11-23T15:39:38Z",
   "files": [
     "go/internal/codeindex",

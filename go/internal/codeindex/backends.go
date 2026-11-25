@@ -10,7 +10,16 @@ import (
 )
 
 type Backends struct {
-	ordered []Backend
+	ordered             []Backend
+	fallThroughOnAbsent bool
+}
+
+type Option func(*Backends)
+
+func WithAbsentFallThrough() Option {
+	return func(b *Backends) {
+		b.fallThroughOnAbsent = true
+	}
 }
 
 func NewBackends(ordered ...Backend) Backends {
@@ -40,12 +49,26 @@ func (b Backends) Search(ctx context.Context, req Request) ([]Hit, error) {
 }
 
 func (b Backends) SearchServed(ctx context.Context, req Request) (hits []Hit, served string, err error) {
-	backend, err := b.For(req.Query)
-	if err != nil {
-		return nil, "", err
+	var firstAbsentName string
+	var firstAbsentErr error
+	for _, backend := range b.ordered {
+		if !backend.Capabilities().Serves(req.Query) {
+			continue
+		}
+		hits, err = Dispatch(ctx, backend, req)
+		if b.fallThroughOnAbsent && errors.Is(err, ErrAbsent) {
+			if firstAbsentErr == nil {
+				firstAbsentName = backend.Name()
+				firstAbsentErr = err
+			}
+			continue
+		}
+		return hits, backend.Name(), err
 	}
-	hits, err = Dispatch(ctx, backend, req)
-	return hits, backend.Name(), err
+	if firstAbsentErr != nil {
+		return nil, firstAbsentName, firstAbsentErr
+	}
+	return nil, "", unsupported(req.Query)
 }
 
 func unsupported(q Query) error {
@@ -54,12 +77,16 @@ func unsupported(q Query) error {
 
 type Factory func() (Backend, error)
 
-func New(names []string, factories map[string]Factory) (Backends, error) {
+func New(names []string, factories map[string]Factory, opts ...Option) (Backends, error) {
 	built, err := Resolve(names, factories)
 	if err != nil {
 		return Backends{}, err
 	}
-	return NewBackends(built...), nil
+	b := NewBackends(built...)
+	for _, opt := range opts {
+		opt(&b)
+	}
+	return b, nil
 }
 
 func Resolve(names []string, factories map[string]Factory) ([]Backend, error) {
