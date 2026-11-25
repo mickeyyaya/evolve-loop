@@ -136,8 +136,9 @@ const (
 )
 
 type DevWorktreesPolicy struct {
-	ArchiveAfterDays   int `json:"archive_after_days,omitempty"`
-	SweepBudgetSeconds int `json:"sweep_budget_seconds,omitempty"`
+	ArchiveAfterDays   int      `json:"archive_after_days,omitempty"`
+	SweepBudgetSeconds int      `json:"sweep_budget_seconds,omitempty"`
+	Protected          []string `json:"protected,omitempty"`
 }
 
 func (d DevWorktreesPolicy) SweepBudget() time.Duration {

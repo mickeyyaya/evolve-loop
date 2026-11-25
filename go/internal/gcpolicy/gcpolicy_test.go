@@ -2,6 +2,7 @@ package gcpolicy_test
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -17,7 +18,7 @@ func TestWithDefaults(t *testing.T) {
 		LogsTTLDays:    30,
 		TrackerTTLDays: 7,
 	}
-	if got != want {
+	if !reflect.DeepEqual(got, want) {
 		t.Errorf("zero Policy.WithDefaults() = %+v, want %+v", got, want)
 	}
 	if got.Runs.ArchiveAfterDays != 0 || got.Runs.DeleteAfterDays != 0 {
@@ -35,7 +36,7 @@ func TestWithDefaultsPreservesExplicitValues(t *testing.T) {
 		TrackerTTLDays: 3,
 		Worktrees:      gcpolicy.WorktreesPolicy{KeepRecent: 5, MinAgeMinutes: 90},
 	}
-	if got := in.WithDefaults(); got != in {
+	if got := in.WithDefaults(); !reflect.DeepEqual(got, in) {
 		t.Errorf("WithDefaults() overwrote explicit config: got %+v, want %+v", got, in)
 	}
 }
@@ -56,7 +57,7 @@ func TestPolicyJSONRoundTrip(t *testing.T) {
 		TrackerTTLDays: 13,
 		Worktrees:      gcpolicy.WorktreesPolicy{KeepRecent: 2, MinAgeMinutes: 45},
 	}
-	if p != want {
+	if !reflect.DeepEqual(p, want) {
 		t.Fatalf("decoded %+v, want %+v", p, want)
 	}
 	out, err := json.Marshal(p)
@@ -67,7 +68,7 @@ func TestPolicyJSONRoundTrip(t *testing.T) {
 	if err := json.Unmarshal(out, &back); err != nil {
 		t.Fatalf("re-unmarshal: %v", err)
 	}
-	if back != want {
+	if !reflect.DeepEqual(back, want) {
 		t.Errorf("round trip lost data: %+v, want %+v", back, want)
 	}
 }
@@ -284,5 +285,15 @@ func TestDiskFloorAndWarn_DefaultToTenAndTwentyGBAndDecodeFromTheirKeys(t *testi
 	}
 	if got := (gcpolicy.Policy{DiskFloorGB: 30, DiskWarnGB: 4}).DiskWarnBytes(); got != 30e9 {
 		t.Errorf("a warn level under the floor = %d, want the floor 30e9", got)
+	}
+}
+
+func TestDevWorktreesProtected_DecodesFromItsPolicyKey(t *testing.T) {
+	var p gcpolicy.Policy
+	if err := json.Unmarshal([]byte(`{"dev_worktrees":{"protected":["lane-*"]}}`), &p); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if !reflect.DeepEqual(p.DevWorktrees.Protected, []string{"lane-*"}) {
+		t.Errorf("Protected = %v, want [lane-*]", p.DevWorktrees.Protected)
 	}
 }

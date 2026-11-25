@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -63,6 +64,7 @@ type DevOptions struct {
 	Processes   func(ctx context.Context) ([]Process, error)
 	OpenPRs     OpenPRLookup
 	MergedPRs   MergedPRLookup
+	ClosedPRs   MergedPRLookup
 	PRHeads     func(ctx context.Context, dir string) (map[string]bool, error)
 	Save        DevSaveFunc
 	Deferred    func(path string)
@@ -114,6 +116,8 @@ type devSweep struct {
 	headsRead  bool
 	merged     map[string][]string
 	mergedRead bool
+	closed     map[string][]string
+	closedRead bool
 }
 
 func newDevSweep(ctx context.Context, o DevOptions) (*devSweep, string, error) {
@@ -223,6 +227,31 @@ func (s *devSweep) gateProtected(_ context.Context, it *DevItem) (string, error)
 	case isPlaneWorktree(s.hub.Root, it.Path):
 		return "a plane worktree (runtime or console)", nil
 	}
+	glob, err := s.protectedGlob(it.Path)
+	if err != nil {
+		return "", err
+	}
+	if glob != "" {
+		return "protected by policy: " + glob, nil
+	}
+	return "", nil
+}
+
+func (s *devSweep) protectedGlob(dir string) (string, error) {
+	rel, err := filepath.Rel(resolveDeep(s.hub.DevDir()), resolveDeep(dir))
+	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", nil
+	}
+	name := filepath.ToSlash(rel)
+	for _, glob := range s.o.Policy.Protected {
+		matched, err := path.Match(glob, name)
+		if err != nil {
+			return "", fmt.Errorf("gc.dev_worktrees.protected %q: %w", glob, err)
+		}
+		if matched {
+			return glob, nil
+		}
+	}
 	return "", nil
 }
 
@@ -282,7 +311,7 @@ func (s *devSweep) gateIdle(ctx context.Context, it *DevItem) (string, error) {
 		return "", nil
 	}
 	reason := fmt.Sprintf("active within the %d-day limit", int(s.limit.Hours()/24))
-	early, err := s.landedEarly(ctx, it)
+	early, cause, err := s.landedEarly(ctx, it)
 	if err != nil && ctx.Err() != nil {
 		return "", err
 	}
@@ -290,6 +319,9 @@ func (s *devSweep) gateIdle(ctx context.Context, it *DevItem) (string, error) {
 		return reason + " (landed check: " + err.Error() + ")", nil
 	}
 	if !early {
+		if cause != "" {
+			return reason + "; " + cause, nil
+		}
 		return reason, nil
 	}
 	if s.early == nil {
@@ -414,10 +446,14 @@ func (s *devSweep) landed(ctx context.Context, it DevItem) (string, error) {
 	switch {
 	case err != nil:
 		return "", err
-	case res.NoNet:
-		return fmt.Sprintf("has no net changes against main (%d commit(s) not in main)", res.Ahead), nil
-	case res.Landed:
+	case res.Landed && !res.NoNet:
 		return landedInMain, nil
+	}
+	if slices.Contains(s.closedTips(ctx)[it.Branch], it.Head) {
+		return landedClosedPR, nil
+	}
+	if res.NoNet {
+		return fmt.Sprintf("has no net changes against main (%d commit(s) not in main)", res.Ahead), nil
 	}
 	return "is not in main", nil
 }

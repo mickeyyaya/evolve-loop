@@ -189,7 +189,15 @@ func ghPullRequestHeads(ctx context.Context, dir string) (map[string]bool, error
 	return heads, nil
 }
 
+func ghClosedPullRequestTips(ctx context.Context, dir string) (map[string][]string, error) {
+	return ghPullRequestTipsByState(ctx, dir, "CLOSED")
+}
+
 func ghMergedPullRequestTips(ctx context.Context, dir string) (map[string][]string, error) {
+	return ghPullRequestTipsByState(ctx, dir, "MERGED")
+}
+
+func ghPullRequestTipsByState(ctx context.Context, dir, wantState string) (map[string][]string, error) {
 	if _, err := exec.LookPath("gh"); err != nil {
 		return nil, fmt.Errorf("%w: %v", gc.ErrPRLookupUnavailable, err)
 	}
@@ -201,7 +209,7 @@ func ghMergedPullRequestTips(ctx context.Context, dir string) (map[string][]stri
 	}
 	tips := map[string][]string{}
 	for _, pr := range prs {
-		if pr.State == "MERGED" && pr.HeadRefOid != "" {
+		if pr.State == wantState && pr.HeadRefOid != "" {
 			tips[pr.Branch] = append(tips[pr.Branch], pr.HeadRefOid)
 		}
 	}
