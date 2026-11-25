@@ -120,7 +120,11 @@ func LedgerFileOf(projectRoot string) string {
 	return filepath.Join(EvolveDirOf(projectRoot), ledgerFileName)
 }
 
-func EventChannelsRoot(evolveDir string) string { return filepath.Join(evolveDir, "events", "ch") }
+const EventChannelsDir = "events/ch"
+
+func EventChannelsRoot(evolveDir string) string {
+	return filepath.Join(evolveDir, filepath.FromSlash(EventChannelsDir))
+}
 
 func RunWorkspace(projectRoot string, cycle int) string {
 	return filepath.Join(EvolveDirOf(projectRoot), "runs", "cycle-"+strconv.Itoa(cycle))

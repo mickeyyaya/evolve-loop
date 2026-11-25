@@ -277,3 +277,19 @@ func TestPublisher_AChannelSegmentSizeOverridesTheDefault(t *testing.T) {
 		}
 	}
 }
+
+func TestValidQoS_IsTheRuleThatNewEnforces(t *testing.T) {
+	t.Parallel()
+	for _, q := range []QoS{QoSLossless, QoSBestEffort, "Lossless", "at_most_once", ""} {
+		cfg := testConfig(t, Channel{Name: "x", Route: "", QoS: q})
+
+		p, err := New(cfg)
+		if p != nil {
+			p.Close(time.Minute)
+		}
+
+		if (err == nil) != ValidQoS(q) {
+			t.Errorf("qos %q: New error = %v, ValidQoS = %v, want them to agree", q, err, ValidQoS(q))
+		}
+	}
+}
