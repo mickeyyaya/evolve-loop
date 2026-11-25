@@ -13,7 +13,6 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/codequality"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
-	"github.com/mickeyyaya/evolve-loop/go/internal/derived"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shipmanifest"
@@ -305,7 +304,7 @@ func (o *Orchestrator) normalizeDerivedProjections(ctx context.Context, worktree
 	if worktree == "" {
 		return
 	}
-	stale := derived.Stale(changedWorktreePaths(ctx, worktree), goInputsFor(ctx, worktree))
+	stale := staleDerivedEntries(ctx, worktree, changedWorktreePaths(ctx, worktree), os.Stderr)
 	regenStaleProjections(ctx, worktree, stale, refreshDerivedEntry, stageDerivedEntry)
 }
 

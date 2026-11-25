@@ -47,7 +47,8 @@ func productionStaticFloorChecks(ctx context.Context, in core.ReviewInput) []str
 	out = append(out, core.StaticBuildFloorChecks(ctx, in)...)
 	out = append(out, core.ScopeDeltaFloorChecks(guards.IsProtectedSurface)(ctx, in)...)
 	out = append(out, core.GateClassifierFloorChecks(ctx, in)...)
-	return append(out, core.LintFloorChecks(lintPackages)(ctx, in)...)
+	out = append(out, core.LintFloorChecks(lintPackages)(ctx, in)...)
+	return append(out, core.DerivedFloorChecks(derivedRunner)(ctx, in)...)
 }
 
 func productionSuiteFloorChecks(ctx context.Context, in core.ReviewInput) []string {
@@ -60,6 +61,8 @@ func productionFloorCheck() core.BuildFloorCheck {
 }
 
 var lintPackages core.LintFn = commitgate.LintPackages
+
+var derivedRunner core.DerivedRunFn = core.LaneDerivedGenerator
 
 var repoContractPack core.RepoContractPackFn = ship.RunRepoContractPack
 
