@@ -13,6 +13,7 @@ type Policy struct {
 	Mode            string     `json:"mode,omitempty"`
 	Runs            RunsPolicy `json:"runs,omitempty"`
 	SalvageTTLDays  int        `json:"salvage_ttl_days,omitempty"`
+	SalvageMaxMB    int        `json:"salvage_max_mb,omitempty"`
 	LogsTTLDays     int        `json:"logs_ttl_days,omitempty"`
 	TrackerTTLDays  int        `json:"tracker_ttl_days,omitempty"`
 	GoCacheTTLHours int        `json:"go_cache_ttl_hours,omitempty"`
@@ -84,6 +85,13 @@ func (p Policy) CacheTrimFreeBytes() uint64 {
 		return 0
 	}
 	return uint64(p.CacheTrimFreeGB) * uint64(bytesPerGB)
+}
+
+func (p Policy) SalvageMaxBytes() int64 {
+	if p.SalvageMaxMB <= 0 {
+		return 0
+	}
+	return int64(p.SalvageMaxMB) * bytesPerMB
 }
 
 func (p Policy) DiskFloorBytes() uint64 {

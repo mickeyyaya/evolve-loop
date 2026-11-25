@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
@@ -174,5 +175,113 @@ func TestGCRun_SalvageScopeStopsWhenTheProjectRootCannotBeResolved(t *testing.T)
 
 	if rc := r.salvageScope("x"); rc != 1 {
 		t.Errorf("rc = %d, want 1", rc)
+	}
+}
+
+func TestRunGC_OnlySalvageRetentionDryRunAndApplyHonorCap(t *testing.T) {
+	e := newGCSalvageEnv(t)
+	e.repo.Write(".evolve/policy.json", `{"gc":{"salvage_max_mb":1}}`)
+	e.repo.Git("checkout", "-q", "-b", "lane/landed")
+	e.repo.Write("landed.txt", "landed\n")
+	e.repo.Git("add", "landed.txt")
+	e.repo.Git("commit", "-q", "-m", "landed")
+	landedTip := e.repo.Git("rev-parse", "HEAD")
+	e.repo.Git("checkout", "-q", "main")
+	e.repo.Git("merge", "--ff-only", "lane/landed")
+	e.repo.Git("update-ref", "refs/remotes/origin/main", "refs/heads/main")
+
+	landedLeaf := filepath.Join(e.root, ".evolve", "operator-salvage", "cycle-cccc-32")
+	if err := os.MkdirAll(landedLeaf, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	pad := make([]byte, 2<<20)
+	if _, err := rand.Read(pad); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(landedLeaf, "HEAD"), []byte(landedTip+" lane/landed\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(landedLeaf, "refs.bundle"), pad, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-10 * 24 * time.Hour)
+	for _, p := range []string{filepath.Join(landedLeaf, "HEAD"), filepath.Join(landedLeaf, "refs.bundle"), landedLeaf} {
+		if err := os.Chtimes(p, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	code, stdout, stderr := e.run(t, "--dry-run")
+	if code != 0 || !strings.Contains(stdout, "EVICT cycle-cccc-32") {
+		t.Fatalf("dry-run code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if _, err := os.Stat(landedLeaf); err != nil {
+		t.Fatalf("dry-run deleted leaf: %v", err)
+	}
+
+	code, stdout, stderr = e.run(t)
+	if code != 0 || !strings.Contains(stdout, "salvage retention evicted") {
+		t.Fatalf("apply code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if _, err := os.Stat(landedLeaf); !os.IsNotExist(err) {
+		t.Errorf("landed leaf still present after apply: %v", err)
+	}
+}
+
+func TestGCRun_SalvageRetentionErrors(t *testing.T) {
+	e := newGCSalvageEnv(t)
+	e.repo.Git("checkout", "-q", "-b", "lane/landed-no-bundle")
+	e.repo.Write("nb.txt", "nb\n")
+	e.repo.Git("add", "nb.txt")
+	e.repo.Git("commit", "-q", "-m", "nb")
+	landedTip := e.repo.Git("rev-parse", "HEAD")
+	e.repo.Git("checkout", "-q", "main")
+	e.repo.Git("merge", "--ff-only", "lane/landed-no-bundle")
+	e.repo.Git("update-ref", "refs/remotes/origin/main", "refs/heads/main")
+	e.repo.Write(".evolve/policy.json", `{"gc":{"salvage_max_mb":1}}`)
+
+	landedLeaf := filepath.Join(e.root, ".evolve", "operator-salvage", "cycle-cccc-33")
+	if err := os.MkdirAll(landedLeaf, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	pad := make([]byte, 2<<20)
+	if _, err := rand.Read(pad); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(landedLeaf, "HEAD"), []byte(landedTip+" lane/landed-no-bundle\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(landedLeaf, "data.bin"), pad, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-10 * 24 * time.Hour)
+	for _, p := range []string{filepath.Join(landedLeaf, "HEAD"), filepath.Join(landedLeaf, "data.bin"), landedLeaf} {
+		if err := os.Chtimes(p, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	e.repo.Git("update-ref", "-d", "refs/remotes/origin/main")
+	var stdout, stderr bytes.Buffer
+	r := newGCRun(context.Background(), true, &stdout, &stderr)
+	opts := gc.WorktreeOptions{ProjectRoot: e.root, EvolveDir: filepath.Join(e.root, ".evolve"), Exec: r.exec}
+	if rc := r.salvageDryRetention(opts, 1<<20); rc != 1 || !strings.Contains(stderr.String(), "salvage retention plan failed") {
+		t.Errorf("dry retention rc=%d stderr=%q", rc, stderr.String())
+	}
+	stderr.Reset()
+	if rc := r.salvageApplyRetention(opts, 1<<20); rc != 1 || !strings.Contains(stderr.String(), "salvage retention plan failed") {
+		t.Errorf("apply retention rc=%d stderr=%q", rc, stderr.String())
+	}
+
+	e.repo.Git("update-ref", "refs/remotes/origin/main", "refs/heads/main")
+	if err := os.RemoveAll(filepath.Join(e.root, ".evolve", "operator-salvage", gcSalvageLeaf)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(e.root, ".evolve", "archive"), []byte("file"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, _, errOut := e.run(t)
+	if code != 1 || !strings.Contains(errOut, "salvage retention apply failed") {
+		t.Errorf("apply error code=%d stderr=%q", code, errOut)
 	}
 }

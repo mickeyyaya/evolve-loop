@@ -4,6 +4,11 @@
     "Red first: a leaf with untracked files stays",
     "Red first: over the cap, an unlanded leaf younger than the TTL stays"
   ],
+  "consumed": {
+    "at": "2026-11-25T14:33:03Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-11-20T00:51:05Z",
   "deps": [
     "recycle-x0-thin-bundle-writers",

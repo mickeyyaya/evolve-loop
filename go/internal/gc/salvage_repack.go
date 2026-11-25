@@ -122,7 +122,14 @@ func (o WorktreeOptions) judgeSalvageLeaf(it SalvageRepackItem, file string) Sal
 	it.Heads = heads
 	ahead, err := o.headsAheadOfBasis(heads, it.Basis)
 	if err != nil {
-		return keep("a head is not in the repository: " + err.Error())
+		if !strings.Contains(verified, salvageFullHistory) {
+			return keep("a head is not in the repository: " + err.Error())
+		}
+		scratchAhead, scratchErr := o.fullBundleHeadsAheadOfBasis(file, heads, it.Basis)
+		if scratchErr != nil {
+			return keep("a head is not in the repository: " + err.Error())
+		}
+		ahead = scratchAhead
 	}
 	switch {
 	case ahead == 0:
@@ -301,21 +308,96 @@ func (o WorktreeOptions) recordSalvage(it SalvageRepackItem, after int64) error 
 	return appendArchiveLine(SalvageRepackAuditPath(o.EvolveDir), it.Leaf, rec)
 }
 
-func (o WorktreeOptions) buildThinBundle(it SalvageRepackItem, out string) error {
+func (o WorktreeOptions) newSalvageScratchRepo(basis string) (string, func(), error) {
 	store, err := o.git(o.ProjectRoot, "rev-parse", "--path-format=absolute", "--git-path", "objects")
 	if err != nil {
-		return err
+		return "", nil, err
 	}
 	scratch, err := os.MkdirTemp("", "salvage-repack-")
 	if err != nil {
-		return err
+		return "", nil, err
 	}
-	defer func() { _ = os.RemoveAll(scratch) }()
+	cleanup := func() { _ = os.RemoveAll(scratch) }
 	if _, err := o.git(scratch, "init", "--bare", "-q", "."); err != nil {
-		return err
+		cleanup()
+		return "", nil, err
 	}
 	alternates := filepath.Join(scratch, "objects", "info", "alternates")
 	if err := os.WriteFile(alternates, []byte(strings.TrimSpace(store)+"\n"), 0o644); err != nil {
+		cleanup()
+		return "", nil, err
+	}
+	if _, err := o.git(scratch, "update-ref", salvageOriginMainRef, basis); err != nil {
+		cleanup()
+		return "", nil, err
+	}
+	return scratch, cleanup, nil
+}
+
+func (o WorktreeOptions) headInRepo(dir, sha string) bool {
+	_, err := o.git(dir, "cat-file", "-e", sha+"^{commit}")
+	return err == nil
+}
+
+func (o WorktreeOptions) ensureScratchHeads(scratch, bundleFile string, heads []string) error {
+	for i, h := range heads {
+		sha, ref, _ := strings.Cut(h, " ")
+		if o.headInRepo(scratch, sha) {
+			continue
+		}
+		dst := fmt.Sprintf("refs/salvage-import/%d", i)
+		if _, err := o.git(scratch, "fetch", "--no-tags", "--quiet", bundleFile, ref+":"+dst); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (o WorktreeOptions) fullBundleHeadsAheadOfBasis(file string, heads []string, basis string) (int, error) {
+	missing := false
+	for _, h := range heads {
+		sha, _, _ := strings.Cut(h, " ")
+		if !o.headInRepo(o.ProjectRoot, sha) {
+			missing = true
+			break
+		}
+	}
+	if !missing {
+		return 0, errors.New("all heads exist in repository")
+	}
+	scratch, cleanup, err := o.newSalvageScratchRepo(basis)
+	if err != nil {
+		return 0, err
+	}
+	defer cleanup()
+	if err := o.ensureScratchHeads(scratch, file, heads); err != nil {
+		return 0, err
+	}
+	ahead := 0
+	for _, h := range heads {
+		sha, _, _ := strings.Cut(h, " ")
+		if _, err := o.git(scratch, "merge-base", salvageOriginMainRef, sha); err != nil {
+			return 0, err
+		}
+		n, err := commitsAhead(o.git, scratch, salvageOriginMainRef, sha)
+		if err != nil {
+			return 0, err
+		}
+		if n > 0 {
+			ahead++
+		}
+	}
+	return ahead, nil
+}
+
+func (o WorktreeOptions) buildThinBundle(it SalvageRepackItem, out string) error {
+	scratch, cleanup, err := o.newSalvageScratchRepo(it.Basis)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	bundleFile := filepath.Join(OperatorSalvageDir(o.EvolveDir), it.Leaf, salvageBundleFile)
+	if err := o.ensureScratchHeads(scratch, bundleFile, it.Heads); err != nil {
 		return err
 	}
 	args := []string{"bundle", "create", out}
@@ -325,9 +407,6 @@ func (o WorktreeOptions) buildThinBundle(it SalvageRepackItem, out string) error
 			return err
 		}
 		args = append(args, ref)
-	}
-	if _, err := o.git(scratch, "update-ref", salvageOriginMainRef, it.Basis); err != nil {
-		return err
 	}
 	_, err = o.git(scratch, append(args, "^"+salvageOriginMainRef)...)
 	return err

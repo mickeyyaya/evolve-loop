@@ -297,3 +297,28 @@ func TestDevWorktreesProtected_DecodesFromItsPolicyKey(t *testing.T) {
 		t.Errorf("Protected = %v, want [lane-*]", p.DevWorktrees.Protected)
 	}
 }
+
+func TestSalvageMaxBytes_UnsetOrNonPositiveMeansNoCapAndPositiveScalesByMiB(t *testing.T) {
+	cases := []struct {
+		name string
+		mb   int
+		want int64
+	}{
+		{"unset", 0, 0},
+		{"negative", -4, 0},
+		{"one", 1, 1 << 20},
+		{"three", 3, 3 << 20},
+	}
+	for _, c := range cases {
+		if got := (gcpolicy.Policy{SalvageMaxMB: c.mb}).SalvageMaxBytes(); got != c.want {
+			t.Errorf("%s: SalvageMaxBytes() with salvage_max_mb=%d = %d, want %d", c.name, c.mb, got, c.want)
+		}
+	}
+	var p gcpolicy.Policy
+	if err := json.Unmarshal([]byte(`{"salvage_max_mb":3}`), &p); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if p.SalvageMaxMB != 3 || p.SalvageMaxBytes() != 3<<20 {
+		t.Errorf("decoded salvage_max_mb=%d (%d bytes), want 3 (%d bytes)", p.SalvageMaxMB, p.SalvageMaxBytes(), 3<<20)
+	}
+}

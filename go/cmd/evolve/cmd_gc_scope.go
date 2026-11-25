@@ -82,8 +82,9 @@ func (r gcRun) salvageScope(projectRoot string) int {
 		return 1
 	}
 	r.salvageReport(items)
+	maxBytes := gcPol.SalvageMaxBytes()
 	if r.dryRun {
-		return 0
+		return r.salvageDryRetention(opts, maxBytes)
 	}
 	freed, err := gc.ApplySalvageRepack(opts, items)
 	fmt.Fprintf(r.stdout, "evolve gc: salvage freed %s\n", gcSize(freed))
@@ -91,7 +92,55 @@ func (r gcRun) salvageScope(projectRoot string) int {
 		fmt.Fprintf(r.stderr, "evolve gc: salvage apply failed: %v\n", err)
 		return 1
 	}
+	return r.salvageApplyRetention(opts, maxBytes)
+}
+
+func (r gcRun) salvageDryRetention(opts gc.WorktreeOptions, maxBytes int64) int {
+	retPlan, err := gc.PlanSalvageRetention(opts, maxBytes)
+	if err != nil {
+		fmt.Fprintf(r.stderr, "evolve gc: salvage retention plan failed: %v\n", err)
+		return 1
+	}
+	r.salvageRetentionReport(retPlan)
 	return 0
+}
+
+func (r gcRun) salvageApplyRetention(opts gc.WorktreeOptions, maxBytes int64) int {
+	if maxBytes <= 0 {
+		return 0
+	}
+	retPlan, err := gc.PlanSalvageRetention(opts, maxBytes)
+	if err != nil {
+		fmt.Fprintf(r.stderr, "evolve gc: salvage retention plan failed: %v\n", err)
+		return 1
+	}
+	r.salvageRetentionReport(retPlan)
+	evicted, err := gc.ApplySalvageRetention(opts, retPlan)
+	fmt.Fprintf(r.stdout, "evolve gc: salvage retention evicted %s\n", gcSize(evicted))
+	if err != nil {
+		fmt.Fprintf(r.stderr, "evolve gc: salvage retention apply failed: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+func (r gcRun) salvageRetentionReport(plan gc.SalvageRetentionPlan) {
+	if plan.CapBytes <= 0 {
+		return
+	}
+	var evictCount int
+	var evictBytes int64
+	for _, it := range plan.Items {
+		if it.Action == gc.SalvageEvict {
+			evictCount++
+			evictBytes += it.Bytes
+		}
+		fmt.Fprintf(r.stdout, "  %s %s %s (%s)\n", strings.ToUpper(string(it.Action)), it.Leaf, gcSize(it.Bytes), it.Reason)
+	}
+	r.summary("salvage store %s vs cap %s: %d leaf/leaves would be evicted (%s)", "salvage store %s vs cap %s: %d leaf/leaves to evict (%s)", gcSize(plan.TotalBytes), gcSize(plan.CapBytes), evictCount, gcSize(evictBytes))
+	if plan.RemainingBytes > plan.CapBytes {
+		fmt.Fprintf(r.stderr, "evolve gc: WARN: salvage store still holds %s over its %s cap\n", gcSize(plan.RemainingBytes), gcSize(plan.CapBytes))
+	}
 }
 
 func (r gcRun) salvageReport(items []gc.SalvageRepackItem) {

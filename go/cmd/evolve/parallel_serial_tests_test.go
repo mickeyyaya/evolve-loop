@@ -610,6 +610,8 @@ var serialTests = map[string]string{
 	"main.TestRunGC_OnlySalvageRefusesWithoutOriginMain":                                                                   "sets env through gcWorktreeEnv",
 	"main.TestRunGC_OnlySalvageRepacksTheBundleAndASecondRunFindsNothingToDo":                                              "sets env through gcWorktreeEnv",
 	"main.TestRunGC_OnlySalvageReportsAnApplyFailureAndExitsOne":                                                           "sets env through gcWorktreeEnv",
+	"main.TestRunGC_OnlySalvageRetentionDryRunAndApplyHonorCap":                                                            "sets env through gcWorktreeEnv",
+	"main.TestGCRun_SalvageRetentionErrors":                                                                                "sets env through gcWorktreeEnv",
 	"main.TestRunGC_TheScanTestCacheSizeCapComesFromPolicy":                                                                "sets env through gcWorktreeEnv",
 	"main.TestRunGC_TrimsTheScanTestCachePastItsTTLAndPreviewsFirst":                                                       "sets env through gcWorktreeEnv",
 	"main.TestRunGCHook_DefaultModeIsShadow":                                                                               "sets env through a helper",

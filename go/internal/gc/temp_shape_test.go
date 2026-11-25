@@ -80,7 +80,6 @@ func TestTempShape_HasLiveSocketHandlesWalkErrors(t *testing.T) {
 }
 
 func TestTempShape_LiveSocketStaysAndStaleSocketGoes(t *testing.T) {
-	t.Parallel()
 	base, err := os.MkdirTemp("/tmp", "cycle2631-")
 	if err != nil {
 		t.Fatal(err)
@@ -102,14 +101,7 @@ func TestTempShape_LiveSocketStaysAndStaleSocketGoes(t *testing.T) {
 	}
 	defer func() { _ = liveLn.Close() }()
 
-	staleLn, err := net.Listen("unix", filepath.Join(staleDir, "s"))
-	if err != nil {
-		t.Fatalf("listen stale socket: %v", err)
-	}
-	staleLn.(*net.UnixListener).SetUnlinkOnClose(false)
-	if err := staleLn.Close(); err != nil {
-		t.Fatal(err)
-	}
+	writeStaleSocket(t, filepath.Join(staleDir, "s"))
 
 	for _, d := range []string{liveDir, staleDir} {
 		if err := os.Chtimes(d, stale, stale); err != nil {
@@ -148,6 +140,26 @@ func TestTempShape_LiveSocketStaysAndStaleSocketGoes(t *testing.T) {
 	if _, err := os.Stat(staleDir); !os.IsNotExist(err) {
 		t.Errorf("Apply left stale socket dir behind: %v", err)
 	}
+}
+
+func writeStaleSocket(t *testing.T, sock string) {
+	t.Helper()
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatalf("listen stale socket: %v", err)
+	}
+	ln.(*net.UnixListener).SetUnlinkOnClose(false)
+	if err := ln.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for deadline := time.Now().Add(time.Second); time.Now().Before(deadline); {
+		conn, dialErr := net.DialTimeout("unix", sock, 20*time.Millisecond)
+		if dialErr != nil {
+			return
+		}
+		_ = conn.Close()
+	}
+	t.Fatalf("stale socket %s still accepts connections after Close", sock)
 }
 
 func TestTempShape_EvIsolatedAndLookalikes(t *testing.T) {
