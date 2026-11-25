@@ -27,6 +27,7 @@ type Seal struct {
 	Cause      string         `json:"cause,omitempty"`
 	Shipped    bool           `json:"shipped,omitempty"`
 	Exit       string         `json:"exit,omitempty"`
+	Routed     []string       `json:"routed,omitempty"`
 	Counters   map[string]int `json:"counters,omitempty"`
 }
 
@@ -34,6 +35,7 @@ type SealInput struct {
 	Prior   *Seal
 	Shipped bool
 	Exit    string
+	Routed  []string
 }
 
 func (s Seal) Encode() string {
@@ -57,7 +59,7 @@ func (s Seal) IsPrefixOf(records []Record) bool {
 }
 
 func (s Seal) Outcome(scope ScopeKey) Outcome {
-	return Outcome{Scope: scope.Kind, ID: scope.ID, Shipped: s.Shipped, Incomplete: s.Incomplete}
+	return Outcome{Scope: scope.Kind, ID: scope.ID, Shipped: s.Shipped, Incomplete: s.Incomplete, Routed: s.Routed}
 }
 
 func BuildSeal(scope ScopeKey, working []byte, in SealInput) (Seal, []Record, error) {
@@ -76,14 +78,14 @@ func BuildSeal(scope ScopeKey, working []byte, in SealInput) (Seal, []Record, er
 	if p := in.Prior; p != nil && !p.IsPrefixOf(records) {
 		return Seal{}, nil, &BrokenChainError{Scope: scope, Seq: p.Count}
 	}
-	seal := Seal{V: SealVersion, Count: len(records), Last: records[len(records)-1].Hash, Shipped: in.Shipped, Exit: in.Exit, Counters: decisionCounters(records)}
+	seal := Seal{V: SealVersion, Count: len(records), Last: records[len(records)-1].Hash, Shipped: in.Shipped, Exit: in.Exit, Routed: slices.Clone(in.Routed), Counters: decisionCounters(records)}
 	seal.Cause = incompleteCause(records, torn)
 	seal.Incomplete = seal.Cause != ""
 	return seal, records, nil
 }
 
 func VerifyStored(scope ScopeKey, stored []byte, seal Seal) ([]Record, error) {
-	rebuilt, records, err := BuildSeal(scope, stored, SealInput{Shipped: seal.Shipped, Exit: seal.Exit})
+	rebuilt, records, err := BuildSeal(scope, stored, SealInput{Shipped: seal.Shipped, Exit: seal.Exit, Routed: seal.Routed})
 	if err != nil {
 		return nil, err
 	}

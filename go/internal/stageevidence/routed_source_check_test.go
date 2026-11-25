@@ -7,7 +7,9 @@ import (
 	"go/parser"
 	"go/token"
 	"io/fs"
+	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -25,19 +27,96 @@ type scanTarget struct {
 	label string
 }
 
+type routedSite struct {
+	File string
+	Kind string
+}
+
+var routedEmitRegistry = map[routedSite]string{
+	{File: "internal/stageevidence/seal.go", Kind: "Outcome literal fills Routed"}: "TestSealOutcomeRoutedReachesConflictClass",
+}
+
 func TestStageEvidenceRoutedSourceGuard(t *testing.T) {
 	verifyConflictClassReachable(t)
-	verifySealOutcomeUnrouted(t)
+	verifySealOutcomeRouted(t)
 	targets := defaultGuardTargets()
 	if root := *routedGuardRoot; root != "" {
 		targets = []scanTarget{{dir: root}}
 	}
 	findings := scanRoutedEmitSites(t, targets)
-	if len(findings) > 0 {
-		t.Errorf("stageevidence routed-item emit site detected while pending F-item F4 conflict-class coverage is unverified:\n  %s\nAdd a scorer test reaching ClassConflict through each emit site and register it.", strings.Join(findings, "\n  "))
+	testNames, err := scorerTestNames(".")
+	if err != nil {
+		t.Fatalf("read scorer test names: %v", err)
+	}
+	if violations := routedRegistryViolations(findings, routedEmitRegistry, testNames); len(violations) > 0 {
+		t.Errorf("stageevidence routed-source guard (F4) failed:\n  %s", strings.Join(violations, "\n  "))
 		return
 	}
-	t.Logf("stageevidence routed-source guard: 0 emit sites fill Outcome.Routed or held-proposal item (pending F-item F4)")
+	t.Logf("stageevidence routed-source guard (F4): %d emit site(s) verified against registry", len(findings))
+}
+
+func parseRoutedFinding(finding string) (routedSite, bool) {
+	parts := strings.SplitN(finding, ": ", 3)
+	if len(parts) != 3 || !strings.HasPrefix(parts[1], "line ") {
+		return routedSite{}, false
+	}
+	return routedSite{File: parts[0], Kind: parts[2]}, true
+}
+
+func routedRegistryViolations(findings []string, registry map[routedSite]string, testNames map[string]bool) []string {
+	var violations []string
+	for _, finding := range findings {
+		site, ok := parseRoutedFinding(finding)
+		if !ok {
+			violations = append(violations, fmt.Sprintf("unregistered malformed finding: %s", finding))
+			continue
+		}
+		if _, registered := registry[site]; !registered {
+			violations = append(violations, fmt.Sprintf("unregistered routed emit site: %s", finding))
+		}
+	}
+	sites := make([]routedSite, 0, len(registry))
+	for site := range registry {
+		sites = append(sites, site)
+	}
+	sort.Slice(sites, func(i, j int) bool {
+		if sites[i].File != sites[j].File {
+			return sites[i].File < sites[j].File
+		}
+		return sites[i].Kind < sites[j].Kind
+	})
+	for _, site := range sites {
+		testName := registry[site]
+		if !testNames[testName] {
+			violations = append(violations, fmt.Sprintf("registered scorer test %s for %s (%s) is missing", testName, site.File, site.Kind))
+		}
+	}
+	return violations
+}
+
+func scorerTestNames(dir string) (map[string]bool, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	fset := token.NewFileSet()
+	names := map[string]bool{}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), "_test.go") {
+			continue
+		}
+		file, err := parser.ParseFile(fset, filepath.Join(dir, entry.Name()), nil, 0)
+		if err != nil {
+			return nil, err
+		}
+		for _, decl := range file.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if ok && fn.Recv == nil && strings.HasPrefix(fn.Name.Name, "Test") {
+				names[fn.Name.Name] = true
+			}
+		}
+	}
+	return names, nil
 }
 
 func verifyConflictClassReachable(t *testing.T) {
@@ -60,11 +139,12 @@ func verifyConflictClassReachable(t *testing.T) {
 	}
 }
 
-func verifySealOutcomeUnrouted(t *testing.T) {
+func verifySealOutcomeRouted(t *testing.T) {
 	t.Helper()
-	seal := stageevidence.Seal{V: stageevidence.SealVersion, Count: 1, Last: "h", Shipped: true}
-	if out := seal.Outcome(stageevidence.CycleScope(1)); len(out.Routed) != 0 {
-		t.Fatalf("stageevidence.Seal.Outcome unexpectedly filled Routed (%v) while pending F-item F4 conflict-class coverage is unverified", out.Routed)
+	seal := stageevidence.Seal{V: stageevidence.SealVersion, Count: 1, Last: "h", Shipped: true, Routed: []string{"item-1"}}
+	out := seal.Outcome(stageevidence.CycleScope(1))
+	if len(out.Routed) != 1 || out.Routed[0] != "item-1" {
+		t.Fatalf("stageevidence.Seal.Outcome dropped Seal.Routed: got %v, want [item-1]", out.Routed)
 	}
 }
 

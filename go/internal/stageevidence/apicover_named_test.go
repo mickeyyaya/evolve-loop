@@ -149,7 +149,9 @@ func TestAPICover_NamesTheEvidenceRecorderAndSealExports(t *testing.T) {
 	if stageevidence.ErrorCode(stageevidence.ErrLedgerBroken) != "ledger-broken" || stageevidence.ErrorCode(stageevidence.ErrCorruptStore) != "corrupt-store" {
 		t.Fatal("ErrorCode does not name the ledger and store faults")
 	}
-	var _ stageevidence.SealInput
+	in := stageevidence.SealInput{Routed: []string{"item-1"}}
+	_ = in.Routed
+	_ = seal.Routed
 	_ = seal.IsPrefixOf(records)
 	_, _ = stageevidence.ParseWorkingName(filepath.Base(stageevidence.WorkingPath(dir, scope)))
 	_ = []stageevidence.Kind{stageevidence.KindOpen, stageevidence.KindClose}
