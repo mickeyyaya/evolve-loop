@@ -2,9 +2,6 @@
   "name": "spec-verifier",
   "role": "spec-verifier",
   "cli": "claude-tmux",
-  "allowed_clis": [
-    "claude"
-  ],
   "cli_fallback": [
     "claude-p"
   ],
