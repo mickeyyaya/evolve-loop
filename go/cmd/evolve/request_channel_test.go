@@ -16,6 +16,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/agentrequest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cli/agentcmd"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxtest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inputindex"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -207,4 +208,109 @@ func TestRunAgentSeat_AGuardRefusalIsATypedErrorAndAnyOtherFailureIsPlain(t *tes
 	if _, err = runAgentSeat(scriptedAgent(`{"cause_code":"guard_refused"}`, 0), []string{"evolve-x"}, "in", io.Discard); err != nil {
 		t.Fatalf("a cause on a run that exited 0 is no error: %v", err)
 	}
+}
+
+const inboxChannelRequest = `{"schema":"evolve.request/1","kind":"inbox-add","what":{"verb":"inbox add","args":{"id":"split-move-one","title":"Move the first command out of cmd/evolve",` +
+	`"kind":"refactor","fix":"Move the command to an internal package.","priority_class":"maintainability","acceptance-1":"The command lives in an internal package.",` +
+	`"files-1":"go/cmd/evolve/cmd_inbox.go"}},"why":"The build saw that the command belongs in an internal package.","inputs":[],"expected_output":{"artifact":"an inbox item"}}`
+
+func inboxRequestCell(t *testing.T, body string) core.RequestCell {
+	t.Helper()
+	root := inboxtest.EmptyRoot(t)
+	ws := filepath.Join(root, ".evolve", "runs", "cycle-7")
+	if err := os.MkdirAll(filepath.Join(ws, "requests"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ws, "requests", "inbox-add-1.json"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return core.RequestCell{ProjectRoot: root, Workspace: ws, Cycle: 7, Phase: "build"}
+}
+
+func TestInboxAddRequest_FilesAnItemThroughTheRealIntake(t *testing.T) {
+	t.Parallel()
+	cell := inboxRequestCell(t, inboxChannelRequest)
+	var events []signalcenter.Event
+	seats := &fakeAgentSeats{reply: func([]string) (int, agentcmd.Envelope) {
+		t.Fatal("an inbox-add request runs no agent")
+		return 0, agentcmd.Envelope{}
+	}}
+
+	handoff := requestHandoff(policy.Policy{}, seats.run, func(e signalcenter.Event) { events = append(events, e) }, io.Discard)
+	if err := handoff(context.Background(), cell); err != nil {
+		t.Fatal(err)
+	}
+
+	matches, err := filepath.Glob(filepath.Join(cell.ProjectRoot, ".evolve", "inbox", "*-split-move-one.json"))
+	if err != nil || len(matches) != 1 {
+		t.Fatalf("want one filed item, got %v (%v); events %+v", matches, err, events)
+	}
+	raw, err := os.ReadFile(matches[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var item map[string]any
+	if err := json.Unmarshal(raw, &item); err != nil {
+		t.Fatal(err)
+	}
+	if item["origin"] != "cycle" || item["source"] != "request:7/inbox-add-1" || item["weight"] != 0.5 || item["summary"] != "The build saw that the command belongs in an internal package." {
+		t.Fatalf("filed item = %v, want origin cycle, the request source, the policy weight and the why as summary", item)
+	}
+	rawRec, err := os.ReadFile(filepath.Join(inputindex.RequestsDir(cell.ProjectRoot, 7), "inbox-add-1.json"))
+	var rec agentrequest.Record
+	if err == nil {
+		err = json.Unmarshal(rawRec, &rec)
+	}
+	if err != nil || rec.Decision != agentrequest.DecisionFiled || rec.ItemID != "split-move-one" || rec.ItemPath != matches[0] {
+		t.Fatalf("the record names the filed item: %s %v", rawRec, err)
+	}
+}
+
+func TestInboxAddRequest_AnItemOnAProtectedPathIsFiledConsoleRouted(t *testing.T) {
+	t.Parallel()
+	body := strings.Replace(inboxChannelRequest, "go/cmd/evolve/cmd_inbox.go", "go/internal/agentrequest/channel.go", 1)
+	cell := inboxRequestCell(t, body)
+	var events []signalcenter.Event
+
+	handoff := requestHandoff(policy.Policy{}, nil, func(e signalcenter.Event) { events = append(events, e) }, io.Discard)
+	if err := handoff(context.Background(), cell); err != nil {
+		t.Fatal(err)
+	}
+
+	rawRec, _ := os.ReadFile(filepath.Join(inputindex.RequestsDir(cell.ProjectRoot, 7), "inbox-add-1.json"))
+	if !strings.Contains(string(rawRec), `"decision": "filed"`) && !strings.Contains(string(rawRec), `"decision":"filed"`) {
+		t.Fatalf("record = %s, want a filed item", rawRec)
+	}
+	if !signalLogHolds(t, cell.ProjectRoot, "INBOX_ITEM_FILED_CONSOLE") {
+		t.Fatalf("the protected path must be classified by the wired host functions and signaled console-owned, got events %+v", events)
+	}
+}
+
+func TestInboxAddRequest_AnInvalidItemIsRefusedWithAnIncidentThatNamesTheRequest(t *testing.T) {
+	t.Parallel()
+	body := strings.Replace(inboxChannelRequest, `"kind":"refactor"`, `"kind":"wish"`, 1)
+	cell := inboxRequestCell(t, body)
+	var events []signalcenter.Event
+
+	handoff := requestHandoff(policy.Policy{}, nil, func(e signalcenter.Event) { events = append(events, e) }, io.Discard)
+	if err := handoff(context.Background(), cell); err != nil {
+		t.Fatal(err)
+	}
+
+	last := events[len(events)-1]
+	if last.Severity != signalcenter.SeverityIncident || last.Code != "ISOLATION_REQUEST_REFUSED" || last.Fields["request_path"] != filepath.Join(cell.Workspace, "requests", "inbox-add-1.json") || !strings.Contains(last.Fields["reason"], `kind "wish"`) {
+		t.Fatalf("want an INCIDENT refusal with the request path and the cause of the intake, got %+v", last)
+	}
+	if matches, _ := filepath.Glob(filepath.Join(cell.ProjectRoot, ".evolve", "inbox", "*.json")); len(matches) != 0 {
+		t.Fatalf("a refused item is not filed: %v", matches)
+	}
+}
+
+func signalLogHolds(t *testing.T, root, needle string) bool {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join(root, ".evolve", "signals.ndjson"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.Contains(string(raw), needle)
 }

@@ -1,6 +1,7 @@
 package inboxcmd
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -14,11 +15,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/evalgate"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxcurator"
-	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-const exitOverlap = 3
+const exitOverlap = exitRefused
 
 type inboxAddRequest struct {
 	file, origin, reason            string
@@ -42,19 +42,10 @@ func runInboxAdd(root string, args []string, stdin io.Reader, stdout, stderr io.
 	}
 	signals, closeSignals := host().NewSignalCenter("inbox", root, filepath.Join(root, ".evolve"), stderr)
 	defer closeSignals()
-	opts := inboxmover.Options{ProjectRoot: root, Stderr: stderr, IsProtectedPath: host().LaneForbidden(root, stderr),
-		Signals: signals, PriorityClasses: pol.InboxPriorityConfig().ClassOrder, Origin: req.origin}
-	if rc := admitInboxItem(raw, req, pol.InboxCuratorConfig(), &opts, stderr); rc != 0 {
-		return rc
-	}
-	res, err := inboxmover.File(opts, raw)
-	switch {
-	case errors.Is(err, inboxmover.ErrInvalidItem):
-		fmt.Fprintf(stderr, "inbox add: %v\n", err)
-		return 1
-	case err != nil:
-		fmt.Fprintf(stderr, "inbox add: %v\n", err)
-		return 2
+	res, err := intakeItem(context.Background(), intakeInput{root: root, raw: raw, req: req, pol: pol,
+		isProtected: host().LaneForbidden(root, stderr), signals: signals, stderr: stderr})
+	if err != nil {
+		return intakeFailure(err, stderr)
 	}
 	printFiledRank(root, res.Path, host().HumanWriter(stdout, req.asJSON), stderr)
 	warnMonotonicBinaryTargets(raw, stderr)
@@ -128,52 +119,6 @@ func readInboxAddItem(file string, stdin io.Reader, stderr io.Writer) ([]byte, i
 	return raw, 0
 }
 
-func admitInboxItem(raw []byte, req inboxAddRequest, cfg policy.InboxCuratorConfig, opts *inboxmover.Options, stderr io.Writer) int {
-	var fields map[string]json.RawMessage
-	if json.Unmarshal(raw, &fields) != nil || fields == nil {
-		return 0
-	}
-	var item inboxbatch.Item
-	if err := json.Unmarshal(raw, &item); err != nil {
-		fmt.Fprintf(stderr, "inbox add: the item does not decode: %v\n", err)
-		return 1
-	}
-	if req.originSet && item.Origin != "" && item.Origin != req.origin {
-		fmt.Fprintf(stderr, "inbox add: the item names origin %q and --origin names %q; name one\n", item.Origin, req.origin)
-		return 10
-	}
-	if item.Origin == "" {
-		item.Origin = req.origin
-	}
-	open, warnings, err := inboxcurator.OpenItems(filepath.Join(opts.ProjectRoot, ".evolve", "inbox"))
-	if err != nil {
-		fmt.Fprintf(stderr, "inbox add: the overlap check: %v\n", err)
-		return 2
-	}
-	for _, w := range warnings {
-		if !w.Unreadable {
-			continue
-		}
-		fmt.Fprintf(stderr, "inbox add: WARN the overlap check skips a file: %s\n", w.String())
-	}
-	tree, err := probeTree(opts.ProjectRoot, item)
-	if err != nil {
-		fmt.Fprintf(stderr, "inbox add: the probe check: %v\n", err)
-		return 2
-	}
-	rules := inboxcurator.Rules{Kinds: cfg.Kinds, IsProtected: opts.IsProtectedPath, Tree: tree,
-		Thresholds: inboxcurator.Thresholds{Refuse: cfg.OverlapRefuse, Warn: cfg.OverlapWarn}}
-	adm, err := inboxcurator.Admit(item, open, rules, inboxcurator.Override{Reason: req.reason, AllowOverlap: req.allowOverlap})
-	reportOverlaps(item.ID, adm.Warned, "WARN ", stderr)
-	if rc := intakeExitCode(item.ID, err, stderr); rc != 0 {
-		return rc
-	}
-	if adm.Record != nil {
-		opts.IntakeRecord, _ = json.Marshal(adm.Record)
-	}
-	return 0
-}
-
 func probeTree(root string, item inboxbatch.Item) (inboxcurator.Tree, error) {
 	tree := inboxcurator.Tree{PathExists: pathExistsUnder(root)}
 	if len(item.Probes) == 0 {
@@ -184,23 +129,43 @@ func probeTree(root string, item inboxbatch.Item) (inboxcurator.Tree, error) {
 	return tree, err
 }
 
-func intakeExitCode(id string, err error, stderr io.Writer) int {
+func intakeFailure(err error, stderr io.Writer) int {
+	var refused *RefusedError
+	if !errors.As(err, &refused) {
+		fmt.Fprintf(stderr, "inbox add: %v\n", err)
+		return exitIO
+	}
 	var overlap *inboxcurator.OverlapError
 	switch {
 	case errors.As(err, &overlap):
-		reportOverlaps(id, overlap.Refused, "", stderr)
-		fmt.Fprintf(stderr, "inbox add: refused: extend %s instead, or file with --allow-overlap --reason <why both are needed>\n", strings.Join(overlap.IDs(), ", "))
+		reportRefusedOverlap(refused, overlap, stderr)
 		return exitOverlap
-	case err != nil:
-		fmt.Fprintf(stderr, "inbox add: %v\n", err)
-		return 1
+	case errors.Is(err, errOriginConflict):
+		fmt.Fprintf(stderr, "inbox add: %s\n", refused.Cause)
+		return exitUsage
 	}
-	return 0
+	fmt.Fprintf(stderr, "inbox add: %s\n", refused.Cause)
+	return exitFailed
+}
+
+func reportRefusedOverlap(refused *RefusedError, overlap *inboxcurator.OverlapError, stderr io.Writer) {
+	for _, line := range strings.Split(refused.Cause, "\n") {
+		fmt.Fprintf(stderr, "inbox add: %s\n", line)
+	}
+	fmt.Fprintf(stderr, "inbox add: refused: extend %s instead, or file with --allow-overlap --reason <why both are needed>\n", strings.Join(overlap.IDs(), ", "))
+}
+
+func overlapLines(id string, overlaps []inboxcurator.Overlap, prefix string) []string {
+	lines := make([]string, len(overlaps))
+	for i, o := range overlaps {
+		lines[i] = fmt.Sprintf("%s%s overlaps open item %s (similarity %.2f on %s)", prefix, id, o.ID, o.Similarity, strings.Join(o.Surface, ", "))
+	}
+	return lines
 }
 
 func reportOverlaps(id string, overlaps []inboxcurator.Overlap, prefix string, stderr io.Writer) {
-	for _, o := range overlaps {
-		fmt.Fprintf(stderr, "inbox add: %s%s overlaps open item %s (similarity %.2f on %s)\n", prefix, id, o.ID, o.Similarity, strings.Join(o.Surface, ", "))
+	for _, line := range overlapLines(id, overlaps, prefix) {
+		fmt.Fprintf(stderr, "inbox add: %s\n", line)
 	}
 }
 

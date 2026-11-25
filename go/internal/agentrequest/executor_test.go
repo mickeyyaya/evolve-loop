@@ -12,19 +12,19 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/agentclass"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inputindex"
-	"github.com/mickeyyaya/evolve-loop/go/internal/isolation"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
 func inboxRequest(id string) string {
-	return `{"schema":"evolve.request/1","kind":"inbox-add","what":{"verb":"inbox add","args":{"id":"` + id + `","title":"A finding","kind":"fix","fix":"Fix it.","priority_class":"P2","acceptance-1":"It is fixed."}},` +
+	return `{"schema":"evolve.request/1","kind":"inbox-add","what":{"verb":"inbox add","args":{"id":"` + id + `","title":"A finding","kind":"fix","fix":"Fix it.","priority_class":"correctness","acceptance-1":"It is fixed.","files-1":"go/internal/x/x.go"}},` +
 		`"why":"The build found a defect outside its scope.","inputs":[],"expected_output":{"artifact":"an inbox item"}}`
 }
 
 func (h *harness) twoKinds(dispatch, inbox policy.RequestStage, inboxCap int) Channel {
 	c := h.channel(dispatch)
-	c.Executors = append(c.Executors, NewInboxAdd(policy.InboxRequestsPolicy{Stage: inbox, PerCycle: inboxCap}))
+	h.filer = newFakeFiler(h.cell.ProjectRoot)
+	c.Executors = append(c.Executors, NewInboxAdd(policy.InboxRequestsPolicy{Stage: inbox, PerCycle: inboxCap, DefaultWeight: testWeight}, h.filer.port()))
 	return c
 }
 
@@ -36,12 +36,11 @@ func TestHandoff_AnInboxAddRequestIsReadWhileDispatchIsOff(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := h.record("inbox-add-1")
-	if r.Kind != agentclass.KindInboxAdd || r.Decision != DecisionRefused || r.Precondition != PreIntake || r.Stage != policy.RequestStageEnforce || !strings.Contains(r.Reason, "intake") {
-		t.Fatalf("want a decision that names the missing intake at the inbox stage, got %+v", r)
+	if r.Kind != agentclass.KindInboxAdd || r.Decision != DecisionFiled || r.Stage != policy.RequestStageEnforce || r.ItemID != "a-finding" {
+		t.Fatalf("want a decision that files the item at the inbox stage, got %+v", r)
 	}
-	last := h.events[len(h.events)-1]
-	if !slices.Equal(h.codes(), []signalcenter.Code{isolation.CodeRequestRefused}) || last.Severity != signalcenter.SeverityWarn || last.Reason == "" {
-		t.Fatalf("the decision signal is the refusal WARN with a reason, got %+v", h.events)
+	if len(h.filer.calls) != 1 {
+		t.Fatalf("the filer ran %d times, want 1", len(h.filer.calls))
 	}
 }
 
@@ -81,7 +80,7 @@ func TestHandoff_TheInboxShadowStageApprovesAValidRequest(t *testing.T) {
 	if err := h.twoKinds(policy.RequestStageOff, policy.RequestStageShadow, 8).Handoff(context.Background(), h.cell); err != nil {
 		t.Fatal(err)
 	}
-	if r := h.record("inbox-add-1"); r.Decision != DecisionApproved || r.Stage != policy.RequestStageShadow {
+	if r := h.record("inbox-add-1"); r.Decision != DecisionApproved || r.Stage != policy.RequestStageShadow || len(h.filer.calls) != 0 {
 		t.Fatalf("shadow approves a request that passes the preconditions, got %+v", r)
 	}
 }
@@ -159,7 +158,7 @@ func TestHandoff_AMissingRoleIsRefusedForTheArgsBeforeThePolicyOfTheRole(t *test
 func TestKindTable_EveryKindWithRequiredArgsHasAnExecutorAndTheOtherWayRound(t *testing.T) {
 	t.Parallel()
 	var kinds []string
-	for _, e := range Executors(policy.Policy{}, DispatchDeps{}) {
+	for _, e := range Executors(policy.Policy{}, DispatchDeps{File: newFakeFiler("").file}) {
 		kinds = append(kinds, e.Kind())
 	}
 	slices.Sort(kinds)
@@ -168,8 +167,21 @@ func TestKindTable_EveryKindWithRequiredArgsHasAnExecutorAndTheOtherWayRound(t *
 	}
 	caps := Caps(policy.Policy{})
 	d, i := caps[agentclass.KindDispatch].(dispatchCap), caps[agentclass.KindInboxAdd].(inboxAddCap)
-	if len(caps) != len(kinds) || d.Stage != policy.RequestStageShadow || !slices.Equal(d.RequiredArgs, []string{"role"}) || i.Stage != policy.RequestStageEnforce || i.PerCycle != 8 {
+	if len(caps) != len(kinds) || d.Stage != policy.RequestStageShadow || !slices.Equal(d.RequiredArgs, []string{"role"}) || i.Stage != policy.RequestStageEnforce || i.PerCycle != 8 || i.DefaultWeight != 0.5 {
 		t.Fatalf("caps = %+v, want the policy view and the required args of each kind", caps)
+	}
+}
+
+func TestLossSeverity_IsIncidentForInboxAddAndWarnForEveryOtherKind(t *testing.T) {
+	t.Parallel()
+	for file, want := range map[string]signalcenter.Severity{
+		"inbox-add-1.json": signalcenter.SeverityIncident,
+		"dispatch-1.json":  signalcenter.SeverityWarn,
+		"unknown-1.json":   signalcenter.SeverityWarn,
+	} {
+		if got := lossSeverity(file); got != want {
+			t.Errorf("lossSeverity(%q) = %v, want %v", file, got, want)
+		}
 	}
 }
 

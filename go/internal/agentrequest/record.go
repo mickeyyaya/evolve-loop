@@ -23,6 +23,7 @@ const (
 
 	DecisionRun      = "run"
 	DecisionApproved = "approved"
+	DecisionFiled    = "filed"
 	DecisionRefused  = "refused"
 	DecisionFailed   = "failed"
 )
@@ -43,6 +44,8 @@ type Record struct {
 	Stage        string    `json:"stage"`
 	RunLabel     string    `json:"run_label,omitempty"`
 	Report       string    `json:"report,omitempty"`
+	ItemID       string    `json:"item_id,omitempty"`
+	ItemPath     string    `json:"item_path,omitempty"`
 	At           time.Time `json:"at"`
 }
 
@@ -80,7 +83,13 @@ func recordKind(path string) string {
 }
 
 func withSummary(r Record) Record {
-	r.Summary = fmt.Sprintf("%s to %s: %s", r.Request, r.Role, r.Decision)
+	r.Summary = fmt.Sprintf("%s: %s", r.Request, r.Decision)
+	if r.Role != "" {
+		r.Summary = fmt.Sprintf("%s to %s: %s", r.Request, r.Role, r.Decision)
+	}
+	if r.ItemID != "" {
+		r.Summary += " item " + r.ItemID
+	}
 	if r.Reason != "" {
 		r.Summary += " (" + r.Reason + ")"
 	}
