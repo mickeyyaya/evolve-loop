@@ -35,6 +35,7 @@ const (
 	swapsCoveringTestsDeriver       = "test swaps package variable coveringTestsDeriver"
 	swapsFailureDecide              = "test swaps package variable failureDecide"
 	swapsFailureDigestMarshal       = "test swaps package variable failureDigestMarshal"
+	swapsBlockerMarshal             = "test swaps package variable blockerMarshal"
 	swapsMarshalIndentJSON          = "test swaps package variable marshalIndentJSON"
 	swapsRandRead                   = "test swaps package variable randRead"
 	swapsResumeBoundaryCheckpointer = "test swaps package variable ResumeBoundaryCheckpointer"
@@ -210,6 +211,7 @@ var serialRequiredTests = map[string]string{
 	"core.TestResumeExecution_ARetroBranchTheStateMachineForbidsAbortsTheResume":                                  swapsFailureDecide,
 	"core.TestResumeExecution_ARetroDecisionCarriesItsEnvironmentIntoTheRescheduledPhase":                         swapsFailureDecide,
 	"core.TestAssembleFailureDigest_EachPersistenceFailureReturnsTheBuiltDigest":                                  swapsFailureDigestMarshal,
+	"core.TestAssembleFailureDigest_ABlockerRecordThatCannotBeEncodedIsAnError":                                   swapsBlockerMarshal,
 	"core.TestFailureClass_AMarshalErrorIsReturned":                                                               swapsFailureDigestMarshal,
 	"core.TestCarryforwardCandidateLandable_CleanMergeIsLandable":                                                 swapsGitRunner,
 	"core.TestCarryforwardCandidateLandable_ConflictIsFalseNotError":                                              swapsGitRunner,
