@@ -34,3 +34,7 @@ The loop writes into tracked inbox items in the plane when a cycle does not ship
 | what origin changed since the merge base | `TestChangedOnRemote_*` |
 | the git failures | `TestClassifyAndPlan_NameTheGitCommandThatFailed`, `TestClassify_ACaptureErrorIsReported` |
 | the wiring | `TestSyncMain_*` and `TestSyncMainAtWaveBoundary_*` (cmd/evolve) |
+
+- **`IsStampCommit(ctx, g, commit, subject)` owns the shape of a stamp commit, and it applies the writer contract.** It reads the changes of the commit. A kept or replay commit must only change tracked items, through `stampBetween` with `consoleEditable`. A move commit must delete root items and add the same item to `quarantine/` or `consumed/`, through `stampBetween` with `IsMoverWritten`. `ship --push-only` uses it. (`TestIsStampCommit_FollowsTheWriterContract`)
+  - Each root deletion matches at most one addition.
+  - **Why a kept commit may change curated keys.** `sync-main` commits the console's own curated edits under `keptMessage`. So the checker allows `consoleEditable` keys, as the writer does. A narrower rule blocks the next boundary that carries a console edit.

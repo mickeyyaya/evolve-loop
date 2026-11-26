@@ -99,3 +99,4 @@
 - **`RollupSpineFailOpens` escalates a cycle only on its own count.** `threshold <= 0` disables escalation. Nil dossiers are skipped.
 - **`CommitSHA` has no `omitempty` on purpose.** An empty value is the "did not deliver" signal. The ship phase writes the binding only after the commit exists. `core.detectLostLanding` keys on the same file.
 - **The location of the corpus is a protocol.** `CyclesDir` is `knowledge-base/cycles`. A move is a protocol change (ADR-0094).
+- **`IsCloseoutCommit(subject, paths)` owns the shape of a closeout commit.** It is true when the subject is the message of `CorpusPair(N)` and each path is one of its two files. `ship --push-only` uses it. (`TestIsCloseoutCommit`)

@@ -497,3 +497,96 @@ func run(ctx context.Context, g Git, args ...string) error {
 	_, err := output(ctx, g, args...)
 	return err
 }
+
+type commitChange struct {
+	status, path string
+}
+
+func IsStampCommit(ctx context.Context, g Git, commit, subject string) (bool, error) {
+	out, err := output(ctx, g, "diff-tree", "--no-commit-id", "-r", "--no-renames", "--name-status", "-z", commit)
+	if err != nil {
+		return false, err
+	}
+	changes := parseNameStatus(out)
+	if len(changes) == 0 {
+		return false, nil
+	}
+	switch subject {
+	case keptMessage, replayMessage:
+		return stampsOnly(ctx, g, commit, changes)
+	case moveMessage:
+		return movesOnly(ctx, g, commit, changes)
+	}
+	return false, nil
+}
+
+func parseNameStatus(out string) []commitChange {
+	fields := strings.Split(strings.TrimSuffix(out, "\x00"), "\x00")
+	var changes []commitChange
+	for i := 0; i+1 < len(fields); i += 2 {
+		changes = append(changes, commitChange{status: fields[i], path: fields[i+1]})
+	}
+	return changes
+}
+
+func stampsOnly(ctx context.Context, g Git, commit string, changes []commitChange) (bool, error) {
+	for _, c := range changes {
+		if c.status != "M" || !strings.HasPrefix(c.path, Pathspec) || strings.HasPrefix(c.path, processedDir) {
+			return false, nil
+		}
+		before, beforeOK, err := itemAt(ctx, g, commit+"^", c.path)
+		if err != nil || !beforeOK {
+			return false, err
+		}
+		after, afterOK, err := itemAt(ctx, g, commit, c.path)
+		if err != nil || !afterOK {
+			return false, err
+		}
+		stamp, ok := stampBetween(c.path, before, after, consoleEditable)
+		if !ok || len(stamp.Set)+len(stamp.Removed) == 0 {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func movesOnly(ctx context.Context, g Git, commit string, changes []commitChange) (bool, error) {
+	deleted := map[string]string{}
+	for _, c := range changes {
+		if c.status == "D" && filepath.Dir(c.path) == filepath.Clean(Pathspec) {
+			deleted[filepath.Base(c.path)] = c.path
+		}
+	}
+	moved := map[string]bool{}
+	for _, c := range changes {
+		base := filepath.Base(c.path)
+		switch {
+		case c.status == "D" && deleted[base] == c.path:
+		case c.status == "A" && !moved[base] && (filepath.Dir(c.path) == filepath.Clean(quarantineDir) || filepath.Dir(c.path) == filepath.Clean(consumedDir)):
+			moved[base] = true
+			ok, err := movedItemMatches(ctx, g, commit, deleted[base], c.path)
+			if err != nil || !ok {
+				return false, err
+			}
+		default:
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func movedItemMatches(ctx context.Context, g Git, commit, from, to string) (bool, error) {
+	if from == "" {
+		return false, nil
+	}
+	before, _, err := itemAt(ctx, g, commit+"^", from)
+	if err != nil {
+		return false, err
+	}
+	after, _, err := itemAt(ctx, g, commit, to)
+	if err != nil {
+		return false, err
+	}
+	_, ok := stampBetween(from, before, after, inboxmover.IsMoverWritten)
+	return ok, nil
+}
