@@ -285,6 +285,19 @@ A guard denial is a fact of the pane, read by the try. `Engine.launchModel` open
 - **The refusal is computed once.** `recordModelAttempt` takes the `Refusal`, so the `llmcalls` row and `BridgeResponse.CauseCode` always agree. A boot-loss cause overrides the classified cause only on exit 80, so it never meets a refusal.
 - **The grain is the try.** A denial before the launch offset, of another working directory, or from a family-bound guard never matches. Without `--worktree` a standalone run shares the caller directory, so there the offset is the only separator. A missing or unreadable stream means no match, which is the old behavior.
 - **Limit.** The comparison is by path string. A hook `cwd` that differs by a symlink from the worktree path does not match, and the chain then walks as before.
+### Test engines (`launch_test.go`, `sandbox_fakes_guard_test.go`)
+
+Every test in this package must build its engine with `newTestEngine`, not `NewEngine`.
+
+`NewEngine` fills nil `SandboxReports` and `SandboxFence` fields with the real `log show` and `sandbox-exec` runners. On macOS, the real fence and the real report reader make `cellReports` poll for up to 60 seconds. The reason is that `log show` never sees the fence line of a test cell.
+
+`newTestEngine` sets `SandboxFence` to a no-op fake and sets `SandboxReports` to a fake that returns the cell fence line on the first read. It also sets `LookupEnv` to an empty map when nil.
+
+`TestBridgeTestEnginesInjectSandboxFakes` scans every test file in this package, with or without a build tag. It fails when `newTestEngine` misses either sandbox fake or when a test calls `NewEngine` without both fields set. The tests that assert the default fields of `NewEngine` are exempt. The map `defaultAssertingTests` in the guard file lists them.
+
+`TestNewTestEngine_SandboxFakesAnswerWithoutStartingAProcess` calls both fakes with a cancelled context. A real runner returns the context error before it starts a process, so the test tells a fake from a real runner without a spawn.
+
+The guard covers package `bridge` only. Callers of `bridge.NewEngine` in other packages either fail before the launch for a missing profile or live in `acs`-tagged packages that CI does not run.
 
 ### The driver factory (`resolve.go`)
 

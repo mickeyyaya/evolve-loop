@@ -30,7 +30,7 @@ func newSeatJourney(t *testing.T) seatJourney {
 	runner := &fakeRunner{}
 	deps.Runner = runner.runner()
 	deps.SandboxWrap = defaultSandboxWrapWithProbe(deps, fakeProbe("darwin", true))
-	return seatJourney{ws: t.TempDir(), runner: runner, engine: NewEngine(deps), signals: signals, events: events}
+	return seatJourney{ws: t.TempDir(), runner: runner, engine: newTestEngine(deps), signals: signals, events: events}
 }
 
 func (j seatJourney) launch(t *testing.T, mutate func(*core.BridgeRequest)) (core.BridgeResponse, error) {

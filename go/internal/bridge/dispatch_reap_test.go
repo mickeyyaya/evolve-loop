@@ -261,7 +261,7 @@ func TestLaunchArgs_SweepsTheTagAfterTheDriverReturns(t *testing.T) {
 		}
 		return withSelf([]proctree.Process{hostProc(31337, 1, ids[0]), hostProc(31338, 1, "")}), nil
 	}
-	eng := NewEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), CaptureBaseline: zeroBaselineCapture,
+	eng := newTestEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), CaptureBaseline: zeroBaselineCapture,
 		ListProcesses: list, SignalProcess: func(pid int, _ syscall.Signal) error { sent = append(sent, pid); return nil }})
 	var stdout, stderr bytes.Buffer
 
@@ -435,7 +435,7 @@ func TestLaunchArgs_ASessionGoneBeforeCleanupStillHasItsRecordedTree(t *testing.
 		}
 		return withSelf(tree), nil
 	}
-	eng := NewEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), CaptureBaseline: zeroBaselineCapture,
+	eng := newTestEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), CaptureBaseline: zeroBaselineCapture,
 		ListProcesses: list, SignalProcess: func(pid int, _ syscall.Signal) error { sent = append(sent, pid); return nil }})
 	var stdout, stderr bytes.Buffer
 

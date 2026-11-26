@@ -95,7 +95,7 @@ func correctionOfABuild(t *testing.T) evidenceLaunch {
 func (l evidenceLaunch) run(t *testing.T, tmux TmuxController) evidenceResult {
 	t.Helper()
 	center := signalcenter.New()
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux:            tmux,
 		Sleep:           func(time.Duration) {},
 		LookupEnv:       mapLookup(nil),

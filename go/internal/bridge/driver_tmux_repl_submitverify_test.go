@@ -94,7 +94,7 @@ func (s *stickyInputTmux) CapturePane(ctx context.Context, session string, scrol
 
 func runSubmitVerify(t *testing.T, fx launchFixture, tm TmuxController) (int, string) {
 	t.Helper()
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux:      tm,
 		Sleep:     func(time.Duration) {},
 		LookupEnv: mapLookup(nil),

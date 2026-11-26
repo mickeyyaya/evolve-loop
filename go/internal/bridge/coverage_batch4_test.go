@@ -36,7 +36,7 @@ func TestEngineLaunch_ArgBranchesAndMissingArtifact(t *testing.T) {
 	art := filepath.Join(ws, "art.md")
 	wt := t.TempDir()
 	fr := &fakeRunner{}
-	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil), CaptureBaseline: zeroBaselineCapture})
+	eng := newTestEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil), CaptureBaseline: zeroBaselineCapture})
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-p", Profile: prof, Model: "auto", Prompt: "x",
 		Workspace: ws, ArtifactPath: art,

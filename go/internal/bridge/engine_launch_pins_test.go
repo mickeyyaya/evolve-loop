@@ -31,7 +31,7 @@ func TestEngineLaunch_RequiredFields_FourSentinelStrings(t *testing.T) {
 			req := full
 			tc.zero(&req)
 			fr := &fakeRunner{}
-			_, err := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)}).Launch(context.Background(), req)
+			_, err := newTestEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)}).Launch(context.Background(), req)
 			if err == nil || err.Error() != tc.want {
 				t.Fatalf("missing %s: err = %v, want %q", tc.name, err, tc.want)
 			}
@@ -49,7 +49,7 @@ func TestEngineLaunch_RequiredFields_FourSentinelStrings(t *testing.T) {
 		{core.BridgeRequest{CLI: "claude-p", Profile: "p"}, "bridge: Workspace required"},
 		{core.BridgeRequest{CLI: "claude-p", Profile: "p", Workspace: "w"}, "bridge: ArtifactPath required"},
 	} {
-		if _, err := NewEngine(Deps{LookupEnv: mapLookup(nil)}).Launch(context.Background(), tc.req); err == nil || err.Error() != tc.want {
+		if _, err := newTestEngine(Deps{LookupEnv: mapLookup(nil)}).Launch(context.Background(), tc.req); err == nil || err.Error() != tc.want {
 			t.Errorf("cumulative gauntlet: err = %v, want %q", err, tc.want)
 		}
 	}

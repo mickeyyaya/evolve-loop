@@ -21,7 +21,7 @@ func runContextFillCase(t *testing.T, fill float64, warnPct int, agent string) (
 	ws := t.TempDir()
 
 	var errBuf bytes.Buffer
-	e := NewEngine(Deps{
+	e := newTestEngine(Deps{
 		Now:                func() time.Time { return end },
 		Stderr:             &errBuf,
 		Signals:            sinkDeps(&errBuf),

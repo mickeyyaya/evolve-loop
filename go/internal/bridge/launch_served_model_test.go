@@ -183,7 +183,7 @@ func launchClaudeTmuxServedBy(t *testing.T, model string, servedModel string) se
 	artifact := filepath.Join(ws, "artifact.md")
 	tmux := &artifactOnPasteTmux{FakeTmuxController: &FakeTmuxController{CaptureFrames: slices.Repeat([]string{"working ❯"}, 20)}, artifact: artifact}
 	center := signalcenter.New()
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), Signals: center,
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) {
 			return tokenusage.Result{Source: tokenusage.SourceTranscript, ServedModel: servedModel}, nil
