@@ -25,6 +25,7 @@ var effectiveStageDefaults = map[string]string{
 	"pr.merge_window.stage":                      "off",
 	"workflow.findings_repair.code-review.stage": "shadow",
 	"workflow.convergence.stage":                 "shadow",
+	"workflow.convergence.audit_rereview.stage":  "shadow",
 	"workflow.retry_ladder.stage":                "shadow",
 	"workflow.retry_ladder.audit_fix.stage":      "shadow",
 	"workflow.repair.fixability.stage":           "shadow",

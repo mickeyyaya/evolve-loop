@@ -130,3 +130,14 @@
 - Shadow signals (2026-11-15). `recordCascadeShadowWith` emits `AUDIT_CASCADE_SHADOW` with `would_escalate` and `changed_files`. The function is the one place that decides, so the signal and the record cannot disagree. The `regression_tia` stage retired on 2026-11-19, and the audit emits no `TIA_SHADOW` signal and writes no TIA decision file. The emitter is `shadowEmitter`, filled from `Config.Signals`; a nil emitter is inert.
 - Pinned by `TestRecordCascadeShadow_EmitsSignal`.
 - Gate facts and the final-diff rubric (ADR-0158 decisions 20 and 21). `hooks.SeedContext` (`facts_seed.go`) is the pipeline step that derives the block of [internal-core-auditfacts](internal-core-auditfacts.md) from the real records and the worktree diff. `ComposePrompt` renders it below the cycle-context boundary and does no work of its own. Pinned by `TestSeedContext_DerivesTheBlockFromTheRealRecordsAndTheWorktreeDiff` and `TestPhaseRun_EveryDispatchCarriesFactsAndRubricEvenWithExplanationVersionZero`.
+
+## The round scope and the late-filing check (ADR-0168)
+
+- **Scope block.** From round 2, at `workflow.convergence.audit_rereview.stage` `enforce`, `roundScopePromptBlock` adds a block to the prompt. It lists the previous findings with their host ids and the repair hunks. At `shadow` the prompt is unchanged: `TestShadowDoesNotChangePrompt`.
+- **Persona.** The persona says "Run the full checklist unless the host gives a Round scope block". The scope block, not the persona, limits a repair round: `TestPersonaScopesFullChecklistToRound1`.
+- **Check.** `checkLateFiling` reads the `## Filed (late)` entries after the audit. An entry fails in three cases:
+  - its host id is known;
+  - its location is inside the hunks, or is the location of an open previous finding;
+  - its severity is HIGH or above.
+
+  The check also fails when the worktree tree moved after the scope was computed. A failed check calls `fail()` and nothing else. So the host can force FAIL and never lifts a verdict: `TestCheckOnlyForcesFail` and `TestCheckNeverLiftsAFail`.

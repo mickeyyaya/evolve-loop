@@ -31,6 +31,7 @@ func (o *Orchestrator) emitPhaseBindings(ctx context.Context, cycle int, project
 	switch {
 	case phase == PhaseAudit && (verdict == VerdictPASS || verdict == VerdictWARN || verdict == VerdictFAIL):
 		o.recordPhaseBinding(ctx, phase, in)
+		o.recordAuditRereview(ctx, cs, verdict)
 	case phase == PhaseBuild && verdict != VerdictSKIPPED:
 		o.recordPhaseBinding(ctx, phase, in)
 	case o.cfg.PhaseIO >= config.StageEnforce && phase != PhaseAudit && phase != PhaseBuild:

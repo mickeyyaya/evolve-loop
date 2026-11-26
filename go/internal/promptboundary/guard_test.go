@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	adapter "github.com/mickeyyaya/evolve-loop/go/internal/adapters/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/convergence"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/audit"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/build"
@@ -191,6 +192,11 @@ func fillRequest(t *testing.T, root string, tag string, base int, operator strin
 				t.Fatalf("PhaseRequest.%s: map of %s is not fillable; classify it in unfillablePhaseFields", f.Name, fv.Type())
 			}
 			fv.Set(reflect.MakeMap(fv.Type()))
+		case reflect.Pointer:
+			if fv.Type() != reflect.TypeOf(&core.AuditRoundScope{}) {
+				t.Fatalf("PhaseRequest.%s (%s) is neither fillable by a sentinel nor classified; add it to staticPhaseFields or unfillablePhaseFields with a reason", f.Name, fv.Type())
+			}
+			fv.Set(reflect.ValueOf(sentinelAuditScope(tag)))
 		default:
 			t.Fatalf("PhaseRequest.%s (%s) is neither fillable by a sentinel nor classified; add it to staticPhaseFields or unfillablePhaseFields with a reason", f.Name, fv.Kind())
 		}
@@ -237,7 +243,30 @@ func sentinelsOf(req core.PhaseRequest, tag string) []string {
 					out = append(out, val)
 				}
 			}
+		case reflect.Pointer:
+			if scope, ok := fv.Interface().(*core.AuditRoundScope); ok && scope != nil {
+				out = append(out, auditScopeSentinels(scope)...)
+			}
 		}
+	}
+	return out
+}
+
+func sentinelAuditScope(tag string) *core.AuditRoundScope {
+	return &core.AuditRoundScope{
+		Round: 2, Enforce: true, Tree: tag + ":scope-tree",
+		Previous: []core.ScopeFinding{{HostID: tag + ":scope-id", Severity: "HIGH", Title: tag + ":scope-title", Location: tag + ":scope-loc"}},
+		Hunks:    []convergence.Hunk{{File: tag + ":scope-file", From: 1, To: 2}},
+	}
+}
+
+func auditScopeSentinels(scope *core.AuditRoundScope) []string {
+	out := []string{scope.Tree}
+	for _, p := range scope.Previous {
+		out = append(out, p.HostID, p.Title, p.Location)
+	}
+	for _, h := range scope.Hunks {
+		out = append(out, h.File)
 	}
 	return out
 }

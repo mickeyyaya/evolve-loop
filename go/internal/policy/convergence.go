@@ -23,6 +23,17 @@ var (
 	convergenceBars   = []string{"CRITICAL", "HIGH", "MEDIUM"}
 )
 
+type AuditRereviewStage string
+
+const (
+	AuditRereviewShadow  AuditRereviewStage = "shadow"
+	AuditRereviewEnforce AuditRereviewStage = "enforce"
+)
+
+type AuditRereviewPolicy struct {
+	Stage AuditRereviewStage `json:"stage,omitempty"`
+}
+
 type ConvergencePolicy struct {
 	Stage                    string   `json:"stage,omitempty"`
 	MaxFixRounds             *int     `json:"max_fix_rounds,omitempty"`
@@ -32,6 +43,8 @@ type ConvergencePolicy struct {
 	ConcentrationWindow      *int     `json:"concentration_window,omitempty"`
 	ConcentrationMinFindings *int     `json:"concentration_min_findings,omitempty"`
 	MaxBackwardEdges         *int     `json:"max_backward_edges,omitempty"`
+
+	AuditRereview *AuditRereviewPolicy `json:"audit_rereview,omitempty"`
 }
 
 type ConvergenceConfig struct {
@@ -43,6 +56,7 @@ type ConvergenceConfig struct {
 	ConcentrationWindow      int
 	ConcentrationMinFindings int
 	MaxBackwardEdges         int
+	AuditRereview            AuditRereviewStage
 	Warnings                 []string
 }
 
@@ -103,6 +117,7 @@ func defaultConvergence() ConvergenceConfig {
 		ConcentrationWindow:      defaultConvergenceWindow,
 		ConcentrationMinFindings: defaultConvergenceMinFindings,
 		MaxBackwardEdges:         defaultConvergenceMaxBackwardEdges,
+		AuditRereview:            AuditRereviewShadow,
 	}
 }
 
@@ -116,6 +131,7 @@ func (p Policy) ConvergenceConfig() ConvergenceConfig {
 func (b ConvergencePolicy) resolve() ConvergenceConfig {
 	c := defaultConvergence()
 	c.Stage = c.resolveWord(convergenceWord{key: "stage", named: b.Stage, known: convergenceStages, fallback: c.Stage})
+	c.AuditRereview = AuditRereviewStage(c.resolveWord(convergenceWord{key: "audit_rereview.stage", named: string(b.auditRereviewStage()), known: convergenceStages, fallback: string(c.AuditRereview)}))
 	c.BaseBlockingBar = c.resolveWord(convergenceWord{key: "base_blocking_bar", named: b.BaseBlockingBar, known: convergenceBars, fallback: c.BaseBlockingBar})
 	c.RaisedBlockingBar = c.resolveWord(convergenceWord{key: "raised_blocking_bar", named: b.RaisedBlockingBar, known: convergenceBars, fallback: c.RaisedBlockingBar})
 	c.holdRaisedBarAtOrAboveBase()
@@ -125,6 +141,13 @@ func (b ConvergencePolicy) resolve() ConvergenceConfig {
 	c.ConcentrationMinFindings = valueOr(b.ConcentrationMinFindings, c.ConcentrationMinFindings)
 	c.MaxBackwardEdges = valueOr(b.MaxBackwardEdges, c.MaxBackwardEdges)
 	return c
+}
+
+func (b ConvergencePolicy) auditRereviewStage() AuditRereviewStage {
+	if b.AuditRereview == nil {
+		return ""
+	}
+	return b.AuditRereview.Stage
 }
 
 type convergenceWord struct {
