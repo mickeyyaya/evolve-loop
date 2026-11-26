@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciwatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/registry"
@@ -34,6 +35,7 @@ type Config struct {
 	HeldAudit        HeldAuditPort
 	HeldAuditPlan    HeldAuditPlanPort
 	StageEvidence    StageOpener
+	MainCI           ciwatch.Fetcher
 }
 
 type RepoContractFunc func(ctx context.Context, gate, root, baseRef, workspace string, stderr io.Writer, cleared func([]string)) error
@@ -51,6 +53,7 @@ type Phase struct {
 	heldAudit        HeldAuditPort
 	heldAuditPlan    HeldAuditPlanPort
 	stageEvidence    StageOpener
+	mainCI           ciwatch.Fetcher
 }
 
 func New(c Config) *Phase {
@@ -62,12 +65,14 @@ func New(c Config) *Phase {
 	if repoContract == nil {
 		repoContract = runRepoContractGateAt
 	}
-	return &Phase{runner: c.Runner, nowFn: nowFn, sleep: c.Sleep, phaseIO: c.PhaseIO, manifestGate: c.ManifestGate, repoContractGate: c.RepoContractGate, repoContract: repoContract, signals: c.Signals, integration: c.Integration, heldAudit: c.HeldAudit, heldAuditPlan: c.HeldAuditPlan, stageEvidence: c.StageEvidence}
+	return &Phase{runner: c.Runner, nowFn: nowFn, sleep: c.Sleep, phaseIO: c.PhaseIO, manifestGate: c.ManifestGate, repoContractGate: c.RepoContractGate, repoContract: repoContract, signals: c.Signals, integration: c.Integration, heldAudit: c.HeldAudit, heldAuditPlan: c.HeldAuditPlan, stageEvidence: c.StageEvidence, mainCI: c.MainCI}
 }
 
 func (p *Phase) Name() string { return phaseName }
 
 func (p *Phase) signalsWired() bool { return p.signals != nil }
+
+func (p *Phase) MainCIWired() bool { return p.mainCI != nil }
 
 func defaultCommitMessage(req core.PhaseRequest) string {
 	if core.DocumentCycle(req.Workspace) {
@@ -134,6 +139,7 @@ func (p *Phase) shipOptions(req core.PhaseRequest, msg string) Options {
 		HeldAudit:                       p.heldAudit,
 		HeldAuditPlan:                   p.heldAuditPlan,
 		StageEvidence:                   p.stageEvidence,
+		mainCI:                          p.mainCI,
 	}
 }
 

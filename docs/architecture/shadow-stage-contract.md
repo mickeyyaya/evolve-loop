@@ -83,7 +83,7 @@ These packages read the ambient environment, the `.git` state and run subprocess
 **I3** The main-red stop opens only from `go test` keys of the lane floor. `reportAttributed` calls `openMainRedStop` (`go/internal/core/base_red_floor.go:182-207`). `stopOpening.through` returns when `MainRed` is empty (`go/internal/core/main_red_stop_open.go:~99`). The required CI check "golangci-lint: Lint" was red on main from 2026-11-14T16:03Z for 5 commits.
 
 The stop saw nothing. `checkMainRedStop` returns `nil, nil` when no stop holds (`go/internal/phases/ship/main_red_stop.go:27-30`).
-*Implication:* a lint fix has no `Package.Test` key. The stop cannot prove such a fix, and it cannot open for such a red.
+*Implication:* a lint fix has no `Package.Test` key. The stop cannot prove such a fix. Fix F3 makes such a red emit a signal once for each main commit, and the train refuses the red main.
 
 **I4** `heldproposal.Decide` holds any kind with the prefix `pipeline-` (`go/internal/heldproposal/heldproposal.go:52-56`). `inboxbatch.ConsoleRouted` sends an operator-filed `pipeline-*` item with `route: lane` to a lane (`go/internal/inboxbatch/consoleroute.go:39-48`). Two copies of one rule disagree.
 
@@ -461,12 +461,14 @@ I did not check the toolchain source. The description of the Go cache comes from
 ### F3 Main-red stop
 
 Source: report B1.
-- Add a source: the required-CI conclusion of main. The ship reads it at the start of `checkMainRedStop` through the existing CLI path (`evolve ci classify`). When main is red and no stop holds, the ship opens a stop.
-- Add step keys. `baseattr.Key` gets a `Step` field. The stop record moves to schema `main-red-stop/v2`. `mainstop/record.go` already refuses an unknown schema, so v1 files need a migration.
-- Proof for a step key: a rerun of the step in the lane tree when the step can run locally. Otherwise the stop releases on a green conclusion of main (`greenOnMain`, `main_red_stop.go:~119`).
-- The CI read fails open with a signal. An unreadable source never refuses a lane.
-- Red tests in `go/internal/phases/ship/main_red_stop_test.go`: a fake CI source reports "golangci-lint: Lint" red on main with no stop on disk. The test expects an opened stop and `CodeMainRedPark` for a lane that does not fix it.
-- A second test admits a lane that turns the step green.
+Design of record: [main-red-stop-provable-means-a-lane-can-prove-it-2026-11.md](../plans/main-red-stop-provable-means-a-lane-can-prove-it-2026-11.md). The stop has two provers, the ship lane and the train, and both run only `go test`. So the stop holds test keys only.
+- Add a source: the required-CI run of main. The ship reads it at the start of `checkMainRedStop` through `Config.MainCI`. When main is red and no stop holds, the ship judges the run once for each main commit.
+- A key enters the stop only when it has a package and a test. A run of the key at the main commit through `Attributor.RunAt` must also find it red. The stop record keeps schema `main-red-stop/v1`, and `baseattr.Key` has no `Step` field.
+- Every other red row, such as a coverage gate, a lint step or a test with no package, emits `SHIP_MAIN_RED_CI_UNPROVABLE` and opens no stop. The train refuses a red main until it is green.
+- The CI read fails open with a signal. An unreadable source never refuses a lane. A failed run at main fails closed: no stop opens, and the signal has the error.
+- Red tests in `go/internal/phases/ship/main_red_ci_test.go`: a fake CI source reports a coverage gate red on main, and the test expects one signal and no stop.
+- A second test shows that a well-formed key that is red at main opens a stop on that key only.
+- Lint proof for both provers is a separate item.
 
 ### F4 Hold
 
