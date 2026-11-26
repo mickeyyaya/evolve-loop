@@ -120,6 +120,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `BUILD_BASE_RED_ATTRIBUTED` | a build floor red was rerun on the lane base and every red test is red there too, so the floor does not refuse the lane; fields.keys (package.Test of each base-red test), main_red (the keys that are red on main too), took |
 | `BUILD_BASE_RED_UNJUDGED` | a build floor red could not be rerun on the lane base, so the lane is blamed as before; fields.keys (package.Test of each red test), cause |
 | `BUILD_COMMENT_HISTORY_SHADOW` | at comment_floor.history_stage shadow, the build removed history-carrying comments that no archive page records, and enforce would send the build back; fields.cycle, count, entries |
+| `BUILD_DERIVED_FLOOR_SKIPPED` | the build floor skipped the derived-file checks because a check verb could not run (no toolchain, or the check passed its deadline). The floor passes this check and the ship gate stays the backstop. fields.cause |
 | `BUILD_FLOOR_CONVERGING` | a build floor rejection after a correction held fewer findings, or the same count of different findings. Build got one more correction inside retry.floor_convergence_rounds. Fields: fields.before, after, round, bound |
 | `BUILD_FLOOR_FLAKY_NEW_TEST` | a build floor test run was RED on a package with a new test file, and its serialized retake was GREEN. The floor fails the run like the ship added-test backstop. Fields: fields.pkg, tests, retake=green, class=flaky_new_test |
 | `BUILD_FLOOR_RETAKE_GREEN` | a build floor test run was RED once and GREEN on its serialized retake under the integration-tier lock, so the build goes on. fields.pkg names the package or run; tests lists failed first-run names (used by evolve ci classify); retake=green |
@@ -545,6 +546,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_COMMIT_GATE_STALE` | verify-class: the commit-gate attestation is for a different tree |
 | `SHIP_COMMIT_PREFIX_GATE` | atomic-ship: the commit-message prefix gate refused the message |
 | `SHIP_CONTROL_PLANE_VIOLATION` | verify-class: a cycle-class commit touches the control-plane integrity surface (ADR-0064); ship it manually |
+| `SHIP_DERIVED_STALE` | verify-class: a derived file of a cycle-class commit fails its check verb (stale or broken input), or the check could not run (transient); the Build phase regenerates it |
 | `SHIP_EGPS_RED_COUNT` | verify-class: the EGPS gate reports red evals; red_count must be 0 to ship |
 | `SHIP_EXPLANATION_DOCUMENTATION` | verify-explanation: the change ships without the explanation documentation its class requires |
 | `SHIP_FOREIGN_PREDICATE_PACKAGE` | atomic-ship: a cycle landing adds a file under go/acs/cycle<M>/ of a cycle other than the shipping one; archive the superseded package with its explanation record |

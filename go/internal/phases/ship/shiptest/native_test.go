@@ -15,6 +15,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/shiptest"
 )
 
+func pluginRootAt(t *testing.T, version string) string {
+	t.Helper()
+	root := t.TempDir()
+	shiptest.MustWrite(t, filepath.Join(root, ".claude-plugin", "plugin.json"), fmt.Sprintf(`{"version":%q}`, version))
+	return root
+}
+
 func TestNative_A_NoAuditor_Refuses(t *testing.T) {
 	t.Parallel()
 	repo := shiptest.MakeRepo(t)
@@ -109,13 +116,12 @@ func TestNative_E_HEADMismatch_Refuses(t *testing.T) {
 func TestNative_F_SelfSHATamperedWithinVersion_Refuses(t *testing.T) {
 	t.Parallel()
 	repo := shiptest.MakeRepo(t)
-	shiptest.MustMkdir(t, filepath.Join(repo, ".claude-plugin"))
-	shiptest.MustWrite(t, filepath.Join(repo, ".claude-plugin", "plugin.json"), `{"version":"1.0.0"}`)
+	pluginRoot := pluginRootAt(t, "1.0.0")
 	shiptest.AddRemote(t, repo)
 
 	shiptest.MustWrite(t, filepath.Join(repo, "audited.txt"), "audited\n")
 	shiptest.SeedAudit(t, repo, "PASS")
-	res1, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, CommitMessage: "first ship"})
+	res1, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, PluginRoot: pluginRoot, CommitMessage: "first ship"})
 	if res1.ExitCode != ship.ExitOK {
 		t.Fatalf("first ship: want ExitOK got %d (logs=%v)", res1.ExitCode, res1.Logs)
 	}
@@ -124,7 +130,7 @@ func TestNative_F_SelfSHATamperedWithinVersion_Refuses(t *testing.T) {
 
 	shiptest.MustWrite(t, filepath.Join(repo, "another.txt"), "another change\n")
 	shiptest.SeedAudit(t, repo, "PASS")
-	res2, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, CommitMessage: "second ship"})
+	res2, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, PluginRoot: pluginRoot, CommitMessage: "second ship"})
 	if res2.ExitCode != ship.ExitIntegrity {
 		t.Fatalf("second ship: want ExitIntegrity got %d (logs=%v)", res2.ExitCode, res2.Logs)
 	}
@@ -320,22 +326,21 @@ Verdict: PASS
 func TestNative_Q_PluginVersionBump_RePins(t *testing.T) {
 	t.Parallel()
 	repo := shiptest.MakeRepo(t)
-	shiptest.MustMkdir(t, filepath.Join(repo, ".claude-plugin"))
-	shiptest.MustWrite(t, filepath.Join(repo, ".claude-plugin", "plugin.json"), `{"version":"1.0.0"}`)
+	pluginRoot := pluginRootAt(t, "1.0.0")
 	shiptest.AddRemote(t, repo)
 
 	shiptest.MustWrite(t, filepath.Join(repo, "q1.txt"), "first audited\n")
 	shiptest.SeedAudit(t, repo, "PASS")
-	res1, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, CommitMessage: "first ship at v1.0.0"})
+	res1, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, PluginRoot: pluginRoot, CommitMessage: "first ship at v1.0.0"})
 	if res1.ExitCode != ship.ExitOK {
 		t.Fatalf("first ship: want ExitOK got %d (logs=%v)", res1.ExitCode, res1.Logs)
 	}
 
-	shiptest.MustWrite(t, filepath.Join(repo, ".claude-plugin", "plugin.json"), `{"version":"1.1.0"}`)
+	shiptest.MustWrite(t, filepath.Join(pluginRoot, ".claude-plugin", "plugin.json"), `{"version":"1.1.0"}`)
 	shiptest.MustWrite(t, filepath.Join(repo, "ship-binary-fixture"), "ship-binary-v2\n# v1.1.0 tweak\n")
 	shiptest.MustWrite(t, filepath.Join(repo, "q2.txt"), "second\n")
 	shiptest.SeedAudit(t, repo, "PASS")
-	res2, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, CommitMessage: "ship at v1.1.0"})
+	res2, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, PluginRoot: pluginRoot, CommitMessage: "ship at v1.1.0"})
 	if res2.ExitCode != ship.ExitOK {
 		t.Fatalf("second ship: want ExitOK got %d (logs=%v)", res2.ExitCode, res2.Logs)
 	}
@@ -347,8 +352,7 @@ func TestNative_Q_PluginVersionBump_RePins(t *testing.T) {
 func TestNative_R_LegacySHAOnlyPin_Migrates(t *testing.T) {
 	t.Parallel()
 	repo := shiptest.MakeRepo(t)
-	shiptest.MustMkdir(t, filepath.Join(repo, ".claude-plugin"))
-	shiptest.MustWrite(t, filepath.Join(repo, ".claude-plugin", "plugin.json"), `{"version":"2.0.0"}`)
+	pluginRoot := pluginRootAt(t, "2.0.0")
 	binPath := filepath.Join(repo, "ship-binary-fixture")
 	currentSHA := shiptest.MustHashFile(t, binPath)
 	shiptest.MustWrite(t, filepath.Join(repo, ".evolve", "state.json"),
@@ -357,7 +361,7 @@ func TestNative_R_LegacySHAOnlyPin_Migrates(t *testing.T) {
 	shiptest.SeedAudit(t, repo, "PASS")
 	shiptest.AddRemote(t, repo)
 
-	res, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, CommitMessage: "ship after migration"})
+	res, _ := runShip(t, repo, ship.Options{Class: ship.ClassCycle, PluginRoot: pluginRoot, CommitMessage: "ship after migration"})
 	if res.ExitCode != ship.ExitOK {
 		t.Fatalf("want ExitOK got %d (logs=%v)", res.ExitCode, res.Logs)
 	}
