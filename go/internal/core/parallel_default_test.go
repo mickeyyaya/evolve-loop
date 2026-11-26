@@ -35,6 +35,7 @@ const (
 	swapsCoveringTestsDeriver       = "test swaps package variable coveringTestsDeriver"
 	swapsFailureDecide              = "test swaps package variable failureDecide"
 	swapsFailureDigestMarshal       = "test swaps package variable failureDigestMarshal"
+	swapsBlockerMarshal             = "test swaps package variable blockerMarshal"
 	swapsMarshalIndentJSON          = "test swaps package variable marshalIndentJSON"
 	swapsRandRead                   = "test swaps package variable randRead"
 	swapsResumeBoundaryCheckpointer = "test swaps package variable ResumeBoundaryCheckpointer"
@@ -54,9 +55,12 @@ const (
 	swapsWorktreeAddRetrySleep      = "test swaps package variable worktreeAddRetrySleep"
 	swapsResumedLadderStore         = "test writes package variable resumedLadderStore"
 	swapsGitOnPath                  = "test puts a faulting git shim on the process PATH"
+	swapsRoundEvidenceResolver      = "test swaps package variable RoundEvidenceResolver"
 )
 
 var serialRequiredTests = map[string]string{
+	"core.TestClaimsFix_AsksTheWiredResolverAboutTheWorktree":                                                     swapsRoundEvidenceResolver,
+	"core.TestClaimsFix_WithNoResolverWiredNoClaimIsFixed":                                                        swapsRoundEvidenceResolver,
 	"core.TestCoverChangedFailures_ABridgeChangeIsMeasuredUnderTheFloorTags":                                      swapsCoverChangedProfiler,
 	"core.TestCoverChangedFailures_AFailingTieredRunNamesItsTagsInTheHeadlineAndTheReproFlags":                    swapsCoverChangedProfiler,
 	"core.TestCoverChangedFailures_AMixedChangeJudgesEachGroupOnlyOnItsOwnPackages":                               swapsCoverChangedProfiler,
@@ -210,6 +214,7 @@ var serialRequiredTests = map[string]string{
 	"core.TestResumeExecution_ARetroBranchTheStateMachineForbidsAbortsTheResume":                                  swapsFailureDecide,
 	"core.TestResumeExecution_ARetroDecisionCarriesItsEnvironmentIntoTheRescheduledPhase":                         swapsFailureDecide,
 	"core.TestAssembleFailureDigest_EachPersistenceFailureReturnsTheBuiltDigest":                                  swapsFailureDigestMarshal,
+	"core.TestAssembleFailureDigest_ABlockerRecordThatCannotBeEncodedIsAnError":                                   swapsBlockerMarshal,
 	"core.TestFailureClass_AMarshalErrorIsReturned":                                                               swapsFailureDigestMarshal,
 	"core.TestCarryforwardCandidateLandable_CleanMergeIsLandable":                                                 swapsGitRunner,
 	"core.TestCarryforwardCandidateLandable_ConflictIsFalseNotError":                                              swapsGitRunner,
@@ -279,6 +284,7 @@ var serialRequiredTests = map[string]string{
 	"core.TestRunCycle_AnUndeliveredPromptAtEveryAttemptDoesNotPauseForQuota":                                     swapsQuotaBoundaryCheckpointer,
 	"core.TestRunCycleFromPhase_AWalledResumedDispatchNamesItsWalk":                                               swapsQuotaBoundaryCheckpointer,
 	"core.TestRunCycleFromPhase_WalledResumedCorrection_Defers":                                                   swapsQuotaBoundaryCheckpointer,
+	"core.TestFailedCycleEvidenceIsSealedAndScored":                                                               swapsQuotaBoundaryCheckpointer,
 	"core.TestRunCycle_ALedgerFaultDoesNotLoseTheQuotaPause":                                                      swapsQuotaBoundaryCheckpointer,
 	"core.TestRunCycle_AWalledPauseHandsTheWalkedCLIsToTheCheckpoint":                                             swapsQuotaBoundaryCheckpointer,
 	"core.TestRunCycle_AllFamilies85_CheckpointsAndDefers":                                                        swapsQuotaBoundaryCheckpointer,

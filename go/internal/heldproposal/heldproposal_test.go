@@ -201,3 +201,15 @@ func TestWrites_RefuseAnIncompleteRecordOrApprovalAndReportAFailedWrite(t *testi
 		t.Errorf("WriteApproval over a directory = %v, want the write error", err)
 	}
 }
+
+func TestDecide_NamesTheRoutedItemsSortedAndLeavesOutTheOthers(t *testing.T) {
+	routedB := inboxbatch.Item{ID: "b", Kind: "pipeline-repair"}
+	routedA := inboxbatch.Item{ID: "a", Kind: "pipeline-repair"}
+	ordinary := inboxbatch.Item{ID: "c", Kind: "bug", Route: "lane"}
+
+	got := Decide(Inputs{Items: []inboxbatch.Item{routedB, ordinary, routedA}, Protected: protectedGuards})
+
+	if want := []string{"a", "b"}; !reflect.DeepEqual(got.Items, want) {
+		t.Errorf("Items = %v, want %v", got.Items, want)
+	}
+}

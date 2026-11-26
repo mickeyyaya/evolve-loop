@@ -14,7 +14,13 @@
 - **Review field evidence.** `EvidenceOrBody` falls back to the whole section when no evidence field exists. The fallback forgives only the field name. The reviewer must still cite each material path at a line.
 - **Finding grammar.** Five auditor layouts are live. Three are headings: the severity sits in parentheses, after a dash, or is implied by the id letter. The other two are a table row and the reference template's TSV block. Outside `## Issues` a finding needs an explicit severity token. `FindingKey` is the cross-round key of a title: the lead clause, lower-cased, alphanumerics only, capped at 80 characters.
 - **Verdict grammar.** A verdict is the canonical two-line `## Verdict` heading, or an inline form that has a colon. The colon is required, so a prose line such as "Verdict PASS is required" cannot read as a PASS on the ship gate. The sentinel of `phasecontract.ParseVerdictSentinel` is authoritative and is tried first by every consumer.
-- **Severity counts.** `CountSeverities` gives the counts of a review report by severity. It reads the tagged finding lines (`[HIGH] ...`), the findings of `Findings`, the count table rows and a counts line of two or more counts. `[MAJOR]` counts as HIGH, and `[MINOR]` counts as LOW. For each severity, the count is the larger of the listed and the declared count. `Blocking` is the sum of CRITICAL and HIGH, and `evolve agent run` checks a review verdict with it ([agent-run.md](../agent-run.md) §4.1).
+- **Severity counts.** `CountSeverities` gives the counts of a review report by severity. `[MAJOR]` counts as HIGH, and `[MINOR]` counts as LOW. For each severity, the count is the larger of the listed and the declared count. `Blocking` is the sum of CRITICAL and HIGH, and `evolve agent run` checks a review verdict with it ([agent-run.md](../agent-run.md) §4.1).
+  - The listed count reads the tagged finding lines (`[HIGH] ...`) and the findings of `Findings`.
+  - The declared count reads the count table rows and the counts lines.
+  - A counts line starts with an optional bullet, up to two one-word labels (`docs-review:`) and then a count. It has two or more `N SEVERITY` pairs.
+  - A recap sentence such as `Round 1 asked for 1 HIGH, 7 MEDIUM and 3 LOW fixes.` is not a counts line, because the pairs sit inside prose. A label with a space is prose too.
+  - A prose-only declaration such as `I found 1 HIGH and 2 MEDIUM.` counts 0. The `See "## Findings" above: 1 CRITICAL` form counts 0 for the same reason. Each finding needs its tagged line, heading or table row.
+  - `TraceBlocking` runs the same scan. It names the line that set the largest declared CRITICAL count, else the largest declared HIGH count. It cuts that line to `MaxSourceLineRunes` and removes control characters, because the model wrote it.
 - **Safe paths.** `ValidReference` is the one check that a relative path is safe. It is shared with `explanationdocs`, whose own copy used to judge the same string differently.
 - **No-follow open.** `OpenRegularNoFollow` opens a file with `O_NOFOLLOW` on darwin and linux. Other platforms fall back to a plain open, so each caller must check identity with `Lstat` and `SameFile`. Do not copy this helper into another package.
 
@@ -29,3 +35,9 @@
 - A prose line without a colon is not a verdict, and the verdict grammar matches the audit gate's fallback. Pinned by `TestVerdict_MatchesTheAuditGatesProseFallback`.
 - The title key joins the same defect across rounds. Pinned by `TestFindingKey_*` in `findings_test.go`.
 - The safe-path rule and the no-follow open have one home each. Pinned by `TestValidReference_SingleSourcedStrictness` and `TestOpenRegularNoFollow_RefusesFinalSymlink`.
+
+## Finding locations and the Filed (late) section (ADR-0168)
+
+- **Location.** `Finding.Location` is the first `path:line` that the heading names, or that the body names before the next heading. A range keeps its first line. A finding with no `path:line` has an empty location and is never late. `Location` is the one reader of that form.
+- **Filed (late).** The section `## Filed (late)` holds the findings that the auditor files from round 2 on. `Findings` skips the section, so a filed entry is never an open finding. `FiledLate` reads only that section.
+- **Pinned by** `TestProjectionKeepsLine`, `TestFindings_ExcludesTheFiledLateSection` and `TestFiledLate_ReadsOnlyTheFiledSectionWithItsLocation`.

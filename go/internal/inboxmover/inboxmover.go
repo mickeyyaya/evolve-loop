@@ -70,6 +70,8 @@ type Options struct {
 
 	IntakeRecord json.RawMessage
 
+	Source string
+
 	CurrentGoal string
 }
 
@@ -245,6 +247,7 @@ func (o Options) reader() *lifecycle.Mover {
 		lifecycle.WithPriorityClasses(o.PriorityClasses),
 		lifecycle.WithOrigin(o.Origin),
 		lifecycle.WithIntakeRecord(o.IntakeRecord),
+		lifecycle.WithSource(o.Source),
 		lifecycle.WithBinding(func(taskID string) (bool, error) {
 			_, bound, err := continuation.ReadRegistryEntry(o.ProjectRoot, taskID)
 			return bound, err

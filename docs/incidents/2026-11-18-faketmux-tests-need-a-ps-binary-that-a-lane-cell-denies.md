@@ -7,7 +7,7 @@ Related documents: the code is `go/internal/faketmux/session.go` and `go/interna
 - **Impact:** cycle 2513 built the right fix (a 12-line `TestMain` in `internal/faketmux`) and failed audit with verdict FAIL. 8 faketmux tests fail in every lane cell, so no lane can verify a change to faketmux.
 - **Root cause:** `commandOf` (`go/internal/faketmux/session.go:31-32`) runs the external `ps` binary. A lane cell denies it: `fork/exec /bin/ps: operation not permitted`. `go/internal/faketmux/format.go:80` also runs `ps`.
 - **Escape:** the acceptance of the item said that `go test -count=1 ./internal/faketmux` must pass. Nobody had run that package suite in a cell before the item was planned. Cycle 2509 had already seen the same 8 failures and filed them as a LOW issue (L3).
-- **Fix:** inbox item `faketmux-reaper-needs-no-ps-binary` (open). Commit `c6c8eaedb` added `faketmux/main_test.go`, which is the TestMain fix of the other record. It does not remove the `ps` dependency.
+- **Fix:** inbox items `proctree-reads-processes-without-ps` and `faketmux-reaper-needs-no-ps-binary` close in one build PR. `proctree` reads the table from the kernel, and faketmux uses it. Commit `c6c8eaedb` added `faketmux/main_test.go`, which is the TestMain fix of the other record. It does not remove the `ps` dependency.
 - **Lesson:** a fake must not depend on a host binary that a cell denies. A red predicate that comes from the cell, not from the change, blocks a ship under EGPS.
 
 ## Terms used throughout
@@ -70,7 +70,7 @@ The failure dossier of 2513:
 
 | Change | Pull request or commit | Regression test |
 |---|---|---|
-| The reaper and the process listing find a process command with no `ps` binary (the build report of 2513 proposes a sysctl or proctree lookup) | inbox item `faketmux-reaper-needs-no-ps-binary` | open |
+| The reaper and the process listing find a process command with no `ps` binary (the build report of 2513 proposes a sysctl or proctree lookup) | the build PR of inbox items `proctree-reads-processes-without-ps` and `faketmux-reaper-needs-no-ps-binary` | `TestFakeTmux_PaneLeaderAndForegroundCommandRunWithoutPS`, `TestStructure_ProctreeAndFaketmuxRunNoPS` |
 | `internal/faketmux` gets its `TestMain` | commit `c6c8eaedb` | `TestEveryTmuxTestPackageUsesTheOrphanGuard` |
 
 ## Limits

@@ -196,11 +196,6 @@
       "rule": "asserts-own-setup"
     },
     {
-      "package": "acs/cycle1932",
-      "test": "TestC1932_005_RecurrenceDelegatesTheItemWriteToTheInjectedReweightSeam",
-      "rule": "mock-call-order"
-    },
-    {
       "package": "acs/cycle1995",
       "test": "TestC1995_004_ThePolicyAdmissionStageDefaultsToShadowAndRefusesAnUnknownWord",
       "rule": "error-text-match"
@@ -1923,16 +1918,6 @@
     {
       "package": "internal/proctree",
       "test": "TestLoadTree_AnUnreadableTreeIsAReadError",
-      "rule": "error-text-match"
-    },
-    {
-      "package": "internal/proctree",
-      "test": "TestNewLister_APSExitNamesTheCodeAndTheStderr",
-      "rule": "error-text-match"
-    },
-    {
-      "package": "internal/proctree",
-      "test": "TestNewLister_AnUnrunnablePSIsAnErrorThatNamesPS",
       "rule": "error-text-match"
     },
     {

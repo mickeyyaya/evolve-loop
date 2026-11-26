@@ -11,6 +11,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
@@ -46,23 +47,37 @@ func curationExitCode(verb string, err error, stderr io.Writer) int {
 
 func runInboxEdit(root string, args []string, stdout, stderr io.Writer) int {
 	asJSON, args := takeInboxJSON(args)
-	target, edits, ok := parseInboxEditArgs(args, stderr)
+	req, ok := parseInboxEditArgs(args, stderr)
 	if !ok {
 		fmt.Fprintln(stderr, inboxUsage("edit"))
 		return 10
 	}
+	if rc := curationExitCode("edit", inboxmover.CheckEdit(req.edits, req.reason), stderr); rc != 0 {
+		return rc
+	}
 	if rc, queued := host().QueueGate(root, "edit", args, asJSON, stdout, stderr); queued {
 		return rc
 	}
-	path, err := inboxmover.Edit(curationOptions(root, stderr), target, edits)
+	pol, err := policy.Load(filepath.Join(paths.EvolveDirOf(root), "policy.json"))
+	if err != nil {
+		return curationExitCode("edit", err, stderr)
+	}
+	opts := curationOptions(root, stderr)
+	opts.PriorityClasses = pol.InboxPriorityConfig().ClassOrder
+	path, err := inboxmover.EditBecause(opts, req.target, req.reason, req.edits)
 	if rc := curationExitCode("edit", err, stderr); rc != 0 {
 		return rc
 	}
 	return finishInboxWrite(asJSON, inboxWriteResult{Verb: "edit", Path: path}, "inbox edit: edited "+filepath.Base(path), stdout, stderr)
 }
 
-func parseInboxEditArgs(args []string, stderr io.Writer) (string, []inboxmover.FieldEdit, bool) {
-	var edits []inboxmover.FieldEdit
+type inboxEditRequest struct {
+	target, reason string
+	edits          []inboxmover.FieldEdit
+}
+
+func parseInboxEditArgs(args []string, stderr io.Writer) (inboxEditRequest, bool) {
+	var req inboxEditRequest
 	fs := flag.NewFlagSet("inbox edit", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	for _, op := range []inboxmover.EditOp{inboxmover.EditSet, inboxmover.EditAdd, inboxmover.EditRemove} {
@@ -71,12 +86,14 @@ func parseInboxEditArgs(args []string, stderr io.Writer) (string, []inboxmover.F
 			if !found || strings.TrimSpace(field) == "" {
 				return fmt.Errorf("%q is not F=V", pair)
 			}
-			edits = append(edits, inboxmover.FieldEdit{Op: op, Field: field, Value: value})
+			req.edits = append(req.edits, inboxmover.FieldEdit{Op: op, Field: field, Value: value})
 			return nil
 		})
 	}
+	fs.StringVar(&req.reason, "reason", "", "why the edit is made; weight and priority_class need one")
 	target, ok := parseOnePositional(fs, args)
-	return target, edits, ok && len(edits) > 0
+	req.target = target
+	return req, ok && len(req.edits) > 0
 }
 
 func parseOnePositional(fs *flag.FlagSet, args []string) (string, bool) {

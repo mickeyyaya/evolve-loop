@@ -136,6 +136,9 @@ func verifyClass(ctx context.Context, opts *Options, res *RunResult) error {
 		if err := verifyAuditBinding(ctx, opts, res); err != nil {
 			return err
 		}
+		if err := refuseStaleDerived(ctx, opts, res); err != nil {
+			return err
+		}
 		return runPersonaLint(ctx, opts, res)
 
 	case ClassRelease:
@@ -153,6 +156,7 @@ func verifyClass(ctx context.Context, opts *Options, res *RunResult) error {
 		if err := verifyCommitGateAttestation(ctx, opts, res); err != nil {
 			return err
 		}
+		emitFixProof(opts)
 		fillManualBranchInboxTrailer(ctx, opts)
 		return runPersonaLint(ctx, opts, res)
 

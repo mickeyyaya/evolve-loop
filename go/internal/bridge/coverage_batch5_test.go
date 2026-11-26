@@ -59,7 +59,7 @@ func TestManifestNames_ReadDirError(t *testing.T) {
 
 func TestProbe_LoadManifestFailsForListedCLI(t *testing.T) {
 	swapManifestFS(t, fakeManifestFS{entries: []fs.DirEntry{fakeDirEntry{"x.json"}}})
-	eng := NewEngine(Deps{LookPath: func(string) (string, error) { return "", errNoBin }})
+	eng := newTestEngine(Deps{LookPath: func(string) (string, error) { return "", errNoBin }})
 	p, err := eng.Probe(context.Background())
 	if err != nil {
 		t.Fatalf("Probe err: %v", err)

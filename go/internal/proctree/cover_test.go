@@ -1,43 +1,13 @@
 package proctree
 
 import (
-	"context"
 	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
-
-func TestNewLister_AnUnrunnablePSIsAnErrorThatNamesPS(t *testing.T) {
-	t.Parallel()
-	cause := errors.New("executable file not found")
-	run := func(context.Context, string, string, []string, []string, io.Reader, io.Writer, io.Writer) (int, error) {
-		return -1, cause
-	}
-
-	got, err := NewLister(run, nil, 501)(context.Background())
-
-	if !errors.Is(err, cause) || err.Error() != "ps: executable file not found" || got != nil {
-		t.Errorf("list = %v, %v, want no table and the error %q wrapping the cause", got, err, "ps: executable file not found")
-	}
-}
-
-func TestNewLister_APSExitNamesTheCodeAndTheStderr(t *testing.T) {
-	t.Parallel()
-	run := func(_ context.Context, _, _ string, _, _ []string, _ io.Reader, _, stderr io.Writer) (int, error) {
-		_, _ = io.WriteString(stderr, "ps: illegal option\n")
-		return 2, nil
-	}
-
-	_, err := NewLister(run, nil, 501)(context.Background())
-
-	if err == nil || err.Error() != "ps: exit 2: ps: illegal option" {
-		t.Errorf("list error = %v, want %q", err, "ps: exit 2: ps: illegal option")
-	}
-}
 
 func TestParseProcArgs2_RefusesAnExecPathWithoutItsTerminator(t *testing.T) {
 	t.Parallel()
@@ -54,31 +24,6 @@ func TestParseProcFiles_AnEmptyCmdlineHasNoArguments(t *testing.T) {
 
 	if args != nil || len(env) != 0 {
 		t.Errorf("parseProcFiles = %q, %v, want nil arguments and no environment (a kernel thread has an empty cmdline)", args, env)
-	}
-}
-
-func TestParsePSRow_RefusesANonNumericIDColumn(t *testing.T) {
-	t.Parallel()
-	valid := "  100     1   100   501 Thu Oct  8 14:00:00 2026     node"
-	if _, ok := parsePSRow(valid, 501); !ok {
-		t.Fatalf("parsePSRow(%q) refused a valid row", valid)
-	}
-	for _, line := range []string{
-		"  10x     1   100   501 Thu Oct  8 14:00:00 2026     node",
-		"  100     1   100   5o1 Thu Oct  8 14:00:00 2026     node",
-	} {
-		if p, ok := parsePSRow(line, 501); ok {
-			t.Errorf("parsePSRow(%q) = %+v, true, want a refusal", line, p)
-		}
-	}
-}
-
-func TestParsePSRow_RefusesAStartTimeOutsideTheLstartFormat(t *testing.T) {
-	t.Parallel()
-	line := "  100     1   100   501 Thx Oct  8 14:00:00 2026     node"
-
-	if p, ok := parsePSRow(line, 501); ok {
-		t.Errorf("parsePSRow(%q) = %+v, true, want a refusal: a row without a start time cannot prove an identity", line, p)
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -160,4 +161,24 @@ func (p BuildHandoffProbe) requireBoundWorktree(bound string) error {
 		return nil
 	}
 	return fmt.Errorf("the cycle state binds worktree %q, not %q", bound, p.Worktree)
+}
+
+var (
+	floorCheckTag        = regexp.MustCompile(`^\[([a-z][a-z0-9]*(?:-[a-z0-9]+)*)\] `)
+	floorCheckIdentifier = regexp.MustCompile(`^[0-9a-f]{16,}$`)
+)
+
+func floorCheckTags(reasons []string) []string {
+	var tags []string
+	for _, r := range reasons {
+		if !floorFailureCount.MatchString(r) {
+			continue
+		}
+		for _, line := range strings.Split(r, floorFailureSeparator)[1:] {
+			if m := floorCheckTag.FindStringSubmatch(line); m != nil && !floorCheckIdentifier.MatchString(m[1]) {
+				tags = append(tags, m[1])
+			}
+		}
+	}
+	return tags
 }

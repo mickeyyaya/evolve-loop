@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Use when the user asks to configure evolve-loop, onboard, pick per-phase models, or learn how the pipeline works. Auto-detects available LLM CLIs/subscriptions, explains the pipeline concisely, then presents THREE ready-made config presets (Recommended/Economy/Max-quality) the Go binary computes deterministically from the public profiles — the user makes ONE choice and the binary writes per-phase pins to .evolve/policy.json. On a project that declares a `cli_routing` table (evolve-loop's own does) presets do not apply: the table owns every route, and the skill shows it with `evolve cli-routing show` instead. Runs once on first launch (the loop nudges) and is re-runnable anytime.
+description: Use when the user asks to configure evolve-loop, onboard, pick per-phase models, or learn how the pipeline works. Auto-detects available LLM CLIs/subscriptions, explains the pipeline concisely, then presents THREE ready-made config presets (Recommended/Economy/Max-quality) the Go binary computes deterministically from the public profiles — the user makes ONE choice and the binary writes per-phase pins to .evolve/policy.json. On a project that declares a `cli_routing` table (evolve-loop's own does) presets do not apply: the table owns every route (a profile with `cli_pinned` leads only the chain of its own agent), and the skill shows it with `evolve cli-routing show` instead. Runs once on first launch (the loop nudges) and is re-runnable anytime.
 argument-hint: ""
 ---
 
@@ -46,7 +46,7 @@ Call `evolve` if on PATH; otherwise `./go/bin/evolve`. Only `apply` (and `comple
 4. **Recommend.** Run `evolve setup recommend --json`. It returns `available_families`, `cross_family_ok` and `presets[]`.
    - Each preset has a full per-phase `assignments[]` (`role`, `cli`, `tier`, `model`, `differs_from_default`, `warning`) plus a `description`.
    - `default` names the recommended preset.
-   - The binary already applied every rule (envelope clamp, `allowed_clis`, availability, cross-family split). You do NOT re-derive any of this.
+   - The binary already applied every rule (envelope clamp, `allowed_clis` or the floor family, availability, cross-family split). You do NOT re-derive any of this.
    - A `degraded` preset has an unsatisfiable phase (for example, no authed CLI). Surface it, but don't pick it.
 
 4b. **Live latest-model probe.** Run `evolve setup latest --json`. It is read-only.

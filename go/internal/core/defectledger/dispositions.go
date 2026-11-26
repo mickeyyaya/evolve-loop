@@ -23,18 +23,26 @@ func (l *Ledger) ReadDispositions(req Request, ancestorCycle int) (map[string]En
 		l.emit("Ledger.ReadDispositions", req, CodeDispositionsUnreadable, msg, map[string]string{"step": "read", "blocked": "true", "op": "read", "path": path})
 		return nil, []cyclestate.Diagnostic{errorDiag(msg)}, true
 	}
-	var doc dispositionDoc
-	if err := json.Unmarshal(raw, &doc); err != nil {
+	claims, err := ParseClaims(raw)
+	if err != nil {
 		l.emit("Ledger.ReadDispositions", req, CodeDispositionsUnreadable, fmt.Sprintf("defect ledger: %s is unparseable (%s)", DispositionsFile, err.Error()),
 			map[string]string{"step": "read", "blocked": "true", "op": "parse", "path": path})
 		return nil, []cyclestate.Diagnostic{errorDiag(fmt.Sprintf("defect ledger: %s is unparseable (%s) — a continuation cannot be graded against claims that cannot be read. Expected schema:\n%s\n(`evidence` may also be an array of citation strings; `status` is exactly FIXED — with resolvable evidence — or DEFERRED, with a reason.)",
 			DispositionsFile, err.Error(), DispositionsSchemaExample))}, true
 	}
+	return claims, nil, false
+}
+
+func ParseClaims(raw []byte) (map[string]Entry, error) {
+	var doc dispositionDoc
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return nil, err
+	}
 	claims := make(map[string]Entry, len(doc.Dispositions))
 	for _, d := range doc.Dispositions {
 		claims[d.ID] = Entry{ID: d.ID, Status: d.Status, Evidence: d.Evidence.joined(), Reason: d.Reason}
 	}
-	return claims, nil, false
+	return claims, nil
 }
 
 func (l *Ledger) Preflight(req Request, ancestorCycle int, ancestor []Entry, claims map[string]Entry) []cyclestate.Diagnostic {

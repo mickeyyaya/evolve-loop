@@ -182,7 +182,7 @@ func pollsUntilTimeout(t *testing.T, resends int) int {
 		left:     resends,
 	}
 	var polls atomic.Int32
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux: tm,
 		Sleep: func(d time.Duration) {
 			if d == artifactWaitInterval {

@@ -111,6 +111,7 @@
 ./internal/launchrecord 100
 ./internal/integration 100
 ./internal/cyclespend 100
+./internal/cycleblocker 100
 ./internal/selfheal 100
 ./internal/citelemetry 100
 ./internal/coversplit 100
@@ -118,3 +119,4 @@
 ./internal/cloudlaunch 100
 ./internal/cli/cloudcmd 100
 ./internal/ledgerscan 100
+./internal/journeys 100

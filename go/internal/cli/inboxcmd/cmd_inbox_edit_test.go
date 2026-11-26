@@ -30,7 +30,7 @@ func TestCmd_InboxEdit_SetWeightRewritesOnlyThatFieldAndRecordsIt(t *testing.T) 
 	before := inboxtest.ItemFields(t, path)
 	var stdout, stderr bytes.Buffer
 
-	rc := runInboxCmd([]string{"edit", "cli-inbox-show", "--set", "weight=0.4"}, nil, &stdout, &stderr)
+	rc := runInboxCmd([]string{"edit", "cli-inbox-show", "--set", "weight=0.4", "--reason", "operator review"}, nil, &stdout, &stderr)
 
 	if rc != 0 {
 		t.Fatalf("rc = %d stderr = %q", rc, stderr.String())
@@ -45,7 +45,7 @@ func TestCmd_InboxEdit_SetWeightRewritesOnlyThatFieldAndRecordsIt(t *testing.T) 
 		t.Errorf("another field changed:\nbefore %v\nafter  %v", before, after)
 	}
 	lines := lifecycleLines(t, root)
-	if last := lines[len(lines)-1]; last.Action != "edit" || last.TaskID != "cli-inbox-show" || last.Message != "set weight=0.4" {
+	if last := lines[len(lines)-1]; last.Action != "edit" || last.TaskID != "cli-inbox-show" || last.Message != "set weight=0.4; reason: operator review" {
 		t.Errorf("ledger tail = %+v, want the edit line", last)
 	}
 	if !strings.Contains(stdout.String(), "cli-inbox-show") {
@@ -96,7 +96,7 @@ func TestCmd_InboxEdit_RoutesLifecycleFieldsAndMalformedEditsAreUsageErrors(t *t
 		{"edit", "cli-inbox-show", "--set", "weight"},
 		{"edit", "cli-inbox-show", "--set", "=0.4"},
 		{"edit", "cli-inbox-show"},
-		{"edit", "--set", "weight=0.4"},
+		{"edit", "--set", "weight=0.4", "--reason", "operator review"},
 		{"edit", "cli-inbox-show", "--set", "weight=0.4", "extra"},
 	} {
 		var stdout, stderr bytes.Buffer
@@ -108,7 +108,7 @@ func TestCmd_InboxEdit_RoutesLifecycleFieldsAndMalformedEditsAreUsageErrors(t *t
 		t.Errorf("a usage error changed the item:\n%s", after)
 	}
 	var stdout, stderr bytes.Buffer
-	if rc := runInboxCmd([]string{"edit", "no-such-item", "--set", "weight=0.4"}, nil, &stdout, &stderr); rc != 1 {
+	if rc := runInboxCmd([]string{"edit", "no-such-item", "--set", "weight=0.4", "--reason", "operator review"}, nil, &stdout, &stderr); rc != 1 {
 		t.Errorf("an unknown id: rc = %d, want 1", rc)
 	}
 }
@@ -122,7 +122,7 @@ func TestCmd_InboxEdit_AnUnwritableInboxExits2(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chmod(inbox, 0o755) })
 	var stdout, stderr bytes.Buffer
 
-	if rc := runInboxCmd([]string{"edit", "cli-inbox-show", "--set", "weight=0.4"}, nil, &stdout, &stderr); rc != 2 {
+	if rc := runInboxCmd([]string{"edit", "cli-inbox-show", "--set", "weight=0.4", "--reason", "operator review"}, nil, &stdout, &stderr); rc != 2 {
 		t.Errorf("rc = %d, want 2 (stderr=%q)", rc, stderr.String())
 	}
 }

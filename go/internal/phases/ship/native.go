@@ -11,8 +11,10 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciwatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/derived"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phaseio"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
@@ -109,6 +111,10 @@ type Options struct {
 
 	baseRun baseattr.Runner
 
+	derivedRun derived.Generator
+
+	mainCI ciwatch.Fetcher
+
 	Signals *signalcenter.Center
 
 	HeldAudit     HeldAuditPort
@@ -119,6 +125,8 @@ type Options struct {
 	relPath func(base, target string) (string, error)
 
 	Integration *Integration
+
+	StageEvidence StageOpener
 }
 
 type Now struct {

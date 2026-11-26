@@ -155,14 +155,14 @@ func TestC2554_002_AVerdictIsRecomputedFromAChainFileThroughTheRealVerb(t *testi
 	cleanPath, _ := writeChain(t, version, map[string]string{"would_stop": "false"}, map[string]string{"would_stop": "false"})
 	stdout, stderr, code := stage(t, "verify", stageKey, "--json", "--project-root", root, "--chain", cleanPath)
 	res := result(t, stdout)
-	if code != 0 || !res.Ready || res.Decisions != 2 || res.FirstCycle != 1 || res.LastCycle != 2 || res.ChainDigest == "" || res.Version != version {
-		t.Errorf("RED: clean chain: exit %d ready %v decisions %d range %d to %d digest %q version %q; stderr %s", code, res.Ready, res.Decisions, res.FirstCycle, res.LastCycle, res.ChainDigest, res.Version, stderr)
+	if code != 0 || !res.Ready || res.Decisions != 2 || res.FirstID != 1 || res.LastID != 2 || res.ChainDigest == "" || res.Version != version {
+		t.Errorf("RED: clean chain: exit %d ready %v decisions %d range %d to %d digest %q version %q; stderr %s", code, res.Ready, res.Decisions, res.FirstID, res.LastID, res.ChainDigest, res.Version, stderr)
 	}
 
 	faultyPath, _ := writeChain(t, version, map[string]string{"would_stop": "false"}, map[string]string{"would_stop": "true"})
 	stdout, _, code = stage(t, "verify", stageKey, "--json", "--project-root", root, "--chain", faultyPath)
 	res = result(t, stdout)
-	wantCase := stageevidence.Case{Class: stageevidence.ClassFalseStop, Cycle: 2, Seq: 2}
+	wantCase := stageevidence.Case{Class: stageevidence.ClassFalseStop, ID: 2, Seq: 2}
 	if code != exitNotReady || res.Ready || res.FalseStops != 1 || !slices.Contains(res.Cases, wantCase) {
 		t.Errorf("RED: chain with one false stop: exit %d ready %v false stops %d cases %+v", code, res.Ready, res.FalseStops, res.Cases)
 	}

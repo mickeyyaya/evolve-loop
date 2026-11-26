@@ -72,7 +72,7 @@ func launchWithResolver(t *testing.T, ws string, resolver tokenResolver) (*[]sig
 	profile := writeProfile(t, ws, "turns", "")
 	artifact := filepath.Join(ws, "artifact.md")
 	fr := &fakeRunner{writeArtifactPath: artifact, writeArtifactBody: "OK\n"}
-	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil), Signals: signals, Stderr: io.Discard, TokenResolver: resolver})
+	eng := newTestEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil), Signals: signals, Stderr: io.Discard, TokenResolver: resolver})
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-p", Profile: profile, Model: "auto", Prompt: "work",
 		Workspace: ws, ArtifactPath: artifact, Agent: "build",

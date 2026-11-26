@@ -849,6 +849,8 @@
 ./internal/launchrecord
 ./internal/integration
 ./internal/fixability
+# cycleblocker - the one named blocker of a sealed cycle and its seal-time record (docs/plans/slow-cycle-blocker-attribution-2026-11.md).
+./internal/cycleblocker
 # cyclespend - the LLM spend of one cycle from llm-calls.ndjson (ADR-0158).
 ./internal/cyclespend
 # selfheal - the incident detector of the self-healing loop: typed incident records from signals, cycle state, CI runs and usage readings (ADR-0155 X12).
@@ -916,3 +918,4 @@
 # the gate and floor facts block and the final-diff rubric of the audit prompt (ADR-0158 decisions 20 and 21). 100% API + 100% line coverage gated.
 ./internal/core/auditfacts
 ./internal/diskfloor
+./internal/journeys

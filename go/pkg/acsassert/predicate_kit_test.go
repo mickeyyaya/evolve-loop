@@ -447,3 +447,44 @@ func TestPathExists_IsTrueOnlyForAPathThatCanBeStatted(t *testing.T) {
 		t.Error("PathExists is true for a path that does not exist")
 	}
 }
+
+func TestDirEntryNames_ListsTheEntriesOfADirectoryInOrder(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	for _, name := range []string{"b.txt", "a.txt"} {
+		if err := os.WriteFile(filepath.Join(dir, name), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := DirEntryNames(t, dir)
+	if len(got) != 2 || got[0] != "a.txt" || got[1] != "b.txt" {
+		t.Errorf("DirEntryNames = %v, want [a.txt b.txt]", got)
+	}
+}
+
+func TestDirEntryNames_FailsTheTBForAMissingDirectory(t *testing.T) {
+	t.Parallel()
+	fake := &recordingTB{}
+	if got := DirEntryNames(fake, filepath.Join(t.TempDir(), "absent")); got != nil || len(fake.fatals) != 1 {
+		t.Errorf("names = %v, Fatalf calls = %q, want nil and one failure", got, fake.fatals)
+	}
+}
+
+func TestFilePerm_ReturnsThePermissionBitsOfAFile(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "f")
+	if err := os.WriteFile(path, nil, 0o640); err != nil {
+		t.Fatal(err)
+	}
+	if got := FilePerm(t, path); got != 0o640 {
+		t.Errorf("FilePerm = %v, want 0640", got)
+	}
+}
+
+func TestFilePerm_FailsTheTBForAMissingFile(t *testing.T) {
+	t.Parallel()
+	fake := &recordingTB{}
+	if got := FilePerm(fake, filepath.Join(t.TempDir(), "absent")); got != 0 || len(fake.fatals) != 1 {
+		t.Errorf("perm = %v, Fatalf calls = %q, want 0 and one failure", got, fake.fatals)
+	}
+}

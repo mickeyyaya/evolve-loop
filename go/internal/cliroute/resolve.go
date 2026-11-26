@@ -59,6 +59,9 @@ func selectRule(v resolver, res resolution) (resolution, error) {
 	}
 	res.rule, res.plan = picked.rule, res.base
 	res.plan.Candidates, res.plan.PrimarySource = picked.chain, picked.rule
+	if picked.rule == rulePinned {
+		res = res.noted("profile %s pins %s: it leads the chain of the default rule", res.req.Agent, res.prof.CLI)
+	}
 	if len(picked.dropped) > 0 {
 		return res.noted("%s: %v filtered out, outside the allowed set %v", picked.rule, picked.dropped, res.allowed), nil
 	}

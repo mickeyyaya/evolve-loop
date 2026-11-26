@@ -31,7 +31,7 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLoopZeroShipHalt, "the zero-ship breaker halted the batch after consecutive waves (fleet) or cycles (sequential) landed no ship up to failure_policy.thresholds.zero_ship_halt. Failed and no-work lanes both count. fields.rule and fields.waves name the rule and run. The remaining fields match LOOP_SYSTEM_FAILURE_HALT (next, escalation, inbox_item)")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLoopFleetLaneHalt, "a fleet lane exited with the system-failure halt code; the lane's own LOOP_SYSTEM_FAILURE_HALT names the failure and the escalation it filed")
 	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLoopHalt, "the batch halted at a boundary: plane diverged, sync refused, main CI red, disk below floor, or boundary CLI smoke test failed. fields.families and fields.versions name the failed update. The reason is the halt error")
-	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLoopEscalationBoundary, "the escalation boundary staged inbox items (bumped/filed/planned) or refused a staged autofile intent without priority_class after a cycle. fields carry the counts (with refused, each refused id printed as WARN) and the stage")
+	signalcenter.RegisterCode(signalcenter.ModuleLoop, CodeLoopEscalationBoundary, "the escalation boundary staged inbox items (escalated/filed/planned) or refused a staged autofile intent without priority_class after a cycle. fields carry the counts (with refused, each refused id printed as WARN) and the stage")
 }
 
 type loopHaltRule struct {

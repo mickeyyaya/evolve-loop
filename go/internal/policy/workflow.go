@@ -7,36 +7,37 @@ import (
 )
 
 type WorkflowPolicy struct {
-	MaxConsecutiveFails      int                     `json:"max_consecutive_fails,omitempty"`
-	MaxCyclesCap             int                     `json:"max_cycles_cap,omitempty"`
-	AutoPrune                *bool                   `json:"auto_prune,omitempty"`
-	BackfillEnabled          *bool                   `json:"backfill_enabled,omitempty"`
-	CycleBudget              string                  `json:"cycle_budget,omitempty"`
-	AllowDocDelete           bool                    `json:"allow_doc_delete,omitempty"`
-	DiffComplexityDisable    bool                    `json:"diff_complexity_disable,omitempty"`
-	AuditorTierOverride      string                  `json:"auditor_tier_override,omitempty"`
-	PhaseEnables             map[string]string       `json:"phase_enables,omitempty"`
-	ConsensusAuditEnabled    *bool                   `json:"consensus_audit_enabled,omitempty"`
-	PSMASEnabled             *bool                   `json:"psmas_enabled,omitempty"`
-	StrictAudit              bool                    `json:"strict_audit,omitempty"`
-	CompactPrompts           *bool                   `json:"compact_prompts,omitempty"`
-	UniversalFallback        *bool                   `json:"universal_fallback,omitempty"`
-	UniversalFallbackExclude []string                `json:"universal_fallback_exclude,omitempty"`
-	RemediationRounds        *int                    `json:"remediation_rounds,omitempty"`
-	SizeBudgetMultipliers    map[string]float64      `json:"size_budget_multipliers,omitempty"`
-	RemediablePhases         []string                `json:"remediable_phases,omitempty"`
-	BuildFloor               *bool                   `json:"build_floor,omitempty"`
-	InteractivePolicy        string                  `json:"interactive_policy,omitempty"`
-	InteractivePolicies      map[string]string       `json:"interactive_policies,omitempty"`
-	FindingsRepair           *FindingsRepairPolicy   `json:"findings_repair,omitempty"`
-	QualityIndex             *QualityIndexPolicy     `json:"quality_index,omitempty"`
-	Convergence              *ConvergencePolicy      `json:"convergence,omitempty"`
-	RetryLadder              *RetryLadderPolicy      `json:"retry_ladder,omitempty"`
-	Repair                   *RepairPolicy           `json:"repair,omitempty"`
-	IntentDelta              bool                    `json:"intent_delta,omitempty"`
-	CycleSpend               *CycleSpendPolicy       `json:"cycle_spend,omitempty"`
-	BuilderSelfCheck         *BuilderSelfCheckPolicy `json:"builder_selfcheck,omitempty"`
-	Supersede                *SupersedePolicy        `json:"supersede,omitempty"`
+	MaxConsecutiveFails      int                       `json:"max_consecutive_fails,omitempty"`
+	MaxCyclesCap             int                       `json:"max_cycles_cap,omitempty"`
+	AutoPrune                *bool                     `json:"auto_prune,omitempty"`
+	BackfillEnabled          *bool                     `json:"backfill_enabled,omitempty"`
+	CycleBudget              string                    `json:"cycle_budget,omitempty"`
+	AllowDocDelete           bool                      `json:"allow_doc_delete,omitempty"`
+	DiffComplexityDisable    bool                      `json:"diff_complexity_disable,omitempty"`
+	AuditorTierOverride      string                    `json:"auditor_tier_override,omitempty"`
+	PhaseEnables             map[string]string         `json:"phase_enables,omitempty"`
+	ConsensusAuditEnabled    *bool                     `json:"consensus_audit_enabled,omitempty"`
+	PSMASEnabled             *bool                     `json:"psmas_enabled,omitempty"`
+	StrictAudit              bool                      `json:"strict_audit,omitempty"`
+	CompactPrompts           *bool                     `json:"compact_prompts,omitempty"`
+	UniversalFallback        *bool                     `json:"universal_fallback,omitempty"`
+	UniversalFallbackExclude []string                  `json:"universal_fallback_exclude,omitempty"`
+	RemediationRounds        *int                      `json:"remediation_rounds,omitempty"`
+	SizeBudgetMultipliers    map[string]float64        `json:"size_budget_multipliers,omitempty"`
+	RemediablePhases         []string                  `json:"remediable_phases,omitempty"`
+	BuildFloor               *bool                     `json:"build_floor,omitempty"`
+	InteractivePolicy        string                    `json:"interactive_policy,omitempty"`
+	InteractivePolicies      map[string]string         `json:"interactive_policies,omitempty"`
+	FindingsRepair           *FindingsRepairPolicy     `json:"findings_repair,omitempty"`
+	QualityIndex             *QualityIndexPolicy       `json:"quality_index,omitempty"`
+	Convergence              *ConvergencePolicy        `json:"convergence,omitempty"`
+	RetryLadder              *RetryLadderPolicy        `json:"retry_ladder,omitempty"`
+	Repair                   *RepairPolicy             `json:"repair,omitempty"`
+	IntentDelta              bool                      `json:"intent_delta,omitempty"`
+	CycleSpend               *CycleSpendPolicy         `json:"cycle_spend,omitempty"`
+	BlockerAttribution       *BlockerAttributionPolicy `json:"blocker_attribution,omitempty"`
+	BuilderSelfCheck         *BuilderSelfCheckPolicy   `json:"builder_selfcheck,omitempty"`
+	Supersede                *SupersedePolicy          `json:"supersede,omitempty"`
 }
 
 type WorkflowConfig struct {
@@ -67,6 +68,7 @@ type WorkflowConfig struct {
 	Repair                   RepairConfig
 	IntentDelta              bool
 	CycleSpend               CycleSpendConfig
+	BlockerAttribution       BlockerAttributionConfig
 	BuilderSelfCheck         BuilderSelfCheckConfig
 	Supersede                SupersedeConfig
 	Convergence              ConvergenceConfig
@@ -105,6 +107,7 @@ func (p Policy) defaultWorkflowConfig() WorkflowConfig {
 		RetryLadder:              p.retryLadderConfig(),
 		Repair:                   p.repairConfig(),
 		CycleSpend:               p.cycleSpendConfig(),
+		BlockerAttribution:       p.blockerAttributionConfig(),
 		BuilderSelfCheck:         p.builderSelfCheckConfig(),
 		Supersede:                p.supersedeConfig(),
 		Convergence:              p.ConvergenceConfig(),

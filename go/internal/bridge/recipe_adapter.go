@@ -49,7 +49,7 @@ func (d *recipeSessionDriver) EnsureSession(ctx context.Context) error {
 	if attached, err := d.attachExisting(ctx); attached || err != nil {
 		return err
 	}
-	if err := d.deps.startSession(ctx, d.session, d.workingDir, d.deps.paneEnv(d.cfg)); err != nil {
+	if err := d.deps.startPaneSession(ctx, d.cfg, d.session, d.workingDir); err != nil {
 		return fmt.Errorf("new-session: %w", err)
 	}
 	if err := sessionrecord.Append(sessionrecord.PathIn(d.cfg.Workspace), sessionrecord.Record{

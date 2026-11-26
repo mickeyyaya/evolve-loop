@@ -3,6 +3,7 @@ package ship
 import (
 	"context"
 	"errors"
+	"maps"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shiperr"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
+	"github.com/mickeyyaya/evolve-loop/go/internal/stageevidence"
 )
 
 const CodeHoldShadow signalcenter.Code = "SHIP_HOLD_SHADOW"
@@ -78,7 +80,7 @@ func (h heldCheck) run(stage config.Stage) error {
 		Requires: []string{heldproposal.RequirementOperator, heldproposal.RequirementAdversarialAudit},
 	}
 	if stage == config.StageShadow {
-		return h.recordShadow(rec)
+		return h.recordShadow(rec, decision.Items)
 	}
 	return h.enforce(rec)
 }
@@ -96,14 +98,16 @@ func (h heldCheck) decide() (heldproposal.Decision, error) {
 	return heldproposal.Decide(heldproposal.Inputs{Items: scan.Items, Changed: changed, Protected: guards.IsProtectedSurface}), nil
 }
 
-func (h heldCheck) recordShadow(rec heldproposal.Record) error {
+func (h heldCheck) recordShadow(rec heldproposal.Record, items []string) error {
 	rec.Status = heldproposal.StatusWouldHold
 	recordErr := ""
 	if err := heldproposal.WriteRecord(h.evolveDir, rec); err != nil {
 		h.logf("[ship] HELD-PROPOSAL: %v", err)
 		recordErr = err.Error()
 	}
-	h.emitShadow(rec, recordErr, h.auditPlan(rec))
+	evidence := maps.Clone(h.emitShadow(rec, recordErr, items, h.auditPlan(rec)))
+	evidence[stageevidence.FieldWouldHold] = "true"
+	h.opts.recordStage(h.cycle, StageKeyHeldProposals, evidence)
 	return nil
 }
 
@@ -202,14 +206,16 @@ func (h heldCheck) auditPlan(rec heldproposal.Record) heldaudit.Plan {
 	return h.opts.HeldAuditPlan(auditWorkspace(h.opts, h.cycle), rec)
 }
 
-func (h heldCheck) emitShadow(rec heldproposal.Record, recordErr string, plan heldaudit.Plan) {
+func (h heldCheck) emitShadow(rec heldproposal.Record, recordErr string, items []string, plan heldaudit.Plan) map[string]string {
+	fields := map[string]string{"cycle": strconv.Itoa(h.cycle), "tree": rec.Tree, "reasons": strings.Join(rec.Reasons, ","), "record_error": recordErr, stageevidence.FieldItem: strings.Join(items, stageevidence.ItemSeparator),
+		"audit_plan": planLabel(plan), "audit_wait": waitLabel(plan)}
 	h.opts.Signals.Emit(signalcenter.Event{
 		Cycle: h.cycle, RunID: h.opts.RunID, Phase: "ship", Module: signalcenter.ModuleShip, Origin: "refuseUnapprovedHeldProposal",
 		Kind: signalcenter.KindShipWarning, Severity: signalcenter.SeverityInfo, Code: CodeHoldShadow,
 		Reason: "shadow: enforce would hold this landing for the operator",
-		Fields: map[string]string{"cycle": strconv.Itoa(h.cycle), "tree": rec.Tree, "reasons": strings.Join(rec.Reasons, ","), "record_error": recordErr,
-			"audit_plan": planLabel(plan), "audit_wait": waitLabel(plan)},
+		Fields: fields,
 	})
+	return fields
 }
 
 func planLabel(p heldaudit.Plan) string {

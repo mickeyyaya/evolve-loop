@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
+	"github.com/mickeyyaya/evolve-loop/go/internal/selfsha"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 	"github.com/mickeyyaya/evolve-loop/go/pkg/version"
 )
@@ -65,13 +66,13 @@ func defaultBootRefreshFleetLane(cfg loopConfig) (bool, error) {
 }
 
 func defaultBootRefreshExecTarget(projectRoot string) (bool, string, error) {
-	self, err := os.Executable()
+	return bootRefreshExecTargetOf(selfsha.Path, projectRoot)
+}
+
+func bootRefreshExecTargetOf(resolveSelf func() (string, error), projectRoot string) (bool, string, error) {
+	selfReal, err := resolveSelf()
 	if err != nil {
 		return false, "", err
-	}
-	selfReal, err := filepath.EvalSymlinks(self)
-	if err != nil {
-		return false, self, err
 	}
 	planeBin, err := filepath.EvalSymlinks(filepath.Join(projectRoot, "go", "bin", "evolve"))
 	if err != nil {

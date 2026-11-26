@@ -88,6 +88,7 @@ type Mover struct {
 	priorityClasses []string
 	origin          string
 	intakeRecord    json.RawMessage
+	source          string
 }
 
 type Option func(*Mover)

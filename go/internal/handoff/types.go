@@ -63,14 +63,15 @@ type Author struct {
 }
 
 type Ledger struct {
-	SchemaVersion int     `json:"schema_version"`
-	Pair          string  `json:"pair"`
-	RequestDigest string  `json:"request_digest"`
-	OutputDigest  string  `json:"output_digest"`
-	Author        Author  `json:"author"`
-	Round         int     `json:"round"`
-	Entries       []Entry `json:"entries"`
-	Check         *Check  `json:"check,omitempty"`
+	SchemaVersion int        `json:"schema_version"`
+	Pair          string     `json:"pair"`
+	RequestDigest string     `json:"request_digest"`
+	OutputDigest  string     `json:"output_digest"`
+	Author        Author     `json:"author"`
+	Round         int        `json:"round"`
+	Entries       []Entry    `json:"entries"`
+	Check         *Check     `json:"check,omitempty"`
+	Judge         *Judgement `json:"judge,omitempty"`
 }
 
 type Check struct {
@@ -81,4 +82,14 @@ type Check struct {
 	Paths          []string `json:"paths"`
 	FailedEvidence []string `json:"failed_evidence"`
 	Errors         []string `json:"errors"`
+}
+
+func (l Ledger) MetAsks() []string {
+	var asks []string
+	for _, entry := range l.Entries {
+		if entry.Status == StatusMet {
+			asks = append(asks, entry.Ask)
+		}
+	}
+	return asks
 }

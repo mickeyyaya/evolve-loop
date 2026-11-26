@@ -221,7 +221,7 @@ func TestEngineRunAttemptBackfillF1(t *testing.T) {
 		t.Parallel()
 		ws := blockedSnapshotF1(t, "f1-agent")
 		var stderr bytes.Buffer
-		e := NewEngine(Deps{Stderr: &stderr, Stdout: io.Discard, LookupEnv: mapLookup(nil), Sleep: func(time.Duration) {}})
+		e := newTestEngine(Deps{Stderr: &stderr, Stdout: io.Discard, LookupEnv: mapLookup(nil), Sleep: func(time.Duration) {}})
 		run := e.runAttempt(context.Background(), core.BridgeRequest{Workspace: ws, Agent: "f1-agent"}, nil)
 		if !strings.Contains(stderr.String(), "[bridge] WARN pane watch: a previous attempt's snapshot could not be removed") {
 			t.Fatalf("stderr = %q", stderr.String())
@@ -236,7 +236,7 @@ func TestEngineRunAttemptBackfillF1(t *testing.T) {
 		if err := panewatch.Write(ws, panewatch.Snapshot{Agent: "f1-agent"}); err != nil {
 			t.Fatal(err)
 		}
-		e := NewEngine(Deps{Stderr: io.Discard, Stdout: io.Discard, LookupEnv: mapLookup(nil), Sleep: func(time.Duration) {}})
+		e := newTestEngine(Deps{Stderr: io.Discard, Stdout: io.Discard, LookupEnv: mapLookup(nil), Sleep: func(time.Duration) {}})
 		e.runAttempt(context.Background(), core.BridgeRequest{Workspace: ws, Agent: "f1-agent"}, nil)
 		if _, err := os.Stat(panewatch.Path(ws, "f1-agent")); !os.IsNotExist(err) {
 			t.Fatalf("stale snapshot survived the new attempt: %v", err)

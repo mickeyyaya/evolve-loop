@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Red first: a table test lists each reader of card section 3 with the state delivered and fails when a reader does not handle it; a scan of the inboxmover readers fails when a new reader is not in the table.",
+    "Journey row 1 of card section 11: two delivered members; a second lane start on either is refused by the menu and the stale-claim sweep does not release them.",
+    "Docs: card section 3 and the internal-inboxmover package note name the state in STE; 100% coverage on each changed function; zero code comments."
+  ],
+  "created_at": "2026-11-25T15:40:00Z",
+  "files": [
+    "go/internal/inboxmover",
+    "go/internal/core/postship.go",
+    "docs/architecture/integration-driver-enforce.md"
+  ],
+  "fix": "Add the lifecycle state delivered next to processed, rejected, retry and quarantine, and make each reader of card section 3 branch on it: the menu skips it, the stale-claim sweep keeps it, claimstate reads it as a held claim, and post-ship cycle-release-unlanded-ship-retry does not run for it. An orphan delivered item with no member in any wave record is reported once, never released.",
+  "id": "train-delivered-inbox-state",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "operator 2026-11-25 asked to enable the merge train; console map of docs/architecture/integration-driver-enforce.md parts 0-8 against code on 2026-11-25 (parts 0, 3, 6 built)",
+  "summary": "At fleet.integration.stage enforce a lane ship writes a deliverable record and stops before main, but post-ship sees isLanded false and releases the item, so a second lane can start the same work (card F2, section 3). lifecycle.validStates (go/internal/inboxmover/lifecycle/lifecycle.go:63) has no delivered value.",
+  "title": "A delivered lane ship holds its inbox item in a delivered state until the train merges or ejects it",
+  "weight": 0.9
+}

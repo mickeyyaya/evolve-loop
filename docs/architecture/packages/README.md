@@ -80,6 +80,7 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/promptboundary` | the one line that splits a composed prompt into a byte-stable cacheable prefix and a per-cycle suffix; `Place` puts a per-try block below it | [internal-promptboundary.md](internal-promptboundary.md) |
 | `internal/atomicwrite` | the one crash-safe write-then-rename implementation: plain `Bytes`/`JSON` and the fsyncing `Durable` | [internal-atomicwrite.md](internal-atomicwrite.md) |
 | `internal/changedpkgs` | maps a change to its packages, covering tests and importers | [internal-changedpkgs.md](internal-changedpkgs.md) |
+| `internal/cycleblocker` | names the one blocker of a sealed cycle: a failed check, a failure class or waiting | [internal-cycleblocker.md](internal-cycleblocker.md) |
 | `internal/cyclestate` | the per-cycle state, verdicts and outcome record every phase shares | [internal-cyclestate.md](internal-cyclestate.md) |
 | `internal/cycleclassify` | classifies how a cycle ended: quota pause, hang, refusal or failure | [internal-cycleclassify.md](internal-cycleclassify.md) |
 | `internal/evalqualitycheck` | grades eval commands for vacuity, diversity and flaky shapes before they run | [internal-evalqualitycheck.md](internal-evalqualitycheck.md) |
@@ -288,6 +289,8 @@ Each Go package directory has one page. The page holds what the code cannot say:
 | `internal/auditcalibration` | a calibration report of auditor narratives against ship-gate outcomes | [internal-auditcalibration.md](internal-auditcalibration.md) |
 | `internal/paralleltest` | the parallel-by-default guard of the package test trees | [internal-paralleltest.md](internal-paralleltest.md) |
 | `test/structure` | source-structure checks shared between package tests | [test-structure.md](test-structure.md) |
+| `test/journeys` | the journey registry file and the guard test that each row names a real, protected test | [test-journeys.md](test-journeys.md) |
+| `internal/journeys` | the journey registry model: rows, test lookup in source, and the `Fix-Journey` trailer of a fix commit | [internal-journeys.md](internal-journeys.md) |
 | `test/e2e` | the end-to-end test tier | [test-e2e.md](test-e2e.md) |
 | `test/component` | the component test tier | [test-component.md](test-component.md) |
 | `test/integration` | the integration test tier | [test-integration.md](test-integration.md) |

@@ -22,7 +22,7 @@ func runFlooredChain(t *testing.T, agent, profile string) (*scriptedModels, stri
 	s := &scriptedModels{outcome: map[string]core.BridgeResponse{"Claude Opus 5.5 (High)": wall, "Gemini 3.1 Pro (High)": ok, "Claude Sonnet 5.5 (High)": ok},
 		artifact: t.TempDir() + "/artifact.md"}
 	var stderr strings.Builder
-	eng := NewEngine(Deps{Stderr: &stderr, ModelChain: geminiInAgyClaude, launchModel: s.launch,
+	eng := newTestEngine(Deps{Stderr: &stderr, ModelChain: geminiInAgyClaude, launchModel: s.launch,
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) { return tokenusage.Result{}, nil }})
 	if _, err := eng.Launch(context.Background(), core.BridgeRequest{CLI: "agy-claude-tmux", Model: "deep", Agent: agent, Profile: profile, ArtifactPath: s.artifact}); err != nil {
 		t.Fatalf("launch: %v", err)
@@ -82,7 +82,7 @@ func TestLaunch_AFlooredSeatKeepsItsRoutedFirstModel(t *testing.T) {
 	t.Parallel()
 	s := &scriptedModels{outcome: map[string]core.BridgeResponse{"Gemini 3.1 Pro (High)": ok}, artifact: t.TempDir() + "/artifact.md"}
 	var stderr strings.Builder
-	eng := NewEngine(Deps{Stderr: &stderr, launchModel: s.launch,
+	eng := newTestEngine(Deps{Stderr: &stderr, launchModel: s.launch,
 		ModelChain:    func(string, string) []string { return []string{"Gemini 3.1 Pro (High)", "Gemini 3.5 Flash (Low)"} },
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) { return tokenusage.Result{}, nil }})
 	if _, err := eng.Launch(context.Background(), core.BridgeRequest{CLI: "agy-tmux", Model: "deep", Agent: "audit", Profile: "/repo/.evolve/profiles/auditor.json", ArtifactPath: s.artifact}); err != nil {
@@ -98,7 +98,7 @@ func runChainUnderFloors(t *testing.T, floors policy.Floors, wantExit int) (*scr
 	s := &scriptedModels{outcome: map[string]core.BridgeResponse{"Claude Opus 5.5 (High)": wall, "Gemini 3.1 Pro (High)": ok, "Claude Sonnet 5.5 (High)": ok},
 		artifact: t.TempDir() + "/artifact.md"}
 	var stderr strings.Builder
-	eng := NewEngine(Deps{Stderr: &stderr, ModelChain: geminiInAgyClaude, launchModel: s.launch, Floors: floors,
+	eng := newTestEngine(Deps{Stderr: &stderr, ModelChain: geminiInAgyClaude, launchModel: s.launch, Floors: floors,
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) { return tokenusage.Result{}, nil }})
 	resp, _ := eng.Launch(context.Background(), core.BridgeRequest{CLI: "agy-claude-tmux", Model: "deep", Agent: "audit", Profile: "/repo/.evolve/profiles/auditor.json", ArtifactPath: s.artifact})
 	if resp.ExitCode != wantExit {

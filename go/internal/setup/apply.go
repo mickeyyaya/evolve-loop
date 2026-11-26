@@ -10,6 +10,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 )
 
+var ErrPinBreachesFloor = errors.New("emitted pin breaches floor")
+
 var ErrRoutingTableDeclared = errors.New("this project declares a cli_routing table, which owns every route, so setup presets do not apply: inspect the routes with `evolve cli-routing show` and change one with `evolve cli-routing set agents.<role> <clis> [--model <tier>]`")
 
 func Apply(rep DetectReport, cfg PresetConfig, presetName string, existingPolicyJSON []byte, profLoader *profiles.Loader) ([]byte, error) {
@@ -24,6 +26,7 @@ func Apply(rep DetectReport, cfg PresetConfig, presetName string, existingPolicy
 	if err != nil {
 		return nil, err
 	}
+	floors := policy.DefaultFloors()
 	for _, a := range preset.Assignments {
 		if a.Warning != "" {
 			return nil, fmt.Errorf("setup apply: preset %q is degraded for phase %q (%s); refusing to write an unsatisfiable pin",
@@ -33,13 +36,14 @@ func Apply(rep DetectReport, cfg PresetConfig, presetName string, existingPolicy
 		if perr != nil {
 			continue
 		}
+		prof = floors.Clamp(a.Role, prof)
 		if !a.DiffersFromDefault {
 			delete(pins, a.Role)
 			continue
 		}
 		pin := policy.Pin{CLI: a.CLI, Model: a.Tier}
 		if verr := policy.ValidatePin(a.Role, pin, &prof); verr != nil {
-			return nil, fmt.Errorf("setup apply: emitted pin for %q breaches floor: %w", a.Role, verr)
+			return nil, fmt.Errorf("setup apply: %w for %q: %w", ErrPinBreachesFloor, a.Role, verr)
 		}
 		pins[a.Role] = pin
 	}

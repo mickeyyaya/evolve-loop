@@ -182,7 +182,7 @@ func TestDispatchEnv_CarriesExactlyTheTagOfThisDispatch(t *testing.T) {
 	deps := Deps{Env: map[string]string{ipcenv.DispatchIDKey: "overlay/1/build/p1n2t1"}}
 	cfg := &Config{DispatchID: thisDispatch}
 
-	env := dispatchEnv(deps, cfg)
+	env := mustDispatchEnv(deps, cfg)
 
 	var tags []string
 	for _, kv := range env {
@@ -261,7 +261,7 @@ func TestLaunchArgs_SweepsTheTagAfterTheDriverReturns(t *testing.T) {
 		}
 		return withSelf([]proctree.Process{hostProc(31337, 1, ids[0]), hostProc(31338, 1, "")}), nil
 	}
-	eng := NewEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), CaptureBaseline: zeroBaselineCapture,
+	eng := newTestEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), CaptureBaseline: zeroBaselineCapture,
 		ListProcesses: list, SignalProcess: func(pid int, _ syscall.Signal) error { sent = append(sent, pid); return nil }})
 	var stdout, stderr bytes.Buffer
 
@@ -435,7 +435,7 @@ func TestLaunchArgs_ASessionGoneBeforeCleanupStillHasItsRecordedTree(t *testing.
 		}
 		return withSelf(tree), nil
 	}
-	eng := NewEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), CaptureBaseline: zeroBaselineCapture,
+	eng := newTestEngine(Deps{Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), CaptureBaseline: zeroBaselineCapture,
 		ListProcesses: list, SignalProcess: func(pid int, _ syscall.Signal) error { sent = append(sent, pid); return nil }})
 	var stdout, stderr bytes.Buffer
 

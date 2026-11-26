@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "The probe result is recorded in the plan or a research note.",
+    "A test fails when a rule file that agy loads is over 24,000 bytes.",
+    "evolve skills check passes after the change."
+  ],
+  "created_at": "2026-11-26T00:45:03Z",
+  "files": [
+    "AGENTS.md",
+    "GEMINI.md",
+    "go/internal/skillcheck/instructions.go"
+  ],
+  "fix": "First prove (with a recorded probe) which rule files agy -p loads in a worktree. Then write a red test that checks the byte size of each file that agy loads. Load the digest and keep the full rules in skills. AGENTS.md is the source of the rendered copies: change it and run evolve skills generate.",
+  "id": "persona-diet-c3-agents-md-size-for-agy",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "docs/plans/persona-diet-2026-11.md (landed with PR #1799); filed by the console at the boundary 189 on 2026-11-26 as the plan section 6 and 7 say",
+  "summary": "Persona diet C3: AGENTS.md is 53,657 bytes and agy cuts a rule file at 24,000 bytes, so an agy seat can lose the end of its rules. It is UNVERIFIED whether agy -p loads the file in a worktree.",
+  "title": "Each rule file that agy loads fits under its 24,000-byte cut",
+  "weight": 0.5
+}

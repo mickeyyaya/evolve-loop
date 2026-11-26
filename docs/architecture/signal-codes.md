@@ -57,6 +57,9 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `AUDIT_LEDGER_PROMPT_DEGRADED` | while composing the audit prompt the continuation manifest (fields.reason=manifest; fallback = registry | none) or the ancestor ledger (fields.reason=ledger, op = read | parse) could not be read, so the auditor was NOT told its inherited ids; stream-only — the same fault blocks at Classify under its own WARN code; fields.step=prompt, path |
 | `AUDIT_LEDGER_UNREADABLE` | the ancestor's or this cycle's own defect-ledger.json is present but unreadable (fields.which = ancestor | own, op = read | parse); the continuation is blocked — repair the file named by fields.path; fields.step=grade, ancestor_cycle |
 | `AUDIT_LEDGER_WRITEBACK_FAILED` | the reconciled ledger could not be written back into the workspace; an invisible disposition is not a disposition, so the cycle is blocked; fields.step=grade, path |
+| `AUDIT_REREVIEW_FILE_FAILED` | at enforce, a late audit finding was not filed as a follow-up, or the landing note was not written. fields.round, fields.reason names the failure |
+| `AUDIT_REREVIEW_NO_SCOPE` | an audit round from 2 on has no repair-diff scope, so it ran as a full audit and nothing was filed (ADR-0168 D3). fields.round, fields.reason names the missing input |
+| `AUDIT_REREVIEW_SHADOW` | from audit round 2, the host measured the repair-diff re-review (ADR-0168). fields.stage is shadow (prompt and verdict unchanged) or enforce. fields.round, hunks, late, would_file (late, below the late-file bar of the audit-repair loop), would_block (late, at or above that bar), reworded (new ids at the location of an open previous finding), filed (follow-ups made at enforce) and verdict |
 
 ### bridge
 
@@ -120,6 +123,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `BUILD_BASE_RED_ATTRIBUTED` | a build floor red was rerun on the lane base and every red test is red there too, so the floor does not refuse the lane; fields.keys (package.Test of each base-red test), main_red (the keys that are red on main too), took |
 | `BUILD_BASE_RED_UNJUDGED` | a build floor red could not be rerun on the lane base, so the lane is blamed as before; fields.keys (package.Test of each red test), cause |
 | `BUILD_COMMENT_HISTORY_SHADOW` | at comment_floor.history_stage shadow, the build removed history-carrying comments that no archive page records, and enforce would send the build back; fields.cycle, count, entries |
+| `BUILD_DERIVED_FLOOR_SKIPPED` | the build floor skipped the derived-file checks because a check verb could not run (no toolchain, or the check passed its deadline). The floor passes this check and the ship gate stays the backstop. fields.cause |
 | `BUILD_FLOOR_CONVERGING` | a build floor rejection after a correction held fewer findings, or the same count of different findings. Build got one more correction inside retry.floor_convergence_rounds. Fields: fields.before, after, round, bound |
 | `BUILD_FLOOR_FLAKY_NEW_TEST` | a build floor test run was RED on a package with a new test file, and its serialized retake was GREEN. The floor fails the run like the ship added-test backstop. Fields: fields.pkg, tests, retake=green, class=flaky_new_test |
 | `BUILD_FLOOR_RETAKE_GREEN` | a build floor test run was RED once and GREEN on its serialized retake under the integration-tier lock, so the build goes on. fields.pkg names the package or run; tests lists failed first-run names (used by evolve ci classify); retake=green |
@@ -205,6 +209,12 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `FAILURELEARNING_POLICY_LOAD_FAILED` | .evolve/policy.json exists, but failed to read or parse while writing the deterministic floor (absence is silent). Novelty threshold and remediation weight fall back to compiled defaults, and the floor proceeds. fields.step=floor, path |
 | `FAILURELEARNING_RECURRENCE_LEDGER_FAILED` | the recurrence ledger keyed by the failing pattern failed to load, update or save (fields.op = load | record | save). Count() stays stale for this pattern, and the phase failure is never masked. fields.step=recurrence, path |
 | `FAILURELEARNING_REMEDIATION_TRUNCATED` | a failed phase self-reported more defects than the remediation cap. First items file as inbox items, and the rest drop; fix the emitter or raise the cap. fields.step=floor, reported, filed |
+
+### fix.proof
+
+| Code | Meaning |
+|---|---|
+| `FIX_PROOF_MISSING` | a manual fix commit has no usable Fix-Journey trailer. fields.subject is the commit subject and fields.problem is missing, malformed, unknown_journey, missing_test or registry_unreadable. A shadow signal: it blocks nothing |
 
 ### gate.contract
 
@@ -302,8 +312,8 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `ISOLATION_I9_VIOLATION` | I-9 proven substitution: no run-time emitter; the conformance matrix TestE2ECycleCLIMatrix is its guard (ADR-0154) |
 | `ISOLATION_LANE_PIN_FORGED` | the workspace lane-scope.json lists other items than host record .evolve/lineage/cycle-N.json. The host kept its record and no reader used the file; emitted once per cycle after a cell. fields.record, fields.file, fields.path |
 | `ISOLATION_READ_UNMEASURED` | the cell read report is incomplete, so its reads count as unmeasured and no open rate counts the cell; fields cell, family, stage, cause (fence-deadline, cancelled, fence-write, report-read), elapsed (only for fence-deadline and cancelled). A cancelled launch is INFO because an operator stop caused it; the other causes are WARN (cell-context-index.md §8) |
-| `ISOLATION_REQUEST_FAILED` | the request channel approved a request of a cell, and the dispatch of the agent failed; the same fields as ISOLATION_REQUEST_REFUSED (llm-isolation.md §7.2.1) |
-| `ISOLATION_REQUEST_REFUSED` | the request channel refused a cell request through validator (schema, kind, role, input, cap, or depth) or orchestrator agent. Fields: request, kind, role, decision, precondition, reason, stage (cli-contract.md §4.5, llm-isolation.md §7.2.1) |
+| `ISOLATION_REQUEST_FAILED` | the request channel approved a request of a cell, and the executor of the kind failed (the dispatch of the agent, or the filing of the inbox item); the same severity rule and fields as ISOLATION_REQUEST_REFUSED (llm-isolation.md §7.2.1) |
+| `ISOLATION_REQUEST_REFUSED` | the request channel refused a cell request through validator (schema, kind, role, args, input, cap, depth, or intake) or orchestrator agent; the severity is WARN for a dispatch request and INCIDENT for an inbox-add request, whose item is lost. Fields: request, kind, role, decision, precondition, reason, stage, request_path, item_id, item_path (cli-contract.md §4.5, llm-isolation.md §7.2.1) |
 
 ### ladder
 
@@ -352,7 +362,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `LOOP_CHAIN_INBOX_ITEM_INVALID` | a root-level .evolve/inbox/*.json failed to parse as an inbox item (no object with a non-empty id). It is NOT counted as pending work. fields.batch, name, path |
 | `LOOP_CHAIN_INBOX_UNREADABLE` | the chain failed to read .evolve/inbox (a read error other than not-exist) and stopped rather than loop blind; fields.batch, path, error, stop_reason=chain_inbox_unreadable, exit=2 |
 | `LOOP_CHAIN_QUOTA_DEFER` | a chained batch exited with resumable rc=5. The chain defers instead of relaunching into the wall or red main (resume with evolve loop --resume). fields.pause names the pause; fields.batch, cycle, wake_at, source come from checkpoint |
-| `LOOP_ESCALATION_BOUNDARY` | the escalation boundary staged inbox items (bumped/filed/planned) or refused a staged autofile intent without priority_class after a cycle. fields carry the counts (with refused, each refused id printed as WARN) and the stage |
+| `LOOP_ESCALATION_BOUNDARY` | the escalation boundary staged inbox items (escalated/filed/planned) or refused a staged autofile intent without priority_class after a cycle. fields carry the counts (with refused, each refused id printed as WARN) and the stage |
 | `LOOP_FLEET_LANE_HALT` | a fleet lane exited with the system-failure halt code; the lane's own LOOP_SYSTEM_FAILURE_HALT names the failure and the escalation it filed |
 | `LOOP_FLEET_POLICY_INVALID` | the loop failed to load .evolve/policy.json at batch start (unreadable, malformed, or strict-schema error). Fleet config fell back to defaults and runs sequential (count 1) until fixed. The reason holds the load error; fields.path |
 | `LOOP_HALT` | the batch halted at a boundary: plane diverged, sync refused, main CI red, disk below floor, or boundary CLI smoke test failed. fields.families and fields.versions name the failed update. The reason is the halt error |
@@ -437,6 +447,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `ORCHESTRATOR_SCOPE_DELTA` | the build handoff floor found changed paths outside declared scope (ADR-0087). fields.total, fields.disposition_keep, fields.disposition_carve, and fields.disposition_refuse hold the counts; scope-delta.json lists the paths. WARN for carve or refuse, INFO when all are keep; reports only (shadow) |
 | `ORCHESTRATOR_SHIP_RECOVERY_PATH` | a ship error naming a moved main (AUDIT_BINDING_HEAD_MOVED or GIT_FLEET_REBASE_NEEDED) took a recovery path. fields.path is rebind (identity carry re-bound audit), reaudit, rebuild, debugger, end, or next phase. Fields: fields.code (routed), fields.original_code (raised), fields.reason (why moved HEAD re-audited) |
 | `ORCHESTRATOR_SHIP_WINDOW_LEASE_BROKEN` | the ship-window lease was broken. A ship recovery broke the lease of a live holder whose heartbeat passed the TTL (fields.owner_pid and fields.heartbeat_at name the broken holder). Or the holder of a recovery lost its own lease at a beat (fields.role is holder, and fields.reason names the cause). Two lanes can overlap in the window |
+| `ORCHESTRATOR_STAGE_EVIDENCE_FAULT` | the shadow-stage evidence of a scope could not be sealed or written, so the scope reads as incomplete and its decisions do not count; fields.cycle names the cycle and fields.error the cause (shadow-contract K2) |
 | `ORCHESTRATOR_SYSTEM_FAILURE` | an ADR-0072 system-level failure was attached to the cycle (INCIDENT when it halts the loop, WARN otherwise); fields.category names the floor |
 
 ### outcome
@@ -492,7 +503,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 
 | Code | Meaning |
 |---|---|
-| `REVIEW_AGENT_RUN_VERDICT_MISMATCH` | evolve agent run found a failing report body when the verdict field passes. The body states FAIL, states no verdict, or lists a CRITICAL or HIGH finding. The run verdict is FAIL. run_id names the run. Fields: fields.field_verdict, fields.stated, fields.critical, fields.high |
+| `REVIEW_AGENT_RUN_VERDICT_MISMATCH` | evolve agent run found a failing report body when the verdict field passes. The body states FAIL, states no verdict, or lists a CRITICAL or HIGH finding. The run verdict is FAIL. run_id names the run. Fields: fields.field_verdict, fields.stated, fields.critical, fields.high, fields.critical_declared, fields.high_listed, fields.high_declared, fields.declared_line |
 | `REVIEW_AGENT_RUN_VERDICT_PARSE_DEFECT` | evolve agent run found no stated verdict in a review report that lists no CRITICAL or HIGH finding. The parser or report format has a defect. The run verdict stays FAIL. run_id names the run, and fields.field_verdict names the field verdict |
 | `REVIEW_FINDINGS` | a code-review dispatch completed and its findings were recorded in the cycle's defect-ledger.json (source code-review); INFO, or WARN when the rows could not be recorded (fields.error) or the findings_repair or quality_index config fell back (fields.config_warning); fields.findings (counts by severity), verdict, would_repair (any finding or a scores gap: the round-1 projection of the loop's decision), stage, threshold, round, recorded, scores (the quality-index vector), gaps (empty when the scores qualify), overflow |
 | `REVIEW_ROUND` | the shadow decision after a code-review round, computed as if enforced and recorded only, so live routing is unchanged; INFO; fields.decision (resolved, gap_open, ledger, history, or the convergence action), stage, round, finding_mass (all OPEN review rows), gap_mass (sum of threshold minus score), decide_mass (the mass convergence uses for the round at its blocking bar, gap included), blocking_bar, rung, reasons; in shadow every row is read as OPEN in every round, so no row goes from FIXED to OPEN and the reopen counts stay zero; zero oscillation stops is no evidence for that rule |
@@ -538,6 +549,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_COMMIT_GATE_STALE` | verify-class: the commit-gate attestation is for a different tree |
 | `SHIP_COMMIT_PREFIX_GATE` | atomic-ship: the commit-message prefix gate refused the message |
 | `SHIP_CONTROL_PLANE_VIOLATION` | verify-class: a cycle-class commit touches the control-plane integrity surface (ADR-0064); ship it manually |
+| `SHIP_DERIVED_STALE` | verify-class: a derived file of a cycle-class commit fails its check verb (stale or broken input), or the check could not run (transient); the Build phase regenerates it |
 | `SHIP_EGPS_RED_COUNT` | verify-class: the EGPS gate reports red evals; red_count must be 0 to ship |
 | `SHIP_EXPLANATION_DOCUMENTATION` | verify-explanation: the change ships without the explanation documentation its class requires |
 | `SHIP_FOREIGN_PREDICATE_PACKAGE` | atomic-ship: a cycle landing adds a file under go/acs/cycle<M>/ of a cycle other than the shipping one; archive the superseded package with its explanation record |
@@ -573,6 +585,9 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 | `SHIP_LANDING_RESUME_FETCH_FAILED` | the git fetch of origin before a landing resume failed; the resume decides on the last known origin ref, and its push reports an outage; fields.step=resume, branch, git_rc, git_err |
 | `SHIP_MAIN_CI_RED` | atomic-ship: the CI of origin/main is red and the main-red stop holds a CI key. No lane can prove a CI job green, so ship refuses the landing until the loop poll sees a green main (precondition) |
 | `SHIP_MAIN_FAST_FORWARDED` | a ship fast-forwarded the local main of the plane to origin inside the ship window, because a ship failure named a moved main and origin held commits the local main lacked. fields.old and fields.new name the heads, fields.cycle the ship |
+| `SHIP_MAIN_RED_CI_OPENED` | the required CI run of the main tip was red and no main-red stop held, so ship opened the stop with the failed tests that are red at main; fields.keys (package.Test of each test), main (the main tip), run (the URL of the run), open_error (empty when the stop and its fix item are written) |
+| `SHIP_MAIN_RED_CI_UNPROVABLE` | the required CI run of the main tip was red at a key that no prover of the stop can run or that is green at main, so ship opened no main-red stop for that key; fields.keys (the keys left out, or (none parsed)), main (the main tip), run (the URL of the run), detail (the hint of the CI row), error (the cause when the run at main failed); next: run the gate on the CI artifact, because the train refuses on the red main until it is green |
+| `SHIP_MAIN_RED_CI_UNREAD` | ship could not read the required CI run of the main tip, so the CI source judged nothing and the lane went on; fields.main (the main tip), error (the cause); next: repair the gh login or the network, because a red main opens no stop while the source is unreadable |
 | `SHIP_MAIN_RED_PARK` | atomic-ship: the lane's red tests are red on its base and on main too. Ship does not blame the lane and parks it until main is green (precondition, ADR-0165 G4) |
 | `SHIP_MANIFEST_GATE` | atomic-ship: a staged path was declared by no build/TDD report (cross-lane leak guard) |
 | `SHIP_MANUAL_DECLINED` | verify-class: the operator declined the manual ship |

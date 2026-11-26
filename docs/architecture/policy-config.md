@@ -337,6 +337,14 @@ The block sets the spend limit of one cycle ([ADR-0158](adr/0158-a-repair-round-
 | `max_cache_read_tokens` | 1000000 to 500000000 | cache-read tokens | 40000000 |
 | `max_audit_rounds` | 1 to 4 | `audit_dispatches` of the cycle | 2 |
 
+## Blocker attribution (`workflow.blocker_attribution`)
+
+The block sets when a shipped cycle names `waiting` as its blocker ([slow-cycle-blocker-attribution-2026-11](../plans/slow-cycle-blocker-attribution-2026-11.md), [internal-cycleblocker](packages/internal-cycleblocker.md)). The loader refuses an unknown key and a value outside its range with the key name. To get the default, leave the key out.
+
+| Key | Range | Meaning | Default |
+|---|---|---|---|
+| `wait_share_pct` | 20 to 95 | the share of the wall time that is neither LLM time nor host time, at which `evolve wave status` names `waiting` | 50 |
+
 ## Builder self-check (`workflow.builder_selfcheck`)
 
 The block sets the stage of the build handoff floor before the build session closes ([ADR-0158](adr/0158-a-repair-round-runs-only-for-a-finding-the-lane-can-fix-and-the-auditor-applies-a-small-prescribed-fix.md) decision 18, [internal-core](packages/internal-core.md), [internal-bridge](packages/internal-bridge.md)). The loader refuses an unknown stage and an unknown key with the key name. `off` and `0` turn the check off. To get the default, leave the key out.

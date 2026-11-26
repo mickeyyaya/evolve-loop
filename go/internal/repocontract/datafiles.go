@@ -68,6 +68,8 @@ var dataFileReads = []DataFileRead{
 		"TestAgyClaudeRouting_ANonFloorSeatNeedsTheLaunchModelCheck",
 		"TestDeepAndTopProfiles_NoChainEntryResolvesTheirTierToAGeminiProModel",
 		"TestGC_TheEnforceHookAndTheOperatorRunKeepTheLedgerEvidenceStore",
+		"TestHandoffJudge_ProductionAuthorsAreAllResolved",
+		"TestHandoffJudge_ProfileAndRoutingAgree",
 		"TestRouter_EveryLaunchOfTheAdvisorStaysOnClaudeModels",
 		"TestRunGCHook_TheCheckedInEnforcePolicyNeverTouchesADevWorktreeALiveLaneAnUnmergedBranchOrAContinuationSnapshot",
 		"TestTheCheckedInCatalogFiltersEachTargetToItsModelFamily",
@@ -77,9 +79,16 @@ var dataFileReads = []DataFileRead{
 		"TestAgyClaudeRouting_AFloorSeatNeedsTheLaunchModelCheck",
 		"TestAgyClaudeRouting_ANonFloorSeatNeedsTheLaunchModelCheck",
 		"TestDeepAndTopProfiles_NoChainEntryResolvesTheirTierToAGeminiProModel",
+		"TestHandoffJudge_ProfileAndRoutingAgree",
 		"TestModelClassifierProfile_DeniesBashAndTheWeb",
 		"TestModelClassifierProfile_GrantMatchesTheArtifactOfTheWorkspace",
 		"TestRouter_EveryLaunchOfTheAdvisorStaysOnClaudeModels",
+	}}},
+	{Path: ".evolve/policy.json", TestSelection: TestSelection{Package: "./internal/cliroute", Tests: []string{
+		"TestResolve_TheTrackedPolicyAndCloudBuilderProfileStartOnTheCloudSeatThenFollowTheDefault",
+	}}},
+	{Path: ".evolve/profiles/", TestSelection: TestSelection{Package: "./internal/cliroute", Tests: []string{
+		"TestResolve_TheTrackedPolicyAndCloudBuilderProfileStartOnTheCloudSeatThenFollowTheDefault",
 	}}},
 	{Path: WholeRepository, TestSelection: TestSelection{Package: "./cmd/evolve", Tests: []string{
 		"TestAgentRunBridge_TheSeatPromptHoldsTheRequiredSectionsOfThePhaseContract",
@@ -773,6 +782,9 @@ var dataFileReads = []DataFileRead{
 	{Path: "skills/", TestSelection: TestSelection{Package: "./internal/skilloverlay", Tests: []string{
 		"TestMaterialize_TheCodeReviewSimplifyOverlayIsItsCompactProjection",
 		"TestMaterialize_TheDocsWriteOverlayIsItsCompactProjectionWithoutFrontmatter",
+	}}},
+	{Path: "skills/docs-write/references/templates.md", TestSelection: TestSelection{Package: "./cmd/evolve", Tests: []string{
+		"TestRunIssue_RenderTurnsATemplateRecordFromFailingCheckToPassing",
 	}}},
 	{Path: "skills/docs-write/SKILL.md", TestSelection: TestSelection{Package: "./internal/skilloverlay", Tests: []string{
 		"TestMaterialize_TheDocsWriteOverlayIsItsCompactProjectionWithoutFrontmatter",

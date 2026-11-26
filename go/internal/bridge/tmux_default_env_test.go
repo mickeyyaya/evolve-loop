@@ -54,7 +54,7 @@ func TestTmuxBoot_ACLIWithoutDefaultEnvExportsNothingExtra(t *testing.T) {
 	fx := newFixture(t, "codex-tmux", "")
 	tmux := &fakeTmux{}
 	runTmuxCLI(t, fx, "codex-tmux", tmux, nil, "--allow-bypass", "--worktree="+t.TempDir())
-	allowed := []string{"EVOLVE_PROJECT_ROOT", ipcenv.DispatchIDKey, ipcenv.DispatchDepthKey, ipcenv.PhaseKey}
+	allowed := []string{"PATH", "EVOLVE_PROJECT_ROOT", ipcenv.DispatchIDKey, ipcenv.DispatchDepthKey, ipcenv.PhaseKey}
 	for k := range ipcenv.CredentialIsolation("dir", "cfg").Set {
 		allowed = append(allowed, k)
 	}

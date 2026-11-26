@@ -17,4 +17,4 @@
 ## Invariants
 
 - The enforced `apicover` gate lists `./internal/incidentkb`, and `apicover_named_test.go` executes every exported symbol.
-- `evolve issue check` and `evolve issue list` in `go/cmd/evolve/cmd_issue.go` are the production callers.
+- `evolve issue check`, `evolve issue render` and `evolve issue list` in `go/cmd/evolve/cmd_issue.go` are the production callers.

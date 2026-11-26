@@ -342,6 +342,11 @@
     },
     {
       "package": "internal/bridge",
+      "test": "TestRealSandboxEngines_FlagsADirectNewEngineWithoutBothFakes",
+      "rule": "single-file-ast-pin"
+    },
+    {
+      "package": "internal/bridge",
       "test": "TestRealTmux_AgentTmuxProbeCannotKillTheRunServer",
       "rule": "sleep-sync"
     },

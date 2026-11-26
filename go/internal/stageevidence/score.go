@@ -9,7 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"sort"
+	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gatecontract"
 )
@@ -60,6 +60,8 @@ func (e *BrokenChainError) Unwrap() error {
 	return ErrBrokenChain
 }
 
+const ErrorCodeUntyped = "error"
+
 func ErrorCode(err error) string {
 	if err == nil {
 		return ""
@@ -76,7 +78,7 @@ func ErrorCode(err error) string {
 	if errors.Is(err, ErrCorruptStore) {
 		return "corrupt-store"
 	}
-	return "error"
+	return ErrorCodeUntyped
 }
 
 type Record struct {
@@ -97,9 +99,9 @@ type Outcome struct {
 	ID             int       `json:"id"`
 	Shipped        bool      `json:"shipped,omitempty"`
 	Incomplete     bool      `json:"incomplete,omitempty"`
-	RoutesMeasured bool      `json:"routes_measured,omitempty"`
 	Failed         []string  `json:"failed,omitempty"`
 	Routed         []string  `json:"routed,omitempty"`
+	RoutesMeasured bool      `json:"routes_measured,omitempty"`
 }
 
 type Chain struct {
@@ -114,9 +116,10 @@ func PreverifiedChain(records []Record, outcomes []Outcome, digest string) Chain
 }
 
 type Case struct {
-	Class Class `json:"class"`
-	Cycle int   `json:"cycle"`
-	Seq   int   `json:"seq"`
+	Class Class     `json:"class"`
+	Scope ScopeKind `json:"scope,omitempty"`
+	ID    int       `json:"id"`
+	Seq   int       `json:"seq"`
 }
 
 type Result struct {
@@ -127,13 +130,13 @@ type Result struct {
 	Error            string         `json:"error,omitempty"`
 	Ready            bool           `json:"ready"`
 	NotReady         NotReadyReason `json:"not_ready,omitempty"`
-	FirstCycle       int            `json:"first_cycle"`
-	LastCycle        int            `json:"last_cycle"`
+	FirstID          int            `json:"first_id"`
+	LastID           int            `json:"last_id"`
 	Decisions        int            `json:"decisions"`
 	FalseStops       int            `json:"false_stops"`
 	Escapes          int            `json:"escapes"`
 	Conflicts        int            `json:"conflicts"`
-	IncompleteCycles []int          `json:"incomplete_cycles,omitempty"`
+	IncompleteScopes []string       `json:"incomplete_scopes,omitempty"`
 	Cases            []Case         `json:"cases,omitempty"`
 	Late             []Record       `json:"late,omitempty"`
 	OtherVersions    map[string]int `json:"other_versions,omitempty"`
@@ -150,17 +153,35 @@ func (defaultScorer) Name() string {
 	return "default"
 }
 
+const (
+	FieldWouldHold = "would_hold"
+	FieldWouldStop = "would_stop"
+	FieldWouldSkip = "would_skip"
+	FieldItem      = "item"
+	FieldCheck     = "check"
+	ItemSeparator  = ","
+)
+
 func (defaultScorer) Classify(rec Record, out Outcome) Class {
-	if rec.Fields["would_hold"] == "true" && rec.Fields["item"] != "" && slices.Contains(out.Routed, rec.Fields["item"]) {
+	if rec.Fields[FieldWouldHold] == "true" && anyRouted(rec.Fields[FieldItem], out.Routed) {
 		return ClassConflict
 	}
-	if rec.Fields["would_stop"] == "true" && out.Shipped {
+	if rec.Fields[FieldWouldStop] == "true" && out.Shipped {
 		return ClassFalseStop
 	}
-	if rec.Fields["would_skip"] == "true" && rec.Fields["check"] != "" && slices.Contains(out.Failed, rec.Fields["check"]) {
+	if rec.Fields[FieldWouldSkip] == "true" && rec.Fields[FieldCheck] != "" && slices.Contains(out.Failed, rec.Fields[FieldCheck]) {
 		return ClassEscape
 	}
 	return ClassNone
+}
+
+func anyRouted(items string, routed []string) bool {
+	for _, item := range strings.Split(items, ItemSeparator) {
+		if item != "" && slices.Contains(routed, item) {
+			return true
+		}
+	}
+	return false
 }
 
 func DefaultScorer() Scorer {
@@ -226,29 +247,36 @@ func VerifyChain(chain Chain) error {
 	return nil
 }
 
-func indexOutcomes(list []Outcome) (map[ScopeKey]Outcome, []int) {
+func indexOutcomes(list []Outcome) (map[ScopeKey]Outcome, []string) {
 	byScope := make(map[ScopeKey]Outcome, len(list))
-	var incomplete []int
+	var incomplete []ScopeKey
 	seenIncomplete := map[ScopeKey]bool{}
 	for _, o := range list {
 		scope := o.ScopeKey()
 		byScope[scope] = o
 		if o.Incomplete && !seenIncomplete[scope] {
 			seenIncomplete[scope] = true
-			incomplete = append(incomplete, o.ID)
+			incomplete = append(incomplete, scope)
 		}
 	}
-	sort.Ints(incomplete)
-	return byScope, incomplete
+	slices.SortFunc(incomplete, compareScopes)
+	labels := make([]string, 0, len(incomplete))
+	for _, scope := range incomplete {
+		labels = append(labels, scope.String())
+	}
+	return byScope, labels
 }
 
 func tallyRecord(res *Result, r Record, out Outcome, scorer Scorer) {
 	res.Decisions++
-	if res.FirstCycle == 0 || r.ID < res.FirstCycle {
-		res.FirstCycle = r.ID
+	if DependsOnConflict(r.Key) && !out.RoutesMeasured {
+		res.NotReady = ReasonConflictsUnmeasured
 	}
-	if r.ID > res.LastCycle {
-		res.LastCycle = r.ID
+	if res.FirstID == 0 || r.ID < res.FirstID {
+		res.FirstID = r.ID
+	}
+	if r.ID > res.LastID {
+		res.LastID = r.ID
 	}
 	c := scorer.Classify(r, out)
 	switch c {
@@ -261,7 +289,7 @@ func tallyRecord(res *Result, r Record, out Outcome, scorer Scorer) {
 	default:
 		return
 	}
-	res.Cases = append(res.Cases, Case{Class: c, Cycle: r.ID, Seq: r.Seq})
+	res.Cases = append(res.Cases, Case{Class: c, Scope: r.Scope, ID: r.ID, Seq: r.Seq})
 }
 
 func Score(chain Chain, version string, promotion gatecontract.Promotion, scorer Scorer) Result {
@@ -272,13 +300,12 @@ func Score(chain Chain, version string, promotion gatecontract.Promotion, scorer
 	res := Result{
 		Scorer:           scorer.Name(),
 		Version:          version,
-		IncompleteCycles: incomplete,
+		IncompleteScopes: incomplete,
 	}
 	if len(chain.Records) > 0 {
 		res.Key = chain.Records[0].Key
 		res.ChainDigest = chain.chainDigest()
 	}
-	unmeasuredConflict := false
 	for _, r := range chain.Records {
 		if r.Kind == KindLate {
 			res.Late = append(res.Late, r)
@@ -296,19 +323,13 @@ func Score(chain Chain, version string, promotion gatecontract.Promotion, scorer
 			continue
 		}
 		tallyRecord(&res, r, out, scorer)
-		if DependsOnConflict(r.Key) && !out.RoutesMeasured {
-			unmeasuredConflict = true
-		}
-	}
-	if unmeasuredConflict {
-		res.NotReady = ReasonConflictsUnmeasured
 	}
 	minDecisions := max(promotion.MinDecisions, 1)
-	res.Ready = res.NotReady == "" &&
-		res.Decisions >= minDecisions &&
+	res.Ready = res.Decisions >= minDecisions &&
 		res.Escapes <= promotion.MaxEscapes &&
 		res.FalseStops <= promotion.MaxFalseStops &&
-		res.Conflicts == 0
+		res.Conflicts == 0 &&
+		res.NotReady == ""
 	return res
 }
 

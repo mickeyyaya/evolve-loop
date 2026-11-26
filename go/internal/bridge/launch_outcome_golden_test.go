@@ -83,7 +83,7 @@ func launchThroughFixture(t *testing.T, ctx context.Context, deps Deps, script [
 	}
 	ctx, cancel := context.WithTimeout(ctx, launchFixtureBudget)
 	defer cancel()
-	resp, err := NewEngine(deps).Launch(ctx, req)
+	resp, err := newTestEngine(deps).Launch(ctx, req)
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		t.Fatalf("the fixture launch exceeded %s: the engine waits on something the fixture does not supply (resp cause %q, err %v)", launchFixtureBudget, resp.CauseCode, err)
 	}

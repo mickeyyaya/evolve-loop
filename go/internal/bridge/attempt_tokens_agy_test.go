@@ -13,7 +13,7 @@ import (
 func TestResolveAttemptTokens_TheAgyConversationStoreIsAMeasuredUsage(t *testing.T) {
 	t.Parallel()
 	usage := cyclestate.TokenUsage{Input: 554617, Output: 69220, CacheRead: 13904571}
-	e := NewEngine(Deps{TokenResolver: func(w tokenusage.Window) (tokenusage.Result, error) {
+	e := newTestEngine(Deps{TokenResolver: func(w tokenusage.Window) (tokenusage.Result, error) {
 		return tokenusage.Result{Usage: usage, Source: tokenusage.SourceAgyConversation, FillPct: 40}, nil
 	}})
 	start := time.Date(2026, 10, 19, 7, 7, 30, 0, time.UTC)

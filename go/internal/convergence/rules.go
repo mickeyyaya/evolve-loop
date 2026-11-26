@@ -22,6 +22,7 @@ type loopRules struct {
 	raisesBar    bool
 	defers       bool
 	filesByRule  bool
+	lateFileBar  Severity
 	accepts      bool
 	adjudicates  bool
 	split        splitExit
@@ -30,10 +31,10 @@ type loopRules struct {
 
 var rulesByLoop = map[Loop]loopRules{
 	LoopCodeReview: {verifyOnly: true, fixerRaise: true, judgeRaise: true, freshContext: true, raisesBar: true,
-		defers: true, filesByRule: true, accepts: true, adjudicates: true, split: splitStopsWithContinuation},
+		defers: true, filesByRule: true, lateFileBar: SeverityHigh, accepts: true, adjudicates: true, split: splitStopsWithContinuation},
 	LoopConsoleLane: {verifyOnly: true, fixerRaise: true, judgeRaise: true, freshContext: true, raisesBar: true,
-		defers: true, filesByRule: true, accepts: true, adjudicates: true, split: splitUnstages},
-	LoopAuditRepair:         {judgeRaise: true, freshContext: true},
+		defers: true, filesByRule: true, lateFileBar: SeverityHigh, accepts: true, adjudicates: true, split: splitUnstages},
+	LoopAuditRepair:         {judgeRaise: true, freshContext: true, lateFileBar: SeverityHigh},
 	LoopExplanationReauthor: {judgeRaise: true, freshContext: true},
 	LoopCycle:               {fixerRaise: true, freshContext: true, backwardEdge: true},
 	LoopInboxItem:           {fixerRaise: true, freshContext: true, split: splitUnstages},

@@ -99,3 +99,12 @@ func goTestRed(tests ...string) string {
 	b.WriteString("FAIL\t" + baseRedPkg + "\t0.1s\nFAIL\n")
 	return b.String()
 }
+
+func (f baseRedFixture) sawAtSeverity(code signalcenter.Code, severity signalcenter.Severity) bool {
+	for _, e := range f.signals.Recent() {
+		if e.Code == code && e.Severity == severity {
+			return true
+		}
+	}
+	return false
+}

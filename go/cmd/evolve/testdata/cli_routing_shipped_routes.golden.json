@@ -548,6 +548,34 @@
       ]
     },
     {
+      "agent": "cloud-builder",
+      "phase": "cloud-builder",
+      "rule": "profile-pinned",
+      "chain": [
+        "claude-cloud",
+        "claude-tmux",
+        "agy-tmux",
+        "agy-claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "balanced",
+          "cli": "claude-cloud",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
+        "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "profile cloud-builder pins claude-cloud: it leads the chain of the default rule",
+        "share: when the agent dispatches at deep, claude takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
       "agent": "code-reviewer",
       "phase": "code-reviewer",
       "rule": "default",
@@ -1309,6 +1337,35 @@
       "allowed": [
         "agy",
         "agy-claude",
+        "claude"
+      ],
+      "notes": [
+        "share: when the agent dispatches at deep, claude takes 50% of the seats; no usage reader, so the pace does not apply"
+      ]
+    },
+    {
+      "agent": "handoff-judge",
+      "rule": "agents:handoff-judge",
+      "chain": [
+        "agy-tmux",
+        "claude-tmux"
+      ],
+      "tiers": [
+        {
+          "tier": "deep",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        },
+        {
+          "tier": "balanced",
+          "cli": "agy-tmux",
+          "effort": "medium",
+          "effort_source": "default"
+        }
+      ],
+      "allowed": [
+        "agy",
         "claude"
       ],
       "notes": [

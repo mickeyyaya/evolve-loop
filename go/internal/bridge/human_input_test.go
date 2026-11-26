@@ -81,7 +81,7 @@ func TestClaudeTmux_HumanInput_AnAuditedReasonTakesTheHumanPath(t *testing.T) {
 
 func runTmuxAudited(t *testing.T, fx launchFixture, tmux *fakeTmux, extra ...string) (int, string) {
 	t.Helper()
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Tmux: tmux, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil), CaptureBaseline: zeroBaselineCapture,
 		RecordBypass: func(string, string) error { return nil },
 	})

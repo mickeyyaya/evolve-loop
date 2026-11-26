@@ -120,7 +120,7 @@ func TestDecideAutoRespond_InvalidRegexSkipped(t *testing.T) {
 func TestRunDryRun_EnsureDirsError(t *testing.T) {
 	t.Parallel()
 	f := writeJSON(t, t.TempDir()+"/file", "x")
-	eng := NewEngine(Deps{})
+	eng := newTestEngine(Deps{})
 	cfg := &Config{Workspace: f, StdoutLog: f + "/s", StderrLog: f + "/e", Artifact: f + "/a", PromptFile: f}
 	if code := eng.runDryRun(cfg, io.Discard, io.Discard); code != ExitBadFlags {
 		t.Fatalf("runDryRun ensureDirs error → code=%d, want ExitBadFlags", code)

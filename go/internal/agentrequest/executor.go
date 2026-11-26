@@ -3,6 +3,7 @@ package agentrequest
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"time"
@@ -28,28 +29,48 @@ func capCheck(cell Cell, count, limit int) (string, string) {
 }
 
 type inboxAdd struct {
-	pol policy.InboxRequestsPolicy
+	pol  policy.InboxRequestsPolicy
+	file FileFunc
 }
 
-func NewInboxAdd(pol policy.InboxRequestsPolicy) Executor { return inboxAdd{pol: pol} }
+func NewInboxAdd(pol policy.InboxRequestsPolicy, file FileFunc) Executor {
+	return inboxAdd{pol: pol, file: file}
+}
 
 func (inboxAdd) Kind() string                 { return agentclass.KindInboxAdd }
 func (e inboxAdd) Stage() policy.RequestStage { return e.pol.Stage }
 
 func (e inboxAdd) admit(f frame, req Request, count int) (string, string) {
-	if pre, reason := capCheck(f.cell, count, e.pol.PerCycle); pre != "" {
-		return pre, reason
+	if unknown := unknownItemArgs(req.What.Args); len(unknown) > 0 {
+		return PreArgs, fmt.Sprintf("the inbox-add request has the args %v, which the item does not take; the pipeline sets the weight and the origin (evolve agent capabilities --json lists the args)", unknown)
 	}
-	return "", ""
+	return capCheck(f.cell, count, e.pol.PerCycle)
 }
 
-func (e inboxAdd) run(_ context.Context, _ Pending, rec Record) (Record, Result) {
-	if e.pol.Stage != policy.RequestStageEnforce {
-		rec.Decision, rec.Reason = DecisionApproved, "the request passed the preconditions and would be filed; the intake lands with the inbox item agent-request-inbox-add-has-no-executor"
+func (e inboxAdd) run(ctx context.Context, p Pending, rec Record) (Record, Result) {
+	refused := func(reason string) (Record, Result) {
+		rec.Decision, rec.Precondition, rec.Reason = DecisionRefused, PreIntake, reason
 		return rec, Result{}
 	}
-	rec.Decision, rec.Precondition = DecisionRefused, PreIntake
-	rec.Reason = "the request passed the preconditions, but the intake that files the item is not built (plan agent-request-inbox-add, component C3), so no item was filed"
+	raw, err := buildItem(p.Request, e.pol.DefaultWeight)
+	switch {
+	case err != nil:
+		return refused(err.Error())
+	case e.pol.Stage != policy.RequestStageEnforce:
+		rec.Decision, rec.Reason = DecisionApproved, "the request passed the preconditions and would be filed; shadow files nothing and runs no intake check"
+		return rec, Result{}
+	case e.file == nil:
+		return refused("no filer is wired, so no item was filed")
+	}
+	filed, err := e.file(ctx, p.Cell.ProjectRoot, raw, sourceOf(p.Cell, p.Name))
+	switch {
+	case errors.Is(err, ErrItemRefused):
+		return refused(err.Error())
+	case err != nil:
+		rec.Decision, rec.Reason = DecisionFailed, err.Error()
+	default:
+		rec.Decision, rec.ItemID, rec.ItemPath = DecisionFiled, filed.ID, filed.Path
+	}
 	return rec, Result{}
 }
 
@@ -67,6 +88,7 @@ type dispatch struct {
 type DispatchDeps struct {
 	Judge JudgeFunc
 	Run   DispatchFunc
+	File  FileFunc
 	Now   func() time.Time
 }
 

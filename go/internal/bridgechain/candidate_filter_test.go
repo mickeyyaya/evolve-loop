@@ -13,6 +13,18 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmroute"
 )
 
+var judgeModels = map[string]map[string]string{
+	"claude": {"balanced": "sonnet", "deep": "opus", "top": "opus"},
+	"codex":  {"balanced": "gpt-5", "deep": "gpt-5", "top": "gpt-5-pro"},
+}
+
+var judgeVendors = map[string][]string{"claude": {"claude"}, "codex": {"gpt"}}
+
+func judgeServed(cli, tier string) (string, bool) {
+	model, ok := judgeModels[llmroute.Family(cli)][tier]
+	return model, ok
+}
+
 func refuseFamily(family string) bridgechain.CandidateSpec {
 	return func(cli, _ string) bool { return llmroute.Family(cli) != family }
 }
@@ -235,21 +247,21 @@ func TestWalking_LaunchHonoursTheCandidateFilterOnTheCoreBridgeEntry(t *testing.
 }
 
 func TestWalking_IndependentsFilterLeavesTheJudgeOnlyAnotherFamilyOrAStrongerTier(t *testing.T) {
-	author := handoff.Author{CLI: "claude-tmux", Model: "opus", Tier: "deep"}
+	author := handoff.Author{CLI: "claude-tmux", Model: "sonnet", Tier: "balanced"}
 	cases := []struct {
 		name  string
 		clis  []string
 		tiers []string
 		want  string
 	}{
-		{"another family serves", []string{"claude-tmux", "codex-tmux"}, []string{"deep"}, "codex-tmux@deep"},
-		{"same family at a stronger tier serves", []string{"claude-tmux"}, []string{"top"}, "claude-tmux@top"},
-		{"same family steps past its own tier to a stronger one", []string{"claude-tmux"}, []string{"deep", "top"}, "claude-tmux@top"},
+		{"another family serves", []string{"claude-tmux", "codex-tmux"}, []string{"balanced"}, "codex-tmux@balanced"},
+		{"same family at a stronger model serves", []string{"claude-tmux"}, []string{"deep"}, "claude-tmux@deep"},
+		{"same family steps past its own model to a stronger one", []string{"claude-tmux"}, []string{"balanced", "deep"}, "claude-tmux@deep"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			inner := &scripted{}
-			w := bridgechain.New(inner, fixedPlan(c.clis, c.tiers), bridgechain.WithCandidateFilter(handoff.Independents(author)))
+			w := bridgechain.New(inner, fixedPlan(c.clis, c.tiers), bridgechain.WithCandidateFilter(handoff.Independents(author, judgeServed, judgeVendors)))
 			if _, _, err := w.LaunchSeat(context.Background(), core.BridgeRequest{CLI: "claude-tmux", Model: c.tiers[0], Agent: "handoff-judge"}); err != nil {
 				t.Fatal(err)
 			}
@@ -263,7 +275,7 @@ func TestWalking_IndependentsFilterLeavesTheJudgeOnlyAnotherFamilyOrAStrongerTie
 func TestWalking_IndependentsFilterRefusesTheAuthorsOwnModelAndLaunchesNothing(t *testing.T) {
 	inner := &scripted{}
 	w := bridgechain.New(inner, fixedPlan([]string{"claude-tmux", "claude-p"}, []string{"deep"}),
-		bridgechain.WithCandidateFilter(handoff.Independents(handoff.Author{CLI: "claude-tmux", Tier: "deep"})))
+		bridgechain.WithCandidateFilter(handoff.Independents(handoff.Author{CLI: "claude-tmux", Tier: "deep"}, judgeServed, judgeVendors)))
 	_, _, err := w.LaunchSeat(context.Background(), core.BridgeRequest{CLI: "claude-tmux", Model: "deep", Agent: "handoff-judge"})
 	if !errors.Is(err, llmroute.ErrNoPermittedAttempt) {
 		t.Fatalf("err = %v", err)

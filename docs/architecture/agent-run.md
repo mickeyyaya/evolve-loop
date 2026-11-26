@@ -10,7 +10,7 @@
 > - **Run workspace**: `.evolve/ephemeral/agent-runs/<run label>`, the only directory that the run writes.
 > - **Report**: the primary artifact of the profile, for example `adversarial-review-report.md`.
 > - **Launch record**: `.evolve/agent-runs/<run label>.json`, the record of the driver, the family, the model and the tree that one run saw (§7).
-> - **Build seat**: the profile `console-builder`, the one profile that writes source in a standalone run (§8).
+> - **Build seat**: the profile `console-builder`, one of two profiles that write source in a standalone run, with `cloud-builder` (§8).
 
 ## Table of contents
 
@@ -112,7 +112,7 @@ An evaluate phase gets `goal` by default, but a plan phase gets no key. The pers
 - A profile that requires a `Verdict` section declares a review report. For such a profile, the run reads the report body after the dispatch (`reportVerdict` in `go/internal/cli/agentcmd/verdict.go`).
 - The body gives two values:
   - the stated verdict: the `evolve-verdict` sentinel, else the `Verdict` line outside the fences (`reportdoc.Verdict`). A verdict line inside a fence states no verdict;
-  - the counts by severity (`reportdoc.CountSeverities`). A finding line starts with `[CRITICAL]`, `[HIGH]`, `[MEDIUM]` or `[LOW]`. `[MAJOR]` counts as HIGH, and `[MINOR]` counts as LOW. A count table row and a counts line (two or more counts on one line) also count. For each severity, the larger of the listed and the declared count is the count.
+  - the counts by severity (`reportdoc.CountSeverities`). A finding line starts with `[CRITICAL]`, `[HIGH]`, `[MEDIUM]` or `[LOW]`. `[MAJOR]` counts as HIGH, and `[MINOR]` counts as LOW. A count table row also counts. A counts line also counts: it starts with an optional bullet and up to two one-word labels, and it has two or more counts (§4.2). For each severity, the larger of the listed and the declared count is the count.
 - When the field is PASS or WARN, these rules apply in this order:
 
 | The report body | The run verdict | Signal |
@@ -123,9 +123,9 @@ An evaluate phase gets `goal` by default, but a plan phase gets no key. The pers
 | the stated verdict is WARN | WARN | none |
 | the stated verdict is PASS or SKIPPED | the field | none |
 
-- **F4.2** On 2026-11-03, three code-reviewer reports put the verdict in a trailing fence, and each clean review became FAIL. The cause was a fenced verdict template in the diff reviewer personas. The fix removes that template, but it is not in this tree yet.
+- **F4.2** On 2026-11-03, three code-reviewer reports put the verdict in a trailing fence, and each clean review became FAIL. The cause was a fenced verdict template in the diff reviewer personas. The fix removes that template.
   *Implication:* the run does not read a fenced verdict. A second fence grammar duplicates `reportdoc` and `phasecontract`. Also, `reportdoc.CountSeverities` counts no fenced finding, so a fenced PASS can hide a fenced HIGH.
-- The persona guard is the test `TestDiffReviewerPersonas_NeverShowTheVerdictLineInsideACodeFence`. It is not in this tree yet. Until both land, a fenced verdict line in a persona makes clean reviews fail with a parse defect.
+- The persona guard is the test `TestDiffReviewerPersonas_NeverShowTheVerdictLineInsideACodeFence` in `go/internal/prompts/persona_verdict_unfenced_test.go`. A fenced verdict line in a persona makes clean reviews fail with a parse defect.
 - No stated verdict with 0 CRITICAL and 0 HIGH is a parse defect. The run also emits `REVIEW_AGENT_RUN_VERDICT_PARSE_DEFECT` and adds one more error diagnostic. The signal shows a clean review that the report format or the parser failed. The run verdict stays FAIL, and the mismatch signal fires too.
 - A field of FAIL or SKIPPED stays as it is. A profile with no `Verdict` section keeps the field, for example `code-simplifier` and the orchestrator seat of the self-healing loop.
 - The signal is WARN in the module `review`. Its `run_id` is the run label, and its reason names the run label too. Its fields give the field verdict, the stated verdict and the CRITICAL and HIGH counts. The envelope gets one error diagnostic with the same reason.
@@ -133,6 +133,163 @@ An evaluate phase gets `goal` by default, but a plan phase gets no key. The pers
 - A body WARN with a field PASS gives WARN, not FAIL. The rule takes the stricter verdict of the two. A WARN review that names only MEDIUM findings does not block a commit.
 - A `Verdict` entry with a heading marker (`## Verdict`) also declares a review report.
 - Limit: a cycle phase does not apply this rule yet, because the rule runs after the phase runner. Item `specrunner-classify-owns-the-review-body-verdict` moves it into the classify stage of `specrunner`. Then one function decides the verdict of a report in a cycle and in a standalone run.
+
+### 4.2 Design of 2026-11-21: a counts line must start the line
+
+- **Status:** built, 2026-11-21, after design review rounds 1 to 3. Item: `review-verdict-counts-a-fixed-finding-as-open`. Design review is required before any build.
+- **Protection:** this item is protected, because `go/internal/reportdoc/` is `AuditVerdictGuarantee` (FX6). Route it to the console. The review fleet is the full seats, the adversarial seat and the security seat. The console can change the diff-reviewer personas (FX6).
+- **Source of the problem:** the operator memory and the item of 2026-11-17. This section replaces two section-scoped designs (worktree `dev/cl-sevcount`, unshipped) and the line-local token design of round 2. Both earlier designs rested on an invented reconstruction of the report. This design rests on the recovered text (FX3).
+
+**Terms used here.**
+
+- **Counts line:** a line with two or more `N SEVERITY` pairs. Example: `docs-review: 0 HIGH, 0 MEDIUM, 2 LOW`.
+- **Recap sentence:** a prose sentence that repeats the counts of an earlier round. Example: `Round 1 asked for 1 HIGH, 7 MEDIUM and 3 LOW fixes.`
+- **Declared count:** the count that a counts line or a table row gives. The run takes the larger of the listed and the declared count.
+
+#### 4.2.1 Request
+
+The item says: "A review report that lists a fixed finding as '- HIGH ...: fixed' turns a PASS into a run verdict FAIL". The run was `agent-docs-review-20261117T104723Z-0962`. The report said "No HIGH finding" and "Verdict: PASS". The run verdict was FAIL.
+
+#### 4.2.2 Facts
+
+**FX1** `CountSeverities` takes a line as a counts line when `countPair` finds `minCountsLinePairs` (2) or more pairs in it. Each pair raises the declared count with `max`. The line can be any prose (`go/internal/reportdoc/severity_counts.go:25`, `:27`, `:46-47`, `:52-56`, `:58`).
+*Implication:* a recap sentence with two or more pairs raises the count of the present round.
+
+**FX2** `reportVerdict` turns PASS or WARN into FAIL when `Blocking()` is above 0 (`go/internal/cli/agentcmd/verdict.go:74-75`, `:101-102`).
+*Implication:* one false count blocks the commit gate. The gate fails closed, and this property must stay.
+
+**FX3** The original report of run 0962 exists. Its provenance:
+
+- Source: the `Write` at line 103 of the seat transcript `~/.evolve-seat/projects/-Users-danleemh-ai-claude-evolve-loop-dev-cl-editlayout/2c402584-9e45-4063-a857-1812af24adef.jsonl`.
+- File: `diff-docs-review-report.md` in `.evolve/ephemeral/agent-runs/agent-docs-review-20261117T104723Z-0962/` (`runsSubpath`, `go/internal/cli/agentcmd/run.go:42`).
+- Size and hash: 2529 bytes, sha256 `355ded5c1cac865de7e3aa2ea1e835ddb23f90a098b1cd98befba8c08ee9d7ab`.
+- Console copy: `/private/tmp/claude-501/-Users-danleemh-ai-claude-evolve-loop/f0748469-0221-4c12-b329-91782f1f5e57/scratchpad/report-0962.md`.
+
+The report has no `[HIGH]` tag. Line 3 is the recap sentence `Round 1 asked for 1 HIGH, 7 MEDIUM and 3 LOW fixes.` Line 11 is `- HIGH K5 vs C6: fixed.` with no brackets, so no rule counts it. The round-2 review ran the real parser on this text. It gives `High 1, Medium 7, Low 3`. Line 3 alone gives the same result. Line 11 alone gives 0.
+
+*Implication:* the root cause is the recap sentence of line 3, not the word "fixed". Line 3 has three pairs, so it is a counts line (FX1). Every round-2 review that recaps round 1 can hit this fault.
+
+**FX4** The personas write these counts forms:
+
+- The docs-review skill ends with a labelled counts line (`skills/docs-review/SKILL.md:96`). It gives findings as `[HIGH|MEDIUM|LOW] <path:line> — <defect>` (`:87`).
+- The code reviewer and the Go reviewer give `[CRITICAL|MAJOR|MINOR]` (`agents/evolve-diff-code-reviewer.md:60`, `agents/evolve-diff-go-reviewer.md:51`).
+- The architecture reviewer gives a Severity Summary table, which `summaryRow` reads (`severity_counts.go:23`, `:49-51`).
+
+*Implication:* the counts line starts with a label and then the pairs. No documented form puts the pairs inside a sentence. Existing tests use only the labelled form (`go/internal/reportdoc/severity_counts_test.go:20-22`).
+
+**FX5** The run keeps the newest 20 report bodies only (`run.go:45` `keptDeliverables=20`, `run.go:227` `launchrecord.KeepDeliverable`). The mismatch signal has the counts only (`verdict.go:83-95`, text at `:26`). It does not say which line set a count.
+*Implication:* after the pruning, no one can see why a run was FAIL. Three review rounds chased the wrong line.
+
+**FX6** The manifest `go/internal/guards/integrity_surface.go` lists:
+
+- `/go/internal/reportdoc/` as `AuditVerdictGuarantee` (`:88`).
+- `/go/internal/launchrecord/` as `GateGuarantee` (`:60`).
+- `/agents/evolve-code-reviewer.md` as `AuditVerdictGuarantee` (`:195`). That persona is the `code-review` phase, which uses the codereview grammar, not this parser.
+
+The manifest does not list `agents/evolve-diff-*.md`.
+*Implication:* the parser change is protected. The four diff-reviewer personas are not protected. This design does not touch `evolve-code-reviewer.md`.
+
+**FX7** 44 phase specs declare a `Verdict` section. Five personas reach `CountSeverities` through the commit gate: the four diff reviewers (`agents/evolve-diff-docs-review.md`, `evolve-diff-code-reviewer.md`, `evolve-diff-go-reviewer.md`, `evolve-diff-architecture-reviewer.md`) and `agents/evolve-adversarial-review.md`. The glob `agents/evolve-diff-*.md` also matches `evolve-diff-code-simplifier.md`, whose phase declares no `Verdict`.
+*Implication:* the persona set is these five files. A rule that selects personas by `require_sections` reaches 44 phases and protected files. The five files are not in the manifest of FX6.
+
+#### 4.2.3 Acceptance criteria
+
+- **A1:** the recovered report of run 0962, copied verbatim, counts 0 HIGH. The test is red today at `High 1`. This is criterion 1 of the item, unchanged. The item needs no edit.
+- **A2:** the same text through `runWithSignals` with field PASS gives `env.Verdict` PASS, exit 0 and no mismatch signal.
+- **A3:** the open forms still count (guard tests, 4.2.6): a labelled counts line `docs-review: 1 HIGH, 0 LOW` counts 1 HIGH. A recap with one open `[HIGH]` line counts 1 HIGH. A table row `| HIGH | 1 |` counts 1 HIGH.
+- **A4:** a mismatch signal names the line that set the largest declared CRITICAL or HIGH count (D4).
+
+#### 4.2.4 Candidate designs
+
+| Id | Design | A1 | Fail-closed | Protected surface | Verdict |
+|---|---|---|---|---|---|
+| A | Section-scoped skip of "Fixed" headings | pass | fails: a nested or setext heading hides an open finding (round 2, HIGH, run 2531) | parser | rejected twice |
+| B | Persona contract only: no recap pairs | fail: the recovered text counts `High 1` until the persona obeys | pass | none | not enough alone: the item needs the parser to stop reading the recovered text as a declaration |
+| C | Line-local token `[HIGH][fixed]` | fail: the recovered text has no token, and line 3 still gives `High 1` | pass | parser, new field, new signal, personas | rejected: it does not fix the cause (FX3) |
+| D | A counts line must start the line: an optional bullet, an optional one-word label and then the pairs. The persona contract adds one line. | pass | pass, with the limit in 4.2.7 | parser, four personas | **chosen** |
+
+**Why D wins.** The cause is the rule that any line with two pairs is a counts line (FX1). D narrows the rule to the documented form (FX4). Design C leaves the faulty rule in place, so it still FAILS the recovered report. Design B depends on the model obeying a rule, and the parser then still fails the recovered text.
+
+D keeps each other form as it is: the tagged lines, the headings, the table rows and the labelled counts line.
+
+#### 4.2.5 Decisions
+
+| Id | Decision | Because | Rejected options and why |
+|---|---|---|---|
+| D1 | In `severity_counts.go`, `countsLine` is a new expression: `^\s*(?:[-*+]\s*)?(?:[A-Za-z][\w-]{0,30}:\s*)?\**\d{1,6}\s+(SEVERITY)\b`. A line gives declared counts only when it matches `countsLine` and has two or more pairs. All pairs of that line count, as today. | FX1, FX3, FX4 | A word list of recap phrases: it is fail-open for each new phrase. A label list: it adds a second home for the labels. |
+| D2 | The label is one token: letters, digits, `_` and `-`, up to 31 characters, then a colon. A label with a space does not match. | `Round 1 fixes: 1 HIGH, 2 MEDIUM` is a recap with a label, and it must not count. FX4: the documented label `docs-review` has no space. | A label with spaces: a recap with a label counts. |
+| D3 | The persona contract: each persona of FX7 gets one line. It says to write the counts of an earlier round in words, never as `N SEVERITY` pairs. The docs-review persona takes the line from `skills/docs-review/SKILL.md` step 4, which is its one source of the report form. No persona gets a new counts form. The guard test lists the carrier files in `recapRuleCarriers` (`go/internal/prompts`) and checks that each holds the line. | FX7. The parser (D1) is the control. The persona line lowers the chance of a false FAIL from a label recap. | A persona set from `require_sections`: 44 phases. The code-review persona: it does not use this grammar (FX6). A counts line for the three code personas: it adds a second home for the form. |
+| D4 | Evidence in the mismatch signal. A new function `reportdoc.TraceBlocking(markdown) BlockingSource` returns `CriticalDeclared`, `HighListed`, `HighDeclared` and `DeclaredLine`. `DeclaredLine` is the first line that set the largest declared CRITICAL count, else the largest declared HIGH count. It has no control characters and at most `MaxSourceLineRunes` (200) runes. `CountSeverities` and `TraceBlocking` share one unexported scan, so the rule has one home. `mismatchEvent` adds the fields `critical_declared`, `high_listed`, `high_declared` and `declared_line`. | FX5 | Save the report body: it grows the launch record, which is `GateGuarantee` (FX6). |
+| D5 | The parser enforces from the first day. The new rule only reads fewer lines as counts lines, and it never reads a finding line differently. | FX1 | A shadow mode: it needs a verb that recomputes the verdict. The design adds none. |
+
+**Worked example.** Take the recovered report (FX3).
+
+- Line 3 does not match `countsLine`: after `Change:` the next character is a backtick, not a digit.
+- Line 25 matches, with the label `docs-review:` and three pairs. It declares `0 HIGH, 0 MEDIUM, 2 LOW`. The two tagged `[LOW]` lines list 2 LOW. The result is `Low 2` and 0 HIGH. The run verdict stays PASS.
+- Change line 3 to `Round 1 fixes: 1 HIGH, 7 MEDIUM.` The label has a space, so the line does not match (D2).
+- Change line 3 to `Counts: 1 HIGH, 7 MEDIUM.` The line matches. The verdict is FAIL, and `declared_line` holds that line.
+
+#### 4.2.6 Files to change and tests
+
+| File | Change |
+|---|---|
+| `go/internal/reportdoc/severity_counts.go` | D1, D2, D4: `countsLine`, the shared scan and `TraceBlocking`. Protected (FX6). One bullet prefix serves `countsLine` and `taggedFinding`. A label may be bold, and two labels may repeat (`Counts: docs-review:`). |
+| `go/internal/reportdoc/severity_counts_test.go` | the tests below |
+| `go/internal/reportdoc/testdata/review-run-0962.md` (new) | a byte copy of the recovered report (FX3). The test checks the sha256 of FX3. |
+| `go/internal/cli/agentcmd/verdict.go` | D4: the four fields in `mismatchEvent`. Update the registered code text to list them. |
+| `go/internal/cli/agentcmd/agent_verdict_test.go` | the end-to-end tests |
+| `go/internal/prompts/persona_recap_rule_test.go` (new guard test) | D3 |
+| the five personas of FX7, and `skills/docs-review/SKILL.md` | D3: one line each. The docs-review persona has no line of its own. |
+| `.claude/agents/code-reviewer.md`, `architecture-reviewer.md`, `go-reviewer.md` | rendered by `evolve skills generate` from the personas. `evolve skills check` fails when a copy differs. |
+| `docs/architecture/signal-codes.md` | regenerate with `evolve signals codes generate`. The generator owns the file (`go/internal/derived/derived.go:50-51`). |
+| `docs/architecture/agent-run.md` §4.1 | the counts line rule. The signal fields are in the package note. |
+| `docs/architecture/packages/internal-reportdoc.md` | line 17: the counts line rule |
+| `docs/architecture/packages/internal-cli-agentcmd.md` | line 50: the new signal fields |
+
+The build is a protected change. A console build runs it, with the full seats, the adversarial seat and the security seat. The change needs no CI workflow edit. The changed files have no build tag, so Linux and Go 1.23 run the same tests.
+
+**Red tests.** Each fails on the current tree. The build report must show the red run.
+
+| Test | Package | Proves | Criterion |
+|---|---|---|---|
+| `TestSeverityCounts_RecoveredRun0962CountsNoHigh` | `reportdoc` | The fixture gives `High 0, Medium 0, Low 2`, and its sha256 is the one of FX3. | A1 |
+| `TestAgentRun_RecoveredRun0962StaysPass` | `agentcmd`, file `agent_verdict_test.go`, harness `runWithSignals` | The harness runs `adversarial-review`, which requires `## Threat Model`. The test puts `threatModel` before the fixture, which changes no counted line. Field PASS gives `env.Verdict` PASS, exit 0 and no mismatch signal. | A2 |
+| `TestAgentRun_MismatchSignalNamesTheDeclaringLine` | `agentcmd` | A report with `Counts: 1 HIGH, 2 MEDIUM.` gives FAIL, and the signal fields hold `high_declared=1`, `high_listed=0`, `critical_declared=0` and the line, cut to 200 runes. | A4 |
+| `TestSeverityCounts_ARecapSentenceDeclaresNothing` | `reportdoc` | `Round 1 asked for 1 HIGH, 7 MEDIUM and 3 LOW fixes.` and `Round 1 fixes: 1 HIGH, 2 MEDIUM` give 0. | A1 |
+| `TestSeverityCounts_ALabelledLineWithOnePairIsNotACountsLine` | `reportdoc` | `Counts: 1 HIGH.` gives 0: one pair is not a counts line. This passes on the old tree, so it is a guard of the old rule. | A1 |
+
+**Guard tests.** These pass on the tree before the change. Each must kill a named mutant. The build report must show the mutation run.
+
+| Test | Proves | Mutant that it kills |
+|---|---|---|
+| `TestSeverityCounts_LabelledCountsLineStillCounts` | `docs-review: 1 HIGH, 0 LOW` gives `High 1`. A bullet, a numbered bullet, a bold label, a double label and no label give `High 1` too. | A `countsLine` that needs no label, or that drops a bullet form. |
+| `TestSeverityCounts_RecapWithOneOpenFindingStillCounts` | The recap sentence plus one `- [HIGH] a.go:1 — x` gives `High 1`. This test is red on the old tree too, because the recap adds 7 MEDIUM. | A rule that drops the tagged line when a recap exists. |
+| `TestSeverityCounts_TableRowStillCounts` | `\| HIGH \| 1 \|` gives `High 1`. | A change of `summaryRow`. |
+| `TestSeverityCounts_RealArchitectureReportKeepsItsCounts` | A real report with bold tagged lines and a Severity Summary table keeps its counts. | A change of `taggedFinding` or `summaryRow`. |
+| `TestDiffReviewerPersonas_HoldTheRecapRule` | Each file of `recapRuleCarriers` holds the line of D3. | A persona that loses the line. |
+
+The fixture of the architecture test is the report `agent-architecture-reviewer-20261119T124409Z-2531.deliverable.md`. The build copies it from `dev/cl-sevcount/.evolve/agent-runs/` into `testdata`, and records its sha256 in the test. The three explanation-review reports in `testdata` hold no tagged line, so they prove no compatibility.
+
+#### 4.2.7 Risks and limits
+
+| Risk | Control |
+|---|---|
+| A report declares a count only in prose, for example `I found 1 HIGH and 2 MEDIUM.` The run then counts 0 from that line. It counted 1 HIGH before. | Limit, accepted. A HIGH finding still counts through its tagged line, its heading, or a table row. The persona contract requires a tagged line for each finding. A report with a hidden HIGH and a stated PASS contradicts itself, and the stated FAIL still blocks (FX2). |
+| A line starts with any other prefix than an optional bullet and up to two one-word labels that end in a colon (bold allowed). Examples: a multi-word label, a heading, a blockquote, a dash in place of the colon, a symbol prefix. The line declares nothing. | Limit, accepted, for the same reason as the prose row. A listed finding still counts through its tagged line or a table row. The rule is the class, so a new prefix needs no new row. |
+| A reviewer writes a recap with a one-word label, for example `Round1: 1 HIGH, 2 LOW`. The line counts. | The result is a false FAIL, so it is fail-closed. D3 asks the personas to write earlier counts in words. D4 shows the line in the signal. |
+| A reviewer or a gate relies on the old reading of a recap line. | Round 3 replayed the old rule and D1 over 914 real review reports. 90 lines had two or more pairs, and D1 drops 10 of them. Four dropped lines carried a blocking count. Two were recaps that cause a false blocker today: run 0962 line 3, and a `Scope:` line with `round-1 CRITICAL`. Two were `See "## Findings" above:` lines, whose reports kept their counts. The build did not repeat the replay. |
+| A persona drops the line of D3. | The guard test (D3). The failure is a false FAIL only if the model writes a labelled recap. |
+| Other readers of `CountSeverities` see a change. | The build must trace each reader with `evolve code callers`. The known reader is `reportVerdict` (`verdict.go:69`). The audit-fix rung reads the counts from the envelope (`go/cmd/evolve/audit_fix_wiring.go:47-50`). |
+
+**Limits.** The design does not read the word "fixed". A fixed finding that keeps its severity tag still counts as open. This is intended and fail-closed: a reviewer can write the fixed finding without a tag. The persona contract of D3 can say this in one more line if the build shows the need. A test cannot prove that a model obeys a persona line.
+
+#### 4.2.8 Follow-up items (not in this build)
+
+- **Token for fixed findings.** File a separate item only when a real report needs a form such as `- [HIGH][fixed] ...`. It must cite that report. It must also say how `go/internal/core/defectledger/severity.go:14` (`leadingSeverityTag`) reads the token.
+- **Open form for adversarial-review.** `agents/evolve-adversarial-review.md:35` says only "list each weakness with a **severity**". The audit-fix seat result for that profile (`audit_fix_wiring.go:47-50`) depends on the format that the model picks. File one item to give it the `[SEVERITY] file:line —` form, with its own guard.
+- **Persona protection.** A decision on the question: do the four personas join the manifest as `AuditVerdictGuarantee`. The precedent is `agents/evolve-code-reviewer.md` (FX6).
+
+**Open questions.** None. Outside sources: none used. The design is synthesis from FX1 and FX3.
 
 ## 5. No cycle
 
@@ -221,7 +378,7 @@ The console ran its builds and its reviews in-process, outside the bridge. Thus 
 
 - **A review seat** is each read-only review profile: `code-simplifier`, `code-reviewer`, `go-reviewer`, `architecture-reviewer` (X10) and `docs-review` (X11). `cli_routing` routes each one like any seat.
 - **The audit of a diff** is `adversarial-review`. No profile is named `auditor`: the built-in `audit` phase reads cycle state.
-- **The build seat** is `console-builder`. Its routing data puts Claude first (`cli_routing.agents.console-builder`), and another family holds the seat when the operator changes that chain.
+- **The build seat** is `console-builder`, or `cloud-builder` for a cloud session that delivers a pull request. The routing data of `console-builder` puts Claude first (`cli_routing.agents.console-builder`), and another family holds the seat when the operator changes that chain.
 - `--worktree DIR` runs the agent in DIR. DIR must be absolute and a linked git worktree (`plane.Classify`), so a seat never runs in the main checkout.
 - A profile is a writer when `core.PhaseWritesSource` marks it, or when its sandbox can write outside the run workspace. A writer runs only when all of these are true:
   - its sandbox is enabled and `read_only_repo`, and each write grant is under `{worktree_path}` or `.evolve/runs/cycle-*`;

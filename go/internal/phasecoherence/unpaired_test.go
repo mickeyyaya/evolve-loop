@@ -77,6 +77,7 @@ func TestRepoPersonaProfilePairing(t *testing.T) {
 	}
 	profileOnly := map[string]string{
 		"evaluator":        "persona projected from skills/evaluator",
+		"handoff-judge":    "the judge prompt is built in Go (cmd/evolve handoffJudgePrompt); the profile holds only the containment of the seat",
 		"inspirer":         "persona projected from skills/inspirer",
 		"model-classifier": "the classifier prompt is built in Go (modelquery buildClassifyPrompt); the profile holds only the containment of the seat",
 		"tool-policy":      "shared tool-policy fragment, not an agent",

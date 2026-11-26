@@ -323,3 +323,21 @@ func TestAdmit_AMaskedCredentialWithNoStageFileIsEnforce(t *testing.T) {
 		t.Fatalf("a credential that cannot be made, with no stage file, stays shadow: %+v", v)
 	}
 }
+
+func TestPasswdHome_ComesFromThePasswdEntryAndFailsLoudly(t *testing.T) {
+	savedLookup := lookupID
+	t.Cleanup(func() { lookupID = savedLookup })
+	lookupID = func(string) (*user.User, error) { return &user.User{HomeDir: "/passwd/home"}, nil }
+	t.Setenv("HOME", "/env/home")
+	if home, err := PasswdHome(); err != nil || home != "/passwd/home" {
+		t.Fatalf("PasswdHome = %q, %v; want the passwd home and not $HOME", home, err)
+	}
+	lookupID = func(string) (*user.User, error) { return nil, errors.New("no passwd") }
+	if home, err := PasswdHome(); err == nil || home != "" {
+		t.Fatalf("a lookup failure must give an error and no home, got %q, %v", home, err)
+	}
+	lookupID = func(string) (*user.User, error) { return &user.User{}, nil }
+	if home, err := PasswdHome(); err == nil || home != "" {
+		t.Fatalf("an empty home must be refused, got %q, %v", home, err)
+	}
+}

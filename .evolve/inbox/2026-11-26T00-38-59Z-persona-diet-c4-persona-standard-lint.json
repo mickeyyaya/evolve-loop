@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Each rule L1 to L7 has a failing fixture and a passing fixture.",
+    "The lint reports findings as warnings and blocks nothing.",
+    "The lint runs on the current agents/ tree with its findings listed in the PR."
+  ],
+  "created_at": "2026-11-26T00:45:04Z",
+  "deps": [
+    "persona-diet-p2-scout"
+  ],
+  "files": [
+    "go/internal/prompts",
+    "agents/evolve-scout.md"
+  ],
+  "fix": "Build the lint with a failing fixture for each of L1 to L7, and fix the one allowed list of tag names for L7. Wire it as a warning in the docs or commit gate. Do not make it a gate; that is a later step after P7. The checks live beside the persona text tests in go/internal/prompts unless the design review picks a better home.",
+  "id": "persona-diet-c4-persona-standard-lint",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "source": "docs/plans/persona-diet-2026-11.md (landed with PR #1799); filed by the console at the boundary 189 on 2026-11-26 as the plan section 6 and 7 say",
+  "summary": "Persona diet C4: the convention section 9 rules L1-L7 have no check. Plan decision D2: the lint starts as a warning after P3 and becomes a gate after P7.",
+  "title": "A persona-standard lint checks rules L1 to L7, as a warning first",
+  "weight": 0.5
+}

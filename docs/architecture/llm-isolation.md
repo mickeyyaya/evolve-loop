@@ -14,7 +14,7 @@
 > - X3: merged in #1127. The single launch API of §5.1 and its AST guard `TestOnlyTheBridgeStartsAnLLMBinary` are on `main`, and matrix row N2 is green.
 > - X4: merged in #1126, and the dispatch credential of I-3 merged in #1132. The request channel of §7.2.1 (item `isolation-dispatch-request-channel`) is built at stage `shadow`.
 > - X5: merged in #1133 at stage `shadow` (the policy key `isolation.i5.stage`).
-> - X6: merged in #1123. The routing data of §10 is on `main`: `cli_routing.floors`, with the compiled default in `go/internal/policy/routing_defaults.json`. The follow-up X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`) moves the `allowed_clis` pins of 7 profiles.
+> - X6: merged in #1123. The routing data of §10 is on `main`: `cli_routing.floors`, with the compiled default in `go/internal/policy/routing_defaults.json`. The follow-up X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`) dropped the `allowed_clis` of the six floor profiles. The `router` ceiling stays.
 > - X7: merged in #1135 at stage `shadow` (the policy key `isolation.i7.stage`). The sandbox holds the protected write rule for each family, `guard phase` follows §7.2 for `Agent` and `Task`, and rows N10 and N11 are green (§9.1).
 > - X8: merged in #1131.
 > - X10: built in this change. `AGENTS.md` is the one source. `evolve skills generate` renders its digest into `CLAUDE.md` and `GEMINI.md`, and the four `.claude/agents` reviewers from their neutral personas (§13).
@@ -299,7 +299,7 @@ Resume with: claude --teleport session_<id>
 
 How a launch runs:
 
-1. A phase dispatch or `evolve agent run <profile>` reaches `claude-cloud` when the profile or a `cli_routing` rule names it. The route goes through `Engine.LaunchArgs`, as for each driver.
+1. A phase dispatch or `evolve agent run <profile>` reaches `claude-cloud` when a `cli_routing.agents` rule names it. It also reaches it when the profile sets `cli_pinned`, as `cloud-builder` does. The route goes through `Engine.LaunchArgs`, as for each driver.
 2. The driver reads the repository of the worktree, else of the project root. An unpushed branch or another host gives exit 2, the reason on stderr and one `BRIDGE_CLOUD_LAUNCH_REFUSED` signal.
 3. The driver starts a private tmux session (`evolve-cloud-…`) with the I-2 environment of the manifest. The pane runs `claude --cloud "$(cat <workspace>/cloud-prompt.txt)"`.
 4. The driver reads the pane once each second, up to `deadline_s` (120). The two confirmation lines give the session. An `Error:` line gives exit 10 with the text of the CLI.
@@ -344,7 +344,7 @@ The environment of a child is the union of three closed sets, and nothing else:
 
 | Set | Names | Source |
 |---|---|---|
-| Base allowlist | `PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`, `LANG`, `LC_*`, `TERM`, `TMPDIR`, `TMP`, `TEMP`, `TZ` | compiled data in the bridge |
+| Base allowlist | `PATH` (the host value, with the `cell-bin` directory first, §6.1), `HOME`, `USER`, `LOGNAME`, `SHELL`, `LANG`, `LC_*`, `TERM`, `TMPDIR`, `TMP`, `TEMP`, `TZ` | compiled data in the bridge |
 | Manifest passthrough | the names in `env_passthrough` (proposed field, §11), for example a proxy or an auth variable that the CLI needs | the manifest of the family |
 | Manifest and pipeline values | `default_env` of the manifest, and the pipeline's own `EVOLVE_*` markers (§7) | the manifest and the launcher |
 
@@ -367,12 +367,22 @@ The builder is `Deps.cellEnv` in `go/internal/bridge/hermetic_env.go`. Each LLM 
 | `shadow` | today's environment, one `ISOLATION_I2_VIOLATION` for each dropped name, `action=logged` |
 | `enforce` | the union only, one INFO `ISOLATION_ENV_REFUSED` event for each dispatch with new names, `action=refused` |
 | Base allowlist | the names of the table above and each `LC_*` name |
+| `PATH` rule | `cellEnv` puts the `cell-bin` directory first on `PATH` at each stage. The list below the table gives the rule. |
 | Pipeline markers | the cell part of the marker list, `ipcenv.CellMarkers()` (X18b): `EVOLVE_PROJECT_ROOT`, `EVOLVE_WORKTREE_ROOT`, `EVOLVE_CYCLE_STATE_FILE`, `EVOLVE_TMUX_SOCKET`, the four `EVOLVE_FLEET*` keys, `EVOLVE_DISPATCH_DEPTH` and `EVOLVE_PHASE`. It applies to the launcher and to `Deps.Env`. A gate or bypass name (`EVOLVE_BYPASS_*`, `EVOLVE_SANDBOX*`, `EVOLVE_MSG_TOKEN`, `BRIDGE_*`) never reaches a child at `enforce`. |
 | Operator opt-ins | The policy key `bridge.allow_anthropic_base_url` passes `ANTHROPIC_BASE_URL`, and `bridge.allow_openai_api_key` passes `OPENAI_API_KEY` (X18d). So the route that the operator opted into stays the route of the child. Each opt-in that is on emits `CONTROL_BYPASS_USED` at each start of the bridge adapter of a cycle. |
 | Excluded always | `EVOLVE_DISPATCH_ID` (the dispatch adds its own tag), and each name that is not a shell identifier |
 | Filter | `ipcenv.Keep`, the allowlist twin of the `ipcenv.Scrub` deny list |
 | Report once | `Deps.EnvDrops` (`EnvDropLog`) keeps the family and name pairs that it reported. The in-process adapter shares one log for its process. An engine with no log gets its own. |
 | Bare execs | `LaunchLLM` (§5.1) gives `probeEnv(bin)` to the doctor, the updater, the version inventory and the model queries. It follows the stage of the policy, with no signal. |
+
+The `PATH` rule of `cellEnv`:
+
+- `cellEnv` applies `prependPath` once, on the environment that its stage returns. So `off`, `shadow` and `enforce` give the same `PATH` rule.
+- The value is `<home>/.evolve/cell-bin/<digest of the real binary path>`, then the host `PATH`. The fallback for a host with no `PATH` is `/usr/bin:/bin`.
+- The directory holds one symlink, `evolve`, to the real path of the running binary (`selfsha.Path`). A new binary path gets a new directory.
+- The write is atomic. The bridge makes the link under a temporary name in the `cell-bin` root, and renames it to `<digest>/evolve`.
+- A failure of the resolver or of the write stops the launch.
+- A pane that does not start hermetic gets the same directory from `export PATH=<dir>:"$PATH"` in `primePaneShell`.
 
 The manifest field `env_passthrough` is built (§11). The parser refuses a name that is not a shell identifier, and it refuses each loop, bridge and credential name, as for `default_env`. So `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL` and `OPENAI_API_KEY` cannot pass through.
 
@@ -623,9 +633,11 @@ A worked example. The build agent of cycle 7 needs the suspect files of a failur
 |---|---|
 | Request file | `requests/<kind>-<n>.json` in the workspace of the cell. The pipeline reads the files in order of the kind and the number. A file with another name is not read. One grammar in `go/internal/agentclass` (`RequestFile`, `ChildRequest`, `ValidRequestName`, `KindDispatch`) gives the file form, the name of a nested request and the name check of the judgement. |
 | Schema | `evolve.request/1` (`agentclass.RequestSchema`), parsed by `agentrequest`. An unknown key, trailing data, an empty `why` or no `expected_output.artifact` is a refusal. |
-| Kinds | `dispatch` only. The kind in the file name and in the file must be the same. The kinds `inbox-add`, `routing-proposal`, `quality-reading` and `code-refresh` of [cli-contract.md](cli-contract.md) §4.3 are refused with precondition `kind`. Item `cli-agent-tool-surface` adds their executors. |
+| Kinds | `dispatch` and `inbox-add`. The kind in the file name and in the file must be the same. The kinds `routing-proposal`, `quality-reading` and `code-refresh` of [cli-contract.md](cli-contract.md) §4.3 are refused with precondition `kind`. Item `cli-agent-tool-surface` adds their executors. |
+| `inbox-add` | The executor builds the item from the args and the `why`, and files it through the intake of `evolve inbox add` under the inbox lock. No judge runs. The record has the decision `filed`, `item_id` and `item_path`. The pipeline sets the weight (`isolation.inbox_requests.default_weight`, default 0.5), the origin `cycle` and the `source` `request:<cycle>/<name>`. At `shadow` nothing is filed. |
+| `inbox-add` refusals | An arg that the item does not take is refused with `args`. A refusal of the intake has the precondition `intake`. A fault of the pipeline, such as a lock timeout, has the decision `failed`. A replay of a request after a crash returns the item that has the same `source`. |
 | Validator | `agentrequest.Channel.check`, in this order: `kind`, `role`, `cycle-cap`, `depth-cap`, `input`. Each input is a clean relative path to a plain file in the workspace of the requester, by the rule of `inputindex.FileEntry`. The same entries go into the evidence index. |
-| Policy | `isolation.dispatch_requests`: `stage` (`off`, `shadow`, `enforce`; default `shadow`), `roles` (default `fault-localization`, `premise-challenge`, `dependency-map`), `per_cycle` (default 3) and `max_depth` (default 1). A value of 0 takes the default. `evolve agent capabilities --json` prints the block as `caps.dispatch`. |
+| Policy | `isolation.dispatch_requests`: `stage` (`off`, `shadow`, `enforce`; default `shadow`), `roles` (default `fault-localization`, `premise-challenge`, `dependency-map`), `per_cycle` (default 3) and `max_depth` (default 1). A value of 0 takes the default. `evolve agent capabilities --json` prints the block as `caps.dispatch`. The block `isolation.inbox_requests` has `stage` (default `enforce`), `per_cycle` (default 8) and `default_weight` (default 0.5), and it prints as `caps.inbox-add`. |
 | Cycle cap | the number of records of the cycle in `.evolve/lineage/requests/cycle-<N>/`. Each request that the channel reads counts, also a refused one. |
 | Depth | A request of a phase agent has depth 1. A request in the workspace of an agent that a request dispatched has the depth of its parent plus 1. Its name is `<parent>.<file>`, for example `dispatch-1.dispatch-1`. |
 | Judge | the seat `selfheal-orchestrator` (ADR-0155). Its persona has the section "Judge a dispatch request". `dispatch-phase-agent` approves. Each other action refuses, with `params.reason` or the hypothesis as the reason (precondition `judged`). |
@@ -634,7 +646,7 @@ A worked example. The build agent of cycle 7 needs the suspect files of a failur
 | `enforce` | An approved request runs. A failed run gets the decision `failed`. |
 | Record | `evolve.request.record/1` in `.evolve/lineage/requests/cycle-<N>/<name>.json`, where no cell can write. The record keeps the `sha256` of the request. A file with a record and the same digest is not read again. A file with a record and another digest is a new request under a used name. The channel refuses it once with the precondition `name`. Its record name is `<name>~<12 hex digits>`. |
 | Index | `inputindex.Build` lists each record of the cycle (`deliverable`) and of each lineage cycle (`lineage`), with kind `request`. The summary names the request, the role, the decision and the reason. |
-| Signals | `isolation.request` (INFO) for each request that parses. `isolation.request.decision`: INFO for `run` and `approved`, WARN `ISOLATION_REQUEST_REFUSED` for a refusal, WARN `ISOLATION_REQUEST_FAILED` for a failed run. |
+| Signals | `isolation.request` (INFO) for each request that parses. `isolation.request.decision`: INFO for `run`, `approved` and `filed`, `ISOLATION_REQUEST_REFUSED` for a refusal, `ISOLATION_REQUEST_FAILED` for a failed executor. The severity of the two codes is WARN for `dispatch` and INCIDENT for `inbox-add`, because a refused `inbox-add` request loses an item. The signal names the file in the field `request_path`. A filed request has `item_id` and `item_path`. |
 | Errors | Three faults are errors: an unreadable `requests/` directory, a corrupt record and a record that cannot be written. Core then prints `[orchestrator] WARN request channel of <phase>`. The cycle goes on. A cancelled cycle reads no further request. The channel removes the kept workspace of each run, also after a failed run or a failed record. |
 | Manifest | the capability `inprocess_subagents` (`bridge.CapabilityInprocessSubagents`), declared by `claude-p` and `claude-tmux` |
 
@@ -1032,7 +1044,7 @@ The floor becomes the `floors` key of `cli_routing` (built in X6, #1123). Its va
 - The bare name `gemini` becomes an error that names the `agy` drivers.
 - A grep guard (proposed `TestFlowCodeNamesNoFamily`) checks each non-test Go file. It fails when flow code names a family as a string. The manifests, the bridge drivers and the routing data are exempt.
 - `evolve cli-routing explain <agent>` prints the same chain for each agent before and after X6. X6 records both outputs in its PR.
-- X6 alone does not make an agy-only table compile. 7 tracked profiles still set `allowed_clis` to Claude families: `auditor`, `adversarial-review`, `tdd-engineer`, `spec-verifier`, `spec-verify` and `code-reviewer` set `["claude"]`, and `router` sets `["agy-claude", "claude"]` (`.evolve/profiles/*.json`). The follow-up X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`) moves these pins into the `floors` data, so that the matrix rows M2 and M3 can pass.
+- X6 alone did not make an agy-only table compile, because 7 tracked profiles set `allowed_clis`. Six floor profiles set `["claude"]`. `router` sets `["agy-claude", "claude"]`. X6b dropped the six floor ceilings. The `router` ceiling stays.
 
 ### Status of X6
 
@@ -1051,7 +1063,7 @@ These parts stay open:
 
 - The seat defaults are compiled data, not policy keys. A policy cannot move the advisor seat yet. The router and the failure advisor already resolve through `cliroute` with their profiles; the seat default applies only when that route fails.
 - Row N13 is green. Rows M2 to M4 stayed open on the next gap, the tmux REPL fake of the harness. X1b (inbox item `isolation-matrix-tmux-repl-fake`) closes that gap, and the rows are green. Row M5 stays open on its tool capability (X19c, §11.1).
-- The tracked profiles of the floor agents and the router set `allowed_clis` to Claude families. Thus an agy-only table over the tracked profiles still refuses seven agents, even with `floors: {}`. The matrix uses its own profiles, so this limit does not show there. Inbox item `isolation-floor-profiles-allowed-clis-as-routing-data` owns it.
+- X6b (item `isolation-floor-profiles-allowed-clis-as-routing-data`) is built. The six floor profiles hold no `allowed_clis`. An agy-only table with `floors: {}` thus refuses only the router. Its ceiling is an open operator question ([design](llm-isolation-x6b-floor-profiles-2026-11.md), Q1).
 - A `--bypass-policy` run ignores the declared table, `floors` included, so it keeps the compiled Claude floor. This is fail-closed (`TestBuild_ABypassRunKeepsTheCompiledFloorEvenWhenThePolicyDeclaresNone`).
 - `TestFlowCodeNamesNoFamily` matches exact string literals only. A built string (`"claude-" + x`), a prefix test, a name outside its list and a file in an exempt home pass it. Non-Go data is not scanned.
 
@@ -1168,6 +1180,7 @@ X8 keeps the file names that the seats already wrote. The bridge waits for the d
 | retry adjudicator | `failure-adjudication.json` | `retry-adjudicator` | `action`, `justification` | `bridgeRetryAdjudicator.Adjudicate` (`go/internal/core/retry_adjudicator_agent.go`) |
 | failure advisor | `failure-advice.json` | `failure-advisor` | `cause`, `pane_substr`, `justification` | `FailureAdvisor.Advise` (`go/internal/core/failure_advisor.go`) |
 | triage | `triage-decision.json` | `triage` | `top_n` | `CapReviewer.Review` (`go/internal/triagecap/flow_stage.go`) |
+| handoff judge | `handoff-judge.json` | `handoff-judge` | `verdicts` | `handoffJudgeRunner` (`go/cmd/evolve/handoff_judge.go`) |
 
 The schemas are `phasecontract.FlowDecisions` (`go/internal/phasecontract/flow_decision.go`). `FlowDecision.Validate` refuses prose around the JSON, trailing data, the wrong top-level shape, an unknown key and a missing key. `TestFlowDecision_ValidateRejectsAnUnknownFieldAndAMissingField` runs both refusals for each seat.
 
@@ -1236,7 +1249,7 @@ The console runs builds and reviews as in-process Claude Code subagents (F1.10).
 | Review | `code-simplifier`, `go-reviewer`, `architecture-reviewer`, `docs-review` | `cli_routing.default` (agy first) | the launch record of each run |
 | Review on the Claude floor | `code-reviewer` | the Claude floor | the launch record |
 | Audit of a diff | `adversarial-review` (no profile is named `auditor`) | the Claude floor | the launch record |
-| Build | `console-builder` with `--worktree` and `--writable` | `cli_routing.agents.console-builder`: Claude first | the launch record and the fenced worktree |
+| Build | `console-builder` with `--worktree` and `--writable` | `cli_routing.agents.console-builder`: Claude first. `cloud-builder` starts on `claude-cloud` (`cli_pinned`). | the launch record and the fenced worktree |
 
 - Each `evolve agent run` writes `.evolve/agent-runs/<run label>.json`. The record names the profile, the driver, the family, the model and the tree state before and after the run.
 - `evolve commit-gate run --reviewers run:<run label>` attests a review from its record. The record must have a driver and no `FAIL` verdict, and both tree states must equal the staged tree. The attestation lists each run under `review_runs`.

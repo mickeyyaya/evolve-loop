@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
@@ -86,10 +87,10 @@ func runShipCmd(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		Stdout:           stdout, Stderr: stderr,
 		Signals:   signals,
 		HeldAudit: heldAuditPort(projectRoot, stderr), HeldAuditPlan: heldAuditPlanPort(projectRoot, stderr),
+		StageEvidence: newStageEvidenceSite(projectRoot, ledger.New(paths.EvolveDirOf(projectRoot), ledger.WithSignals(signals)), signals).shipOpener(),
 	}
 
 	res, err := shipRunFn(ship.WithPaths(context.Background(), splitShipPaths(*pathsFlag)), opts)
-
 	for _, line := range res.Logs {
 		fmt.Fprintln(stderr, line)
 	}

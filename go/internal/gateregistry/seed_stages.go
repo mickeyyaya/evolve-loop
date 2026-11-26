@@ -43,7 +43,14 @@ var stageSeeds = []stageSeed{
 	{key: "workflow.findings_repair.code-review.stage"},
 	{key: "workflow.convergence.stage"},
 	{
-		key:     "workflow.retry_ladder.stage",
+		key:     "workflow.convergence.audit_rereview.stage",
+		signal:  core.CodeAuditRereviewShadow,
+		site:    gatecontract.EmitSite{Path: "internal/core/audit_rereview.go", Func: "emitAuditRereviewShadow", Ref: "CodeAuditRereviewShadow"},
+		fields:  []string{"stage", "round", "hunks", "late", "would_file", "would_block", "reworded", "filed", "verdict"},
+		closure: []string{"internal/convergence"},
+	},
+	{
+		key:     core.StageKeyRetryLadder,
 		signal:  core.CodeLadderDecision,
 		site:    gatecontract.EmitSite{Path: "internal/core/retry_ladder.go", Func: "emitLadderDecision", Ref: "CodeLadderDecision"},
 		fields:  []string{"next", "action", "fingerprint", "tier"},
@@ -70,7 +77,7 @@ var stageSeeds = []stageSeed{
 		closure: []string{"internal/commentaudit"},
 	},
 	{
-		key:     "held_proposals.stage",
+		key:     ship.StageKeyHeldProposals,
 		signal:  ship.CodeHoldShadow,
 		site:    gatecontract.EmitSite{Path: "internal/phases/ship/held_proposal_gate.go", Func: "emitShadow", Ref: "CodeHoldShadow"},
 		fields:  []string{"cycle", "tree", "reasons"},

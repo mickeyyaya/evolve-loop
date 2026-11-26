@@ -47,7 +47,7 @@ func TestEngineLaunch_PopulatesBridgeResponseTokens(t *testing.T) {
 	fr := &fakeRunner{writeArtifactPath: artifact, writeArtifactBody: "OK\n"}
 
 	wantUsage := cyclestate.TokenUsage{Input: 1000, Output: 250, CacheRead: 10, CacheWrite: 5}
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Runner:    fr.runner(),
 		LookupEnv: mapLookup(nil),
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) {
@@ -74,7 +74,7 @@ func TestEngineLaunch_AppendsLLMCallRecordPerFallbackAttempt(t *testing.T) {
 	artifact := filepath.Join(ws, "artifact.md")
 	fr := &fakeRunner{writeArtifactPath: artifact, writeArtifactBody: "OK\n"}
 
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Runner:    fr.runner(),
 		LookupEnv: mapLookup(nil),
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) {
@@ -147,7 +147,7 @@ func TestEngineLaunch_CollectorErrorNeverFailsLaunch(t *testing.T) {
 	fr := &fakeRunner{writeArtifactPath: artifact, writeArtifactBody: "OK\n"}
 	var stderr bytes.Buffer
 
-	eng := NewEngine(Deps{
+	eng := newTestEngine(Deps{
 		Runner:    fr.runner(),
 		LookupEnv: mapLookup(nil),
 		Stderr:    &stderr, Signals: sinkDeps(&stderr),

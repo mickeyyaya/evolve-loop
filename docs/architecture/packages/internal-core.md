@@ -232,6 +232,7 @@ It carries audited work forward across fleet rebases and failed cycles, and conn
     - **A finding** is a floor RED. The line names the packages, each `file:line` of the finding (the text is cut at 1500 characters) and the `golangci-lint run` command that reproduces it.
     - **A tool that is missing or fails to run** fails open. The floor writes a WARN, emits the signal `BUILD_LINT_FLOOR_SKIPPED` with `fields.cause`, and passes. The CI lint job stays the backstop. The signal makes a fleet-wide skip visible, for example a version skew between the local tool and `go/.golangci.yml`.
     - **A lock-wait timeout** is a RED with `class: retryable`, not a pass. The lint did not judge the code, so the line tells the lane to build again.
+    - **The derived floor** (`derived_floor.go`) is `DerivedFloorChecks`. It takes a `DerivedRunFn`, which binds a generator to the worktree, and the composition root injects `core.DerivedWorktree(worktree).Run`. It calls `StaleDerivedFindings` on the paths of the floor diff, and the ship gate calls the same function. The rules are in [internal-derived.md](internal-derived.md). A check that cannot run fails open with the signal `BUILD_DERIVED_FLOOR_SKIPPED`. Pinned by the `TestDerivedFloor_` tests and `TestProductionBuildFloorChecks_CorrectsAStaleDerivedFileByItsGenerateVerb`.
     - **The cost** was measured on 2026-11-14: a warm run on `./internal/core ./internal/commitgate ./internal/derived ./cmd/evolve` took 8.4 seconds of wall time. A run on one small package took under 1 second. Pinned by the `TestLintFloor_` tests and `TestProductionBuildFloorChecks_CorrectsALintFindingByFileAndLine`.
   - `changedPackageFloorChecks`, which reuses the post-build selfcheck machinery (`floorTestPackages` → `runBuildSelfCheck`). Packages enrolled in `.apicover-enforce` run once, under the coverage-instrumented pass in `apicoverNamingFailures`. That pass doubles as their selfcheck and applies CI's apicover naming floor at handoff. The rest take the plain selfcheck. The floor writes `build-selfcheck.json` for the ACS toolchain gate. The advisory binding skips its duplicate run when the floor is enforced, so one build has one go-test pass.
     - **The floor package set** is built by `floorTestPackages`. It takes the changed Go packages and adds the owner package of each changed non-Go file under `go/`, found with `changedpkgs.PatternOf`. Thus a lane that changes only a fixture or an embedded file runs the tests of that package. Changes to `go.mod`, `go.sum`, `vendor/` and the module root are left to the composed gates and CI. The cover-changed floor, the lint floor and the covering-tests artifact keep `changedGoTestPackages`, because a data file has no statements. The repo-contract data rows select data that is read across packages, so the two rules do not overlap; the advisory `buildSelfCheck` stays Go-only.
@@ -253,7 +254,7 @@ It carries audited work forward across fleet rebases and failed cycles, and conn
     - Thus the floor is never stricter than a later gate running that package (`taggedTestArgs`, 2026-09-30).
     - At 120 s the floor killed cycle 1763's `-count=50 -race` predicate, and the lane edited the floor to survive.
   - **The floor runs in two stages** (`build_handoff_floor.go`, plan S6). Each `BuildFloorCheck` has `Run` for Stage A and optional `Tests` for Stage B.
-    - Stage A holds cheap static checks: protected surface, explanation documentation, removal claims, placeholder tokens, persona budget and docs lint. It also checks comment floor, size floor, floor lists, scope delta, gate classifier and lint. `StaticBuildFloorChecks` holds the engine part.
+    - Stage A holds cheap static checks: protected surface, explanation documentation, removal claims, placeholder tokens, persona budget and docs lint. It also checks comment floor, size floor, floor lists, scope delta, gate classifier and lint. The derived files check joins this list in `productionStaticFloorChecks`. `StaticBuildFloorChecks` holds the engine part.
     - `BuildHandoffFloor.Failures` runs Stage A and reports all failures together. It runs Stage B (`SuiteBuildFloorChecks` and the repo-contract pack) only when Stage A is green.
     - `BuildHandoffFloor.StaticFailures` runs Stage A only so an explanation gap skips long tests.
     - `DefaultBuildFloorChecks` keeps the same order for direct calls: static first, then suite.
@@ -299,6 +300,12 @@ It carries audited work forward across fleet rebases and failed cycles, and conn
   - `MandatoryBuildHandoffFloor()` runs in the mandatory reviewer outside optional seams so callers cannot replace it.
   - `NewExplanationLifecycleReviewer` runs last in the production chain and seals Build output only after earlier reviewers approve.
   - `guards/integrity_surface_explanation_callsites_test.go` parses lifecycle vocabulary from function declarations in `build_explanation_handoff.go`.
+- **The seal writes the blocker record beside the failure digest** ([internal-cycleblocker](internal-cycleblocker.md)).
+  - `AssembleFailureDigest` calls `writeBlockerRecord` (`failure_blocker.go`) after `persistFailureDigest`.
+  - `floorCheckTags` (`build_handoff_floor.go`) returns the `[tag]` of each line after `floorFailureSeparator` in a floor reason. It skips a hexadecimal identifier.
+  - It reads the raw reasons of `audit-fail-reason.json`. The class is the first two segments of the digest fingerprint.
+  - A write failure is an error that names the blocker record.
+  - Pinned by `TestAssembleFailureDigest_WritesTheBlockerRecordBesideTheDigest` and `TestFloorCheckTags_*`.
 - **One named floor, run by the cycle and by both pre-handoff probes** (`build_handoff_floor.go`, [ADR-0117](../adr/0117-pre-handoff-probes-run-the-build-floor.md)).
   - `BuildHandoffFloor` is an ordered list of `BuildFloorCheck{Name, Run}` whose `Failures` runs all checks and `Review` rejects build handoffs with `Retry` set.
   - Core owns `MandatoryBuildHandoffFloor()` (explanation-documentation check); the composition root owns composed checks and mounts `WholeBuildHandoffFloor(composed)`.
@@ -987,6 +994,10 @@ The reasons that the comments of the decision, disposition, dossier, failure-lea
 The reasons that the comments of the orchestrator, phase advisor, phase binding, self-check and graduation files carried. The code and the tests state the what.
 
 - **Orchestrator wiring.**
+  - `WithStageEvidence` wires the `StageRecorder` and `StageSealer` ports of shadow-contract K2. `RunCycle` and the resume entry open one recorder session when the cycle number is known. Both close and seal it in a `defer` on every exit path, so a failed, parked or cancelled cycle seals too. A hard kill is the one exit that cannot seal. The orphan seal (K2f) is to repair it.
+    - The seal runs on a context without the cancel of the cycle, bounded by `stageSealBudget`. The `exit` of the seal is `completed`, `failed`, `parked`, `deadline` or `unended`.
+    - A seal that fails emits `ORCHESTRATOR_STAGE_EVIDENCE_FAULT` and never changes the verdict of the cycle. A cycle with no decision seals nothing and stays quiet.
+    - `emitLadderDecision` is the emit site of the key `workflow.retry_ladder.stage`. It records the fields of the signal and `would_stop`.
   - `PhaseBoundaryCheckpointer` and `QuotaBoundaryCheckpointer` are package-level hooks set by the checkpoint package, because core cannot import it without a cycle.
   - `specFor` canonicalizes the phase name before the lookup, so the core and router spellings of one phase cannot miss each other.
     - The registry is the single source of truth and wins over `builtinControlSpec`.
@@ -2360,3 +2371,15 @@ The file is `main_red_park.go`. The design is in [gate-contract-g4-base-red-attr
 - Limits: the exit code of a parked cycle and the release of its claims are the work of `cmd/evolve`. The pool reads the stop before it resumes a parked lane. `parkedLanes.resume` in `cmd/evolve` resumes the lanes only when `mainstop.Stop.Resumes` holds for the tip of `main`.
 - `parallel_evaluate` at `shadow` is no longer the same as `off` (2026-11-15). `parallelEvaluateBatch` computes the evaluate batch with the existing batch code at `shadow` and at `enforce`. At `shadow` it emits `PARALLEL_EVALUATE_SHADOW` with `fields.batch`, then returns no batch, so each member still runs serially. At `enforce` it returns the batch for `dispatchEvaluateBatch`. Pinned by `TestOrchestrator_ParallelEvaluateShadowRecordsBatch` and `TestShadowIsNotOff`.
 - **Core test git-start guard.** `TestCoreTestGitStartsStayInsideTheRecordedCount` (`git_starts_ceiling_test.go`) calls `gitstarts.Verify(".", "testdata/gitstarts.json")` so core test git starts never rise above the recorded baseline ([internal-gitstarts.md](internal-gitstarts.md)).
+
+## The audit round scope (ADR-0168)
+
+- **Scope.** `computeAuditScope` builds the scope of audit round *r* from two tree SHAs. The tree of round 1 comes from the auditor binding in the ledger. The tree of round *r* comes from `worktreeContentSHA`. The binding uses the same function, but it does not exist before the audit.
+  - The hunks are the post-image lines of `git diff-tree -U0`.
+  - A pure deletion becomes one line, so it fails closed.
+- **No scope is round 1.** A missing binding, an empty tree SHA, a lost archive, a git error and an in-place worktree each give no scope. The round then runs as a full audit and `AUDIT_REREVIEW_NO_SCOPE` names the reason. `ReauditCycle` has no `AuditRound`, so a re-audit stays a full audit.
+- **Both entry points.** The dispatch path and the resume path set `PhaseRequest.AuditScope`. The scope is written to `audit-scope.round<n>.json`, so the decision after the audit reads the same scope: `TestScopeReachesAuditOnDispatchAndResume`.
+- **Identity.** At `enforce` with a scope, a previous finding is fixed only when `audit-round-dispositions.json` holds a FIXED entry with evidence that resolves. A missing or DEFERRED entry leaves it open. The file is archived each round and never shares a file with the continuation ledger: `TestMissingDispositionIsOpen`.
+- **Late.** A finding is late when its host id is new and its location is outside the cumulative hunks. No open previous finding may sit there. Lateness is sticky. A filed finding stays filed when the next round repeats it: `TestRewordedOldFindingStaysOpen` and `TestReplayCycle2035Shape`.
+- **Shadow.** At `shadow` the judgments equal the unscoped judgments: `TestShadowAndMissingScopeLeaveTheJudgmentsUnchanged`. The host only emits `AUDIT_REREVIEW_SHADOW` with the late counts.
+- **Filing.** At `enforce` a valid `## Filed (late)` entry becomes one inbox item through `inboxfile.Mint`, which skips a repeat. A filing failure keeps the finding in `audit-late-findings.json` and emits a signal: `TestStageActorAtEnforce` and `TestEnforceFilingFailureKeepsTheFindingInTheNoteAndSignals`. The core `StageActor` port of ADR-0167 does not exist yet, so the test drives the production entry `emitPhaseBindings`.

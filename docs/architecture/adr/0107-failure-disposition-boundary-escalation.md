@@ -4,6 +4,7 @@
 - **Date:** 2026-07-23
 - **Renumbered:** filed as ADR-0076 alongside [ADR-0076 convergence architecture](0076-convergence-architecture.md); moved to 0107 on 2026-09-27 so each ADR number names one file. Slice D of ADR-0076 (the deterministic tier-escalation floor) is a different decision and keeps its number.
 - **Cycle:** 1062 (`chronicle-s6-escalation-boundary`, superseded into `failure-disposition-router` S3+S4)
+- **Amended 2026-11-21:** the weight bump of this decision is superseded by [ADR-0121](0121-inbox-priority-is-a-computed-rank.md) and plan P5. The boundary applier still files an autofile intent and still reports an escalated item. It no longer writes a weight, because the recurrence factor of the rank already counts the recurrence. The formula `min(cap, base + step*(count-1))` below is history.
 - **Supersedes/extends:** the recurrence ledger (cycle-661), `internal/retrofile` (cycle-657)
 
 ## Context

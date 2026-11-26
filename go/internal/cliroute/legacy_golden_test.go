@@ -23,7 +23,7 @@ func TestResolve_AbsentTableMatchesLegacyGolden(t *testing.T) {
 		if len(findings) != 0 {
 			t.Fatalf("variant %s: the legacy projection has no findings, got %+v", v.Name, findings)
 		}
-		r := mustRouter(t, table, cliroute.Host{LookPath: v.LookPath, Discover: v.RawDiscover, Bench: realBench})
+		r := mustRouter(t, table, cliroute.Host{LookPath: v.LookPath, Discover: v.RawDiscover, CloudHosts: cloudHostsOfTheTest, Bench: realBench})
 		for _, agent := range agents {
 			phase := cliroutetest.PhaseOf(agent)
 			runnerRecords = append(runnerRecords, legacyRecord(r, cliroutetest.ResolverRunner, v, agent, phase, cliroute.Request{

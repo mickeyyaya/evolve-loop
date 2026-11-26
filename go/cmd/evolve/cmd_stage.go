@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -15,12 +14,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gateregistry"
 	"github.com/mickeyyaya/evolve-loop/go/internal/stageevidence"
 )
-
-type emptyStageReader struct{}
-
-func (emptyStageReader) ReadChain(context.Context, string) (stageevidence.Chain, error) {
-	return stageevidence.Chain{}, stageevidence.ErrEmptyChain
-}
 
 func runStage(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
@@ -80,11 +73,11 @@ func loadStagePolicy(projectRoot string, stderr io.Writer) (string, []byte, int)
 	return root, policyBytes, cliExitOK
 }
 
-func stageChainReader(chainPath string) stageevidence.ChainReader {
+func stageChainReader(chainPath, root string) stageevidence.ChainReader {
 	if chainPath != "" {
 		return stageevidence.FileChain(chainPath)
 	}
-	return emptyStageReader{}
+	return stageLedgerReader(root)
 }
 
 func verifyStageEntry(root string, policyBytes []byte, e gatecontract.Entry, reader stageevidence.ChainReader) (stageevidence.Result, int, error) {
@@ -93,7 +86,7 @@ func verifyStageEntry(root string, policyBytes []byte, e gatecontract.Entry, rea
 		return stageevidence.Result{}, cliExitIO, err
 	}
 	res, err := stageevidence.Verify(context.Background(), reader, e.Shadow.PolicyKey, version, e.Shadow.Promotion, stageevidence.ScorerFor(e.Shadow.PolicyKey))
-	if err != nil && !errors.Is(err, stageevidence.ErrBrokenChain) && !errors.Is(err, stageevidence.ErrEmptyChain) {
+	if err != nil && stageevidence.ErrorCode(err) == stageevidence.ErrorCodeUntyped {
 		return res, cliExitIO, err
 	}
 	return res, cliExitOK, err
@@ -129,7 +122,7 @@ func runStageVerify(args []string, stdout, stderr io.Writer) int {
 	if rc != cliExitOK {
 		return rc
 	}
-	res, rc, verifyErr := verifyStageEntry(root, policyBytes, entry, stageChainReader(flags.chainPath))
+	res, rc, verifyErr := verifyStageEntry(root, policyBytes, entry, stageChainReader(flags.chainPath, root))
 	if rc != cliExitOK {
 		fmt.Fprintf(stderr, "evolve stage verify: %v\n", verifyErr)
 		return rc
@@ -165,15 +158,15 @@ func writeStageVerifyText(stdout io.Writer, res stageevidence.Result, verifyErr 
 	}
 	fmt.Fprintf(stdout, "scorer: %s\n", res.Scorer)
 	fmt.Fprintf(stdout, "decision version: %s\n", res.Version)
-	fmt.Fprintf(stdout, "evidence range: cycle %d to cycle %d\n", res.FirstCycle, res.LastCycle)
+	fmt.Fprintf(stdout, "evidence range: id %d to id %d\n", res.FirstID, res.LastID)
 	fmt.Fprintf(stdout, "chain digest: %s\n", res.ChainDigest)
 	fmt.Fprintf(stdout, "decisions: %d\n", res.Decisions)
 	fmt.Fprintf(stdout, "false stops: %d\n", res.FalseStops)
 	fmt.Fprintf(stdout, "escapes: %d\n", res.Escapes)
 	fmt.Fprintf(stdout, "conflicts: %d\n", res.Conflicts)
-	fmt.Fprintf(stdout, "incomplete cycles: %d\n", len(res.IncompleteCycles))
+	fmt.Fprintf(stdout, "incomplete scopes: %d\n", len(res.IncompleteScopes))
 	for _, c := range res.Cases {
-		fmt.Fprintf(stdout, "case: %s cycle %d seq %d\n", c.Class, c.Cycle, c.Seq)
+		fmt.Fprintf(stdout, "case: %s %s seq %d\n", c.Class, c.ScopeKey(), c.Seq)
 	}
 	if len(res.OtherVersions) > 0 {
 		versions := make([]string, 0, len(res.OtherVersions))
@@ -200,7 +193,7 @@ func runStageReport(args []string, stdout, stderr io.Writer) int {
 	if rc != cliExitOK {
 		return rc
 	}
-	reader := stageChainReader(flags.chainPath)
+	reader := stageChainReader(flags.chainPath, root)
 	entries := gateregistry.StageEntries()
 	results := make([]stageevidence.Result, 0, len(entries))
 	for _, entry := range entries {

@@ -81,3 +81,64 @@ func TestLiveSmokeResult_ARejectedDriverCarriesOnlyTheExitCode(t *testing.T) {
 		t.Fatalf("LiveSmokeTest = %+v, want %+v", got, want)
 	}
 }
+
+type livePathTmux struct {
+	*FakeTmuxController
+	artifact string
+	answer   func() string
+}
+
+func (a *livePathTmux) PasteBuffer(ctx context.Context, session string) error {
+	if err := a.FakeTmuxController.PasteBuffer(ctx, session); err != nil {
+		return err
+	}
+	return os.WriteFile(a.artifact, []byte(a.answer()+"\n"), 0o644)
+}
+
+func TestLiveSmokeTest_AsksTheCellWhereEvolveResolvesAndComparesItToTheCellBinEntry(t *testing.T) {
+	t.Parallel()
+	for name, answer := range map[string]func(string) string{
+		"the cell-bin entry": func(root string) string {
+			entries, _ := filepath.Glob(filepath.Join(root, "*", "evolve"))
+			return strings.Join(entries, "")
+		},
+		"another evolve": func(string) string { return "/usr/local/bin/evolve" },
+	} {
+		ws := t.TempDir()
+		base := &FakeTmuxController{CaptureFrames: []string{"❯", "working ❯", "working ❯", "done ❯", "cleanup"}}
+		deps := liveSmokeDeps(nil)
+		root := filepath.Join(t.TempDir(), "cell-bin")
+		deps.CellBinRoot = fixedRoot(root)
+		tm := &livePathTmux{FakeTmuxController: base, artifact: filepath.Join(ws, LiveSmokeArtifact), answer: func() string { return answer(root) }}
+		deps.Tmux = tm
+		got := LiveSmokeTest(context.Background(), "claude-tmux", &Config{Workspace: ws}, deps)
+		if got.RC != ExitOK {
+			t.Fatalf("%s: rc=%d", name, got.RC)
+		}
+		wantMismatch := name == "another evolve"
+		if got.EvolveMismatch() != wantMismatch || got.EvolveEntry == "" || !strings.HasPrefix(got.EvolveEntry, root) {
+			t.Errorf("%s: entry %q found %q mismatch %v, want mismatch %v under %s", name, got.EvolveEntry, got.EvolveFound, got.EvolveMismatch(), wantMismatch, root)
+		}
+		prompt, err := os.ReadFile(filepath.Join(ws, "live-smoke-prompt.txt"))
+		if err != nil || !strings.Contains(string(prompt), "command -v evolve") {
+			t.Errorf("%s: the probe prompt must ask for command -v evolve, got %q (err %v)", name, prompt, err)
+		}
+	}
+}
+
+func TestCellBinEntry_IsEmptyUntilTheLaunchResolvedTheDirectory(t *testing.T) {
+	t.Parallel()
+	if got := cellBinEntry(&Config{}); got != "" {
+		t.Errorf("entry of an unresolved config = %q, want empty", got)
+	}
+	if got := cellBinEntry(&Config{cellBin: "/cb/x"}); got != "/cb/x/evolve" {
+		t.Errorf("entry = %q, want /cb/x/evolve", got)
+	}
+}
+
+func TestLiveSmokeResult_NoEntryNeverMismatches(t *testing.T) {
+	t.Parallel()
+	if (LiveSmokeResult{EvolveFound: "x"}).EvolveMismatch() {
+		t.Error("a result with no cell-bin entry cannot mismatch")
+	}
+}

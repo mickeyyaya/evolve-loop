@@ -28,7 +28,7 @@ func runWith(d Deps, root string, args ...string) (int, string, string) {
 func TestQueueGate_ReturnsTheQueuedExitCodeFromEveryWriteVerb(t *testing.T) {
 	root := inboxtest.EmptyRoot(t)
 	cases := map[string][]string{
-		"edit":          {"edit", "x", "--set", "weight=0.4"},
+		"edit":          {"edit", "x", "--set", "weight=0.4", "--reason", "operator review"},
 		"withdraw":      {"withdraw", "x", "reason"},
 		"verify":        {"verify", "x", "--evidence", "checked"},
 		"route-console": {"route-console", "x", "reason", "3"},

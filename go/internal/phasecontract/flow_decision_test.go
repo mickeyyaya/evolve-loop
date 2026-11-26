@@ -22,6 +22,7 @@ var validFlowDecisions = map[string]string{
 	FlowSeatFailureAdvisor:       `{"cause":"dead_shell","pane_substr":"zsh: command not found","justification":"plain shell"}`,
 	FlowSeatTriage:               `{"cycle":3,"top_n":[{"id":"a"}],"committed_floors":["./x"]}`,
 	FlowSeatSelfhealOrchestrator: validDiagnosis,
+	FlowSeatHandoffJudge:         `{"verdicts":[{"ask":"a1","agrees":true,"note":"ok"}]}`,
 }
 
 func TestFlowDecisions_EachSeatHasADeclaredFileAndASchema(t *testing.T) {
@@ -439,5 +440,37 @@ func TestFlowDecision_ClearRemovesTheFileAndFailsClosed(t *testing.T) {
 	}
 	if err := d.Clear(path); err == nil || !strings.Contains(err.Error(), "clear the decision file before the launch") {
 		t.Fatalf("a path that cannot be removed must fail closed: %v", err)
+	}
+}
+
+func TestFlowDecision_HandoffJudgeRefusesProseAnUnknownKeyAndAMissingVerdicts(t *testing.T) {
+	t.Parallel()
+	d := mustFlowDecision(t, FlowSeatHandoffJudge)
+	if d.ArtifactName != "handoff-judge.json" || d.Shape != JSONShapeObject {
+		t.Fatalf("seat = %+v", d)
+	}
+	for name, body := range map[string]string{
+		"prose":            "the judge agrees with every ask",
+		"an unknown key":   `{"verdicts":[],"score":1}`,
+		"missing verdicts": `{}`,
+		"an array":         `[]`,
+	} {
+		if err := d.Validate([]byte(body)); err == nil {
+			t.Errorf("%s must be refused", name)
+		}
+	}
+}
+
+func TestFlowDecision_HandoffJudgeAtShadowGivesNoDisagreementForAValidFileAndItsStdout(t *testing.T) {
+	t.Parallel()
+	d := mustFlowDecision(t, FlowSeatHandoffJudge)
+	path := filepath.Join(t.TempDir(), d.ArtifactName)
+	body := validFlowDecisions[FlowSeatHandoffJudge]
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := d.Read(FlowStageShadow, path, time.Now().Add(-time.Minute), func() ([]byte, bool) { return []byte(body), true })
+	if r.Disagree || r.FileErr != nil {
+		t.Fatalf("read = %+v; a valid file and the same stdout must not disagree", r)
 	}
 }

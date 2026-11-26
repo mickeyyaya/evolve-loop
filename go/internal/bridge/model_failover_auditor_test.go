@@ -30,7 +30,7 @@ func launchAuditorAtDeep(t *testing.T, outcome map[string]core.BridgeResponse) (
 	t.Helper()
 	s := &scriptedModels{outcome: outcome, artifact: t.TempDir() + "/artifact.md"}
 	var stderr strings.Builder
-	eng := NewEngine(Deps{Stderr: &stderr, ModelChain: CatalogModelChain, launchModel: s.launch,
+	eng := newTestEngine(Deps{Stderr: &stderr, ModelChain: CatalogModelChain, launchModel: s.launch,
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) { return tokenusage.Result{}, nil }})
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{CLI: "claude-tmux", Model: "deep", Agent: "audit",
 		Profile: auditorProfilePath, ArtifactPath: s.artifact})

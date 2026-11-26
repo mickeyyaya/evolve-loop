@@ -21,7 +21,8 @@ func TestRoleOf_EveryItemFieldHasOneOwner(t *testing.T) {
 	for key, want := range map[string]inboxbatch.FieldRole{
 		"title":                     {Owner: inboxbatch.CuratorOwned, Shape: inboxbatch.TextValue},
 		"id":                        {Owner: inboxbatch.CuratorOwned, Shape: inboxbatch.TextValue},
-		"weight":                    {Owner: inboxbatch.CuratorOwned, Shape: inboxbatch.NumberValue},
+		"weight":                    {Owner: inboxbatch.CuratorOwned, Shape: inboxbatch.NumberValue, NeedsReason: true},
+		"priority_class":            {Owner: inboxbatch.CuratorOwned, Shape: inboxbatch.TextValue, NeedsReason: true},
 		"deps":                      {Owner: inboxbatch.CuratorOwned, Shape: inboxbatch.ListValue},
 		"route":                     {Owner: inboxbatch.LoopStampOwned},
 		inboxbatch.LandedSHAField:   {Owner: inboxbatch.LoopStampOwned},
@@ -38,6 +39,15 @@ func TestRoleOf_EveryItemFieldHasOneOwner(t *testing.T) {
 	} {
 		if got := inboxbatch.RoleOf(key); got != want {
 			t.Errorf("RoleOf(%q) = %+v, want %+v", key, got, want)
+		}
+	}
+}
+
+func TestFieldRole_NeedsReasonNamesOnlyTheTwoPriorityFields(t *testing.T) {
+	for _, key := range append(inboxbatch.FieldsOwnedBy(inboxbatch.CuratorOwned), "kind", "route") {
+		want := key == "weight" || key == "priority_class"
+		if got := inboxbatch.RoleOf(key).NeedsReason; got != want {
+			t.Errorf("RoleOf(%q).NeedsReason = %v, want %v", key, got, want)
 		}
 	}
 }
@@ -178,6 +188,18 @@ func TestFieldRole_IsGrowOnlyNamesOnlyTheProvenProtectedFiles(t *testing.T) {
 	for key, want := range map[string]bool{"protected_files": true, "files": false, "failure_count": false, "route": false} {
 		if got := inboxbatch.RoleOf(key).IsGrowOnly(); got != want {
 			t.Errorf("RoleOf(%q).IsGrowOnly() = %v, want %v", key, got, want)
+		}
+	}
+}
+
+func TestFieldsNeedingReason_ListsExactlyTheFieldsOfTheOneWriterContract(t *testing.T) {
+	want := []string{"priority_class", "weight"}
+	if got := inboxbatch.FieldsNeedingReason(); !slices.Equal(got, want) {
+		t.Errorf("FieldsNeedingReason() = %v, want %v", got, want)
+	}
+	for _, key := range want {
+		if !inboxbatch.RoleOf(key).NeedsReason {
+			t.Errorf("RoleOf(%q).NeedsReason = false", key)
 		}
 	}
 }

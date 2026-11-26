@@ -162,6 +162,7 @@ The cycles and the bundle path are derived from `signals` and `id`, so the front
 | `evolve issue open --incident <id> \| --signal <cycle>:<seq>` | writes the skeleton and moves the staged evidence into the bundle; `--signal` is for a code with no self-heal rule |
 | `evolve issue capture` | the sweep of D4: stages the evidence of each incident at level `record` in the mode of D15, and marks the due records of D5 |
 | `evolve issue evidence add <id> <source>` | copies one more source into the bundle and updates the manifest |
+| `evolve issue render <id>` | fills the `status`, `actions` and `effectiveness` regions from the frontmatter, in place and atomically; `issue open` and `issue verify` reuse the same function |
 | `evolve issue check [<id>]` | checks the schema, the sections, the rendered parts, the links, each digest and the redaction |
 | `evolve issue verify <id>` | computes the metric, appends a result and renders it |
 | `evolve issue due [--verify]` | lists the records with a check point at this wave end; `--verify` runs `verify` on each and moves a record to `reopened` (D14) |

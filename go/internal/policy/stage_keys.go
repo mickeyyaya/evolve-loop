@@ -169,6 +169,7 @@ var stageReaders = map[string]stageReader{
 	"pr.merge_window.stage":                      Policy.PRMergeWindowStage,
 	"workflow.findings_repair.code-review.stage": plainStage(func(p Policy) string { return p.WorkflowConfig().CodeReviewRepair.Stage }),
 	"workflow.convergence.stage":                 plainStage(func(p Policy) string { return p.ConvergenceConfig().Stage }),
+	"workflow.convergence.audit_rereview.stage":  plainStage(func(p Policy) string { return string(p.ConvergenceConfig().AuditRereview) }),
 	"workflow.retry_ladder.stage":                plainStage(func(p Policy) string { return p.WorkflowConfig().RetryLadder.Stage }),
 	"workflow.retry_ladder.audit_fix.stage":      plainStage(func(p Policy) string { return p.WorkflowConfig().RetryLadder.AuditFix.Stage }),
 	"workflow.repair.fixability.stage":           plainStage(func(p Policy) string { return p.WorkflowConfig().Repair.Fixability.Stage }),

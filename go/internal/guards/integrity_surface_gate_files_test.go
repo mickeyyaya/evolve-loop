@@ -30,6 +30,7 @@ var protectedGateFiles = []struct {
 	{"go/internal/phases/ship/foreign_predicate_guard_test.go", GuardGuarantee},
 	{"go/internal/bridge/driver_tmux_submitverify_guard_test.go", GuardGuarantee},
 	{"go/internal/bridge/integration_wait_guard_test.go", GuardGuarantee},
+	{"go/internal/bridge/sandbox_fakes_guard_test.go", GuardGuarantee},
 	{"go/internal/sysexec/command_guard_test.go", GuardGuarantee},
 	{"go/internal/sysexec/llm_launch_guard_test.go", GuardGuarantee},
 	{"go/internal/sysexec/llm_runner_guard_test.go", GuardGuarantee},
@@ -181,9 +182,20 @@ var protectedGateFiles = []struct {
 	{"go/internal/core/base_red_floor.go", GateGuarantee},
 	{"go/internal/core/repo_contract_floor.go", GateGuarantee},
 	{"go/internal/repocontract/repocontract.go", GateGuarantee},
+	{"go/internal/phases/ship/main_red_stop.go", GateGuarantee},
+	{"go/internal/phases/ship/main_red_ci.go", GateGuarantee},
 	{"go/internal/phases/ship/base_red.go", GateGuarantee},
 	{"go/internal/phases/ship/repocontract.go", GateGuarantee},
 	{"go/internal/policy/held_proposals.go", PolicyGuarantee},
+	{"go/test/journeys/journeys.json", GateGuarantee},
+	{"go/test/journeys/journeys_test.go", GateGuarantee},
+	{"go/internal/journeys/assess.go", GateGuarantee},
+	{"go/internal/phases/ship/fixjourney.go", GateGuarantee},
+	{"go/internal/phases/ship/fixjourney_test.go", GateGuarantee},
+	{"go/internal/bridge/driver_claudecloud_test.go", GuardGuarantee},
+	{"go/cmd/evolve/cmd_cycle_resume_concurrent_test.go", GuardGuarantee},
+	{"go/internal/orchestrator/family_holds_test.go", GuardGuarantee},
+	{"go/internal/cli/agentcmd/agent_verdict_fence_test.go", GuardGuarantee},
 }
 
 var freedByTheNarrowFence = []string{

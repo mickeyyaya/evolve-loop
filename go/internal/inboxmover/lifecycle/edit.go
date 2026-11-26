@@ -30,20 +30,28 @@ type FieldEdit struct {
 }
 
 func (m *Mover) Edit(target string, edits []FieldEdit) (string, error) {
-	edits = trimmedEdits(edits)
-	if err := checkEditRequest(edits); err != nil {
+	return m.EditBecause(target, "", edits)
+}
+
+func (m *Mover) EditBecause(target, reason string, edits []FieldEdit) (string, error) {
+	edits, reason = trimmedEdits(edits), strings.TrimSpace(reason)
+	if err := checkEditRequest(edits, reason); err != nil {
 		return "", err
 	}
 	path, err := m.locateEditable(target)
 	if err != nil {
 		return "", err
 	}
-	return m.editAt(path, edits)
+	return m.editAt(path, reason, edits)
+}
+
+func CheckEdit(edits []FieldEdit, reason string) error {
+	return checkEditRequest(trimmedEdits(edits), strings.TrimSpace(reason))
 }
 
 func (m *Mover) EditHeld(taskID string, cycle int, edits []FieldEdit) (string, error) {
 	edits = trimmedEdits(edits)
-	if err := checkEditRequest(edits); err != nil {
+	if err := checkEditRequest(edits, ""); err != nil {
 		return "", err
 	}
 	if cycle <= 0 {
@@ -58,29 +66,70 @@ func (m *Mover) EditHeld(taskID string, cycle int, edits []FieldEdit) (string, e
 	case loc.Cycle != cycle:
 		return "", fmt.Errorf("%w: %s (held by cycle %d, not cycle %d)", ErrNotFound, taskID, loc.Cycle, cycle)
 	}
-	return m.editAt(loc.Path, edits)
+	return m.editAt(loc.Path, "", edits)
 }
 
-func (m *Mover) editAt(path string, edits []FieldEdit) (string, error) {
+func (m *Mover) editAt(path, reason string, edits []FieldEdit) (string, error) {
 	filed, err := m.identityIndex(edits)
 	if err != nil {
 		return "", err
 	}
+	summary := describeEdits(edits)
 	var id string
+	recorded := false
 	if err := rewriteItemJSON(path, admitEvery, func(item map[string]json.RawMessage) error {
-		consoleReason := m.consoleReason(item)
 		var cerr error
-		if id, cerr = curate(item, edits, filed); cerr == nil && consoleReason != "" && m.consoleReason(item) == "" {
-			cerr = fmt.Errorf("%w: the edit would open %s to lanes (it is console-owned: %s); a lane route is `evolve inbox route-lane`'s", ErrConsoleRouted, cmp.Or(id, "the item"), consoleReason)
+		if id, cerr = m.curateItem(item, edits, filed); cerr != nil || reason == "" {
+			return cerr
 		}
-		return cerr
+		if cerr = m.appendRecord(editEntry(id, summary, reason)); cerr != nil {
+			return fmt.Errorf("record the reason before the edit: %w", cerr)
+		}
+		recorded = true
+		return nil
 	}); err != nil {
+		if recorded {
+			m.ledgerLine(ledgerEntry{Action: "edit-aborted", TaskID: cmp.Or(id, "unknown"), Reason: err.Error()})
+		}
 		return "", fmt.Errorf("edit %s: %w", filepath.Base(path), err)
 	}
-	summary := describeEdits(edits)
 	m.linef("edited %s: %s", filepath.Base(path), summary)
-	m.ledgerLine(ledgerEntry{Action: "edit", TaskID: cmp.Or(id, "unknown"), Reason: summary})
+	if !recorded {
+		m.ledgerLine(editEntry(id, summary, ""))
+	}
 	return path, nil
+}
+
+func editEntry(id, summary, reason string) ledgerEntry {
+	if reason != "" {
+		summary += "; reason: " + reason
+	}
+	return ledgerEntry{Action: "edit", TaskID: cmp.Or(id, "unknown"), Reason: summary}
+}
+
+func (m *Mover) curateItem(item map[string]json.RawMessage, edits []FieldEdit, filed map[string]bool) (string, error) {
+	consoleReason := m.consoleReason(item)
+	id, err := curate(item, edits, filed)
+	switch {
+	case err != nil:
+		return id, err
+	case consoleReason != "" && m.consoleReason(item) == "":
+		return id, fmt.Errorf("%w: the edit would open %s to lanes (it is console-owned: %s); a lane route is `evolve inbox route-lane`'s", ErrConsoleRouted, cmp.Or(id, "the item"), consoleReason)
+	}
+	return id, m.checkEditedClass(edits)
+}
+
+func (m *Mover) checkEditedClass(edits []FieldEdit) error {
+	class, edited := "", false
+	for _, e := range edits {
+		if e.Field == "priority_class" {
+			class, edited = e.Value, true
+		}
+	}
+	if !edited {
+		return nil
+	}
+	return m.checkPriorityClass(inboxbatch.Item{PriorityClass: class})
 }
 
 func trimmedEdits(edits []FieldEdit) []FieldEdit {
@@ -91,7 +140,7 @@ func trimmedEdits(edits []FieldEdit) []FieldEdit {
 	return out
 }
 
-func checkEditRequest(edits []FieldEdit) error {
+func checkEditRequest(edits []FieldEdit, reason string) error {
 	if len(edits) == 0 {
 		return fmt.Errorf("%w: edit needs at least one field edit", ErrBadArgs)
 	}
@@ -101,6 +150,8 @@ func checkEditRequest(edits []FieldEdit) error {
 		case role.Owner != inboxbatch.CuratorOwned:
 			return fmt.Errorf("%w: %q is %s-owned, not a curation field (%s); routes and stamps have their own verbs",
 				ErrBadArgs, e.Field, role.Owner, strings.Join(inboxbatch.FieldsOwnedBy(inboxbatch.CuratorOwned), ", "))
+		case role.NeedsReason && reason == "":
+			return fmt.Errorf("%w: editing %s needs a reason (--reason WHY)", ErrBadArgs, e.Field)
 		case e.Op == EditSet:
 		case e.Op != EditAdd && e.Op != EditRemove:
 			return fmt.Errorf("%w: unknown edit %q", ErrBadArgs, e.Op)

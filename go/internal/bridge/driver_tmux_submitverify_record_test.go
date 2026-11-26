@@ -96,7 +96,7 @@ func TestTmuxREPL_SubmitVerify_RecordReachesLedger(t *testing.T) {
 	run := func(t *testing.T, tm TmuxController) []interaction.Outcome {
 		t.Helper()
 		fx := newFixture(t, "claude-tmux", "")
-		eng := NewEngine(Deps{Tmux: tm, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil)})
+		eng := newTestEngine(Deps{Tmux: tm, Sleep: func(time.Duration) {}, LookupEnv: mapLookup(nil)})
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
 		var stdout, stderr bytes.Buffer

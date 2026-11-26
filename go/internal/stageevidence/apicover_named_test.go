@@ -23,7 +23,7 @@ func TestAPICover_NamesAllStageEvidenceExports(t *testing.T) {
 		Kind:    stageevidence.KindDecision,
 		ID:      1,
 		Seq:     1,
-		Fields:  map[string]string{"would_stop": "true"},
+		Fields:  map[string]string{stageevidence.FieldWouldStop: "true"},
 	})
 	r2 := stageevidence.Link("", stageevidence.Record{
 		Key:     "k",
@@ -46,7 +46,7 @@ func TestAPICover_NamesAllStageEvidenceExports(t *testing.T) {
 	if got := scorer.Classify(stageevidence.Record{}, stageevidence.Outcome{}); got != stageevidence.ClassNone {
 		t.Fatalf("expected ClassNone, got %v", got)
 	}
-	if got := scorer.Classify(stageevidence.Record{Fields: map[string]string{"would_skip": "true", "check": "c"}}, stageevidence.Outcome{Failed: []string{"c"}}); got != stageevidence.ClassEscape {
+	if got := scorer.Classify(stageevidence.Record{Fields: map[string]string{stageevidence.FieldWouldSkip: "true", stageevidence.FieldCheck: "c"}}, stageevidence.Outcome{Failed: []string{"c"}}); got != stageevidence.ClassEscape {
 		t.Fatalf("expected ClassEscape, got %v", got)
 	}
 	if got := scorer.Classify(stageevidence.Record{Fields: map[string]string{"would_hold": "true", "item": "i"}}, stageevidence.Outcome{Routed: []string{"i"}}); got != stageevidence.ClassConflict {
@@ -62,8 +62,12 @@ func TestAPICover_NamesAllStageEvidenceExports(t *testing.T) {
 		t.Fatal(err)
 	}
 	var res stageevidence.Result
+	var notReady stageevidence.NotReadyReason = stageevidence.ReasonConflictsUnmeasured
+	if res.NotReady == notReady {
+		t.Fatal("a zero Result must not carry a not-ready reason")
+	}
 	res, err = stageevidence.Verify(context.Background(), stageevidence.FileChain(chainPath), "k", "v1", gatecontract.Promotion{MinDecisions: 1}, scorer)
-	if err != nil || res.FalseStops != 1 || res.Cases[0] != (stageevidence.Case{Class: stageevidence.ClassFalseStop, Cycle: 1, Seq: 1}) {
+	if err != nil || res.FalseStops != 1 || res.Cases[0] != (stageevidence.Case{Class: stageevidence.ClassFalseStop, ID: 1, Seq: 1}) {
 		t.Fatalf("Verify: res=%+v err=%v", res, err)
 	}
 	var scored stageevidence.Result = stageevidence.Score(c, "v1", gatecontract.Promotion{MinDecisions: 1}, scorer)
@@ -140,7 +144,7 @@ func TestAPICover_NamesTheEvidenceRecorderAndSealExports(t *testing.T) {
 	if chain.Digest != "d" {
 		t.Fatal("PreverifiedChain lost the digest")
 	}
-	causes := []string{stageevidence.CauseWriteFailed, stageevidence.CauseOpenSession, stageevidence.CauseGap, stageevidence.CauseTornTail, stageevidence.FaultWriteFailed}
+	causes := []string{stageevidence.CauseWriteFailed, stageevidence.CauseOpenSession, stageevidence.CauseGap, stageevidence.CauseTornTail}
 	for _, c := range causes {
 		if c == "" {
 			t.Fatal("empty cause code")
@@ -156,11 +160,8 @@ func TestAPICover_NamesTheEvidenceRecorderAndSealExports(t *testing.T) {
 	_, _ = stageevidence.ParseWorkingName(filepath.Base(stageevidence.WorkingPath(dir, scope)))
 	_ = []stageevidence.Kind{stageevidence.KindOpen, stageevidence.KindClose}
 
-	if !stageevidence.DependsOnConflict("held_proposals.stage") || stageevidence.DependsOnConflict("k") {
-		t.Fatal("DependsOnConflict mismatch")
-	}
 	unmeasured := stageevidence.Score(stageevidence.Chain{
-		Records:  []stageevidence.Record{stageevidence.Link("", stageevidence.Record{Key: "held_proposals.stage", Version: "v1", Kind: stageevidence.KindDecision, ID: 1, Seq: 1})},
+		Records:  []stageevidence.Record{stageevidence.Link("", stageevidence.Record{Key: "held_proposals.stage", Version: "v1", Kind: stageevidence.KindDecision, ID: 1, Seq: 1, Fields: map[string]string{stageevidence.FieldWouldHold: "true"}})},
 		Outcomes: []stageevidence.Outcome{{ID: 1, Shipped: true, RoutesMeasured: false}},
 	}, "v1", gatecontract.Promotion{MinDecisions: 1}, stageevidence.ScorerFor("held_proposals.stage"))
 	var wantReason stageevidence.NotReadyReason = stageevidence.ReasonConflictsUnmeasured

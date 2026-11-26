@@ -122,7 +122,7 @@ func TestEngineLaunch_PromptWriteError(t *testing.T) {
 		t.Fatal(err)
 	}
 	prof := writeJSON(t, filepath.Join(ws, "prof.json"), `{"name":"n"}`)
-	_, err := NewEngine(Deps{LookupEnv: mapLookup(nil)}).Launch(context.Background(), core.BridgeRequest{
+	_, err := newTestEngine(Deps{LookupEnv: mapLookup(nil)}).Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-p", Profile: prof, Model: "auto", Prompt: "x",
 		Workspace: ws, ArtifactPath: filepath.Join(ws, "a"), Agent: "scout",
 	})
@@ -206,7 +206,7 @@ func TestEngineLaunch_EmptyModelDefaultsAuto(t *testing.T) {
 	prof := writeJSON(t, filepath.Join(ws, "p.json"), `{"name":"n","model":"haiku"}`)
 	art := filepath.Join(ws, "a.md")
 	fr := &fakeRunner{writeArtifactPath: art, writeArtifactBody: "ok"}
-	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil)})
 	if _, err := eng.Launch(context.Background(), core.BridgeRequest{
 		CLI: "claude-p", Profile: prof, Model: "", Prompt: "x", Workspace: ws, ArtifactPath: art,
 	}); err != nil {

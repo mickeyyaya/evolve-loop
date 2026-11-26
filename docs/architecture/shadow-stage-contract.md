@@ -83,7 +83,7 @@ These packages read the ambient environment, the `.git` state and run subprocess
 **I3** The main-red stop opens only from `go test` keys of the lane floor. `reportAttributed` calls `openMainRedStop` (`go/internal/core/base_red_floor.go:182-207`). `stopOpening.through` returns when `MainRed` is empty (`go/internal/core/main_red_stop_open.go:~99`). The required CI check "golangci-lint: Lint" was red on main from 2026-11-14T16:03Z for 5 commits.
 
 The stop saw nothing. `checkMainRedStop` returns `nil, nil` when no stop holds (`go/internal/phases/ship/main_red_stop.go:27-30`).
-*Implication:* a lint fix has no `Package.Test` key. The stop cannot prove such a fix, and it cannot open for such a red.
+*Implication:* a lint fix has no `Package.Test` key. The stop cannot prove such a fix. Fix F3 makes such a red emit a signal once for each main commit, and the train refuses the red main.
 
 **I4** `heldproposal.Decide` holds any kind with the prefix `pipeline-` (`go/internal/heldproposal/heldproposal.go:52-56`). `inboxbatch.ConsoleRouted` sends an operator-filed `pipeline-*` item with `route: lane` to a lane (`go/internal/inboxbatch/consoleroute.go:39-48`). Two copies of one rule disagree.
 
@@ -207,6 +207,7 @@ At HEAD, the seeds of `gateregistry` are the floors, `rawgitratchet`, `sizeratch
 | `audit_cascade.stage` | `AUDIT_CASCADE_SHADOW` | proposed, no signal exists | `auditcascade.Decide` | `stage-feature` (not a gate) |
 | `regression_tia.stage` | `TIA_SHADOW` | proposed, no signal exists | `regressiontia.Compute` | `stage-feature` (not a gate) |
 | `parallel_evaluate.stage` | `PARALLEL_EVALUATE_SHADOW` | proposed, no signal exists | `parallelevaluate.Decide` (new package, moved out of the unexported `core.cycleRun.evaluateBatchAt`) | `stage-feature` (not a gate) |
+| `workflow.convergence.audit_rereview.stage` | `AUDIT_REREVIEW_SHADOW` | exists (`core/audit_rereview.go`) and is emitted | the late test of `AuditRoundScope.Late` | `stage-feature` (not a gate) |
 | `workflow.retry_ladder.stage` | `LADDER_DECISION` | exists (`retryladder/tryrecord.go:25`) and is emitted | `retryladder.Next` | `stage-feature` (not a gate) |
 | `gates.main_red_stop` | `SHIP_MAIN_RED_STOP_SHADOW` | proposed | the stop check of the ship | `ship-check` |
 | `held_proposals.stage` | `SHIP_HOLD_SHADOW` | exists (`phases/ship/held_proposal_gate.go:20`) | `heldproposal.Decide` | `ship-check` (the builder confirms the kind) |
@@ -460,12 +461,14 @@ I did not check the toolchain source. The description of the Go cache comes from
 ### F3 Main-red stop
 
 Source: report B1.
-- Add a source: the required-CI conclusion of main. The ship reads it at the start of `checkMainRedStop` through the existing CLI path (`evolve ci classify`). When main is red and no stop holds, the ship opens a stop.
-- Add step keys. `baseattr.Key` gets a `Step` field. The stop record moves to schema `main-red-stop/v2`. `mainstop/record.go` already refuses an unknown schema, so v1 files need a migration.
-- Proof for a step key: a rerun of the step in the lane tree when the step can run locally. Otherwise the stop releases on a green conclusion of main (`greenOnMain`, `main_red_stop.go:~119`).
-- The CI read fails open with a signal. An unreadable source never refuses a lane.
-- Red tests in `go/internal/phases/ship/main_red_stop_test.go`: a fake CI source reports "golangci-lint: Lint" red on main with no stop on disk. The test expects an opened stop and `CodeMainRedPark` for a lane that does not fix it.
-- A second test admits a lane that turns the step green.
+Design of record: [main-red-stop-provable-means-a-lane-can-prove-it-2026-11.md](../plans/main-red-stop-provable-means-a-lane-can-prove-it-2026-11.md). The stop has two provers, the ship lane and the train, and both run only `go test`. So the stop holds test keys only.
+- Add a source: the required-CI run of main. The ship reads it at the start of `checkMainRedStop` through `Config.MainCI`. When main is red and no stop holds, the ship judges the run once for each main commit.
+- A key enters the stop only when it has a package and a test. A run of the key at the main commit through `Attributor.RunAt` must also find it red. The stop record keeps schema `main-red-stop/v1`, and `baseattr.Key` has no `Step` field.
+- Every other red row, such as a coverage gate, a lint step or a test with no package, emits `SHIP_MAIN_RED_CI_UNPROVABLE` and opens no stop. The train refuses a red main until it is green.
+- The CI read fails open with a signal. An unreadable source never refuses a lane. A failed run at main fails closed: no stop opens, and the signal has the error.
+- Red tests in `go/internal/phases/ship/main_red_ci_test.go`: a fake CI source reports a coverage gate red on main, and the test expects one signal and no stop.
+- A second test shows that a well-formed key that is red at main opens a stop on that key only.
+- Lint proof for both provers is a separate item.
 
 ### F4 Hold
 
@@ -590,8 +593,8 @@ The operator's order: keep the evidence and the contract intact, and make both v
 
 **E3 Scoring is reproducible.**
 - The verdict of a stage is a pure function of the chained evidence plus the chained cycle outcomes. It reads no signal file and no other input.
-- `evolve stage verify <key>` recomputes the verdict from the chain alone. It prints the evidence range (first and last cycle) and the digest that it verified.
-- It also prints the counts: decisions, false stops, escapes, conflicts and incomplete cycles. It lists each counted case with its cycle and sequence number.
+- `evolve stage verify <key>` recomputes the verdict from the chain alone. It prints the evidence range (first and last scope id) and the digest that it verified.
+- It also prints the counts: decisions, false stops, escapes, conflicts and incomplete scopes. It lists each counted case with its scope and sequence number.
 - A broken chain gives the verdict `not ready` and a typed error. It never gives a partial verdict.
 - Tests: `TestVerdictRecomputesFromFixtureChain` recomputes the verdict from a fixture chain and compares it with a golden. `TestScorerMutationChangesGolden` changes the scorer and expects the golden to fail.
 
@@ -646,6 +649,6 @@ Stage `regression_tia.stage`, cycle 2400, two decisions.
 - `evolve docs ste-lint --strict` reports 0 findings on this revision.
 - The chain proves that evidence did not change after it was written. It does not prove that the decision function was right when it wrote the record. S2 and the scorer tests cover that.
 - A party that can rewrite the whole chain and the head anchor can forge evidence. The hash chain detects an edit by a party that cannot do this. The protected paths (C1) and the ship gate limit who can.
-- The file:line cites of §10 were read at HEAD `64bcd83c4`. The recorder, the seal writer and the ledger reader exist as packages from K2a and K2b. The wiring of the recorder into the cycle, the default reader of `evolve stage report` and the verbs `evolve stage status`, `evolve stage flip` and `evolve stage migrate` do not exist yet.
+- The file:line cites of §10 were read at HEAD `64bcd83c4`. The recorder, the seal writer and the ledger reader exist as packages from K2a and K2b. K2c to K2e wire the recorder into the cycle and make the ledger reader the default of `evolve stage report`. They also record the retry ladder and the held proposals. The orphan seal (K2f) and the verbs `evolve stage status`, `evolve stage flip` and `evolve stage migrate` do not exist yet.
 - A scorer proves a stage only for the cases that the data holds. A rare failure can stay unseen until the flip. The stop-and-revert path of each enforce branch is the second defense.
 - The description of the Go test cache in §7 F2 comes from the research notes of 2026-11-15 and not from a test run.

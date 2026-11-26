@@ -77,6 +77,7 @@ The pack takes the changed paths (D23). The floor judge passes `floorPaths`. If 
 No check proves that each reader has a row (D19). A static read detector is open by construction, and three review rounds found new shapes that escaped it. The registry has these checks instead:
 
 - `TestDataFileReads_EveryNamedTestExists` fails when a row names a test function that its package does not declare. `go test -run` of an absent name passes with nothing run.
+- The row for `go/` and `TestDarwinSetFile_MatchesTheSetDerivedFromTheTree` is CI parity for `go/.darwin-set`. The derived catalog is the one home of the freshness rule ([internal-derived.md](internal-derived.md)). The build floor runs the catalog check first. The pack still refuses the same fact at the floor and at ship, with the `make -C go darwin-set` text of the test.
 - `TestDataFileReads_EveryPathExists` fails when a row `Path` is absent from the tree. `WholeRepository` is exempt.
 - `TestDataFileReads_EveryRowPathMatchesItsKind` fails on a directory `Path` with no `/`, and on a file `Path` that ends in `/`.
 - `TestByNameTests_StaysUnderTheCap` fails when `ByNameTests()` names more than `byNameTestCap` (775) tests. The floor judge fails open on a timeout, so the cap stops silent growth.
@@ -135,3 +136,13 @@ A test that runs the pack and compares `git status --porcelain --ignored` before
 - `Packages()` is the union of the pack patterns that a registry entry covers and the debt set `gateregistry.Unregistered()`. See [internal-gateregistry.md](internal-gateregistry.md) and [gate-contract.md](../gate-contract.md) section 6.5.
 - `TreeReadingTests()` names the tests of 23 packages that read the real tree, among them the `gateregistry` tests and `tmuxtest.TestEveryTmuxTestPackageUsesTheOrphanGuard`. The pack stays at 15 patterns. `ByNameTestsFor(changed)` adds the data rows to the same by-name call.
 - `repocontract.go` and `phases/ship/repocontract.go` are on the protected surface. They select the tests that the ship gate runs.
+
+## Change digest home rule
+
+- `changedigest_home_test.go` fails on a second home of the change digest. The test walks the production `.go` files under `go/` and parses each one.
+- **Rule 1.** A call or a literal list that holds `"diff"` and no output-shape flag is a site. The set `outputShapeFlags` in `changedigest_home_test.go` is the one list of those flags. The rule ignores how the output is hashed, so a hash in another function does not hide a site.
+- **Rule 2.** A call of `treestate.DiffArgs` outside `internal/treestate` fails. Such a caller skips the hunk-header strip and the env scrub, and so it gets another digest.
+- `internal/treestate` and every `_test.go` file are exempt. A test that needs the argv builds it through `treestate.DiffArgs`.
+- The allowlist `diffHomeAllowlist` names each other site and its reason. A site that moves to `treestate` leaves the list in the same PR, and a stale entry fails the test.
+- Planted trees in a temp directory prove the scan. They hold a second home, a hash through a helper, a `DiffArgs` caller, an output-shape call and a stale entry.
+- The plan is [change-digest-has-one-pinned-home-2026-11.md](../../plans/change-digest-has-one-pinned-home-2026-11.md). The test file is on the protected surface.

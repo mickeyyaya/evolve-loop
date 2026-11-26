@@ -285,6 +285,19 @@ A guard denial is a fact of the pane, read by the try. `Engine.launchModel` open
 - **The refusal is computed once.** `recordModelAttempt` takes the `Refusal`, so the `llmcalls` row and `BridgeResponse.CauseCode` always agree. A boot-loss cause overrides the classified cause only on exit 80, so it never meets a refusal.
 - **The grain is the try.** A denial before the launch offset, of another working directory, or from a family-bound guard never matches. Without `--worktree` a standalone run shares the caller directory, so there the offset is the only separator. A missing or unreadable stream means no match, which is the old behavior.
 - **Limit.** The comparison is by path string. A hook `cwd` that differs by a symlink from the worktree path does not match, and the chain then walks as before.
+### Test engines (`launch_test.go`, `sandbox_fakes_guard_test.go`)
+
+Every test in this package must build its engine with `newTestEngine`, not `NewEngine`.
+
+`NewEngine` fills nil `SandboxReports` and `SandboxFence` fields with the real `log show` and `sandbox-exec` runners. On macOS, the real fence and the real report reader make `cellReports` poll for up to 60 seconds. The reason is that `log show` never sees the fence line of a test cell.
+
+`newTestEngine` sets `SandboxFence` to a no-op fake and sets `SandboxReports` to a fake that returns the cell fence line on the first read. It also sets `LookupEnv` to an empty map when nil.
+
+`TestBridgeTestEnginesInjectSandboxFakes` scans every test file in this package, with or without a build tag. It fails when `newTestEngine` misses either sandbox fake or when a test calls `NewEngine` without both fields set. The tests that assert the default fields of `NewEngine` are exempt. The map `defaultAssertingTests` in the guard file lists them.
+
+`TestNewTestEngine_SandboxFakesAnswerWithoutStartingAProcess` calls both fakes with a cancelled context. A real runner returns the context error before it starts a process, so the test tells a fake from a real runner without a spawn.
+
+The guard covers package `bridge` only. Callers of `bridge.NewEngine` in other packages either fail before the launch for a missing profile or live in `acs`-tagged packages that CI does not run.
 
 ### The driver factory (`resolve.go`)
 
@@ -962,3 +975,12 @@ The guard checks a closed marker table: `requireTmux`, `testhost.Tool` with `"tm
 - The adapter keeps one listing per resolved (binary, argv) pair, so `agy` and `agy-claude` share one run and a failed listing fails both. A family with no models id and an unknown family return an error before any process starts.
 - `bridge` imports `modelquery`; `modelquery` never imports `bridge`.
 - Pinned by `model_lister_test.go` and `model_formats_test.go`. The fixtures are `testdata/agy_models.txt` and `testdata/ollama_list.txt`.
+## The cell PATH
+
+Every cell environment holds `PATH=<cell-bin directory>:<host PATH>` at each isolation stage. The cause of the old failure was the host `PATH`: the host process had no `evolve` directory on it, and `hermeticEnv` copies the host value. A correction line such as `evolve phase verify triage --workspace <dir>` then ended with exit 127. The rule, the stages and the failure handling are in [llm-isolation](../llm-isolation.md) section 6.1. The plan is [phase-cell-has-no-evolve-on-path](../../plans/phase-cell-has-no-evolve-on-path-2026-11.md).
+
+- `Deps.ExecutablePath` and `Deps.CellBinRoot` are the seams. A test sets both, so no test writes to the real home.
+- The cell-bin directory is exact when it holds one entry, the `evolve` link to the target. A planted second file (for example `git`) makes it not exact, so the launch rebuilds it. Root and directory are mode 0700. Each launch removes its own stage and aside directories.
+- One publish rule serves the fresh root and the repair. It renames the stage into place. When that fails, it moves the old directory aside and renames again. A launch fails only when the directory is still not exact after 8 attempts. A lost race to another launcher is a success. Pinned by `TestCellBinDir_ManyConcurrentLaunchesRepairAPlantedDirectoryAllSucceed`, `TestCellBinDir_APlantedFileBesideTheLinkIsRebuiltToExactlyTheLink` and `TestCellBinDir_TheRootAndTheDirectoryAreOwnerOnly`.
+- `evolve doctor live` asks the cell for `command -v evolve` and fails when the answer is not the `cell-bin` entry. An earlier `evolve` on the user `PATH` shows there.
+- Agent-facing text names only class A verbs of `agentclass`. `TestAgentCorrections_AreClassA` in `internal/core` enforces it.

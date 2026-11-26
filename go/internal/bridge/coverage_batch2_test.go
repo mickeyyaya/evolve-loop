@@ -154,7 +154,7 @@ func TestLaunchArgs_ErrorBranches(t *testing.T) {
 func TestLaunchArgs_InvalidStreamOutputEnv(t *testing.T) {
 	t.Parallel()
 	fx := newFixture(t, "claude-p", "")
-	eng := NewEngine(Deps{Runner: (&fakeRunner{}).runner(), LookupEnv: mapLookup(nil)})
+	eng := newTestEngine(Deps{Runner: (&fakeRunner{}).runner(), LookupEnv: mapLookup(nil)})
 	var so, se strings.Builder
 	code := eng.LaunchArgs(context.Background(), fx.args("claude-p"), map[string]string{"BRIDGE_STREAM_OUTPUT": "bogus"}, &so, &se)
 	if code != ExitBadFlags || !strings.Contains(se.String(), "invalid --stream-output") {
@@ -204,7 +204,7 @@ func TestEnsureDirsAndOpenLogs_Error(t *testing.T) {
 
 func TestEngineLaunch_ValidationAndMkdir(t *testing.T) {
 	t.Parallel()
-	eng := NewEngine(Deps{})
+	eng := newTestEngine(Deps{})
 	reqs := []core.BridgeRequest{
 		{Profile: "p", Workspace: "w", ArtifactPath: "a"},
 		{CLI: "c", Workspace: "w", ArtifactPath: "a"},
@@ -301,7 +301,7 @@ func TestRequireFull_ManifestMissing(t *testing.T) {
 		"--stdout-log=" + fx.stdoutLog, "--stderr-log=" + fx.stderrLog,
 		"--artifact=" + fx.artifact, "--require-full",
 	}
-	eng := NewEngine(Deps{LookupEnv: mapLookup(nil), LookPath: func(string) (string, error) { return "", errNoBin }})
+	eng := newTestEngine(Deps{LookupEnv: mapLookup(nil), LookPath: func(string) (string, error) { return "", errNoBin }})
 	var so, se strings.Builder
 	code := eng.LaunchArgs(context.Background(), args, nil, &so, &se)
 	if code != ExitRequireFullUnmet {

@@ -166,7 +166,7 @@ The check has two layers. The deterministic layer always runs first.
 **The judge layer (a model, only where a pair declares a judge):**
 
 - It runs only on entries that passed the deterministic layer, and only to ask "does this evidence meet the meaning of this ask?".
-- Its seat is another family, or a stronger tier, than the `author` of the ledger. At stage enforce, a seat on the model of the author is refused.
+- Its seat is of another vendor than the `author` of the ledger, or it is a stronger model of the same family. A seat on the model of the author is refused. A seat of the vendor of the author in another family is refused. The vendor is `catalog.allowed_families[Family(cli)]`.
 - It writes its result for each ask, with its own identity, to the same `handoff-<pair>.json` under `judge`.
 
 **The pass condition:** each `required` ask is `met`, the deterministic layer resolved its evidence, and the judge (if any) agrees. A stated confidence never counts (research P2.10).
@@ -207,11 +207,30 @@ A request with `ChainAttempt` set does not bypass the filter. The walker refuses
 
 `Walking.LaunchSeat` returns the `Seat` that served the request. The seat holds the CLI and the tier of the last launch. It is the routed driver, not the head of the plan.
 
-`handoff.Independents` builds the filter of the judge from the `Author` of the ledger. It allows a seat of another family. It allows a seat of the same family only at a stronger tier than the tier of the author. It refuses each seat when the author is unattributed or has no CLI. It refuses a same-family seat when the tier of the author is empty or unknown.
+`handoff.Independents(author, served, vendors)` builds the filter of the judge from the `Author` of the ledger. The package main injects the data: `bridgechain.ServedModel` and `policy.Catalog.AllowedFamilies`. The rule has one home.
+
+The rule admits a seat of another vendor. It admits a seat of the same family only when the served model differs and the tier is stronger. It refuses a seat in four cases:
+
+- The author or the seat has no served model.
+- The seat has an empty vendor set.
+- The seat is of the same vendor in another family.
+- The seat is of the same vendor with the same model name.
+
+A model name is the served model without its effort suffix, so one model at two efforts is one model. The author resolves from its CLI and its tier, never from `author.Model`. The rule refuses each seat when the author is unattributed or has no CLI. `handoff.Unattributed` is the one value that the ledger stamp and the rule share.
+
+`(*Walking).With` derives the judge walker from the cycle walker for each judgement. It keeps the inner bridge, the bench, the clock and the log. It sets the resolver `bridgechain.TierOverlayResolver` and the filter. The runner never sets `ChainAttempt`. The runner takes a `*bridgechain.Walking`, so a raw bridge does not compile.
+
+The pair key `judge_tier` is the one home of the tier. It also switches the judge on for the pair. The judge shares the `stage` of its pair. The policy accepts `judge_tier` only on the pairs that have a judge in the table of §3 and a reviewer check. Today that is `triage-tdd`.
+
+The reviewer calls the judge only when the check outcome is `pass`, and only with the ids of the `met` asks. It deletes each `judge` key that the ledger holds before it records the review. It records the judgement at both stages. The record holds the seat that launched, the verdicts, `refused` or `error`, and the `basis`. The basis holds the author model, the seat model, the two vendor sets and the tier ceiling. One reader can recompute the filter decision from it.
+
+A walk that the filter leaves with no seat is `refused`. Any other fault is `error`. At stage enforce, only a disagreement acts. It returns a retry with the ask ids and never a proven blocker, because a seat fault is not a conflict of the asks. `evolve handoff show --cycle N` prints the seat, the outcome and the basis.
+
+The judge reply is the flow seat `handoff-judge` in `phasecontract`. The runner clears `handoff-judge.json` before the launch. It reads the file only through `FlowDecision.Resolve` with the launch time. The stage `isolation.i8.stage` governs the stdout fallback as for each other seat.
 
 A test pins `policy.TierNames` equal to `modelcatalog.CanonicalTiers`. The two lists cannot drift apart.
 
-The judge is not in the tree yet. The seam has tests, and the judge will call it.
+The plan [handoff-judge-one-seat-walker-ac-1b-console-2026-11](../plans/handoff-judge-one-seat-walker-ac-1b-console-2026-11.md) holds the design and the rollout. The first pair is `triage-tdd` at stage shadow.
 
 ### Where the check runs (H8)
 
@@ -319,9 +338,13 @@ The tdd phase wrote `TestC1950_001` (100.0% of `AppendResolvedFingerprint`, erro
 | `go/internal/handoff/request` | the request builders for each source (H2) | no |
 | `go/internal/handoff/evidence` | the evidence resolvers (H3) | no |
 | `go/internal/handoff/exit` | the exit decision and the blocker proof (H4, H5) | no |
-| `go/internal/policy/handoff.go` | the `handoff` policy block (H6) | no |
+| `go/internal/policy/handoff.go` | the `handoff` policy block, the judged pairs and the `judge_tier` checks (H6) | yes, console |
 | `go/cmd/evolve/cmd_handoff.go` | `evolve handoff check` and `evolve handoff show` (H7) | no |
-| `go/internal/core/handoff_reviewer.go` and `go/cmd/evolve/cmd_cycle.go` | the handoff reviewer in the reviewer chain (H8, §5) | yes, console |
+| `go/internal/core/handoff_reviewer.go` | the handoff reviewer in the reviewer chain (H8, §5) | yes, console |
+| `go/cmd/evolve/cmd_cycle.go` | the call `wireHandoffJudge` in the reviewer chain | no; `TestHandoffJudge_IsWiredIntoTheCycleReviewer` guards the call (ADR-0157) |
+| `go/internal/core/handoff_judge.go` and `go/cmd/evolve/handoff_judge.go` | the judge step and the judge runner (H10) | yes, console |
+| `go/internal/handoff/independents.go` and `go/internal/handoff/judge.go` | the independence rule and the judge record (H10) | yes, console |
+| `.evolve/profiles/handoff-judge.json` | the read-only profile of the judge seat | yes, console |
 | `agents/` and `go/internal/core/task_contract.go` | the ledger in the personas and the request in the task contract (H9) | yes, console |
 
 The `handoff` package depends on `inboxbatch`, `committedset` and the guards manifest. It does not depend on `core`, so `core` can call it without a cycle.
@@ -334,7 +357,11 @@ The `handoff` package depends on `inboxbatch`, `committedset` and the guards man
 | Each evidence pointer resolves in code. | the H3 resolver tests | planned |
 | A blocked exit needs proof, not a claim. | the H5 test: a claim with no proof is `unmet` | planned |
 | A round with no new met ask ends the loop. | the H4 test | planned |
-| A judge seat is not the model of the author at stage enforce. | `TestIndependents_AdmitsOnlyAnotherFamilyOrAStrongerTier` and `TestWalking_IndependentsFilterRefusesTheAuthorsOwnModelAndLaunchesNothing` | seam done, judge planned |
+| A judge seat is not the model of the author. | `TestIndependents_AdmitsOnlyAnotherFamilyOrAStrongerTier`, `TestIndependents_RefusesTheAuthorModelByDriverName`, `TestWalking_IndependentsFilterRefusesTheAuthorsOwnModelAndLaunchesNothing` and `TestHandoffJudge_EnforceNeverLaunchesTheAuthorModelSeat` | done |
+| The judge uses the one walker, so it gets the bench and the fresh session. | `TestHandoffJudge_Exit85BenchesTheSeatAndWalksToTheNextIndependentSeat` and `TestHandoffJudge_TransientFaultRelaunchesInAFreshSession` | done |
+| The judge runs only after a passing check, and a forged `judge` key is never kept. | `TestHandoffReviewer_JudgeRunsOnlyAfterThePassingDeterministicLayer` and `TestHandoffReviewer_AnAuthorWrittenJudgeKeyIsNeverKept` | done |
+| A judge seat fault is recorded and is never a blocker. | `TestHandoffReviewer_JudgeFaultsAreRecordedAndKeepTheVerdict` | done |
+| The judge, its profile and its routing entry agree. | `TestHandoffJudge_ProfileAndRoutingAgree` | done |
 | Each pair starts at shadow. | the H6 default test | planned |
 | At stage enforce of `build-audit`, an unmet required ask in a ledger forces the audit to FAIL. | `TestChainLedgers_AtEnforceAnUnmetRequiredAskForcesFAIL` | done |
 | At stage enforce of `build-audit`, an inbox acceptance with no met `tdd-build` entry forces the audit to FAIL. | `TestChainLedgers_AtEnforceAnAcceptanceWithNoMetBuildEntryForcesFAIL` | done |

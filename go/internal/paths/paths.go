@@ -110,6 +110,10 @@ func FailureDigestRecordPath(evolveDir string, cycle int) string {
 	return filepath.Join(evolveDir, FailureDigestsDir, "cycle-"+strconv.Itoa(cycle)+".json")
 }
 
+func BlockerRecordPath(evolveDir string, cycle int) string {
+	return filepath.Join(evolveDir, FailureDigestsDir, "cycle-"+strconv.Itoa(cycle)+".blocker.json")
+}
+
 const evolveDirName = ".evolve"
 
 const ledgerFileName = "ledger.jsonl"

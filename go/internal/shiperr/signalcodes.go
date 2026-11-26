@@ -25,6 +25,7 @@ var codeDocs = map[ShipErrorCode]string{
 	CodeEGPSRedCount:                "verify-class: the EGPS gate reports red evals; red_count must be 0 to ship",
 	CodeControlPlaneViolation:       "verify-class: a cycle-class commit touches the control-plane integrity surface (ADR-0064); ship it manually",
 	CodeGateWeakened:                "verify-class: the gate classifier flags a cycle-class commit that changes a kernel surface or weakens a gate (I-10, HEALING_I10_VIOLATION); ship it manually",
+	CodeDerivedStale:                "verify-class: a derived file of a cycle-class commit fails its check verb (stale or broken input), or the check could not run (transient); the Build phase regenerates it",
 	CodeInvalidClass:                "verify-class: unknown ship class",
 	CodeManualNotTTY:                "verify-class: a manual ship needs an interactive confirmation (or the audited --auto-confirm=<reason> parameter)",
 	CodeManualDeclined:              "verify-class: the operator declined the manual ship",

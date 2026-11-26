@@ -899,6 +899,18 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [plans/cycle-recycle-and-gc-check-2026-11.md](plans/cycle-recycle-and-gc-check-2026-11.md) | Plan for a mandatory recycle step at the end of each cycle. The step writes a thin archive, then releases the cycle resources. It also adds a gc check registry. Each check has a rule, a justification and an action. The facts come from the disk-full event of 2026-11-20. |
 
+## 2026-11-21 — The change digest has one home with pinned git diff settings
+
+| Document | What it records |
+|---|---|
+| [plans/change-digest-has-one-pinned-home-2026-11.md](plans/change-digest-has-one-pinned-home-2026-11.md) | Plan to give the change digest one home in `treestate` with pinned `git diff` flags. It versions the digest, runs a shadow stage, then enforces. A structure test bans a second home. |
+
+## 2026-11-21 — Phase cell has no evolve on PATH
+
+| Document | What it records |
+|---|---|
+| [plans/phase-cell-has-no-evolve-on-path-2026-11.md](plans/phase-cell-has-no-evolve-on-path-2026-11.md) | Plan to make each command in a correction run inside a phase cell. The plan compares four designs. It chooses one cell `PATH` rule in the bridge. The facts come from cycle 2161, where `evolve` gave exit 127. |
+
 ## 2026-11-21 — One verb decides if the running wave is healthy
 
 | Document | What it records |
@@ -959,5 +971,13 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [research/cli-interface-design-2026-11.md](research/cli-interface-design-2026-11.md) | Research of 22 source entries on CLI design, applied to the measured facts of the 127 verbs of `evolve`. It scores four command structures and recommends noun-verb groups with one release of aliases. |
 | [conventions/cli-design.md](conventions/cli-design.md) | The policy of the command line: rules for shape, names, flags, help, output, exit codes, destructive actions, agents and renames. It lists the current deviations and proposes `evolve cli lint`. |
+
+## 2026-11-25 — Persona prompt standards for both CLI families
+
+| Document | What it records |
+|---|---|
+| [research/persona-prompt-standards-2026-11.md](research/persona-prompt-standards-2026-11.md) | Merge of two live reads of vendor sources: 56 Claude findings and 29 Gemini and agy findings. It lists 15 Claude model exceptions, 12 conflicts between the families, and the wording that works for both. |
+| [conventions/persona-writing.md](conventions/persona-writing.md) | The standard for each persona in `agents/`: shape, wording, no reasoning-field requests, verification, reviewer rules, length, and seven candidate lint checks. |
+| [plans/persona-diet-2026-11.md](plans/persona-diet-2026-11.md) | The plan. It scores three approaches, recommends measured changes for the core phases and grouped changes for the rest, and lists four separate components. |
 
 <!-- GENERATED:research-index END -->

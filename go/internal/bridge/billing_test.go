@@ -24,7 +24,7 @@ func TestBillingSnapshot(t *testing.T) {
 	home := t.TempDir()
 	mkfile(t, filepath.Join(home, ".claude", ".credentials.json"), `{"accessToken":"tok-secret-aaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`)
 	fixed := time.Date(2026, 5, 26, 0, 0, 0, 0, time.UTC)
-	eng := NewEngine(Deps{LookupEnv: mapLookup(map[string]string{"HOME": home, "ANTHROPIC_API_KEY": "k", "ANTHROPIC_BASE_URL": "http://x"}), Now: func() time.Time { return fixed }})
+	eng := newTestEngine(Deps{LookupEnv: mapLookup(map[string]string{"HOME": home, "ANTHROPIC_API_KEY": "k", "ANTHROPIC_BASE_URL": "http://x"}), Now: func() time.Time { return fixed }})
 
 	dir := t.TempDir()
 	p, err := eng.BillingSnapshot(dir, "pre")

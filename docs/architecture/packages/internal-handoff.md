@@ -8,13 +8,21 @@
 
 ## Design
 
-- **Leaf package.** The package has no internal imports. It depends on standard library packages only.
+- **Few dependencies.** The package imports `llmroute`, `policy` and `clihealth` for the independence rule. It does not import `core` or `bridgechain`.
 - **Request and ledger types.** A `Request` contains asks. A `Ledger` contains answers for each ask of a request.
 - **Deterministic validation.** `Validate` checks the ledger against the request. It confirms pair names, request digests, and entry counts.
 - **Unified errors.** `Validate` reports all detected violations at once with `errors.Join`.
 - **Evidence resolvers.** `internal/handoff/evidence` decides in code whether an `Evidence` pointer resolves. `Resolve` returns `ErrUnresolved` when it does not, and the entry is then unmet.
 - **Digest binding.** `Request.Digest` computes a SHA-256 digest of the request JSON payload.
 - **Check record.** `Check` is the result of the check of one ledger. It holds the stage, the outcome, the unmet and blocked asks, the proof paths, the failed evidence and the errors. `core.HandoffReviewer` writes it to `Ledger.Check` (key `check`, omitted when empty). `IsCheckOnly` is true for a file with a check and no ledger fields, and each reader treats that file as an absent ledger.
+
+- **Judge record.** `Judgement` is the result of the judge seat. It holds the seat that launched, the verdicts, `Refused` or `Error`, and a `Basis`. `core.HandoffReviewer` writes it to `Ledger.Judge` (key `judge`, omitted when empty). 
+
+- **Verdict check.** `CheckVerdicts` checks a reply against the asks. It refuses a missing, an extra and a duplicate ask, and an unknown key of a verdict.
+
+- **Independence rule.** `Independents(author, served, vendors)` returns the filter of the judge seat. The package main injects the served model and the vendor sets. A seat of the vendor of the author in another family is refused. A seat on the model of the author is refused, at any effort.
+
+- **Basis.** `Identity.Basis` records the data that the rule read. `Unattributed` is the one value of the unattributed author. See [the plan](../../plans/handoff-judge-one-seat-walker-ac-1b-console-2026-11.md).
 
 - **Exit decision.** `internal/handoff/exit` decides the exit of a round. `Decide` is pure: it takes the request, the check results, the earlier rounds and a `Policy`, and returns a `Decision`.
 - **Blocked exit.** A `blocked` result carries a `Claim`. `Decide` hands the claims to the injected `Policy.Prover`. The exit is `blocked` only when the prover returns `Blocked` and every unmet required ask is named by a proven claim. The console wires the prover to `core.NewBlockerProver`, so `exit` imports neither `core` nor `guards` and holds no protected-path matcher. An unproven claim stays an unmet ask.

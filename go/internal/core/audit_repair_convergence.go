@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/convergence"
+	"github.com/mickeyyaya/evolve-loop/go/internal/core/defectledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/reportdoc"
@@ -31,33 +32,86 @@ func init() {
 	signalcenter.RegisterCode(signalcenter.ModuleConvergence, CodeConvergenceRung, "the convergence policy chose the next rung of the audit-repair loop after an audit FAIL. fields.stage is shadow (repair flow unchanged) or enforce (Stop ends repair). fields.loop, fields.round, fields.action, fields.rung, and fields.blocking_bar give the decision; fields.fresh_context skips failed context")
 }
 
+type auditRound struct {
+	round        int
+	report       string
+	scope        *AuditRoundScope
+	dispositions map[string]defectledger.Entry
+}
+
+func (r auditRound) scoped() bool { return r.scope != nil && r.scope.Enforce }
+
 func auditRepairJudgments(workspace string, dispatches int, warn io.Writer) []convergence.Judgment {
-	var reports []string
+	return judgmentsOfRounds(appendLiveAuditRound(loadArchivedAuditRounds(workspace, dispatches, warn), workspace, dispatches, warn))
+}
+
+func loadArchivedAuditRounds(workspace string, dispatches int, warn io.Writer) []auditRound {
+	var rounds []auditRound
 	for round := 1; round < dispatches; round++ {
 		if raw, err := os.ReadFile(filepath.Join(workspace, phasecontract.RoundArchiveFilename(auditReportName, round))); err == nil {
-			reports = append(reports, string(raw))
+			rounds = append(rounds, auditRound{round: round, report: string(raw), scope: readAuditScope(workspace, round), dispositions: roundDispositions(workspace, round, false, warn)})
 		}
 	}
+	return rounds
+}
+
+func appendLiveAuditRound(rounds []auditRound, workspace string, dispatches int, warn io.Writer) []auditRound {
 	live, err := os.ReadFile(filepath.Join(workspace, auditReportName))
 	if err != nil {
 		fmt.Fprintf(warn, "audit-repair convergence: no live %s, no decision: %v\n", auditReportName, err)
 		return nil
 	}
-	return judgmentsOf(append(reports, string(live)))
+	return append(rounds, auditRound{round: dispatches, report: string(live), scope: readAuditScope(workspace, dispatches), dispositions: roundDispositions(workspace, dispatches, true, warn)})
 }
 
 func judgmentsOf(reports []string) []convergence.Judgment {
-	judgments := make([]convergence.Judgment, 0, len(reports))
-	var previous map[string]convergence.Finding
+	rounds := make([]auditRound, len(reports))
 	for i, report := range reports {
-		open := openAuditFindings(report)
-		judgments = append(judgments, convergence.Judgment{
+		rounds[i] = auditRound{round: i + 1, report: report}
+	}
+	return judgmentsOfRounds(rounds)
+}
+
+func judgmentsOfRounds(rounds []auditRound) []convergence.Judgment {
+	judgments := make([]convergence.Judgment, 0, len(rounds))
+	var previous map[string]convergence.Finding
+	for i, r := range rounds {
+		open := r.openFindings(previous)
+		j := convergence.Judgment{
 			Index:    i,
 			Findings: slices.Concat(sortedFindings(open), fixedSince(previous, open)),
-		})
+		}
+		if r.scoped() {
+			j.FixHunks = r.scope.FixHunks
+		}
+		judgments = append(judgments, j)
 		previous = open
 	}
 	return judgments
+}
+
+func (r auditRound) openFindings(previous map[string]convergence.Finding) map[string]convergence.Finding {
+	if !r.scoped() {
+		return openAuditFindings(r.report)
+	}
+	open := map[string]convergence.Finding{}
+	for _, f := range reportdoc.Findings(r.report) {
+		id := findingTitleKey(f)
+		open[id] = convergence.Finding{
+			ID: id, Severity: convergence.Severity(f.Severity), Class: auditFindingClass, Status: convergence.StatusOpen,
+			Location: f.Location, Late: previous[id].Late || r.scope.Late(f),
+		}
+	}
+	for id, carried := range previous {
+		if _, reported := open[id]; !reported && !r.fixed(id) {
+			open[id] = carried
+		}
+	}
+	return open
+}
+
+func (r auditRound) fixed(id string) bool {
+	return claimsFix(r.dispositions[defectledger.ID(id)], r.scope.Worktree)
 }
 
 func openAuditFindings(report string) map[string]convergence.Finding {

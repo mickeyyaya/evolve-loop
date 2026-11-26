@@ -53,7 +53,7 @@ func runChain(t *testing.T, ctx context.Context, outcome map[string]core.BridgeR
 	t.Helper()
 	s := &scriptedModels{outcome: outcome, artifact: filepath.Join(t.TempDir(), "artifact.md")}
 	var stderr strings.Builder
-	eng := NewEngine(Deps{Stderr: &stderr, ModelChain: chain, launchModel: s.launch,
+	eng := newTestEngine(Deps{Stderr: &stderr, ModelChain: chain, launchModel: s.launch,
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) { return tokenusage.Result{}, nil }})
 	resp, err := eng.Launch(ctx, core.BridgeRequest{CLI: "claude-tmux", Model: "deep", ArtifactPath: s.artifact, SessionName: session})
 	return s, resp, err, stderr.String()
@@ -126,7 +126,7 @@ func TestLaunch_AnArtifactThatCannotBeClearedIsAWarning(t *testing.T) {
 		t.Fatal(err)
 	}
 	var stderr strings.Builder
-	eng := NewEngine(Deps{Stderr: &stderr, TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) { return tokenusage.Result{}, nil }})
+	eng := newTestEngine(Deps{Stderr: &stderr, TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) { return tokenusage.Result{}, nil }})
 	eng.clearArtifact(core.BridgeRequest{ArtifactPath: dir})
 	if !strings.Contains(stderr.String(), "could not clear the artifact "+dir) {
 		t.Errorf("stderr %q, want the clear failure named", stderr.String())
@@ -138,7 +138,7 @@ func TestLaunch_WithoutASeamLaunchesTheModelForReal(t *testing.T) {
 	ws := t.TempDir()
 	artifact := filepath.Join(ws, "artifact.md")
 	fr := &fakeRunner{writeArtifactPath: artifact, writeArtifactBody: "OK\n"}
-	eng := NewEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil), ModelChain: deepChain,
+	eng := newTestEngine(Deps{Runner: fr.runner(), LookupEnv: mapLookup(nil), ModelChain: deepChain,
 		TokenResolver: func(tokenusage.Window) (tokenusage.Result, error) { return tokenusage.Result{}, nil }})
 	resp, err := eng.Launch(context.Background(), core.BridgeRequest{CLI: "claude-p", Profile: writeProfile(t, ws, "real", ""), Model: "deep",
 		Prompt: "x", Workspace: ws, ArtifactPath: artifact, Agent: "auditor"})

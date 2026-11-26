@@ -83,9 +83,9 @@ func TestCellEnv_IsolatesHostCredentialsOnEachCarrier(t *testing.T) {
 		ghDir := filepath.Join(cfg.Workspace, "gh-config")
 		gitCfg := filepath.Join(cfg.Workspace, "gitconfig")
 		deps := Deps{EnvStage: stage, Stderr: io.Discard, HostGitConfig: fakeHostGit(nil)}
-		env, _ := deps.cellEnv(cfg)
+		env, _, _ := deps.cellEnv(cfg)
 		assertIsolated(t, "cellEnv "+stage, env, ghDir, gitCfg)
-		assertIsolated(t, "headless "+stage, dispatchEnv(deps, cfg), ghDir, gitCfg)
+		assertIsolated(t, "headless "+stage, mustDispatchEnv(deps, cfg), ghDir, gitCfg)
 		if fi, err := os.Stat(ghDir); err != nil || !fi.IsDir() {
 			t.Errorf("%s: the gh config dir %s must be an empty dir of the workspace: %v", stage, ghDir, err)
 		}
@@ -93,7 +93,7 @@ func TestCellEnv_IsolatesHostCredentialsOnEachCarrier(t *testing.T) {
 
 	seatCfg := isolationConfig(t)
 	seatCfg.Decision.SeatToken = "tok"
-	seatEnv, hermetic := Deps{EnvStage: "off", Stderr: io.Discard, HostGitConfig: fakeHostGit(nil)}.cellEnv(seatCfg)
+	seatEnv, hermetic, _ := Deps{EnvStage: "off", Stderr: io.Discard, HostGitConfig: fakeHostGit(nil)}.cellEnv(seatCfg)
 	if !hermetic {
 		t.Fatal("a seat dispatch runs at enforce")
 	}
@@ -128,7 +128,7 @@ func TestCellEnv_NoWorkspaceGivesTheGhConfigNoDirAndNoIdentityFile(t *testing.T)
 	t.Setenv("GH_TOKEN", "x")
 	isolationParent(t)
 	var calls []string
-	env, _ := Deps{EnvStage: "shadow", Stderr: io.Discard, HostGitConfig: fakeHostGit(&calls)}.cellEnv(&Config{CLI: "claude-tmux", Agent: "probe"})
+	env, _, _ := Deps{EnvStage: "shadow", Stderr: io.Discard, HostGitConfig: fakeHostGit(&calls)}.cellEnv(&Config{CLI: "claude-tmux", Agent: "probe"})
 	assertIsolated(t, "no workspace", env, os.DevNull, os.DevNull)
 	if len(calls) != 0 {
 		t.Errorf("a cell with no workspace has no file to hold an identity, yet git config was read: %v", calls)
@@ -138,7 +138,7 @@ func TestCellEnv_NoWorkspaceGivesTheGhConfigNoDirAndNoIdentityFile(t *testing.T)
 func TestCellEnv_AnUnreadableHostGitWritesNoUserSection(t *testing.T) {
 	t.Parallel()
 	cfg := isolationConfig(t)
-	env, _ := Deps{EnvStage: "shadow", Stderr: io.Discard, HostGitConfig: func(string) string { return "" }}.cellEnv(cfg)
+	env, _, _ := Deps{EnvStage: "shadow", Stderr: io.Discard, HostGitConfig: func(string) string { return "" }}.cellEnv(cfg)
 	assertIsolated(t, "no identity", env, filepath.Join(cfg.Workspace, "gh-config"), os.DevNull)
 	if _, err := os.Stat(filepath.Join(cfg.Workspace, "gitconfig")); err == nil {
 		t.Error("an empty identity must write no gitconfig file")
@@ -152,14 +152,14 @@ func TestCellEnv_AnUnwritableWorkspaceWarnsAndFallsBackToTheNullConfigs(t *testi
 		t.Fatal(err)
 	}
 	var stderr bytes.Buffer
-	env, _ := Deps{EnvStage: "shadow", Stderr: &stderr, HostGitConfig: fakeHostGit(nil)}.cellEnv(&Config{CLI: "claude-tmux", Agent: "probe", Workspace: blocked})
+	env, _, _ := Deps{EnvStage: "shadow", Stderr: &stderr, HostGitConfig: fakeHostGit(nil)}.cellEnv(&Config{CLI: "claude-tmux", Agent: "probe", Workspace: blocked})
 	assertIsolated(t, "unwritable workspace", env, filepath.Join(blocked, "gh-config"), os.DevNull)
 	for _, want := range []string{"gh config dir", "git config"} {
 		if !strings.Contains(stderr.String(), want) {
 			t.Errorf("a failed write must warn about %q: %q", want, stderr.String())
 		}
 	}
-	env, _ = Deps{EnvStage: "shadow", HostGitConfig: fakeHostGit(nil)}.cellEnv(&Config{CLI: "claude-tmux", Agent: "probe", Workspace: blocked})
+	env, _, _ = Deps{EnvStage: "shadow", HostGitConfig: fakeHostGit(nil)}.cellEnv(&Config{CLI: "claude-tmux", Agent: "probe", Workspace: blocked})
 	assertIsolated(t, "unwritable workspace without a log", env, filepath.Join(blocked, "gh-config"), os.DevNull)
 }
 
@@ -187,7 +187,7 @@ func TestCellEnv_ReadsTheHostIdentityOncePerLaunch(t *testing.T) {
 	var calls []string
 	deps := Deps{EnvStage: "enforce", Stderr: io.Discard, Tmux: &fakeTmux{}, HostGitConfig: fakeHostGit(&calls)}
 	deps.cellEnv(cfg)
-	dispatchEnv(deps, cfg)
+	mustDispatchEnv(deps, cfg)
 	if err := primePaneShell(context.Background(), deps, cfg, "s", "/wt"); err != nil {
 		t.Fatal(err)
 	}
@@ -255,7 +255,7 @@ func TestCellEnv_BuilderCommitGetsTheHostIdentityAndARepoLocalIdentityWins(t *te
 	for _, stage := range []string{"off", "shadow", "enforce"} {
 		cfg := isolationConfig(t)
 		deps := Deps{EnvStage: stage, Stderr: io.Discard, HostGitConfig: fakeHostGit(nil)}
-		env, _ := deps.cellEnv(cfg)
+		env, _, _ := deps.cellEnv(cfg)
 		wtRepo := gittest.Fixture(t)
 		wt := wtRepo.Dir
 		gitCmd(t, wt, env, "config", "--local", "--unset", "user.name")
@@ -284,7 +284,7 @@ func TestCellEnv_DropsEachUnsetKeyFromEverySource(t *testing.T) {
 		cfg := isolationConfig(t)
 		cfg.Realization.Env = map[string]string{"GH_TOKEN": "manifest", "GITHUB_TOKEN": "manifest", "KEEP": "1"}
 		deps := Deps{EnvStage: stage, Stderr: io.Discard, HostGitConfig: fakeHostGit(nil), Env: map[string]string{"GH_TOKEN": "pipeline", "GITHUB_TOKEN": "pipeline"}}
-		env, _ := deps.cellEnv(cfg)
+		env, _, _ := deps.cellEnv(cfg)
 		for _, k := range []string{"GH_TOKEN", "GITHUB_TOKEN"} {
 			if v, ok := lastEnvValue(env, k); ok {
 				t.Errorf("%s: %s = %q reached the child", stage, k, v)
@@ -337,7 +337,7 @@ func TestCellEnv_GitFindsNoCredentialHelperInTheCell(t *testing.T) {
 	}
 
 	cfg := isolationConfig(t)
-	env, _ := Deps{EnvStage: "enforce", Stderr: io.Discard}.cellEnv(cfg)
+	env, _, _ := Deps{EnvStage: "enforce", Stderr: io.Discard}.cellEnv(cfg)
 	cell := exec.Command("git", "ls-remote", url)
 	cell.Env = env
 	_ = cell.Run()
@@ -355,7 +355,7 @@ func TestCredentialIsolation_IsTheOneSet(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = restore() })
 	cfg := isolationConfig(t)
-	env, _ := Deps{EnvStage: "enforce", Stderr: io.Discard, HostGitConfig: fakeHostGit(nil)}.cellEnv(cfg)
+	env, _, _ := Deps{EnvStage: "enforce", Stderr: io.Discard, HostGitConfig: fakeHostGit(nil)}.cellEnv(cfg)
 	want := ipcenv.CredentialIsolation("", os.DevNull)
 	for k, v := range want.Set {
 		if k == "GH_CONFIG_DIR" || k == "GIT_CONFIG_GLOBAL" {
