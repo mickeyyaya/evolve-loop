@@ -128,7 +128,7 @@ func (c Channel) read(ctx context.Context, f frame) error {
 		rec = withSummary(rec)
 		err = writeRecord(f.cell, rec)
 		if err == nil {
-			c.emitDecision(f.cell, rec)
+			c.emitDecision(f, file, rec)
 		}
 		if err == nil && rec.Decision == DecisionRun {
 			err = c.read(ctx, frame{cell: f.cell, workspace: result.Workspace, prefix: rf.name, depth: f.depth + 1})

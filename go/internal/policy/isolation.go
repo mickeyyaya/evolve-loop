@@ -16,6 +16,7 @@ const (
 	dispatchRequestsMaxDepth = 1
 
 	inboxRequestsPerCycle = 8
+	inboxRequestsWeight   = 0.5
 )
 
 var (
@@ -44,8 +45,9 @@ type IsolationPolicy struct {
 }
 
 type InboxRequestsPolicy struct {
-	Stage    RequestStage `json:"stage,omitempty"`
-	PerCycle int          `json:"per_cycle,omitempty"`
+	Stage         RequestStage `json:"stage,omitempty"`
+	PerCycle      int          `json:"per_cycle,omitempty"`
+	DefaultWeight float64      `json:"default_weight,omitempty"`
 }
 
 type DispatchRequestsPolicy struct {
@@ -202,6 +204,9 @@ func (p Policy) IsolationInboxRequests() InboxRequestsPolicy {
 	if out.PerCycle == 0 {
 		out.PerCycle = inboxRequestsPerCycle
 	}
+	if out.DefaultWeight == 0 {
+		out.DefaultWeight = inboxRequestsWeight
+	}
 	return out
 }
 
@@ -213,6 +218,8 @@ func (d *InboxRequestsPolicy) validate() error {
 		return fmt.Errorf("stage %q: the stages are %v", d.Stage, requestStages)
 	case d.PerCycle < 0:
 		return fmt.Errorf("per_cycle %d: a cap cannot be negative", d.PerCycle)
+	case d.DefaultWeight < 0 || d.DefaultWeight > 1:
+		return fmt.Errorf("default_weight %v: the weight of a filed item is above 0 and at most 1", d.DefaultWeight)
 	}
 	return nil
 }

@@ -108,6 +108,22 @@ Consequences:
 
 What changes our mind: the curator rejects more than half of the items that agents file over 2 waves. Then the stage goes to `shadow`, and design A returns.
 
+### 5.1 Changes while building C3 and C4
+
+The build of C3 and C4 (item `agent-request-inbox-add-has-no-executor`) changed these decisions. Each change has a reason.
+
+| Id | Change | Because |
+|---|---|---|
+| D7 | The signal levels are INFO, WARN and INCIDENT. No ERROR level exists in `signalcenter`. A refused or failed `inbox-add` request is INCIDENT. The severity is one field of the kind table (`lossSeverity`), so the next kind sets it in one place. | A refused request loses an item, so it must be as loud as a stall. The operator can decide to keep WARN. Then one field changes. |
+| D7 | The signal also holds the field `request_path`. The kind of the request file gives the severity, so a malformed file is as loud as a missing arg. | Acceptance 3 covers each invalid `inbox-add` request. |
+| D3 | `isolation.inbox_requests.default_weight` is now a policy key (default 0.5, range above 0 and at most 1). The args of the item are closed: an arg that is not `id`, `title`, `kind`, `fix`, `priority_class`, `acceptance-<n>` or `files-<n>` is refused with `args`. `files-1` is a required arg. | The intake refuses an item with no fix surface. The required args and the intake must agree. |
+| D4 | The intake takes the inbox lock (`.bump.lock`) around the overlap check and the filing. The verb and the filer share it. The host functions are fields of `intakeInput`, not globals of the CLI. A shadow run runs no `Validate`. | Two lanes that file at one time can file the same id. The cycle process has no CLI globals. Shadow evidence cannot show that the curator rejects an item. |
+| D10 | Not built. An agent item has no probes, so the tree is never read. | `Cell.Workspace` is the run directory, not the worktree. |
+| D11 | `source` is not a loop stamp in the field-owner table. An authored `source` is refused only when the filer stamps one. `Item.Source` reads it. | 112 console items carry an authored `source` of free text. A loop stamp refuses them. |
+| D12 | The record has the fields `item_id` and `item_path`. `Report` stays for a dispatch result. The new decision is `filed`. The filer treats a try to file an item that has the same `source` as done, and it returns the item that exists. | `Report` already holds a dispatch report. A decision `run` makes the channel read child requests. |
+| D9 | Not built. File it as a separate inbox item. | The `scope` check needs the files of the item of the requester in the cell. That is a second change to a protected surface. |
+| Q1 | The pin test that a failed cycle keeps its filed items is not written. | The filer writes the item at the handoff, before the verdict. A later change can pin it. |
+
 ## 6. Components
 
 | Id | Component | Red test first | Lane or owner |

@@ -18,6 +18,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gateclass"
 )
 
+const SourceField = "source"
+
 type Item struct {
 	ID                string                     `json:"id"`
 	Title             string                     `json:"title"`
@@ -28,6 +30,7 @@ type Item struct {
 	Priority          string                     `json:"priority"`
 	PriorityClass     string                     `json:"priority_class"`
 	Origin            string                     `json:"origin"`
+	Source            string                     `json:"source,omitempty"`
 	Campaign          string                     `json:"campaign"`
 	Files             []string                   `json:"files"`
 	ProtectedFiles    []string                   `json:"protected_files"`

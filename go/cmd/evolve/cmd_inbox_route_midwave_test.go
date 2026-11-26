@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxfile"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
@@ -43,6 +45,7 @@ func TestCmd_InboxRouteVerbs_RefuseWhileALoopLaneIsLiveAndLeaveTheItemByteIdenti
 			t.Errorf("%v: a refused verb changed the item: %v\n%s", args, err, after)
 		}
 		entries, _ := filepath.Glob(filepath.Join(root, ".evolve", "inbox", "*"))
+		entries = slices.DeleteFunc(entries, func(path string) bool { return filepath.Base(path) == inboxfile.LockName })
 		if len(entries) != 1 {
 			t.Errorf("%v: a refused verb left %v in the inbox, want only the original item", args, entries)
 		}
