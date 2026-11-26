@@ -46,7 +46,11 @@ func LaunchLLM(ctx context.Context, deps Deps, x LLMExec) (int, error) {
 		return ExitSafetyGate, err
 	}
 	deps.logUnsandboxed(x.Purpose, x.Binary)
-	env := slices.DeleteFunc(probeEnv(deps, x.Binary), func(kv string) bool {
+	probe, err := probeEnv(deps, x.Binary)
+	if err != nil {
+		return ExitBadFlags, err
+	}
+	env := slices.DeleteFunc(probe, func(kv string) bool {
 		name, _, _ := strings.Cut(kv, "=")
 		return slices.Contains(runTmuxEnvNames, name) || slices.Contains(x.Drop, name)
 	})

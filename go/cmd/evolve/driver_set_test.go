@@ -18,7 +18,7 @@ import (
 func TestBridgeModelCapturer_CapturesThroughTheResolvedDriver(t *testing.T) {
 	t.Parallel()
 	boot := errors.New("no tmux in a test")
-	c := bridgeModelCapturer{workspace: t.TempDir(), deps: bridge.Deps{Tmux: &bridge.FakeTmuxController{NewSessionErr: boot}}}
+	c := bridgeModelCapturer{workspace: t.TempDir(), deps: bridge.Deps{Tmux: &bridge.FakeTmuxController{NewSessionErr: boot}, CellBinRoot: fixedCellBinRoot}}
 
 	_, err := c.CaptureModelPicker(context.Background(), "claude")
 
@@ -30,7 +30,7 @@ func TestBridgeModelCapturer_CapturesThroughTheResolvedDriver(t *testing.T) {
 func TestBridgeModelCapturer_AnUnknownCLIIsRefusedBeforeAnySession(t *testing.T) {
 	t.Parallel()
 	tmux := &bridge.FakeTmuxController{}
-	c := bridgeModelCapturer{workspace: t.TempDir(), deps: bridge.Deps{Tmux: tmux}}
+	c := bridgeModelCapturer{workspace: t.TempDir(), deps: bridge.Deps{Tmux: tmux, CellBinRoot: fixedCellBinRoot}}
 
 	_, err := c.CaptureModelPicker(context.Background(), "nosuchcli")
 

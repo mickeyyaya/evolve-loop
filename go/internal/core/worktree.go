@@ -13,6 +13,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasecontract"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runscope"
+	"github.com/mickeyyaya/evolve-loop/go/internal/selfsha"
 )
 
 type WorktreeProvisioner interface {
@@ -180,7 +181,7 @@ func (g gitWorktree) CreateFrom(projectRoot string, cycle int, startRef string) 
 }
 
 func linkGuardDeps(worktree, projectRoot string, cycle int) {
-	if self, err := os.Executable(); err == nil {
+	if self, err := selfsha.Path(); err == nil {
 		if err := os.MkdirAll(filepath.Join(worktree, "go", "bin"), 0o755); err == nil {
 			symlinkForce(self, filepath.Join(worktree, "go", "bin", "evolve"))
 		}

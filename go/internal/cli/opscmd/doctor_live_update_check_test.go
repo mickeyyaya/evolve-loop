@@ -14,7 +14,7 @@ import (
 func TestDoctorLive_LaunchesCodexWithItsStartupUpdateCheckOff(t *testing.T) {
 	frames := slices.Repeat([]string{"starting"}, 256)
 	pane := &bridge.FakeTmuxController{CaptureFrames: frames}
-	deps := bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: io.Discard}
+	deps := bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: io.Discard, CellBinRoot: fixedCellBinRoot}
 
 	runDoctorLiveWith([]string{"codex-tmux"}, io.Discard, deps)
 

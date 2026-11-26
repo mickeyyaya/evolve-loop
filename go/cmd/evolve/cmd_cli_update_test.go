@@ -317,7 +317,7 @@ func TestLiveProbeWith_RetriesAnAgyBootTimeoutOnceBeforeConcluding(t *testing.T)
 	t.Parallel()
 	var log bytes.Buffer
 	pane := &bridge.FakeTmuxController{CaptureFrames: slices.Repeat([]string{"Antigravity CLI\n  signing in…"}, 512)}
-	deps := bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: &log}
+	deps := bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: &log, CellBinRoot: fixedCellBinRoot}
 
 	rc, _, scrollback := liveProbeWith(context.Background(), t.TempDir(), "", deps)("agy-tmux")
 
@@ -353,7 +353,7 @@ func TestCLIUpdateWiring_TheProbeAndTheSmokeLaunchTheDispatchTierNotTheCLIsOwnDe
 			t.Run(seam+"/"+family, func(t *testing.T) {
 				t.Parallel()
 				pane := &bridge.FakeTmuxController{CaptureFrames: slices.Repeat([]string{"starting"}, 256)}
-				deps := bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: io.Discard, SeatLogin: seatlogin.Deps{Stat: func(string) (fs.FileInfo, error) { return nil, fs.ErrNotExist }, ReadFile: func(string) ([]byte, error) { return nil, fs.ErrNotExist }}}
+				deps := bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: io.Discard, CellBinRoot: fixedCellBinRoot, SeatLogin: seatlogin.Deps{Stat: func(string) (fs.FileInfo, error) { return nil, fs.ErrNotExist }, ReadFile: func(string) ([]byte, error) { return nil, fs.ErrNotExist }}}
 
 				_ = seamOf(cliUpdateWiringWith(t.TempDir(), deps, io.Discard).seams)(context.Background(), family)
 

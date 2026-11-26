@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 )
 
 func Of(path string) (string, error) {
@@ -23,10 +24,26 @@ func Of(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-func Running() (string, error) {
-	p, err := os.Executable()
+func Running() (string, error) { return hashExecutable(Path) }
+
+func hashExecutable(resolve func() (string, error)) (string, error) {
+	p, err := resolve()
+	if err != nil {
+		return "", err
+	}
+	return Of(p)
+}
+
+func Path() (string, error) { return resolveExecutable(os.Executable) }
+
+func resolveExecutable(executable func() (string, error)) (string, error) {
+	p, err := executable()
 	if err != nil {
 		return "", fmt.Errorf("selfsha: resolve executable: %w", err)
 	}
-	return Of(p)
+	real, err := filepath.EvalSymlinks(p)
+	if err != nil {
+		return "", fmt.Errorf("selfsha: resolve symlinks of %s: %w", p, err)
+	}
+	return real, nil
 }
