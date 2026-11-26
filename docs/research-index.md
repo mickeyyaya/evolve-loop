@@ -980,4 +980,13 @@ approaches / decision / results / retro) — lives at
 | [conventions/persona-writing.md](conventions/persona-writing.md) | The standard for each persona in `agents/`: shape, wording, no reasoning-field requests, verification, reviewer rules, length, and seven candidate lint checks. |
 | [plans/persona-diet-2026-11.md](plans/persona-diet-2026-11.md) | The plan. It scores three approaches, recommends measured changes for the core phases and grouped changes for the rest, and lists four separate components. |
 
+## 2026-11-26 — Harness²: how it drives harness self-improvement
+
+| Document | What it records |
+|---|---|
+| [research/harness2-self-evolution-2026-11.md](research/harness2-self-evolution-2026-11.md) | A read of `google-research/harness2` at commit `6868817` and of arXiv:2610.14224. It records the code layout, the Propose–Probe–Compose loop, the lesson library, the signals, the fixed budget, the reported results and the critiques. It compares eight related systems. It holds 11 local findings, adopt or reject recommendations and 8 candidate refinements. The plan below uses it. |
+| [plans/harness-self-improvement-2026-11.md](plans/harness-self-improvement-2026-11.md) | The plan that turns the 8 refinements into decisions. It records 15 measured facts of the plane, 4 candidate designs and 12 decisions. It adopts 3 refinements at `shadow`, defers 3 and rejects 2. It measures the lesson read path first: 20 opens of 1,350 listed lessons. |
+| [architecture/adr/0169-lesson-yield-is-measured-before-a-lesson-store-is-built.md](architecture/adr/0169-lesson-yield-is-measured-before-a-lesson-store-is-built.md) | ADR-0169, Proposed. It records 12 decisions. The loop measures the lesson read path first. It adopts R1, R3 and R6 at `shadow`, defers R2, R4 and R7, and rejects R5 and R8. It lists the rejected designs A, B and C, each with its ruling fact. |
+| [architecture/harness-self-improvement.md](architecture/harness-self-improvement.md) | The spec of record. It gives the issue, the gap and the solution for C1 to C5. It names the stage keys and signals at `shadow`. It has a guards table and the limits, with the reopen condition of each deferred item. |
+
 <!-- GENERATED:research-index END -->
