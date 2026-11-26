@@ -2,41 +2,10 @@ package recurrence_test
 
 import (
 	"errors"
-	"os"
-	"path/filepath"
 	"testing"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/dispositionrouter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 )
-
-func TestApplyBoundary_AWeightWriteFailureSurfacesAndStampsNothing(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
-	inboxDir := filepath.Join(root, "inbox")
-	path := seedItem(t, inboxDir, "x", 0.10)
-	stage(t, root, dispositionrouter.ActionEscalate, "x", "pattern:x", 3, 0.50)
-	if err := os.Chmod(inboxDir, 0o555); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(inboxDir, 0o755) })
-	if probe, err := os.Create(filepath.Join(inboxDir, "probe")); err == nil {
-		probe.Close()
-		t.Skip("directory permissions are not enforced here")
-	}
-
-	res, err := recurrence.ApplyBoundary(opts(root, 5, false))
-
-	if err == nil {
-		t.Fatalf("a failed weight write must surface, got res=%+v", res)
-	}
-	if len(res.Bumped) != 0 {
-		t.Fatalf("nothing may be reported bumped on a failed write: %+v", res)
-	}
-	if got := readWeight(t, path); got != 0.10 {
-		t.Fatalf("the item weight changed despite the failure: %v", got)
-	}
-}
 
 func TestRecordClosure_AZeroValueLedgerGrowsItsEntryMap(t *testing.T) {
 	t.Parallel()

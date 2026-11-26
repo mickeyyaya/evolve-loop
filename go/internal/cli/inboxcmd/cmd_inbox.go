@@ -38,7 +38,7 @@ func inboxVerbs() []inboxVerb {
 		{"show", "show <id> [--json]", withoutStdin(runInboxShow)},
 		{"rank", "rank [--list " + strings.Join(rankListNames, "|") + "] [--top N] [--explain <id>] [--json]", withoutStdin(runInboxRank)},
 		{"add", "add --file <item.json|-> [--origin O] [--allow-overlap --reason R] [--json]   (--file - reads the item JSON from stdin)", runInboxAdd},
-		{"edit", "edit <id|item-path> (--set F=V | --add F=V | --remove F=V)... [--json]   (--set on a list field takes a JSON array)", withoutStdin(runInboxEdit)},
+		{"edit", "edit <id|item-path> (--set F=V | --add F=V | --remove F=V)... [--reason WHY] [--json]   (--set on a list field takes a JSON array; weight and priority_class need --reason)", withoutStdin(runInboxEdit)},
 		{"verify", "verify <id> --evidence <text> [--json]", withoutStdin(runInboxVerify)},
 		{"withdraw", "withdraw <id> <reason> [--json]", withoutStdin(runInboxWithdraw)},
 		{"claim", "claim <id> --cycle N [--json]   (moves a dispatchable item into processing/cycle-N/)", withoutStdin(runInboxClaim)},

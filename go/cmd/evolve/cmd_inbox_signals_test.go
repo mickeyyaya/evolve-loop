@@ -97,7 +97,6 @@ func TestInboxCenterlessRootsArePinned(t *testing.T) {
 		"internal/loopwave/launcher.go":                    "the wave engine's one read-only lifecycle, rooted at EvolveDir: the launch gate's probe and the plan-time prune (ADR-0106 W3) — WIRED (Signals: e.center())",
 		"internal/deliverable/effects.go":                  "the read-only dependency probe of the claim check text — it reads the inbox and moves no file, so the mover has nothing to emit",
 		"internal/triagecap/lane_menu.go":                  "the ProjectRoot-less read-only lifecycle (the undispatchable prune and the backlog deps check) — never writes",
-		"cmd/evolve/cmd_loop_escalate.go":                  "the loop's escalation boundary reweight (cycle 1932) — WIRED (Signals: signals)",
 		"cmd/evolve/cmd_loop_goal_ids.go":                  "the launch check of the items a goal names (goal-text-has-no-selection-authority) — it places pending items read-only and never moves a file, so the mover has nothing to emit",
 		"cmd/evolve/cmd_loop_signal_stop.go":               "the claim survey of the fleet signal-stop message (resume-after-a-fleet-signal-stop) — read-only, it names the stopped lanes and moves no file",
 		"cmd/evolve/cmd_supply_wiring.go":                  "the supply census of `evolve wave supply` and of each loop iteration (ADR-0139 O6) — it scans and ranks the inbox and never moves a file, so the mover has nothing to emit",

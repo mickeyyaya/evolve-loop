@@ -23,7 +23,15 @@ const (
 var ErrNotWithdrawable = lifecycle.ErrNotWithdrawable
 
 func Edit(opts Options, target string, edits []FieldEdit) (string, error) {
-	return withMover(opts, func(m *lifecycle.Mover) (string, error) { return m.Edit(target, edits) })
+	return EditBecause(opts, target, "", edits)
+}
+
+func EditBecause(opts Options, target, reason string, edits []FieldEdit) (string, error) {
+	return withMover(opts, func(m *lifecycle.Mover) (string, error) { return m.EditBecause(target, reason, edits) })
+}
+
+func CheckEdit(edits []FieldEdit, reason string) error {
+	return lifecycle.CheckEdit(edits, reason)
 }
 
 func EditHeld(opts Options, taskID string, cycle int, edits []FieldEdit) (string, error) {

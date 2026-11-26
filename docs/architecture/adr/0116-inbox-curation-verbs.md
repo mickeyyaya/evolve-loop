@@ -88,7 +88,7 @@ Hand edits also let an operator change fields the lifecycle owns: a route stamp,
   - Keep #758's host facade `inboxmover.IsMoverWritten` (its sync's caller). It delegates to the leaf, so it reads this branch's projection. Until #758 lands, `IsMoverWritten` has no production caller in this branch.
   - In #758's `TestIsMoverWritten_CoversTheRouteAndEveryLifecycleField`, change the `retired_at` row to `retired_reason`. No writer writes `retired_at`, and under exact keys that row reads false.
 - The item writer still rewrites the whole file as compact JSON with HTML escaping, so a curation's data-PR diff is the whole file. The route verbs already behave this way; compare fields, not lines.
-- The recurrence engine (`internal/recurrence/apply.go`) reweights inbox items at the boundary through its own writer, although the table gives `weight` to the curator. #758's sync would treat such a plane-side reweight as other dirt. This is filed as a follow-up.
+- The recurrence engine (`internal/recurrence/apply.go`) reweights inbox items at the boundary through its own writer, although the table gives `weight` to the curator. The sync of #758 treats such a plane-side reweight as other dirt. This is filed as a follow-up. Amended 2026-11-21: plan P5 removed that writer. Recurrence moves the rank through the recurrence factor ([ADR-0121](0121-inbox-priority-is-a-computed-rank.md)), and `evolve inbox edit` needs `--reason` for `weight` and `priority_class`.
 
 ## Evidence
 

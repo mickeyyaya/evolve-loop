@@ -4,7 +4,7 @@
 >
 > **Decision record:** ADR-0121, which lands with P1.
 >
-> **Progress:** P1 landed unwired on 2026-10-06 ([notes](#p1-landing-notes-2026-10-06)); the P2 prerequisite and P2 landed the same day and wired the rank ([notes](#p2-prerequisite-and-p2-landing-notes-2026-10-06)). On 2026-10-27 the operator revised P3 into a deterministic intake and an event-driven curator ([the revision](#p3-revision-2026-10-27-a-deterministic-intake-and-an-event-driven-curator)). P4 and P5 remain. The inbox items are in [the table at the end](#inbox-items-for-the-open-components-2026-10-27).
+> **Progress:** P1 landed unwired on 2026-10-06 ([notes](#p1-landing-notes-2026-10-06)); the P2 prerequisite and P2 landed the same day and wired the rank ([notes](#p2-prerequisite-and-p2-landing-notes-2026-10-06)). On 2026-10-27 the operator revised P3 into a deterministic intake and an event-driven curator ([the revision](#p3-revision-2026-10-27-a-deterministic-intake-and-an-event-driven-curator)). P5 landed on 2026-11-21, except the `fingerprint` field ([notes](#p5-landing-notes-2026-11-21)). P4 remains. The inbox items are in [the table at the end](#inbox-items-for-the-open-components-2026-10-27).
 
 ## Context: what existed on 2026-10-06
 
@@ -180,7 +180,7 @@ P1 landed unwired on branch `feat/inbox-priority-rank` (console lane), from `ori
 3. **The scalar keys are pointers**, so an explicit `preempt_margin: 0` means zero rather than "absent". Every value is validated at load: the block fails `policy.Load` naming `inbox_priority`, as `cli_routing` does. A present `factors` block must name all six factors, so an omitted one never silently weighs 0.
 4. **`priority_class` is required at filing**, not only checked when present: absent, unknown and mis-cased classes are all refused (exit 1). Every one of the 241 pending items carries one of the eight classes. Thus no normalization map was needed. The plan's "normalizes `correctness` and `maintainability`" became a direct match, because each is in the order. An unknown class at load ranks below every class (feature 0; the last known class scores 1/8). `evolve inbox rank` names it in a `WARN`.
 5. **A lifecycle filer built without a class order refuses every filing as a fault** (not `ErrInvalidItem`). It does not admit an unjudged class. Only `evolve inbox add` files through it, and it always passes the policy's order.
-6. **`Edit` does not judge the class yet.** `evolve inbox edit --set priority_class=…` still accepts any text; the load warning catches a bad one. P5 adds the check together with the `--reason` it requires.
+6. **`Edit` did not judge the class.** `evolve inbox edit --set priority_class=…` accepted any text; the load warning caught a bad one. P5 (2026-11-21) added the check together with the `--reason` it requires.
 7. **The recurrence linkage.** Items carry no fingerprint field. Thus an item's recurrence count is the largest non-generic ledger entry that names the item in one of two ways:
    - its pattern equals the item's id (an autofiled recurrence item is filed under its pattern);
    - its `fix_item_id` names the item.
@@ -395,7 +395,7 @@ The architecture review judged that the rank can starve a class by design (ADR-0
 
 ### What remains
 
-P3 (one intake path, the overlap judge; revised on 2026-10-27, see below) and P4 (boundary preemption) remain. P5 also remains: `--reason` on every priority change. P5 also deletes the last weight write outside the lifecycle, the `Reweight` option of `recurrence.ApplyOptions`. `recurrence.setItemWeight` is gone. The writers `ciwatch`, `retrofile`, `dispositionrouter` and `core/failurelearning` have no package page under `docs/architecture/packages/`. Their class is recorded here, in ADR-0121's amendment and in `internal-core.md`, `internal-recurrence.md`, `internal-faillearn.md`, `internal-fleet.md`, `internal-triagecap.md` and `cmd-evolve.md`.
+P3 (one intake path, the overlap judge; revised on 2026-10-27, see below) and P4 (boundary preemption) remain. P5 landed on 2026-11-21: `--reason` on every priority change, and the removal of the last weight write outside the lifecycle, the `Reweight` option of `recurrence.ApplyOptions`. `recurrence.setItemWeight` is gone. The writers `ciwatch`, `retrofile`, `dispositionrouter` and `core/failurelearning` have no package page under `docs/architecture/packages/`. Their class is recorded here, in ADR-0121's amendment and in `internal-core.md`, `internal-recurrence.md`, `internal-faillearn.md`, `internal-fleet.md`, `internal-triagecap.md` and `cmd-evolve.md`.
 
 ## P3 revision (2026-10-27): a deterministic intake and an event-driven curator
 
@@ -410,7 +410,7 @@ The revision replaces the LLM overlap judge of the P3 row above. No LLM edits th
 
 The three triggers and the boundary backstop are in [inbox-curator.md §The design](../architecture/inbox-curator.md#the-design). The `merge`, sweep `consume` and lane `reroute` proposals are judgment proposals for the operator and the orchestrator item X13.
 
-**Two promises of the old P3 move.** The `fingerprint` field of the item moves to P5, with the recurrence work. "The top movers" on every add is dropped: `evolve inbox add` prints the rank of the filed item, and `evolve inbox rank` shows the rest.
+**Two promises of the old P3 move.** The `fingerprint` field of the item moved to P5, with the recurrence work. P5 did not build it (see the P5 landing notes). "The top movers" on every add is dropped: `evolve inbox add` prints the rank of the filed item, and `evolve inbox rank` shows the rest.
 
 **Verification of P3** (replaces the P3 list above):
 - A duplicate is refused, and a near overlap is warned.
@@ -444,3 +444,14 @@ P4, P5 and P6 depend on P3. The item `inbox-curator-event-triggered` starts each
 | P6 | done | [`4ea0406`](https://github.com/mickeyyaya/evolve-loop/commit/4ea0406bf) (cycle 2288) | none |
 
 Only P5 is left, and its build is in review. P5 must also remove the `Reweight` option of `recurrence.ApplyOptions`. No component lacks an open item. ADR-0121 status was not checked.
+
+## P5 landing notes (2026-11-21)
+
+P5 is partly landed. Two promises of the plan stay open, and each needs its own inbox item.
+
+- **Landed: a reason on every priority change.** `evolve inbox edit --set weight=` and `--set priority_class=` need `--reason`. The reason is part of the one `edit` ledger line, and a failed ledger append fails the edit. The rule lives in `lifecycle.Mover.EditBecause`, so a caller other than the CLI cannot bypass it. The field list is `FieldRole.NeedsReason` in `inboxbatch`.
+- **Landed: the class check.** `edit --set priority_class=` runs `CheckPriorityClass` with `inbox_priority.class_order`, which `evolve inbox edit` reads from the policy.
+- **Landed: one weight writer.** `recurrence.ApplyOptions` lost `Reweight` and `Policy`. A recurrence moves the rank through the recurrence factor, and `TestNoProductionCodeWritesAnItemWeightOutsideTheLifecycleWriter` proves that only the lifecycle writer writes a weight. The result field `Bumped` is now `Escalated`.
+- **Retired predicates.** The change retired predicates of cycles 1932 and 1062 and amended one of cycle 2478. The record is [the archive](../private/research/archived-2026-11-21/superseded-predicates/README.md), and the ledger table of [acs-predicate-quality-gate.md](../architecture/acs-predicate-quality-gate.md) names each row.
+- **Open: the `fingerprint` field of the item.** No code writes or reads it yet. It needs an inbox item of its own.
+- **Open: the dormant `Escalator` seam.** `recurrence.RecordClosure` still takes an `Escalator`, and `failure_disposition.step` and `cap` still feed it. No production caller wires it. An inbox item removes the seam and the two keys.

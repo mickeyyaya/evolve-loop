@@ -214,7 +214,7 @@ func contractGateDemotedItem(t *testing.T) inboxbatch.Item {
 	}
 	_, err := recurrence.ApplyBoundary(recurrence.ApplyOptions{
 		InboxDir: filepath.Join(root, "inbox"), EscalationsPath: dispositionrouter.PendingActionsPath(escalations),
-		ReportPath: filepath.Join(root, "report.json"), Cycle: 42, Policy: recurrence.DefaultEscalationPolicy(), Now: autofilerClock(),
+		ReportPath: filepath.Join(root, "report.json"), Cycle: 42, Now: autofilerClock(),
 	})
 	if err != nil {
 		t.Fatal(err)

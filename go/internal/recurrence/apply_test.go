@@ -1,14 +1,13 @@
 package recurrence_test
 
 import (
+	"bytes"
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/atomicwrite"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dispositionrouter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/recurrence"
 )
@@ -48,15 +47,7 @@ func opts(root string, cycle int, shadow bool) recurrence.ApplyOptions {
 		ReportPath:      filepath.Join(root, "report.json"),
 		Cycle:           cycle,
 		Shadow:          shadow,
-		Policy:          recurrence.DefaultEscalationPolicy(),
 		Now:             time.Date(2026, 7, 23, 0, 0, 0, 0, time.UTC),
-		Reweight:        fakeItemWriter(filepath.Join(root, "inbox")),
-	}
-}
-
-func fakeItemWriter(inboxDir string) func(id string, weight float64) error {
-	return func(id string, weight float64) error {
-		return atomicwrite.JSON(filepath.Join(inboxDir, id+".json"), map[string]any{"id": id, "weight": weight})
 	}
 }
 
@@ -70,7 +61,7 @@ func stage(t *testing.T, root, action, id, pattern string, count int, weight flo
 	}
 }
 
-func TestApplyBoundary_BumpsThenIsIdempotent(t *testing.T) {
+func TestApplyBoundary_EscalatesThenIsIdempotent(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	path := seedItem(t, filepath.Join(root, "inbox"), "recurring", 0.80)
@@ -80,16 +71,15 @@ func TestApplyBoundary_BumpsThenIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ApplyBoundary: %v", err)
 	}
-	want := recurrence.DefaultEscalationPolicy().Target(0.80, 4)
-	if len(first.Bumped) != 1 || readWeight(t, path) != want {
-		t.Fatalf("first pass: Bumped=%v weight=%v, want 1 bump to %v", first.Bumped, readWeight(t, path), want)
+	if len(first.Escalated) != 1 || readWeight(t, path) != 0.80 {
+		t.Fatalf("first pass: Escalated=%v weight=%v, want 1 escalation and the weight as filed", first.Escalated, readWeight(t, path))
 	}
 	second, err := recurrence.ApplyBoundary(opts(root, 1062, false))
 	if err != nil {
 		t.Fatalf("ApplyBoundary (second): %v", err)
 	}
-	if len(second.Bumped) != 0 || readWeight(t, path) != want {
-		t.Fatalf("second pass in the same cycle re-escalated: Bumped=%v weight=%v", second.Bumped, readWeight(t, path))
+	if len(second.Escalated) != 0 || readWeight(t, path) != 0.80 {
+		t.Fatalf("second pass in the same cycle re-escalated: Escalated=%v weight=%v", second.Escalated, readWeight(t, path))
 	}
 }
 
@@ -106,8 +96,8 @@ func TestApplyBoundary_NeverLowersWeight(t *testing.T) {
 	if w := readWeight(t, path); w != 0.97 {
 		t.Fatalf("weight moved 0.97 → %v; escalation must never lower", w)
 	}
-	if len(res.Skipped) != 1 || len(res.Bumped) != 0 {
-		t.Fatalf("result = %+v, want the item reported skipped, not bumped", res)
+	if len(res.Escalated) != 1 {
+		t.Fatalf("result = %+v, want the escalation applied to the rank", res)
 	}
 }
 
@@ -130,7 +120,7 @@ func TestApplyBoundary_SkipsClaimedItems(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ApplyBoundary: %v", err)
 	}
-	if len(res.Bumped) != 0 || len(res.Skipped) != 1 {
+	if len(res.Escalated) != 0 || len(res.Skipped) != 1 {
 		t.Fatalf("result = %+v, want the claimed item skipped", res)
 	}
 	if w := readWeight(t, dest); w != 0.70 {
@@ -156,7 +146,7 @@ func TestApplyBoundary_ShadowWritesReportOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ApplyBoundary(shadow): %v", err)
 	}
-	if !res.Shadow || len(res.Planned) != 2 || len(res.Bumped)+len(res.Filed) != 0 {
+	if !res.Shadow || len(res.Planned) != 2 || len(res.Escalated)+len(res.Filed) != 0 {
 		t.Fatalf("shadow result = %+v, want Shadow=true, 2 planned, 0 applied", res)
 	}
 	if _, err := os.Stat(o.ReportPath); err != nil {
@@ -219,7 +209,7 @@ func TestApplyBoundary_NothingStagedStillReports(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ApplyBoundary(empty): %v", err)
 	}
-	if len(res.Bumped)+len(res.Filed)+len(res.Skipped) != 0 || res.Cycle != 1062 {
+	if len(res.Escalated)+len(res.Filed)+len(res.Skipped) != 0 || res.Cycle != 1062 {
 		t.Fatalf("result = %+v, want an empty pass stamped with the cycle", res)
 	}
 	if _, err := os.Stat(o.ReportPath); err != nil {
@@ -251,7 +241,7 @@ func TestApplyBoundary_UnknownActionIsSkipped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ApplyBoundary: %v", err)
 	}
-	if len(res.Skipped) != 1 || len(res.Bumped)+len(res.Filed) != 0 || readWeight(t, path) != 0.5 {
+	if len(res.Skipped) != 1 || len(res.Escalated)+len(res.Filed) != 0 || readWeight(t, path) != 0.5 {
 		t.Fatalf("unknown action was acted on: %+v", res)
 	}
 }
@@ -272,8 +262,8 @@ func TestApplyBoundary_PatternOnlyIntentAndNoReportPath(t *testing.T) {
 		t.Fatalf("ApplyBoundary: %v", err)
 	}
 	var _ recurrence.ApplyResult = res
-	if len(res.Bumped) != 1 || res.Bumped[0] != "pattern:only" {
-		t.Fatalf("Bumped = %v, want the pattern used as the item id", res.Bumped)
+	if len(res.Escalated) != 1 || res.Escalated[0] != "pattern:only" {
+		t.Fatalf("Escalated = %v, want the pattern used as the item id", res.Escalated)
 	}
 	if _, err := os.Stat(filepath.Join(root, "report.json")); !os.IsNotExist(err) {
 		t.Fatalf("an empty ReportPath still wrote a report")
@@ -303,44 +293,30 @@ func TestApplyBoundary_CorruptInboxItemSurfaces(t *testing.T) {
 		t.Fatalf("corrupt item: %v", err)
 	}
 	res, err := recurrence.ApplyBoundary(opts(root, 1062, false))
-	if err == nil && len(res.Bumped) != 0 {
+	if err == nil && len(res.Escalated) != 0 {
 		t.Fatalf("a corrupt inbox item was bumped: %+v", res)
 	}
 }
 
-func TestApplyBoundary_ReweightGoesOnlyThroughTheSeam(t *testing.T) {
+func TestApplyBoundary_NeverWritesAnItem(t *testing.T) {
 	t.Parallel()
-	refusal := errors.New("curator refused")
-	cases := []struct {
-		name       string
-		seam       func(id string, weight float64) error
-		wantErr    error
-		wantBumped bool
-	}{
-		{name: "nil seam skips the item", seam: nil},
-		{name: "refusing seam surfaces its error", seam: func(string, float64) error { return refusal }, wantErr: refusal},
-		{name: "accepting seam bumps", seam: func(string, float64) error { return nil }, wantBumped: true},
+	root := t.TempDir()
+	path := seedItem(t, filepath.Join(root, "inbox"), "unwritten", 0.50)
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			root := t.TempDir()
-			path := seedItem(t, filepath.Join(root, "inbox"), "reweighted", 0.50)
-			stage(t, root, dispositionrouter.ActionEscalate, "reweighted", "pattern:r", 4, 0.50)
-			o := opts(root, 1932, false)
-			o.Reweight = tc.seam
+	stage(t, root, dispositionrouter.ActionEscalate, "unwritten", "pattern:r", 4, 0.50)
 
-			res, err := recurrence.ApplyBoundary(o)
-			if !errors.Is(err, tc.wantErr) {
-				t.Fatalf("ApplyBoundary error = %v, want %v", err, tc.wantErr)
-			}
-			if got := len(res.Bumped) == 1; got != tc.wantBumped {
-				t.Fatalf("Bumped = %v, want bumped=%v", res.Bumped, tc.wantBumped)
-			}
-			if got := readWeight(t, path); got != 0.50 {
-				t.Fatalf("recurrence wrote the item itself: weight = %v, want 0.50", got)
-			}
-		})
+	res, err := recurrence.ApplyBoundary(opts(root, 1932, false))
+	if err != nil {
+		t.Fatalf("ApplyBoundary: %v", err)
+	}
+	if len(res.Escalated) != 1 {
+		t.Fatalf("Escalated = %v, want the escalation recorded", res.Escalated)
+	}
+	if after, _ := os.ReadFile(path); !bytes.Equal(before, after) {
+		t.Fatalf("recurrence wrote the item:\nbefore %s\nafter  %s", before, after)
 	}
 }
 
@@ -388,5 +364,22 @@ func TestApplyBoundary_UpdatesOpenAutofiledItemOnFurtherCycle(t *testing.T) {
 	}
 	if got.Recurrence != 4 || got.Title != "Stop class-1 (4)" || got.Summary != "cycle 1060\ncycle 1061\ncycle 1062\ncycle 1065" || len(got.Acceptance) != 1 {
 		t.Fatalf("updated item = %+v", got)
+	}
+}
+
+func TestApplyBoundary_AnEscalationWritesNothingIntoTheInbox(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	path := seedItem(t, filepath.Join(root, "inbox"), "recurring", 0.80)
+	before, _ := os.ReadFile(path)
+	stage(t, root, dispositionrouter.ActionEscalate, "recurring", "pattern:p", 9, 0.80)
+
+	res, err := recurrence.ApplyBoundary(opts(root, 1062, false))
+
+	if err != nil || len(res.Escalated) != 1 {
+		t.Fatalf("res = %+v err = %v, want the open item escalated", res, err)
+	}
+	if after, _ := os.ReadFile(path); !bytes.Equal(before, after) {
+		t.Errorf("an escalation wrote the item:\nbefore %s\nafter  %s", before, after)
 	}
 }

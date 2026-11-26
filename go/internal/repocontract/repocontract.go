@@ -215,6 +215,7 @@ var treeReadingSelections = []TestSelection{
 		"TestNoProductionCodeCallsLoadDir",
 	}},
 	{Package: "./internal/inboxmover", Tests: []string{
+		"TestNoProductionCodeWritesAnItemWeightOutsideTheLifecycleWriter",
 		"TestOptionsMover_OneConstructionSite",
 	}},
 	{Package: "./internal/inboxmover/lifecycle", Tests: []string{
