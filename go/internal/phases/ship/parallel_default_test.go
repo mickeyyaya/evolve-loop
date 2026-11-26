@@ -21,6 +21,7 @@ const (
 var serialTests = map[string]string{
 	"ship.TestPersonaLint_EachCheckErrorFailsTheLint":                                "swaps seam personaChecks",
 	"ship.TestPhase_TheRepoContractPackRunsOutsideTheShipWindow":                     seamRepoContract,
+	"ship.TestShipPhase_AStepRedOnMainParksNoLane":                                   seamRepoContract,
 	"ship.TestAppendQuarantineManifestCoverfix_AnEncodingFailureLeavesNoManifest":    seamMarshalIndent,
 	"ship.TestRepairSelfSHAPinCoverfix_AnUnlocatableExecutableDeclines":              seamExecutable,
 	"ship.TestRepinPostCycleCoverfix_AnUnknownRunningBinaryLeavesThePinUntouched":    seamExecutable,

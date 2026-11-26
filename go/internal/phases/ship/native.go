@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/baseattr"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciwatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/config"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/derived"
@@ -111,6 +112,8 @@ type Options struct {
 	baseRun baseattr.Runner
 
 	derivedRun derived.Generator
+
+	mainCI ciwatch.Fetcher
 
 	Signals *signalcenter.Center
 

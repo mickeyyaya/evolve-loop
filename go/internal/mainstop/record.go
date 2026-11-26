@@ -56,3 +56,59 @@ func Update(evolveDir string, fn func(Stop, bool) (Stop, error)) (Stop, error) {
 	}
 	return next, nil
 }
+
+const judgedName = "main-red-judged.json"
+
+type judgedRecord struct {
+	SHA string `json:"sha"`
+}
+
+func JudgedPath(evolveDir string) string {
+	return filepath.Join(evolveDir, judgedName)
+}
+
+func Judged(evolveDir, sha string) bool {
+	return readJudged(evolveDir) == sha
+}
+
+func readJudged(evolveDir string) string {
+	data, err := os.ReadFile(JudgedPath(evolveDir))
+	if err != nil {
+		return ""
+	}
+	var r judgedRecord
+	if json.Unmarshal(data, &r) != nil {
+		return ""
+	}
+	return r.SHA
+}
+
+func ClaimJudged(evolveDir, sha string) (bool, error) {
+	release, err := flock.PathLock(Path(evolveDir))
+	if err != nil {
+		return false, fmt.Errorf("mainstop: %w", err)
+	}
+	defer release()
+	if readJudged(evolveDir) == sha {
+		return false, nil
+	}
+	if err := atomicwrite.JSON(JudgedPath(evolveDir), judgedRecord{SHA: sha}); err != nil {
+		return false, fmt.Errorf("mainstop: write the judged record: %w", err)
+	}
+	return true, nil
+}
+
+func ReleaseJudged(evolveDir, sha string) error {
+	release, err := flock.PathLock(Path(evolveDir))
+	if err != nil {
+		return fmt.Errorf("mainstop: %w", err)
+	}
+	defer release()
+	if readJudged(evolveDir) != sha {
+		return nil
+	}
+	if err := os.Remove(JudgedPath(evolveDir)); err != nil {
+		return fmt.Errorf("mainstop: release the judged record: %w", err)
+	}
+	return nil
+}

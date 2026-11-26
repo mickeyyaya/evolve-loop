@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
 )
 
 const (
@@ -189,5 +191,15 @@ func TestClassifyTarget_ARunOfTheHeadCommitOnMainGivesNoWarning(t *testing.T) {
 
 	if err != nil || !slices.Equal(rep.Warnings, []string{"older"}) {
 		t.Errorf("err %v warnings %q, want only the warning of the run that gave a fact", err, rep.Warnings)
+	}
+}
+
+func TestGateRow_NamesAStepAndNeverATestOrAPackage(t *testing.T) {
+	t.Parallel()
+	for _, g := range ciparity.GateSteps {
+		row := gateRow(g, 7, 1)
+		if row.Package != "" || row.Test != "" || row.Step != g.Gate {
+			t.Errorf("gateRow(%q) = %+v, want only the Gate name in Step: the main-red stop treats a row with a package and a test as a test it can run", g.Gate, row)
+		}
 	}
 }

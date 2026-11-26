@@ -134,3 +134,23 @@ func TestWriteClassifyWarnings_NamesEachWarningOnStderrWithThePrefix(t *testing.
 		t.Errorf("stderr %q, want silence", stderr.String())
 	}
 }
+
+func TestMainCIFetcher_WarnsOnAMissingGoModAndStaysSilentOnAReadableOne(t *testing.T) {
+	t.Parallel()
+	var warn bytes.Buffer
+	if MainCIFetcher(t.TempDir(), &warn) == nil || !strings.Contains(warn.String(), "the main-red stop reads the CI run without the module path") {
+		t.Errorf("a root without go.mod: warning = %q, want the module path named as unread and a fetcher", warn.String())
+	}
+
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ciModuleDir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ciModuleDir, "go.mod"), []byte("module example.com/m\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	warn.Reset()
+	if MainCIFetcher(root, &warn) == nil || warn.Len() != 0 {
+		t.Errorf("a root with go.mod: warning = %q, want none", warn.String())
+	}
+}
