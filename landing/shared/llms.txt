@@ -112,7 +112,7 @@ within a line budget. `evolve wave latency --check` judges each recorded wave.
 seat started.
 
 Upgrading from v22 or earlier: no code reads a control value from the
-environment now. A set name such as `EVOLVE_SANDBOX=off` has no effect. An
+environment now. An old control variable set in the shell has no effect. An
 unknown key in `.evolve/policy.json` fails the load. CHANGELOG.md entries X18a,
 X18c and X18d give the replacement of each name.
 
