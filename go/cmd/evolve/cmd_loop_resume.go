@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/checkpoint"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 )
 
@@ -25,13 +27,11 @@ func runResumeBatch(
 	stdout, stderr io.Writer,
 ) int {
 	lr.Resumed = true
-	rp, err := core.LoadResumeState(ctx, cfg.ProjectRoot, cfg.EvolveDir, core.ResumeOptions{Log: stderr})
-	if err != nil {
-		fmt.Fprintf(stderr, "evolve loop: resume: %v\n", err)
-		lr.StopReason = "error"
-		lr.emitFatal(stdout, stderr, cfg, 0)
+	rp, ok := loadAndValidateResumePoint(ctx, cfg, lr, stdout, stderr)
+	if !ok {
 		return 2
 	}
+	defer checkpoint.BindLane(rp.PoolID)()
 	fmt.Fprintf(stderr, "[resume] cycle=%d phase=%s reason=%s cost=$%.2f state=%s\n",
 		rp.CycleID, rp.Phase, rp.Reason, rp.CostAtPause, rp.StatePath)
 	if !admitResume(cfg, rp, lr, stdout, stderr) {
@@ -131,4 +131,51 @@ func admitResume(cfg loopConfig, rp *core.ResumePoint, lr *loopResult, stdout, s
 		return false
 	}
 	return true
+}
+
+var errLegacyLaneCheckpointStage = errors.New("checkpoint integration stage")
+
+func loadAndValidateResumePoint(ctx context.Context, cfg loopConfig, lr *loopResult, stdout, stderr io.Writer) (*core.ResumePoint, bool) {
+	rp, err := loadBatchResumePoint(ctx, cfg, stderr)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve loop: resume: %v\n", err)
+		lr.StopReason = "error"
+		lr.emitFatal(stdout, stderr, cfg, 0)
+		return nil, false
+	}
+	if err := legacyLaneCheckpointErr(cfg, rp, stderr); err != nil {
+		fmt.Fprintf(stderr, "evolve loop: resume: %v\n", err)
+		lr.StopReason = "error"
+		lr.emitFatal(stdout, stderr, cfg, rp.CycleID)
+		return nil, false
+	}
+	return rp, true
+}
+
+func loadBatchResumePoint(ctx context.Context, cfg loopConfig, stderr io.Writer) (*core.ResumePoint, error) {
+	if cfg.resumePoint != nil {
+		return cfg.resumePoint, nil
+	}
+	return core.LoadResumeState(ctx, cfg.ProjectRoot, cfg.EvolveDir, core.ResumeOptions{Log: stderr})
+}
+
+func legacyLaneCheckpointErr(cfg loopConfig, rp *core.ResumePoint, stderr io.Writer) error {
+	if rp.PoolID > 0 {
+		return nil
+	}
+	scope := rp.Scope
+	if len(scope) == 0 {
+		scope = core.LaneScopeIDs(cycleWorkspace(cfg.ProjectRoot, rp.CycleID))
+	}
+	if len(scope) == 0 {
+		return nil
+	}
+	stage, err := policy.LoadOrDefaults(filepath.Join(cfg.EvolveDir, "policy.json"), stderr).FleetIntegrationStage()
+	if err != nil {
+		return fmt.Errorf("%w %s: %v", errLegacyLaneCheckpointStage, rp.StatePath, err)
+	}
+	if stage == policy.FleetIntegrationEnforce {
+		return fmt.Errorf("fleet.integration.stage=enforce refuses legacy lane checkpoint %s without a pool id", rp.StatePath)
+	}
+	return nil
 }

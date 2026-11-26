@@ -32,6 +32,9 @@ type ResumePoint struct {
 	AutoMaxAttempts int
 	QuotaResetAt    string
 	StatePath       string
+	PoolID          int
+	LaneCycle       int
+	Scope           []string
 }
 
 type ResumeOptions struct {
@@ -253,6 +256,26 @@ func firstLoadable(cands []perRunState, projectRoot string, opts ResumeOptions, 
 	return nil, firstErr
 }
 
+func resumePointFrom(statePath string, blob, cp map[string]any) *ResumePoint {
+	return &ResumePoint{
+		StatePath:       statePath,
+		CycleID:         intFromAny(blob["cycle_id"]),
+		Phase:           strFromAny(cp["resumeFromPhase"]),
+		WorktreePath:    strFromAny(cp["worktreePath"]),
+		GitHead:         strFromAny(cp["gitHead"]),
+		CompletedPhases: stringsFromAny(cp["completedPhases"]),
+		CostAtPause:     floatFromAny(cp["costAtCheckpoint"]),
+		Reason:          strFromAny(cp["reason"]),
+		SavedAt:         strFromAny(cp["savedAt"]),
+		AutoAttempts:    intFromAny(cp["autoResumeAttempts"]),
+		AutoMaxAttempts: intFromAny(cp["autoResumeMaxAttempts"]),
+		QuotaResetAt:    strFromAny(cp["quotaResetAt"]),
+		PoolID:          intFromAny(cp["poolId"]),
+		LaneCycle:       intFromAny(cp["laneCycle"]),
+		Scope:           stringsFromAny(cp["scope"]),
+	}
+}
+
 func loadResumeStateFrom(statePath, projectRoot string, opts ResumeOptions) (*ResumePoint, error) {
 	raw, err := os.ReadFile(statePath)
 	if err != nil {
@@ -278,20 +301,7 @@ func loadResumeStateFrom(statePath, projectRoot string, opts ResumeOptions) (*Re
 		return nil, fmt.Errorf("%w: checkpoint.enabled != true", ErrNoCheckpoint)
 	}
 
-	rp := &ResumePoint{
-		StatePath:       statePath,
-		CycleID:         intFromAny(blob["cycle_id"]),
-		Phase:           strFromAny(cp["resumeFromPhase"]),
-		WorktreePath:    strFromAny(cp["worktreePath"]),
-		GitHead:         strFromAny(cp["gitHead"]),
-		CompletedPhases: stringsFromAny(cp["completedPhases"]),
-		CostAtPause:     floatFromAny(cp["costAtCheckpoint"]),
-		Reason:          strFromAny(cp["reason"]),
-		SavedAt:         strFromAny(cp["savedAt"]),
-		AutoAttempts:    intFromAny(cp["autoResumeAttempts"]),
-		AutoMaxAttempts: intFromAny(cp["autoResumeMaxAttempts"]),
-		QuotaResetAt:    strFromAny(cp["quotaResetAt"]),
-	}
+	rp := resumePointFrom(statePath, blob, cp)
 	if rp.Phase == "" {
 		return nil, fmt.Errorf("%w: checkpoint.resumeFromPhase missing", ErrStaleCheckpoint)
 	}

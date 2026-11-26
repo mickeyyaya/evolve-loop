@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/flock"
@@ -63,14 +64,30 @@ type Checkpoint struct {
 	WorkspacePath         string              `json:"workspacePath,omitempty"`
 	QuotaWall             []core.FamilyEnd    `json:"quotaWall,omitempty"`
 	PhaseIntegrity        []phaseblock.Digest `json:"phaseIntegrity,omitempty"`
+	PoolID                int                 `json:"poolId,omitempty"`
+	LaneCycle             int                 `json:"laneCycle,omitempty"`
+	Scope                 []string            `json:"scope,omitempty"`
 }
 
 const DefaultAutoResumeAttempts = 3
+
+var boundLanePool atomic.Int64
+
+func BindLane(pool int) func() {
+	prev := boundLanePool.Swap(int64(pool))
+	return func() { boundLanePool.Store(prev) }
+}
 
 func Compose(cs core.CycleState, reason Reason, cost float64, gitHead string, now time.Time) Checkpoint {
 	completed := cs.CompletedPhases
 	if completed == nil {
 		completed = []string{}
+	}
+	pool := int(boundLanePool.Load())
+	scope := core.LaneScopeIDs(cs.WorkspacePath)
+	laneCycle := 0
+	if pool > 0 || len(scope) > 0 {
+		laneCycle = cs.CycleID
 	}
 	return Checkpoint{
 		Enabled:               true,
@@ -84,6 +101,9 @@ func Compose(cs core.CycleState, reason Reason, cost float64, gitHead string, no
 		AutoResumeAttempts:    0,
 		AutoResumeMaxAttempts: DefaultAutoResumeAttempts,
 		WorkspacePath:         cs.WorkspacePath,
+		PoolID:                pool,
+		LaneCycle:             laneCycle,
+		Scope:                 scope,
 	}
 }
 

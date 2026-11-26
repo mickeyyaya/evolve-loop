@@ -1014,4 +1014,11 @@ var serialTests = map[string]string{
 	"main.TestBootBinaryRefresh_ZeroResumeWavesArmsNothing":                                                                "TDD-owned test that swaps package-level bootRefresh and loopchain seams without t.Parallel",
 	"main.TestRunLoop_BootRefreshReExecCarriesTheResumePointTheLaunchTook":                                                 "TDD-owned test that swaps package-level bootRefresh, loopchain, and runLoop seams without t.Parallel",
 	"main.TestBootBinaryRefresh_UnfetchedOriginRefusesRebuild":                                                             "swaps package-level bootRefresh seams without t.Parallel",
+	"main.TestLaneIdentity_ALegacyLaneCheckpointAtEnforceIsRefusedBeforeAnyPhaseRuns":                                      "TDD-owned test calling resumeLaneIdentityCheckpoint which swaps wireOrchestratorDepsFn and sets PATH",
+	"main.TestLaneIdentity_ALegacyLaneCheckpointAtShadowStillResumesAsBefore":                                              "TDD-owned test calling resumeLaneIdentityCheckpoint which swaps wireOrchestratorDepsFn and sets PATH",
+	"main.TestLaneIdentity_AResumedLaneCheckpointAtEnforceTakesItsPoolAndScopeFromTheCheckpoint":                           "TDD-owned test calling resumeLaneIdentityCheckpoint which swaps wireOrchestratorDepsFn and sets PATH",
+	"main.TestLaneIdentity_AResumedLaneCheckpointAtShadowTakesItsPoolAndScopeFromTheCheckpoint":                            "TDD-owned test calling resumeLaneIdentityCheckpoint which swaps wireOrchestratorDepsFn and sets PATH",
+	"main.TestLaneIdentity_ASequentialCheckpointAtEnforceStillResumesWithoutAPool":                                         "TDD-owned test calling resumeLaneIdentityCheckpoint which swaps wireOrchestratorDepsFn and sets PATH",
+	"main.TestLaneIdentity_AnEnforceLaneWiredWithAPoolAndAScopeBuildsItsOrchestrator":                                      "TDD-owned test calling wireOrchestratorDeps which sets SetModelCatalogDirFn and runner.DefaultRouter",
+	"main.TestLaneIdentity_AnEnforceLaneWiredWithAScopeAndNoPoolStopsBeforeAnyDispatch":                                    "TDD-owned test calling wireOrchestratorDeps which sets SetModelCatalogDirFn and runner.DefaultRouter",
 }

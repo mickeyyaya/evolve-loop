@@ -22,6 +22,14 @@ type routingRun struct {
 	overrides  cliroute.Overrides
 	sandboxOff string
 	pool       int
+	scope      []string
+}
+
+func (r routingRun) integrationScope() []string {
+	if len(r.scope) > 0 {
+		return r.scope
+	}
+	return fleetLaneScope()
 }
 
 func (r routingRun) centerRole() string {

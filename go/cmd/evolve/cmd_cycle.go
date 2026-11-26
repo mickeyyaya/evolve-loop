@@ -261,6 +261,7 @@ func runCycleRun(args []string, stdout, stderr io.Writer) int {
 	}
 	var lifecycleLedger inboxmover.LedgerAppender = d.Ledger
 	orch, signals := d.Orchestrator, d.Signals
+	defer checkpoint.BindLane(f.pool)()
 	lane := laneResume{projectRoot: projectRoot, evolveDir: evolveDir, scope: fleetLaneScope(), record: checkpoint.RecordLaneResume,
 		claim: hostInboxClaimer(lifecycleLedger, signals, laneForbiddenTo(projectRoot, signals.Emit)), protected: laneForbiddenTo(projectRoot, signals.Emit),
 		release: laneClaimReleaser(projectRoot, stderr, lifecycleLedger, signals), signals: signals, stderr: stderr}
@@ -562,7 +563,7 @@ func wireOrchestratorDeps(projectRoot, evolveDir string, console io.Writer, run 
 	newLiveReaction(evolveDir, pol.HealingLiveReaction(), console).arm(signals)
 	swCfg := swarmrunner.Config{Stage: pol.SwarmConfig().Stage, PortBase: pol.SwarmConfig().PortBase, WorktreeBase: pol.WorktreeBase()}
 	gatesCfg := pol.GatesConfig()
-	shipIntegration, integrationErr := shipIntegrationOf(pol, fleetLaneFromEnv(), fleetLaneScope(), run.pool, console)
+	shipIntegration, integrationErr := shipIntegrationOf(pol, fleetLaneFromEnv() || len(run.scope) > 0 || run.pool > 0, run.integrationScope(), run.pool, console)
 	if integrationErr != nil {
 		return orchDeps{Signals: signals, CloseSignals: closeSignals, RoutingErr: integrationErr}
 	}

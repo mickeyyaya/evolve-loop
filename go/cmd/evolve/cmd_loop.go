@@ -64,6 +64,7 @@ type loopConfig struct {
 	Epoch             *integration.EpochHolder `json:"-"`
 	announce          loopAnnouncer
 	retire            func()
+	resumePoint       *core.ResumePoint
 }
 
 func emitSignalStop(stdout, stderr io.Writer, lr *loopResult, cycle int) {
@@ -156,7 +157,7 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) (exit i
 
 	gcOrphanSessions("startup", stderr)
 
-	deps := wireOrchestratorDepsFn(cfg.ProjectRoot, cfg.EvolveDir, stderr, routingRun{bypass: cfg.BypassPolicy, env: carriedEnv(os.Environ()), role: roleLoop, overrides: cfg.agentOverrides(), sandboxOff: cfg.SandboxOff})
+	deps := wireOrchestratorDepsFn(cfg.ProjectRoot, cfg.EvolveDir, stderr, resumeRoutingRun(cfg, preloadResumePoint(ctx, &cfg, stderr)))
 	defer deps.closeSignals()
 	if deps.RoutingErr != nil {
 		fmt.Fprintf(stderr, "evolve loop: %v\n", deps.RoutingErr)
@@ -204,6 +205,27 @@ func runLoopBatch(cfg loopConfig, _ io.Reader, stdout, stderr io.Writer) (exit i
 		stderr:       stderr,
 		now:          loopClock,
 	}).run()
+}
+
+func preloadResumePoint(ctx context.Context, cfg *loopConfig, stderr io.Writer) *core.ResumePoint {
+	if !cfg.Resume {
+		return nil
+	}
+	rp, err := core.LoadResumeState(ctx, cfg.ProjectRoot, cfg.EvolveDir, core.ResumeOptions{Log: stderr})
+	if err != nil {
+		return nil
+	}
+	cfg.resumePoint = rp
+	return rp
+}
+
+func resumeRoutingRun(cfg loopConfig, rp *core.ResumePoint) routingRun {
+	run := routingRun{bypass: cfg.BypassPolicy, env: carriedEnv(os.Environ()), role: roleLoop, overrides: cfg.agentOverrides(), sandboxOff: cfg.SandboxOff}
+	if rp != nil {
+		run.pool = rp.PoolID
+		run.scope = rp.Scope
+	}
+	return run
 }
 
 func isTaskLevelFailure(c cycleclassify.Classification) bool {

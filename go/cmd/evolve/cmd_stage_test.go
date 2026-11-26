@@ -95,7 +95,8 @@ func TestEveryStageHasScorerAndVerdict(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, errOut, code := runStageVerb(t, "report", "--json", "--project-root", repo)
+	emptyChain := writeStageChain(t, stageevidence.Chain{})
+	out, errOut, code := runStageVerb(t, "report", "--json", "--project-root", repo, "--chain", emptyChain)
 	if code != cliExitOK {
 		t.Fatalf("stage report exited %d; stderr: %s", code, errOut)
 	}
