@@ -8,6 +8,12 @@
     "The CI waker is one gh run watch child that blocks for each batch PR, and no code polls the GitHub API",
     "When main moves under a batch PR, the CI run of the old tip is cancelled"
   ],
+  "consumed": {
+    "at": "2026-11-25T15:30:33Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "built on main per docs/plans/wave-integration-2026-10.md delivery status (2026-11-21); console verified the named code exists on origin/main d6f3bbeb3 at the wave-189 boundary"
+  },
   "created_at": "2026-10-26T19:24:12Z",
   "deps": [
     "wave-integration-i3b-batch-test",
