@@ -70,6 +70,7 @@ const (
 type PhaseRequest struct {
 	Cycle                           int               `json:"cycle"`
 	AuditRound                      int               `json:"audit_round,omitempty"`
+	AuditScope                      *AuditRoundScope  `json:"audit_scope,omitempty"`
 	ProjectRoot                     string            `json:"project_root"`
 	Workspace                       string            `json:"workspace"`
 	Worktree                        string            `json:"worktree"`

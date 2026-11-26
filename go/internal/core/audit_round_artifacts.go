@@ -33,7 +33,7 @@ func retireSupersededAuditArtifacts(workspace string, round int, warn io.Writer)
 	if workspace == "" || round < 1 {
 		return
 	}
-	for _, name := range []string{acsverdict.Filename, phasecontract.ArtifactFilename(string(PhaseAudit))} {
+	for _, name := range []string{acsverdict.Filename, phasecontract.ArtifactFilename(string(PhaseAudit)), AuditRoundDispositionsFile} {
 		src := filepath.Join(workspace, name)
 		dst := filepath.Join(workspace, phasecontract.RoundArchiveFilename(name, round))
 		if _, err := os.Stat(dst); err == nil {

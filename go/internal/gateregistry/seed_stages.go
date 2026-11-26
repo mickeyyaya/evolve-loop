@@ -43,6 +43,13 @@ var stageSeeds = []stageSeed{
 	{key: "workflow.findings_repair.code-review.stage"},
 	{key: "workflow.convergence.stage"},
 	{
+		key:     "workflow.convergence.audit_rereview.stage",
+		signal:  core.CodeAuditRereviewShadow,
+		site:    gatecontract.EmitSite{Path: "internal/core/audit_rereview.go", Func: "emitAuditRereviewShadow", Ref: "CodeAuditRereviewShadow"},
+		fields:  []string{"stage", "round", "hunks", "late", "would_file", "would_block", "reworded", "filed", "verdict"},
+		closure: []string{"internal/convergence"},
+	},
+	{
 		key:     core.StageKeyRetryLadder,
 		signal:  core.CodeLadderDecision,
 		site:    gatecontract.EmitSite{Path: "internal/core/retry_ladder.go", Func: "emitLadderDecision", Ref: "CodeLadderDecision"},

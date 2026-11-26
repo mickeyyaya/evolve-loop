@@ -18,6 +18,7 @@ func compiledConvergence() policy.ConvergenceConfig {
 		ConcentrationWindow:      2,
 		ConcentrationMinFindings: 5,
 		MaxBackwardEdges:         3,
+		AuditRereview:            policy.AuditRereviewShadow,
 	}
 }
 
@@ -56,7 +57,7 @@ func TestConvergenceConfig_EveryNamedValueOverridesTheDefault(t *testing.T) {
 
 	want := policy.ConvergenceConfig{
 		Stage: "enforce", MaxFixRounds: 4, BaseBlockingBar: "HIGH", RaisedBlockingBar: "CRITICAL",
-		ConcentrationThreshold: 0.75, ConcentrationWindow: 3, ConcentrationMinFindings: 7, MaxBackwardEdges: 5,
+		ConcentrationThreshold: 0.75, ConcentrationWindow: 3, ConcentrationMinFindings: 7, MaxBackwardEdges: 5, AuditRereview: policy.AuditRereviewShadow,
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("ConvergenceConfig() = %+v, want %+v", got, want)

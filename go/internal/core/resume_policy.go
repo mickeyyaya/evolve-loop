@@ -6,6 +6,7 @@ var ResumeBoundaryCheckpointer func(cs CycleState, projectRoot string, now time.
 
 func (cr *cycleRun) applyDispatchPolicy(next Phase, req *PhaseRequest) {
 	cr.adoptResumedLadder()
+	req.AuditScope = cr.o.auditScopeFor(cr.ctx, next, cr.cs, cr.req.ProjectRoot)
 	if next == PhaseBuild {
 		if tier, raised := cr.escalatedBuildTier(req.Assignment.Tier); raised {
 			req.Assignment.Tier = tier

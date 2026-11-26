@@ -49,6 +49,10 @@ func WithRepairFixability(check func(RepairCheck) RepairFindings) Option {
 	return func(o *Orchestrator) { o.repairFixability = check }
 }
 
+func inboxDirOf(cs CycleState) string {
+	return filepath.Join(filepath.Dir(filepath.Dir(cs.WorkspacePath)), "inbox")
+}
+
 func (o *Orchestrator) repairHandoff(cs CycleState, fb *phasecontract.FailureBlock, env retryEnvelope) (string, bool) {
 	stage := o.workflowConfig.Repair.Fixability
 	if o.repairFixability == nil || stage.Stage == policy.FixabilityOff || !offersRepair(env) {
@@ -56,7 +60,7 @@ func (o *Orchestrator) repairHandoff(cs CycleState, fb *phasecontract.FailureBlo
 	}
 	d := o.repairFixability(RepairCheck{
 		Defects: fb.Defects, GateFailures: gateFailures(cs),
-		InboxDir: filepath.Join(filepath.Dir(filepath.Dir(cs.WorkspacePath)), "inbox"), Salvage: cs.ActiveWorktree,
+		InboxDir: inboxDirOf(cs), Salvage: cs.ActiveWorktree,
 	})
 	decision := RepairDecisionNone
 	switch {
