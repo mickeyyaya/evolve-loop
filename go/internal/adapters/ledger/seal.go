@@ -60,7 +60,11 @@ func (l *FileLedger) sealAndAnchor(keepTail int) (*core.LedgerEntry, error) {
 	if err != nil || anchor == nil {
 		return nil, err
 	}
-	return anchor, l.appendChainedLocked(chainInto(anchor))
+	rec, err := l.writeManifestAndSealRecord(anchor)
+	if err != nil {
+		return nil, err
+	}
+	return &rec.LedgerEntry, l.appendChainedLocked(chainSealInto(rec))
 }
 
 func (l *FileLedger) sealLocked(keepTail int) (*core.LedgerEntry, error) {
@@ -116,14 +120,14 @@ func (l *FileLedger) sealLocked(keepTail int) (*core.LedgerEntry, error) {
 }
 
 func (l *FileLedger) anchorFor(segPath, uncompressedSHA string, lineCount int) (*core.LedgerEntry, error) {
-	rel, err := filepath.Rel(filepath.Dir(l.ledgerPath), segPath)
+	rel, err := relSegment(filepath.Dir(l.ledgerPath), segPath)
 	if err != nil {
 		return nil, fmt.Errorf("ledger seal: rel: %w", err)
 	}
 	return &core.LedgerEntry{
 		Role:           "operator",
 		Kind:           SealKind,
-		ArtifactPath:   filepath.ToSlash(rel),
+		ArtifactPath:   rel,
 		ArtifactSHA256: uncompressedSHA,
 		Message:        fmt.Sprintf("sealed %d lines into %s (uncompressed sha256 anchored)", lineCount, filepath.Base(segPath)),
 	}, nil
@@ -143,25 +147,19 @@ func (l *FileLedger) unanchoredSegment(segs []string, liveLines [][]byte) (path,
 			return "", "", 0, rerr
 		}
 		cache[i] = segData{lines, segSHA}
-		for _, line := range lines {
-			var e core.LedgerEntry
-			if json.Unmarshal(line, &e) == nil && e.Kind == SealKind {
-				anchored[e.ArtifactPath] = true
-			}
+		for _, seal := range decodeSeals(lines) {
+			anchored[seal.ArtifactPath] = true
 		}
 	}
-	for _, line := range liveLines {
-		var e core.LedgerEntry
-		if json.Unmarshal(line, &e) == nil && e.Kind == SealKind {
-			anchored[e.ArtifactPath] = true
-		}
+	for _, seal := range decodeSeals(liveLines) {
+		anchored[seal.ArtifactPath] = true
 	}
 	for i, s := range segs {
-		rel, rerr := filepath.Rel(evolveDir, s)
+		rel, rerr := relSegment(evolveDir, s)
 		if rerr != nil {
 			return "", "", 0, fmt.Errorf("ledger seal: rel: %w", rerr)
 		}
-		if !anchored[filepath.ToSlash(rel)] {
+		if !anchored[rel] {
 			d := cache[i]
 			return s, d.sha, len(d.lines), nil
 		}
@@ -176,6 +174,11 @@ type sealedSegment struct {
 }
 
 var segmentRel = filepath.Rel
+
+func relSegment(evolveDir, path string) (string, error) {
+	rel, err := segmentRel(evolveDir, path)
+	return filepath.ToSlash(rel), err
+}
 
 func (l *FileLedger) readChain() ([]sealedSegment, [][]byte, error) {
 	evolveDir := filepath.Dir(l.ledgerPath)
@@ -193,11 +196,11 @@ func (l *FileLedger) readChain() ([]sealedSegment, [][]byte, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		rel, err := segmentRel(evolveDir, s)
+		rel, err := relSegment(evolveDir, s)
 		if err != nil {
 			return nil, nil, fmt.Errorf("ledger verify: rel: %w", err)
 		}
-		segs = append(segs, sealedSegment{rel: filepath.ToSlash(rel), sha: segSHA, lines: segLines})
+		segs = append(segs, sealedSegment{rel: rel, sha: segSHA, lines: segLines})
 	}
 	return segs, splitLines(liveRaw), nil
 }

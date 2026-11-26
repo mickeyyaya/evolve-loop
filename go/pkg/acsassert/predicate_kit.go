@@ -70,6 +70,30 @@ func ExitedPID(t testing.TB) int {
 	return cmd.ProcessState.Pid()
 }
 
+func DirEntryNames(tb testing.TB, dir string) []string {
+	tb.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		tb.Fatalf("listing %s: %v", dir, err)
+		return nil
+	}
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	return names
+}
+
+func FilePerm(tb testing.TB, path string) fs.FileMode {
+	tb.Helper()
+	info, err := os.Stat(path)
+	if err != nil {
+		tb.Fatalf("stat %s: %v", path, err)
+		return 0
+	}
+	return info.Mode().Perm()
+}
+
 func OutputTail(output string, n int) string {
 	if n <= 0 {
 		return ""

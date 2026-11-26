@@ -163,6 +163,8 @@ subprocess path is the safety net the dual-root pattern keeps correct.
 | `ModuleDir` | Returns the nearest directory with a `go.mod` at or above a start path. |
 | `GoModuleDir` | Takes the `*testing.T` of a predicate and returns the module directory, or fails the test. Call it in place of a `moduleDir(t)` wrapper. |
 | `ExitedPID` | Takes the `*testing.T` of a predicate and returns the ID of a child process that has exited and was reaped. Call it in place of an `exitedPID(t)` helper. |
+| `DirEntryNames` | Returns the sorted entry names of a directory and fails the test when the directory cannot be listed. Call it in place of an `entryNames(t, dir)` helper. |
+| `FilePerm` | Returns the permission bits of a file and fails the test when the file cannot be read. Call it in place of a `permOf(t, path)` helper. |
 | `OutputTail` | Returns the last N lines of a command output. |
 | `FuncCoverage` | Returns the coverage percentage of one function from `go tool cover -func` output. |
 | `WalkModule` | Lists the module files, as slash paths relative to the root, that a filter keeps. |
