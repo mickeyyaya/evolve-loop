@@ -275,6 +275,7 @@ var treeReadingSelections = []TestSelection{
 		"TestParallelLanesAddingOneIdenticalLineKeepOneLineInBothMergeOrders",
 		"TestParallelLanesAddingOnePackageFailTheGuardInBothMergeOrders",
 		"TestRegistryFilesHoldEachPackageOnce",
+		"TestStructure_ProctreeAndFaketmuxRunNoPS",
 		"TestTheCodeIndexAbstractionRunsNoProcessAndNamesNoBackend",
 		"TestTheMCPConfigReaderOnlyReads",
 		"TestTheTrailAdapterIsTheHomeThatRunsAProcess",

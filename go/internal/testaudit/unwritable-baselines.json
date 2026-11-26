@@ -1922,16 +1922,6 @@
     },
     {
       "package": "internal/proctree",
-      "test": "TestNewLister_APSExitNamesTheCodeAndTheStderr",
-      "rule": "error-text-match"
-    },
-    {
-      "package": "internal/proctree",
-      "test": "TestNewLister_AnUnrunnablePSIsAnErrorThatNamesPS",
-      "rule": "error-text-match"
-    },
-    {
-      "package": "internal/proctree",
       "test": "TestRemoveTree_AnUnremovableTreeIsAnError",
       "rule": "error-text-match"
     },

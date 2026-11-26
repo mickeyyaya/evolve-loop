@@ -26,6 +26,10 @@ func LiteralFiles(root, needle string, dirs ...string) ([]string, error) {
 	return filesWhere(root, dirs, func(file *ast.File) bool { return hasLiteralWith(file, needle) })
 }
 
+func ProgramLiteralFiles(root, name string, dirs ...string) ([]string, error) {
+	return filesWhere(root, dirs, func(file *ast.File) bool { return runsAProcess(file) && hasLiteralEqual(file, name) })
+}
+
 func filesWhere(root string, dirs []string, keep func(*ast.File) bool) ([]string, error) {
 	files, err := SourceFiles(root, dirs...)
 	if err != nil {

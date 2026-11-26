@@ -11,12 +11,14 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/proctree"
 )
 
 type server struct {
 	dir    string
 	stdout io.Writer
-	procs  func() ([]process, error)
+	procs  proctree.Lister
 }
 
 func (s *server) startServer(invocation) error {

@@ -6,7 +6,7 @@
 
 `internal/proctree` is the one kill path for the processes that a dispatch leaves behind. It owns:
 
-- the process table (`Process`, `Lister`, `NewLister`, `ExecLister`);
+- the process table (`Process`, `Lister`, `ExecLister`) and the command name of one pid (`CommOf`);
 - the identity of a process (`Identity`: the pid plus the start time);
 - the ownership proofs (`Proof`, `TaggedWith`, `Recorded`, `AnyOf`, `Descendants`, `Select`);
 - the dispatch id (`DispatchID`, `ParseDispatchID`), the value of `EVOLVE_DISPATCH_ID`;
@@ -19,7 +19,13 @@ The bridge uses it at the end of each dispatch (`internal/bridge/dispatch_reap.g
 
 ## Design
 
-- **The table.** `ps -A -o pid=,ppid=,pgid=,uid=,lstart=,comm=` runs with `LC_ALL=C`, so `lstart` has one format. The table keeps only the rows of the current uid.
+- **The table comes from the kernel and starts no program** ([plan](../../plans/proctree-reads-processes-without-ps-2026-11.md)). `ExecLister` keeps its name and signature. It reads the rows of the current uid, then attaches the arguments and the environment of each pid.
+  - On macOS, `sysctl kern.proc.uid` gives the rows. The kernel filters by the effective uid, as `ps` does. The decoder reads a `kinfo_proc` of 648 bytes at fixed offsets: start second 0, pid 40, `p_comm` 243, ppid 560 and pgid 564.
+  - Before the table returns, the decoder checks the row of its own process: pid, ppid, pgid and start second. A mismatch returns an error that names the layout, so a macOS release that moves a field stops the reaper and does not corrupt `Descendants`. When the parent exits between the two reads, the check refuses the table for that one call. This is safe.
+  - On Linux, the scan reads the numeric entries of `/proc`. One `stat` parser reads the command name, ppid, pgrp and start ticks after the last `)`. The effective uid is the second field of the `Uid:` line of `status`. The owner of `/proc/<pid>` is root for a non-dumpable process, so it is not used. A pid that gives `ENOENT`, `ESRCH`, `EACCES` or `EPERM` is skipped, as `ps` does under `hidepid`.
+  - Other systems return an error that names the platform.
+  - `Started` has a resolution of one second and equals `StartTime` cut to the second, so a persisted tree matches a new listing (`TestExecLister_RowsHaveTheStartSecondOfStartTime`).
+- **`Comm` is what `ps -o comm=` prints.** On macOS, it is `argv[0]` without trailing blanks, and `p_comm` when no argument is readable or `argv[0]` is empty. On Linux, it is the command name of `stat`. A row whose argument read fails stays in the table with an empty `Env`, so no tag proof can match it. `SharedHelper` reads the base of `Comm`: on macOS `Comm` equals the old `ps` value, and a row with `p_comm` such as `Google Chrome He` still holds `chrome`. `CommOf(pid)` reads the same value for one pid, with no program.
 - **Arguments and environment come from the kernel, apart.** On macOS, `sysctl KERN_PROCARGS2` gives the argument count, the arguments and then the environment. On Linux, `/proc/<pid>/cmdline` and `/proc/<pid>/environ` give them. `ps -E` is not used: it prints the arguments and the environment on one line, so an argument such as `grep EVOLVE_DISPATCH_ID=x` can look like a tag. The table keeps only the `EVOLVE_` keys of each environment.
 - **`StartOf(pid)` reads the start time of one process from the kernel.** A caller compares two values for equality only: equal means the same process. A gone pid gives `ESRCH`, and other systems refuse.
   - On macOS, `sysctl KERN_PROC_PID` gives the `kinfo_proc` of the pid. The value is `p_starttime` as `<seconds>.<microseconds>`. The call uses the general `sysctl` helper of `KERN_PROCARGS2`, which now takes a MIB of any length.
@@ -49,7 +55,8 @@ The bridge uses it at the end of each dispatch (`internal/bridge/dispatch_reap.g
 ## Invariants
 
 - The arguments and the environment stay apart (`TestParseProcArgs2_KeepsArgumentsAndEnvironmentApart`, `TestTaggedWith_ATagInTheArgumentsIsNoProof`).
-- The table keeps only the rows of the given uid (`TestParsePS_KeepsOnlyTheRowsOfTheGivenUser`).
+- The table keeps only the rows of the given uid (`TestReadTable_KeepsOnlyTheRowsOfTheGivenUID`, `TestReadTableAt_KeepsOnlyTheRowsWhoseEffectiveUIDIsTheGivenUID`).
+- The table needs no `ps` binary (`TestExecLister_RunsNoProgramAndListsThisProcess`, `TestStructure_ProctreeAndFaketmuxRunNoPS`). It matches `ps` for the own-uid rows (`TestExecLister_MatchesPSForTheOwnUIDTable`, integration tier) and refuses a layout that moved (`TestReadTableVia_RefusesATableWhoseSelfRowDisagreesWithTheProcess`).
 - A reused pid is a different process (`TestRecorded_MatchesPidAndStartTimeTogether`, `TestReap_APidReusedByANewProcessIsNotKilled`).
 - Each round checks the proof again (`TestReap_AProcessThatLostItsProofIsNotKilled`).
 - pid 0, pid 1 and the protected pids never get a signal (`TestReap_NeverSignalsInitItselfOrItsParent`, `TestReap_SignalsSinglePidsOnly`, `TestDescendants_RefusesInitAndPidZeroAsARoot`).

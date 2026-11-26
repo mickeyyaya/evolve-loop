@@ -42,7 +42,7 @@ The pane process starts in its own session (`Setsid`), so `new-session` returns 
 - `paste-buffer` writes the buffer as it is. No program in the fake asks for bracketed paste, so `-p` adds no markers.
 - `capture-pane` turns `\r\n` into `\n` and drops a lone `\r`. It does not wrap long lines.
 
-**The foreground program.** `#{pane_current_command}` reads `ps -A -o pid= -o ppid= -o comm=` and follows the newest child from the pane process to the deepest descendant. The dead-shell guard of the bridge (`paneShellProcess`) thus sees `sh` before the launch and the CLI after it.
+**The foreground program.** `#{pane_current_command}` reads the own-uid table from `proctree.ExecLister` and follows the newest child from the pane process to the deepest descendant. The dead-shell guard of the bridge (`paneShellProcess`) thus sees `sh` before the launch and the CLI after it.
 
 **A session ends with its process.** The `pane` record holds the pid, the rows and the start time of the pane process (`proctree.StartOf`). A session is live only while that pid exists with the same start time. A session whose program exited is gone, and its name is free for a new session. A pid that the host gives to an unrelated process does not match the start time, so the fake never signals it (`TestSession_APidThatStartedAgainIsNotTheRecordedPaneAndIsNeverSignalled`).
 
@@ -61,7 +61,7 @@ A run that holds an entry other than `owner` and the server directories is refus
 - the pid is not the process itself or its parent;
 - the start time matches the record;
 - the pid still leads its own process group (`getpgid`), and that group is not the group of the fake;
-- `ps -o comm=` names a shell.
+- `proctree.CommOf` names a shell: `argv[0]` on macOS and the `stat` command name on Linux.
 
 Pinned by `TestSeams_TheFakeNeverSignalsItselfItsParentOrANonShellLeader` and `TestSeams_TheFakeSignalsOnlyALiveGroupLeaderThatIsNotItsOwnGroup`, which use a recording sender.
 
@@ -80,7 +80,8 @@ Pinned by `TestSeams_TheFakeNeverSignalsItselfItsParentOrANonShellLeader` and `T
 - **A pane runs what it is sent and shows the output.** Pinned by `TestRun_APaneRunsTheKeysItIsSentAndShowsTheirOutput` and `TestRun_APastedBufferReachesTheProgramAndTheBufferIsDeletedWithD`.
 - **`kill-session` and `kill-server` end the pane processes.** Pinned by `TestRun_KillSessionEndsThePaneAndTheSessionIsGone` and `TestRun_KillServerEndsEverySessionAndListSessionsThenFinds_NoServer`. The fake signals only a recorded pid above 1. The signal goes through the `signalGroup` seam, so a test never sends a real kill to a wrong group.
 - **A refusal is loud.** Pinned by `TestRun_RefusesWhatTmuxWouldRefuse` and `TestRun_TheStateRootAndTheSocketNameMustBeUsable`.
-- **No platform branch.** The package has no branch on `runtime.GOOS`. It uses POSIX calls (`mkfifo`, `setsid`, `kill`) and `ps -A -o`, which macOS and Linux both have. The `faults_test.go` seams (`openFile`, `signalGroup`, `setBlocking`, `runPS`) reach each error path on each OS.
+- **No platform branch.** The package has no branch on `runtime.GOOS`. It uses POSIX calls (`mkfifo`, `setsid`, `kill`) and the kernel readers of `proctree`, so it runs no `ps` and works in a lane cell. The `faults_test.go` seams (`openFile`, `signalGroup`, `setBlocking`, `listProcesses`) reach each error path on each OS. Pinned by `TestFakeTmux_PaneLeaderAndForegroundCommandRunWithoutPS` and `TestStructure_ProctreeAndFaketmuxRunNoPS`.
+- **The table has the own-uid rows only.** `ps -A` listed all users. A setuid foreground program such as `sudo` drops out of `pane_current_command`, and the parent shell shows instead. On macOS, `TestFakeTmux_PaneCommandIsArgv0OnDarwin` pins `argv[0]` as the name.
 
 ## Limits
 
