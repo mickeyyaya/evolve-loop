@@ -78,6 +78,12 @@ func New(inner core.Bridge, resolve PlanResolver, opts ...Option) *Walking {
 	return w
 }
 
+func (w *Walking) With(resolve PlanResolver, spec CandidateSpec) *Walking {
+	derived := *w
+	derived.resolve, derived.admit = resolve, spec
+	return &derived
+}
+
 func (w *Walking) Probe(ctx context.Context) (core.BridgeProbe, error) { return w.inner.Probe(ctx) }
 
 func (w *Walking) Launch(ctx context.Context, req core.BridgeRequest) (core.BridgeResponse, error) {
@@ -151,10 +157,18 @@ func withDefaults(plan llmroute.Plan, req core.BridgeRequest) llmroute.Plan {
 }
 
 func DefaultPlanResolver(router *cliroute.Router) PlanResolver {
+	return routedPlan(router, llmroute.Overlay{})
+}
+
+func TierOverlayResolver(router *cliroute.Router, tier string) PlanResolver {
+	return routedPlan(router, llmroute.Overlay{Tier: tier})
+}
+
+func routedPlan(router *cliroute.Router, overlay llmroute.Overlay) PlanResolver {
 	return func(req core.BridgeRequest) (llmroute.Plan, error) {
 		d, err := router.Resolve(cliroute.Request{
 			Agent: req.Agent, ProjectRoot: req.ProjectRoot, DefaultModel: req.Model, Env: req.Env, CallerCLI: req.CLI,
-			NeedsTools: req.Worktree != "", Cycle: req.Cycle,
+			NeedsTools: req.Worktree != "", Cycle: req.Cycle, Overlay: overlay,
 		})
 		return d.Plan, err
 	}
@@ -255,9 +269,16 @@ func scopeCoversSeat(e clihealth.Entry, plan llmroute.Plan) bool {
 	return false
 }
 
-func seatModel(cli, tier string) string {
+func ServedModel(cli, tier string) (string, bool) {
 	if m, err := bridge.LoadManifest(cli); err == nil && m.ModelTierMap[tier] != "" {
-		return m.ModelTierMap[tier]
+		return m.ModelTierMap[tier], true
+	}
+	return "", false
+}
+
+func seatModel(cli, tier string) string {
+	if model, ok := ServedModel(cli, tier); ok {
+		return model
 	}
 	return tier
 }

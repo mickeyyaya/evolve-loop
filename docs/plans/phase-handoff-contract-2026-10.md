@@ -176,7 +176,7 @@ The order puts the pure code first. Thus lanes build most of the plan, and the c
 | Risk | Control |
 |---|---|
 | The ledger becomes a form that the agent fills with false evidence. | H3 resolves each pointer in code. A pointer that does not resolve is not met. The judge samples the met entries. |
-| The extra checks and the judge cost tokens. | The deterministic layer costs no tokens. The judge runs only on asks that code cannot decide, and only at stage enforce. |
+| The extra checks and the judge cost tokens. | The deterministic layer costs no tokens. The judge runs only on asks that code cannot decide, and at the stage of its pair. |
 | A loop runs too long. | D8: the existing cap, plus a stop after a round with no new met ask. |
 | A lane escapes a real failure with a false blocked claim. | D9: only deterministic proof blocks. |
 | The waves run fewer than 4 lanes. | §6 puts 7 components in an unprotected package. The 25 lane parts of PR #978 fill the rest. The console checks `evolve wave status` after each launch. |

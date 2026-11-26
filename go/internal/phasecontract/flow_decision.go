@@ -57,6 +57,7 @@ const (
 	FlowSeatRetryAdjudicator = "retry-adjudicator"
 	FlowSeatFailureAdvisor   = "failure-advisor"
 	FlowSeatTriage           = "triage"
+	FlowSeatHandoffJudge     = "handoff-judge"
 )
 
 type FlowDecision struct {
@@ -91,6 +92,8 @@ var flowDecisions = []FlowDecision{
 	{Seat: FlowSeatSelfhealOrchestrator, ArtifactName: "diagnosis.json", Shape: JSONShapeObject,
 		Required: []string{"schema", "incident_id", "hypothesis", "evidence", "action", "expected_effect", "confidence"},
 		Allowed:  []string{"schema", "incident_id", "hypothesis", "evidence", "action", "alternative", "expected_effect", "confidence"}},
+	{Seat: FlowSeatHandoffJudge, ArtifactName: "handoff-judge.json", Shape: JSONShapeObject,
+		Required: []string{"verdicts"}, Allowed: []string{"verdicts"}},
 }
 
 func FlowDecisions() []FlowDecision { return slices.Clone(flowDecisions) }

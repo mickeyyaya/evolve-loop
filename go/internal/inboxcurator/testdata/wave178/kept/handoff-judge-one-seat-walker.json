@@ -9,9 +9,7 @@
   ],
   "evidence": "Branch dev/cl-c1 (handoff-h10-independent-judge, not shipped) was blocked by the architecture review in round 3: the judge walks its own seats (ChainAttempt) beside bridgechain.Walking, so it skips the exit-85 bench and LaunchWithFreshSession; 3 surviving mutants (empty Worktree fallback, multi-line ask text, judge_tier empty).",
   "files": [
-    "go/internal/bridgechain/bridgechain.go",
-    "go/cmd/evolve/handoff_judge.go",
-    "go/internal/core/handoff_judge.go"
+    "go/internal/bridgechain/bridgechain.go"
   ],
   "fix": "Design doc, architecture review, then build: bridgechain takes a candidate filter (Specification) and the judge passes handoff.Independents through it; the routed driver is carried in the seat; the 3 mutant-kill tests; profile cli agrees with cli_routing.agents.handoff-judge; a test that policy.TierNames equals modelcatalog.CanonicalTiers.",
   "id": "handoff-judge-one-seat-walker",

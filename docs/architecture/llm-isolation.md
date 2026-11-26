@@ -1168,6 +1168,7 @@ X8 keeps the file names that the seats already wrote. The bridge waits for the d
 | retry adjudicator | `failure-adjudication.json` | `retry-adjudicator` | `action`, `justification` | `bridgeRetryAdjudicator.Adjudicate` (`go/internal/core/retry_adjudicator_agent.go`) |
 | failure advisor | `failure-advice.json` | `failure-advisor` | `cause`, `pane_substr`, `justification` | `FailureAdvisor.Advise` (`go/internal/core/failure_advisor.go`) |
 | triage | `triage-decision.json` | `triage` | `top_n` | `CapReviewer.Review` (`go/internal/triagecap/flow_stage.go`) |
+| handoff judge | `handoff-judge.json` | `handoff-judge` | `verdicts` | `handoffJudgeRunner` (`go/cmd/evolve/handoff_judge.go`) |
 
 The schemas are `phasecontract.FlowDecisions` (`go/internal/phasecontract/flow_decision.go`). `FlowDecision.Validate` refuses prose around the JSON, trailing data, the wrong top-level shape, an unknown key and a missing key. `TestFlowDecision_ValidateRejectsAnUnknownFieldAndAMissingField` runs both refusals for each seat.
 
