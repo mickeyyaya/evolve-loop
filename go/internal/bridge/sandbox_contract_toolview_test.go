@@ -41,7 +41,10 @@ func toolViewHome(t *testing.T) string {
 func (h contractHost) toolViewEnv(t *testing.T, home string) []string {
 	t.Helper()
 	cfg := &Config{CLI: "claude-tmux", Agent: "builder", Workspace: h.run, Realization: RealizeFor("claude-tmux", LaunchIntent{})}
-	env, hermetic := Deps{EnvStage: "enforce", Env: map[string]string{}, Stderr: io.Discard, HostGitConfig: fakeHostGit(nil)}.cellEnv(cfg)
+	env, hermetic, err := Deps{EnvStage: "enforce", Env: map[string]string{}, Stderr: io.Discard, HostGitConfig: fakeHostGit(nil)}.cellEnv(cfg)
+	if err != nil {
+		t.Fatalf("cellEnv: %v", err)
+	}
 	if !hermetic {
 		t.Fatal("the cell env must be hermetic at enforce")
 	}
