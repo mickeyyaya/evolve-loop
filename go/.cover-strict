@@ -118,3 +118,4 @@
 ./internal/cloudlaunch 100
 ./internal/cli/cloudcmd 100
 ./internal/ledgerscan 100
+./internal/journeys 100
