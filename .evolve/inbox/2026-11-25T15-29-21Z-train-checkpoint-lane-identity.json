@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "Red first: a resumed lane checkpoint at enforce delivers to the wave record and does not write main.",
+    "100% coverage on each changed function; zero code comments."
+  ],
+  "created_at": "2026-11-25T15:40:00Z",
+  "files": [
+    "go/internal/core",
+    "go/cmd/evolve",
+    "go/internal/checkpoint"
+  ],
+  "fix": "Record the pool id, lane cycle and scope in the checkpoint, and derive the lane identity on resume; at enforce, refuse a lane checkpoint with no identity or give it the current pool id, as card section 9 decides.",
+  "id": "train-checkpoint-lane-identity",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "operator 2026-11-25 asked to enable the merge train; console map of docs/architecture/integration-driver-enforce.md parts 0-8 against code on 2026-11-25 (parts 0, 3, 6 built)",
+  "summary": "Card finding 5 (section 9): a resumed lane checkpoint reads as a non-lane and lands on main at enforce. No checkpoint or resume code carries the lane identity today.",
+  "title": "evolve loop --resume of a lane checkpoint keeps its lane identity, so it never lands on main at enforce",
+  "weight": 0.75
+}

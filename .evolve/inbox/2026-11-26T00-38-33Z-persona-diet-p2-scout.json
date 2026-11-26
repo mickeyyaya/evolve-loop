@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "go test -count=1 ./internal/prompts/... ./internal/explanationdocs/... ./internal/router/... ./internal/phasecoherence/... passes from go/, plus the acs packages that read scout persona text (grep -rl agents/evolve-scout go/acs).",
+    "The plan records the before reading of ship rate, retries, contract blocks and tokens, and the loud-capital and line counts of the persona before and after.",
+    "The scout persona keeps every contract field that the scout report parser reads."
+  ],
+  "created_at": "2026-11-26T00:45:00Z",
+  "files": [
+    "agents/evolve-scout.md",
+    "agents/evolve-scout-reference.md",
+    "agents/evolve-scout-scan.md",
+    "docs/plans/persona-diet-2026-11.md"
+  ],
+  "fix": "Change the three scout persona files in one change by the rules of the convention (plan decisions D3, D4, D6). Keep the header lines that go/internal/router/header_persona_pin_test.go pins. Change a pin test only in the same change as the text it pins, with the reason in the commit. Record the before reading (10 cycles before, from the ledger) in the plan.",
+  "id": "persona-diet-p2-scout",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "source": "docs/plans/persona-diet-2026-11.md (landed with PR #1799); filed by the console at the boundary 189 on 2026-11-26 as the plan section 6 and 7 say",
+  "summary": "Step P2 of the persona diet: rewrite evolve-scout.md, evolve-scout-reference.md and evolve-scout-scan.md (rank 1, 200 launches) to the persona standard of docs/conventions, with the before and after reading of ADR-0133.",
+  "title": "The scout persona follows the persona standard (persona diet step P2)",
+  "weight": 0.6
+}

@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "evolve wave latency --check reports the newest wave ok or left out",
+    "The cause has a regression test that fails before the fix and passes after it"
+  ],
+  "created_at": "2026-11-25T02:08:45Z",
+  "files": [
+    "go/internal/lanetime/check.go",
+    "go/cmd/evolve/cmd_wave_latency_check.go"
+  ],
+  "fix": "Run evolve wave latency --wave 187, find where the live lanes or the host gate time went, and fix the cause at its source.",
+  "id": "latency-wave-breach-from-wave-163",
+  "kind": "fix",
+  "origin": "cycle",
+  "priority": "high",
+  "priority_class": "performance",
+  "source": "wave-latency-check",
+  "summary": "evolve wave latency --check found waves 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 181, 183, 184, 186, 187 in breach in a row: live lanes 20.0% of the target, below the floor of 80.0%; host gate share 41.5% (lock wait 0.0%), above the ceiling of 25.0%. A wave with a quota pause, a loop stop_reason or an operator brake does not count. The bounds are wave_latency.min_live_share and wave_latency.max_gate_share in policy.json.",
+  "title": "Wave latency budget exceeded in waves 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 181, 183, 184, 186, 187",
+  "weight": 0.7
+}

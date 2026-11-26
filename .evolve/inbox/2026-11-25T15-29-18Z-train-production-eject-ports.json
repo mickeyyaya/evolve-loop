@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "Red first: with production ports, Missing() no longer names Requeue or Briefs.",
+    "Journey: a conflicting member is ejected, its item leaves delivered for the queue with the brief path, and the next lane prompt shows the brief.",
+    "Docs: card section 2 and 4 state the kept ports in STE; 100% coverage on each changed function; zero code comments."
+  ],
+  "created_at": "2026-11-25T15:40:00Z",
+  "deps": [
+    "train-delivered-inbox-state"
+  ],
+  "files": [
+    "go/internal/integration/enforce_actor.go",
+    "go/cmd/evolve/cmd_loop_driver.go",
+    "go/internal/inboxbatch",
+    "go/internal/inboxmover",
+    "docs/architecture/integration-driver-enforce.md"
+  ],
+  "fix": "Keep the Requeuer and BriefStore ports (record the decision in card section 2). BriefStore writes the brief through Ejection.WriteBrief. Requeuer moves the delivered item back to the queue through inboxmover with a brief path field (card F3): inboxbatch.Item gains the field and inboxBatchesSection renders it, so the next lane reads it. Each ejection adds to the failure count, so the ADR-0126 convergence count bounds the retries.",
+  "id": "train-production-eject-ports",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "operator 2026-11-25 asked to enable the merge train; console map of docs/architecture/integration-driver-enforce.md parts 0-8 against code on 2026-11-25 (parts 0, 3, 6 built)",
+  "summary": "EnforceActor.Missing() (go/internal/integration/enforce_actor.go:144) names Requeue and Briefs because productionEnforceActor (go/cmd/evolve/cmd_loop_driver.go:133) sets neither. The card section 2 says Merger.Eject replaced these ports, but slice 1 code and the plan delivery status of 2026-11-21 keep them; the default Eject calls ejectMember, which uses both.",
+  "title": "The enforce actor gets production Requeue and Briefs ports, so an ejected lane returns to the queue with its brief",
+  "weight": 0.9
+}

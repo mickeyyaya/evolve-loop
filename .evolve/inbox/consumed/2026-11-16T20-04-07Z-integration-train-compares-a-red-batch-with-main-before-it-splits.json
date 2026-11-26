@@ -4,6 +4,12 @@
     "a red batch whose only failed tests also fail on main at the base is held, not split",
     "each bisect step prints its members, its run and its verdict"
   ],
+  "consumed": {
+    "at": "2026-11-25T15:30:33Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "built on main per docs/plans/wave-integration-2026-10.md delivery status (2026-11-21); console verified the named code exists on origin/main d6f3bbeb3 at the wave-189 boundary"
+  },
   "created_at": "2026-11-16T20:04:07Z",
   "files": [
     "go/internal/integration/batchpr.go",

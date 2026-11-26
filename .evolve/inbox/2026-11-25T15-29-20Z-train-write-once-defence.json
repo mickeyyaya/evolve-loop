@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "Red first: each R-a to R-c row of card section 10 is a test; a ship retry after a delivery is not a failure.",
+    "Journey rows 10a-10e of card section 11 pass.",
+    "100% coverage on each changed function; zero code comments."
+  ],
+  "created_at": "2026-11-25T15:40:00Z",
+  "files": [
+    "go/internal/integration",
+    "go/internal/phases/ship/deliverable.go"
+  ],
+  "fix": "Add the enforce-stage admits defence in driver.go, the guard table of card section 10 (R-a to R-c), and ship handling of ErrRecordExists so a ship retry after delivery reads as delivered, not as a failure.",
+  "id": "train-write-once-defence",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "operator 2026-11-25 asked to enable the merge train; console map of docs/architecture/integration-driver-enforce.md parts 0-8 against code on 2026-11-25 (parts 0, 3, 6 built)",
+  "summary": "WriteOnce and ErrRecordExists exist (go/internal/integration/deliverable.go:203-250) and ship picks WriteOnce at enforce (go/internal/phases/ship/deliverable.go:53,87-90), but the enforce admits defence, the guard table of card section 10 and a ship handler for ErrRecordExists are missing (card part 7).",
+  "title": "Write-once delivery at enforce gets its admits defence, guard table and ErrRecordExists handling in ship",
+  "weight": 0.8
+}
