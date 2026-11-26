@@ -1,6 +1,7 @@
 package ship
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,7 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxstamps"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phases/ship/landing"
 	"github.com/mickeyyaya/evolve-loop/go/internal/shipjournal"
@@ -81,13 +84,13 @@ func runPushOnly(ctx context.Context, opts *Options, res *RunResult) error {
 	}
 	var unprovenanced []string
 	for _, sha := range ahead {
-		if journalHasSHA(opts.ProjectRoot, sha) || isSyncMainMerge(ctx, opts, sha, branch) {
+		if journalHasSHA(opts.ProjectRoot, sha) || isSyncMainMerge(ctx, opts, sha, branch) || isBookkeepingCommit(ctx, opts, sha) {
 			continue
 		}
 		unprovenanced = append(unprovenanced, sha[:min(12, len(sha))])
 	}
 	if len(unprovenanced) > 0 {
-		return fmt.Errorf("ship --push-only: REFUSED — %d ahead commit(s) lack ship provenance (not in %s, not a sync-main reconcile merge): [%s]. Push-only is a recovery for attested strands, never a guard bypass; land un-provenanced work through a normal `evolve ship`",
+		return fmt.Errorf("ship --push-only: REFUSED — %d ahead commit(s) lack ship provenance (not in %s, not a sync-main reconcile merge, not a bookkeeping commit of a dossier closeout or an inbox stamp): [%s]. Push-only is a recovery for attested strands, never a guard bypass; land un-provenanced work through a normal `evolve ship`",
 			len(unprovenanced), shipjournal.FileName, strings.Join(unprovenanced, ", "))
 	}
 	if err := pushWithRepair(ctx, opts, res, landing.PushRequest{Branch: branch, Site: landing.SitePushOnly}); err != nil {
@@ -149,4 +152,35 @@ func isSyncMainMerge(ctx context.Context, opts *Options, sha, branch string) boo
 		}
 	}
 	return false
+}
+
+func isBookkeepingCommit(ctx context.Context, opts *Options, sha string) bool {
+	parents, err := captureGitOutput(ctx, opts, "rev-list", "--parents", "-n", "1", sha)
+	if err != nil || len(strings.Fields(parents)) != 2 {
+		return false
+	}
+	subject, err := captureGitOutput(ctx, opts, "log", "-1", "--format=%s", sha)
+	if err != nil {
+		return false
+	}
+	changed, err := captureGitOutput(ctx, opts, "diff-tree", "--no-commit-id", "--name-only", "-r", "--no-renames", sha)
+	if err != nil {
+		return false
+	}
+	subject, files := strings.TrimSpace(subject), strings.Fields(changed)
+	if dossier.IsCloseoutCommit(subject, files) {
+		return true
+	}
+	stamp, err := inboxstamps.IsStampCommit(ctx, stampGit{opts: opts}, sha, subject)
+	return err == nil && stamp
+}
+
+type stampGit struct {
+	opts *Options
+}
+
+func (g stampGit) Capture(ctx context.Context, args ...string) (string, string, int, error) {
+	var stdout, stderr bytes.Buffer
+	exit, err := g.opts.run(ctx, "git", args, &stdout, &stderr)
+	return stdout.String(), stderr.String(), exit, err
 }
