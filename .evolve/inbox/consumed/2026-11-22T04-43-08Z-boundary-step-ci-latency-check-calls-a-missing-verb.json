@@ -4,6 +4,12 @@
     "A test fails when any boundary step names a verb or sub-verb that the binary does not register; the test is red before the fix",
     "`evolve boundary run --dry-run` prints no step that exits with a usage error"
   ],
+  "consumed": {
+    "at": "2026-11-26T11:55:38Z",
+    "via": "inbox curate",
+    "cycle": "console",
+    "resolution": "inbox curator: a lane's triage claimed the item as landed, and the commit is on main and changes a declared path (landed_sha 71a88079e)"
+  },
   "created_at": "2026-11-22T04:43:08Z",
   "files": [
     "go/cmd/evolve/cmd_boundary.go",

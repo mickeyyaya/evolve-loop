@@ -4,6 +4,12 @@
     "At enforce, a delivered lane record reaches main through the actor: a test drives the production driver from a delivered record to a merged member (red first, per plan section 11).",
     "The I11 rows hold through the driver: the plane main equals origin/main after a merge, the window takes its conflict feed from SHIP_INTEGRATION_EJECTED cause=conflict, and the ship counters count merged deliverables."
   ],
+  "consumed": {
+    "at": "2026-11-26T11:55:38Z",
+    "via": "inbox curate",
+    "cycle": "console",
+    "resolution": "inbox curator: a lane's triage claimed the item as landed, and the commit is on main and changes a declared path (landed_sha fe5038000)"
+  },
   "created_at": "2026-11-23T16:19:40Z",
   "files": [
     "go/cmd/evolve/cmd_loop_driver.go",
