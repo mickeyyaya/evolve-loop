@@ -90,6 +90,8 @@ Queue more work while the loop runs:
 evolve inbox add --file fix-flaky-auth-test.json
 ```
 
+**Upgrading from v22 or earlier.** No code reads a control value from the environment now. A set name such as `EVOLVE_SANDBOX=off` has no effect, and the cycle start can print a `[policy] WARN` that names the replacement. An unknown key in `.evolve/policy.json` now fails the load. The [CHANGELOG](CHANGELOG.md) entries X18a, X18c and X18d give the replacement of each name.
+
 ## How it works
 
 ```mermaid

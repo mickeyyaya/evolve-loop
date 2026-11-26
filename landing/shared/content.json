@@ -104,7 +104,7 @@
   "pipelineDemo": {
     "kicker": "AI-composed pipeline",
     "heading": "The model composes its own pipeline.",
-    "sub": "Give it a goal. The advisor runs the mandated phases, picks from the common phases and writes new phases when the goal needs them. Then one routing table gives each phase that uses a model its CLI and model. agy runs first, on Gemini 3.8 Flash High. Deep seats on an agy chain run Gemini 4 Argon first, and they share by budget with Claude. Top seats run Claude Opus through agy first and through Claude Code second. Nothing here is pre-scripted. The rows below show typical choices.",
+    "sub": "Give it a goal. The advisor runs the mandated phases, picks from the common phases and writes new phases when the goal needs them. Then one routing table gives each phase that uses a model its CLI and model. Most phases start on Claude Code, and the builder runs on agy first, on Gemini 4 Hydrogen High. Claude takes half of the deep seats by budget, and agy (Gemini 4 Neon High) takes the rest. Top seats run Claude Opus through agy first and through Claude Code second. Nothing here is pre-scripted. The rows below show typical choices.",
     "floor": [
       "Build",
       "Audit",
@@ -115,7 +115,7 @@
       "Claude",
       "host"
     ],
-    "routeNote": "One routing table gives each phase that uses a model its CLI and model. Below the deep tier, agy runs first, on Gemini 3.8 Flash High. The auditor, the tdd engineer and the code reviewer run on Claude Code only. Thus by default, the build and the review use different model families. Ship is host code, and it uses no model.",
+    "routeNote": "One routing table gives each phase that uses a model its CLI and model. The builder runs on agy first, on Gemini 4 Hydrogen High. Most other phases start on Claude Code. The auditor, the tdd engineer and the code reviewer run on Claude Code only. Thus by default, the build and the review use different model families. Ship is host code, and it uses no model.",
     "cases": [
       {
         "goal": "Build a `<canvas>` Snake game web page",
@@ -131,15 +131,15 @@
           {
             "phase": "Scout",
             "use": true,
-            "cli": "Gemini",
-            "model": "Gemini-3.8-Flash-High",
+            "cli": "Claude",
+            "model": "Sonnet",
             "why": "no game code yet: a fast survey of the stack picks canvas"
           },
           {
             "phase": "Triage",
             "use": true,
-            "cli": "Gemini",
-            "model": "Gemini-3.8-Flash-High",
+            "cli": "Claude",
+            "model": "Sonnet",
             "why": "split board · snake · food · loop · score"
           },
           {
@@ -160,7 +160,7 @@
             "phase": "Build",
             "use": true,
             "cli": "Gemini",
-            "model": "Gemini-3.8-Flash-High",
+            "model": "Gemini-4-Hydrogen-High",
             "why": "fundamental: make the loop, the input and the render"
           },
           {
@@ -205,8 +205,8 @@
           {
             "phase": "Learn",
             "use": true,
-            "cli": "Gemini",
-            "model": "Gemini-3.8-Flash-High",
+            "cli": "Claude",
+            "model": "Sonnet",
             "why": "PASS → keep the canvas game-loop pattern as a memo"
           }
         ]
@@ -223,8 +223,8 @@
           {
             "phase": "Scout",
             "use": true,
-            "cli": "Gemini",
-            "model": "Gemini-3.8-Flash-High",
+            "cli": "Claude",
+            "model": "Sonnet",
             "why": "find where the code computes the page boundary"
           },
           {
@@ -256,7 +256,7 @@
             "phase": "Build",
             "use": true,
             "cli": "Gemini",
-            "model": "Gemini-3.8-Flash-High",
+            "model": "Gemini-4-Hydrogen-High",
             "why": "fundamental: fix the index math → GREEN"
           },
           {
@@ -293,8 +293,8 @@
           {
             "phase": "Learn",
             "use": true,
-            "cli": "Gemini",
-            "model": "Gemini-3.8-Flash-High",
+            "cli": "Claude",
+            "model": "Sonnet",
             "why": "PASS → keep the boundary-test pattern as a memo"
           }
         ]
@@ -313,15 +313,15 @@
           {
             "phase": "Scout",
             "use": true,
-            "cli": "Gemini",
-            "model": "Gemini-3.8-Flash-High",
+            "cli": "Claude",
+            "model": "Sonnet",
             "why": "survey the session and DB layers; check the Stripe SDK"
           },
           {
             "phase": "Triage",
             "use": true,
-            "cli": "Gemini",
-            "model": "Gemini-3.8-Flash-High",
+            "cli": "Claude",
+            "model": "Sonnet",
             "why": "sequence: auth → checkout → webhooks"
           },
           {
@@ -342,7 +342,7 @@
             "phase": "Build",
             "use": true,
             "cli": "Gemini",
-            "model": "Gemini-3.8-Flash-High",
+            "model": "Gemini-4-Hydrogen-High",
             "why": "fundamental: make auth and checkout → GREEN"
           },
           {
@@ -362,8 +362,8 @@
           {
             "phase": "Security",
             "use": true,
-            "cli": "Gemini",
-            "model": "Gemini-3.8-Flash-High",
+            "cli": "Claude",
+            "model": "Sonnet",
             "why": "scored: password hashes, authz, secrets, webhook signatures"
           },
           {
@@ -389,8 +389,8 @@
           {
             "phase": "Learn",
             "use": true,
-            "cli": "Gemini",
-            "model": "Gemini-3.8-Flash-High",
+            "cli": "Claude",
+            "model": "Sonnet",
             "why": "PASS → keep the auth and webhook pattern as a memo"
           }
         ]
@@ -425,7 +425,7 @@
     {
       "title": "Any model. No lock-in.",
       "claim": "One routing table sends each phase to the right model.",
-      "proof": "One cli_routing table in .evolve/policy.json decides every dispatch, and evolve cli-routing is its only writer. In the table that builds Evolve Loop, agy runs first, on Gemini 3.8 Flash High. Deep seats on an agy chain run Gemini 4 Argon first. Top seats run Claude Opus through agy, then through Claude Code. The auditor, the tdd engineer and the code reviewer run on Claude Code only, and that floor is data in the same table. A quota wall benches only the model group that hit it. Codex and local models through Ollama are also routable."
+      "proof": "One cli_routing table in .evolve/policy.json decides every dispatch, and evolve cli-routing is its only writer. In the table that builds Evolve Loop, most phases start on Claude Code, and the builder runs on agy first, on Gemini 4 Hydrogen High. Claude takes half of the deep seats by budget, and agy (Gemini 4 Neon High) takes the rest. Top seats run Claude Opus through agy, then through Claude Code. The auditor, the tdd engineer and the code reviewer run on Claude Code only, and that floor is data in the same table. A quota wall benches only the model group that hit it. Codex and local models through Ollama are also routable."
     },
     {
       "title": "Standards, enforced",

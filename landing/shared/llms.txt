@@ -59,9 +59,11 @@ One `cli_routing` table in `.evolve/policy.json` decides every dispatch.
 
 In the table that builds Evolve Loop itself:
 
-- agy runs first, on Gemini 3.8 Flash High.
-- Deep seats on an agy chain run Gemini 4 Argon first, and share by budget with
-  Claude.
+- The default chain starts with Claude Code (Sonnet), then agy.
+- The builder runs on agy first, on Gemini 4 Hydrogen High. Thus the build and
+  the review use different model families.
+- Claude takes half of the deep seats by budget. agy (Gemini 4 Neon High) takes the
+  rest.
 - Top seats run Claude Opus through agy (`agy-claude`), then Claude Code.
 - The integrity floor agents (auditor, adversarial review, tdd and the code
   reviewer) run on Claude Code only.
@@ -104,6 +106,15 @@ then the scope, and its design allows no fourth round.
 `evolve wave next` runs the next wave, and `evolve wave status` reads it.
 `evolve agent run <name>` runs one read-only phase agent with no cycle.
 `evolve integration batch <pr>...` composes reviewed PRs and lands them together.
+`evolve logs digest|events|failures|show --cycle N` reads the logs of a cycle
+within a line budget. `evolve wave latency --check` judges each recorded wave.
+`evolve cloud list` prints the Claude Code cloud sessions that a `claude-cloud`
+seat started.
+
+Upgrading from v22 or earlier: no code reads a control value from the
+environment now. A set name such as `EVOLVE_SANDBOX=off` has no effect. An
+unknown key in `.evolve/policy.json` fails the load. CHANGELOG.md entries X18a,
+X18c and X18d give the replacement of each name.
 
 ## Standards
 
