@@ -8,7 +8,13 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover/lifecycle"
 )
 
+var ErrDelivered = errors.New("inboxmover: item is delivered and waits for the integration — refusing claim")
+
 var ErrWaitingOnDependency = errors.New("inboxmover: item waits on a dependency that has not landed — refusing claim")
+
+func IsClaimRefusal(err error) bool {
+	return errors.Is(err, ErrConsoleRouted) || errors.Is(err, ErrWaitingOnDependency) || errors.Is(err, ErrDelivered)
+}
 
 func ClaimPending(opts Options, cycle int, ids []string) error {
 	opts, err := opts.resolved()
@@ -28,7 +34,7 @@ func ClaimPending(opts Options, cycle int, ids []string) error {
 		case loc.Cycle != 0:
 			continue
 		}
-		if _, err := ClaimDispatchable(opts, id, cycleStr); err != nil && !errors.Is(err, ErrConsoleRouted) && !errors.Is(err, ErrNotFound) && !errors.Is(err, ErrWaitingOnDependency) {
+		if _, err := ClaimDispatchable(opts, id, cycleStr); err != nil && !IsClaimRefusal(err) && !errors.Is(err, ErrNotFound) {
 			errs = append(errs, fmt.Errorf("claim %q: %w", id, err))
 		}
 	}
@@ -40,7 +46,11 @@ func ClaimDispatchable(opts Options, taskID, cycle string) (ClaimResult, error) 
 	if err != nil {
 		return ClaimResult{}, err
 	}
-	if ds := ResolveDispatchState(opts, taskID); ds.State == StatePending {
+	ds := ResolveDispatchState(opts, taskID)
+	if ds.State == StateDelivered {
+		return ClaimResult{}, fmt.Errorf("%w: %s", ErrDelivered, taskID)
+	}
+	if ds.State == StatePending {
 		if d := PendingDispatchability(opts, ds.Deps); !d.Dispatchable {
 			fmt.Fprintf(opts.Stderr, lifecycle.LegacyPrefix+"refusing claim of %q for cycle %s: %s — it stays pending until that dependency lands\n", taskID, cycle, d.Reason)
 			return ClaimResult{}, fmt.Errorf("%w: %s: %s", ErrWaitingOnDependency, taskID, d.Reason)

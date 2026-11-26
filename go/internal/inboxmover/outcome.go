@@ -15,6 +15,7 @@ import (
 type CycleOutcome struct {
 	Cycle        int
 	Passed       bool
+	Delivered    bool
 	CommittedIDs []string
 	CommitSHA    string
 	Reason       string
@@ -46,6 +47,9 @@ func ApplyCycleOutcome(opts Options, oc CycleOutcome) (OutcomeResult, error) {
 	res := OutcomeResult{}
 	committed := dedupeIDs(oc.CommittedIDs)
 
+	if oc.Passed && oc.Delivered {
+		return applyDeliveredOutcome(opts, oc, committed)
+	}
 	if oc.Passed {
 		return applyPassedOutcome(opts, oc, committed)
 	}
@@ -71,11 +75,8 @@ func applyPassedOutcome(opts Options, oc CycleOutcome, committed []string) (Outc
 	var errs []error
 	var notMoved []string
 	for _, id := range committed {
-		if oc.Cycle > 0 {
-			if loc, lerr := lifecycle.Locate(opts.InboxDir, id); lerr == nil && loc.Cycle != 0 && loc.Cycle != oc.Cycle {
-				opts.logf("WARN: ", "apply-cycle-outcome: refused %q for cycle %d (held by cycle %d)", id, oc.Cycle, loc.Cycle)
-				continue
-			}
+		if heldByOtherCycle(opts, oc.Cycle, id) {
+			continue
 		}
 		pr, err := Promote(opts, id, "processed", PromoteOpts{Cycle: cycleStr, CommitSHA: oc.CommitSHA})
 		if err != nil {
@@ -97,6 +98,63 @@ func applyPassedOutcome(opts Options, oc CycleOutcome, committed []string) (Outc
 	res.Released = rr.Paths
 	if err != nil {
 		errs = append(errs, fmt.Errorf("residual drain: %w", err))
+	}
+	if len(errs) > 0 {
+		return res, fmt.Errorf("apply-cycle-outcome: %w", errors.Join(errs...))
+	}
+	return res, nil
+}
+
+func heldByOtherCycle(opts Options, cycle int, id string) bool {
+	if cycle <= 0 {
+		return false
+	}
+	loc, err := lifecycle.Locate(opts.InboxDir, id)
+	if err != nil || loc.Cycle == 0 || loc.Cycle == cycle {
+		return false
+	}
+	opts.logf("WARN: ", "apply-cycle-outcome: refused %q for cycle %d (held by cycle %d)", id, cycle, loc.Cycle)
+	return true
+}
+
+func stillClaimedBy(opts Options, cycle int, id string) bool {
+	loc, err := lifecycle.Locate(opts.InboxDir, id)
+	return err == nil && loc.Cycle == cycle
+}
+
+func applyDeliveredOutcome(opts Options, oc CycleOutcome, committed []string) (OutcomeResult, error) {
+	res := OutcomeResult{}
+	var errs []error
+	var kept []string
+	hold := func(id string, cause error) {
+		held, err := holdFailedDelivery(opts, oc.Cycle, id, cause)
+		errs = append(errs, err)
+		if !held {
+			kept = append(kept, id)
+		}
+	}
+	for _, id := range committed {
+		if heldByOtherCycle(opts, oc.Cycle, id) {
+			continue
+		}
+		pr, err := Promote(opts, id, StateDelivered, PromoteOpts{Cycle: strconv.Itoa(oc.Cycle), CommitSHA: oc.CommitSHA})
+		switch {
+		case err != nil:
+			hold(id, fmt.Errorf("%w %q: %w", errDeliveryFailed, id, err))
+		case pr.NoOp && stillClaimedBy(opts, oc.Cycle, id):
+			hold(id, fmt.Errorf("%w %q: the move to delivered/ did not happen", errDeliveryFailed, id))
+		case !pr.NoOp:
+			res.Promoted = append(res.Promoted, id)
+		}
+	}
+	if len(kept) > 0 {
+		errs = append(errs, fmt.Errorf("%w: %v stay in processing/cycle-%d/ after a failed delivery and a failed hold", errDeliveryKept, kept, oc.Cycle))
+		return res, fmt.Errorf("apply-cycle-outcome: %w", errors.Join(errs...))
+	}
+	rr, err := releaseCycleProcessing(opts, oc.Cycle, oc.Reason, nil)
+	res.Released = rr.Paths
+	if err != nil {
+		errs = append(errs, fmt.Errorf("%w: %w", errResidualDrain, err))
 	}
 	if len(errs) > 0 {
 		return res, fmt.Errorf("apply-cycle-outcome: %w", errors.Join(errs...))

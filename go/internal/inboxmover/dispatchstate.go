@@ -15,6 +15,7 @@ const (
 	StateRejected   = "rejected"
 	StateRetry      = "retry"
 	StateQuarantine = "quarantine"
+	StateDelivered  = "delivered"
 	StateUnknown    = "unknown"
 )
 
@@ -31,6 +32,9 @@ func ResolveDispatchState(opts Options, taskID string) DispatchState {
 	opts.resolveOpts()
 	if claimDir, claimPath, held := claimHolding(opts.InboxDir, taskID); held {
 		return DispatchState{State: StateProcessing, Detail: claimDir, Path: claimPath}
+	}
+	if path, held := deliveredAt(opts.InboxDir, taskID); held {
+		return DispatchState{State: StateDelivered, Path: path}
 	}
 	if path, err := FindFileByTaskID(opts.InboxDir, taskID); err == nil {
 		return DispatchState{State: StatePending, Deps: readTaskDeps(path), Path: path}

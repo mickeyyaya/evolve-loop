@@ -236,8 +236,8 @@ func TestDeliver_ShadowStillLandsWhenTheRecordCannotBeWritten(t *testing.T) {
 	shiptest.MustWrite(t, filepath.Join(l.Repo, ".evolve", "waves"), "a file where the directory belongs\n")
 	rr := &recordingRunner{}
 	res, err := Run(context.Background(), laneOptions(l, rr.run(), fleetIntegration(policy.FleetIntegrationShadow)))
-	if err != nil || res.ExitCode != ExitOK || rr.pushs == 0 {
-		t.Fatalf("shadow must land: exit=%v err=%v pushes=%d", res.ExitCode, err, rr.pushs)
+	if err != nil || res.ExitCode != ExitOK || rr.pushs == 0 || res.Delivered {
+		t.Fatalf("shadow must land and must not report a delivery: exit=%v err=%v pushes=%d delivered=%v", res.ExitCode, err, rr.pushs, res.Delivered)
 	}
 	if !shiptest.ContainsLog(res.Logs, "deliverable record not written") {
 		t.Errorf("no WARN for the unwritten record: %v", res.Logs)
@@ -262,6 +262,9 @@ func TestDeliver_EnforceStopsBeforeMainAfterWritingTheRecord(t *testing.T) {
 	}
 	if _, err := os.Stat(l.IntentFile()); !os.IsNotExist(err) {
 		t.Errorf("a landing intent exists at enforce: %v", err)
+	}
+	if !res.Delivered {
+		t.Error("an enforce delivery must set RunResult.Delivered")
 	}
 	if !shiptest.ContainsLog(res.Logs, "DELIVERED") {
 		t.Errorf("no DELIVERED log: %v", res.Logs)

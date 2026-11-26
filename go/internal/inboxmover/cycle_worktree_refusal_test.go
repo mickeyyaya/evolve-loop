@@ -43,9 +43,13 @@ func facadeCalls(opts Options) map[string]func() error {
 		"RecoverOrphans":         func() error { _, err := RecoverOrphans(opts); return err },
 		"ReleaseCycleProcessing": func() error { _, err := ReleaseCycleProcessing(opts, 9); return err },
 		"ReleaseClaim":           func() error { _, err := ReleaseClaim(opts, "task-2", "stale"); return err },
-		"AbsorbRootCopies":       func() error { _, err := AbsorbRootCopies(opts); return err },
-		"RouteLane":              func() error { _, err := RouteLane(opts, "task-1", "r"); return err },
-		"RouteConsole":           func() error { _, err := RouteConsole(opts, "task-1", "r", 9); return err },
+		"ReportOrphanDelivered": func() error {
+			_, err := ReportOrphanDelivered(opts, func(string) bool { return false }, map[string]bool{})
+			return err
+		},
+		"AbsorbRootCopies": func() error { _, err := AbsorbRootCopies(opts); return err },
+		"RouteLane":        func() error { _, err := RouteLane(opts, "task-1", "r"); return err },
+		"RouteConsole":     func() error { _, err := RouteConsole(opts, "task-1", "r", 9); return err },
 		"RouteLaneRequest": func() error {
 			_, err := RouteLaneRequest(opts, RouteRequest{TaskID: "task-1", Reason: "r"})
 			return err

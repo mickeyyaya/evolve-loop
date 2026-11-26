@@ -137,6 +137,7 @@ type Now struct {
 type RunResult struct {
 	ExitCode   ExitCode
 	CommitSHA  string
+	Delivered  bool
 	ClassUsed  Class
 	Provenance string
 	Logs       []string

@@ -133,11 +133,8 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 	cycleDir := filepath.Join(opts.ProjectRoot, ".evolve", "runs", fmt.Sprintf("cycle-%d", cid))
 	body, logLine := triageDecisionBytes(cycleDir, cid)
 	res.Logs = append(res.Logs, logLine)
-	unlandedShip := false
-	commitShort := ""
-	if len(res.CommitSHA) >= 8 {
-		commitShort = res.CommitSHA[:8]
-	}
+	inbox := cycleInbox{opts: opts, mv: mvOpts, res: res, dir: cycleDir, cid: cid, body: body}
+	releaseReason := ""
 	var committedIDs []string
 	var laneFallbackIDs []string
 	if body == nil {
@@ -150,28 +147,29 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: build-report Closes-Inbox marker for cycle %d: %v", cid, markerIDs))
 	}
 	if body != nil || len(laneFallbackIDs) > 0 || len(markerIDs) > 0 {
-		if res.CommitSHA != "" && !isLanded(ctx, opts, res.CommitSHA) {
-			unlandedShip = true
-			res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: promotion skipped: unlanded — commit %s is not an ancestor of HEAD or origin; inbox items for cycle %d left in processing/ for re-triage", commitShort, cid))
-		} else {
-			res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: promoted: landed — commit %s verified in durable history for cycle %d", commitShort, cid))
-			committedIDs = PromoteLanded(opts, mvOpts, res, cycleDir, cid, commitShort, body)
-		}
+		committedIDs, releaseReason = inbox.settle(ctx)
 	}
 
-	releaseReason := ""
-	if unlandedShip {
-		releaseReason = "cycle-release-unlanded-ship-retry"
-	}
-	if or, outcomeErr := inboxmover.ApplyCycleOutcome(mvOpts, inboxmover.CycleOutcome{
+	inbox.applyOutcome(committedIDs, releaseReason)
+	return nil
+}
+
+func (c cycleInbox) applyOutcome(committedIDs []string, releaseReason string) {
+	res, cid := c.res, c.cid
+	if or, outcomeErr := inboxmover.ApplyCycleOutcome(c.mv, inboxmover.CycleOutcome{
 		Cycle:        cid,
 		Passed:       true,
+		Delivered:    res.Delivered,
 		CommittedIDs: committedIDs,
-		CommitSHA:    commitShort,
+		CommitSHA:    shortSHA(res.CommitSHA),
 		Reason:       releaseReason,
 	}); outcomeErr != nil {
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: inbox outcome apply for cycle %d: %v", cid, outcomeErr))
-		res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: inbox lifecycle drain INCOMPLETE for cycle %d — items may remain in processing/ for re-triage", cid))
+		if res.Delivered {
+			res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: inbox delivery INCOMPLETE for cycle %d — an item whose move to delivered/ failed ends in quarantine/ or stays in processing/ (see INBOX_DELIVERY_FAILED end_state) and no lane draws it; an operator releases it", cid))
+		} else {
+			res.Logs = append(res.Logs, fmt.Sprintf("[ship] WARN: inbox lifecycle drain INCOMPLETE for cycle %d — items may remain in processing/ for re-triage", cid))
+		}
 	} else {
 		if len(or.Promoted) > 0 {
 			res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: promoted %d committed inbox item(s) for cycle %d: %v", len(or.Promoted), cid, or.Promoted))
@@ -181,13 +179,55 @@ func promoteInbox(ctx context.Context, opts *Options, res *RunResult) error {
 		}
 		res.Logs = append(res.Logs, fmt.Sprintf("[ship] OK: inbox lifecycle drain complete for cycle %d", cid))
 	}
-	return nil
+}
+
+func shortSHA(sha string) string {
+	if len(sha) >= 8 {
+		return sha[:8]
+	}
+	return ""
+}
+
+type cycleInbox struct {
+	opts *Options
+	mv   inboxmover.Options
+	res  *RunResult
+	dir  string
+	cid  int
+	body []byte
+}
+
+func (c cycleInbox) settle(ctx context.Context) ([]string, string) {
+	commitShort := shortSHA(c.res.CommitSHA)
+	switch {
+	case c.res.Delivered:
+		c.res.Logs = append(c.res.Logs, fmt.Sprintf("[ship] OK: delivered: commit %s waits for the integration; inbox items for cycle %d move to delivered/", commitShort, c.cid))
+		return c.scopedCommittedIDs(), ""
+	case c.res.CommitSHA != "" && !isLanded(ctx, c.opts, c.res.CommitSHA):
+		c.res.Logs = append(c.res.Logs, fmt.Sprintf("[ship] WARN: promotion skipped: unlanded — commit %s is not an ancestor of HEAD or origin; inbox items for cycle %d left in processing/ for re-triage", commitShort, c.cid))
+		return nil, "cycle-release-unlanded-ship-retry"
+	}
+	c.res.Logs = append(c.res.Logs, fmt.Sprintf("[ship] OK: promoted: landed — commit %s verified in durable history for cycle %d", commitShort, c.cid))
+	return PromoteLanded(c.opts, c.mv, c.res, c.dir, c.cid, commitShort, c.body), ""
+}
+
+func (c cycleInbox) scopedCommittedIDs() []string {
+	committedIDs, refusals := c.committedInScope()
+	for _, w := range refusals {
+		c.res.Logs = append(c.res.Logs, "[ship] WARN: "+w)
+	}
+	return committedIDs
+}
+
+func (c cycleInbox) committedInScope() ([]string, []string) {
+	pinIDs := cycleoutcome.LaneScopeIDs(c.dir)
+	rawIDs := withoutHeldCIFixItem(c.opts, c.opts.Stderr, committedInboxIDs(c.dir, c.body, workspaceACSVerdict(c.dir) == "PASS"))
+	return inboxmover.FilterPromotionScope(c.mv, c.cid, pinIDs, rawIDs)
 }
 
 func PromoteLanded(opts *Options, mvOpts inboxmover.Options, res *RunResult, cycleDir string, cid int, commitShort string, body []byte) []string {
 	pinIDs := cycleoutcome.LaneScopeIDs(cycleDir)
-	rawIDs := withoutHeldCIFixItem(opts, opts.Stderr, committedInboxIDs(cycleDir, body, workspaceACSVerdict(cycleDir) == "PASS"))
-	committedIDs, committedRefusals := inboxmover.FilterPromotionScope(mvOpts, cid, pinIDs, rawIDs)
+	committedIDs, committedRefusals := cycleInbox{opts: opts, mv: mvOpts, res: res, dir: cycleDir, cid: cid, body: body}.committedInScope()
 	supersededIDs, supersededRefusals := inboxmover.FilterPromotionScope(mvOpts, cid, pinIDs, inboxmover.SupersededInboxIDs(body))
 	for _, w := range append(committedRefusals, supersededRefusals...) {
 		res.Logs = append(res.Logs, "[ship] WARN: "+w)

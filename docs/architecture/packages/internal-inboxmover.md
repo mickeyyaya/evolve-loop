@@ -4,7 +4,7 @@
 
 ## Purpose
 
-`internal/inboxmover` hosts the inbox lifecycle: `inbox/` → `processing/cycle-N/` → `processed/`, `rejected/`, `retry/`, `quarantine/`, or back to the root. The movers themselves live in the `lifecycle` leaf. This package owns `Options` and its defaults, builds the leaf's `Mover`, and applies each cycle's verdict (`ApplyCycleOutcome`). It also holds the readers that sit beside the lifecycle: the triage-decision readers, the `Closes-Inbox:` parser, dispatch-state resolution and the continuation-binding trio.
+`internal/inboxmover` hosts the inbox lifecycle: `inbox/` → `processing/cycle-N/` → `processed/`, `rejected/`, `retry/`, `quarantine/`, `delivered/`, or back to the root. The movers themselves live in the `lifecycle` leaf. This package owns `Options` and its defaults, builds the leaf's `Mover`, and applies each cycle's verdict (`ApplyCycleOutcome`). It also holds the readers that sit beside the lifecycle: the triage-decision readers, the `Closes-Inbox:` parser, dispatch-state resolution and the continuation-binding trio.
 
 ## Design
 
@@ -60,6 +60,14 @@
   - A claim in `processing/cycle-N/` means processing. It is read before the root, so a root copy of a held id is never pending (cycle 1838).
   - The inbox root means pending (with its deps and live path). Then each `retirementStates` dir is checked flat and then by `cycle-N`, newest first, because a hit is almost always recent.
   - No evidence means unknown. Unreadable evidence counts as none, so a bad inbox can only fail open at the gate.
+- **The state `delivered`.** At fleet integration stage enforce, a lane ship stops before main and writes a deliverable record. Post-ship then calls `ApplyCycleOutcome` with `Delivered` set, and each committed item moves to `delivered/` and is not released. The item waits there for the integration to end the state. Each reader of the item state treats `delivered` as a held claim:
+  - `ResolveDispatchState` returns `delivered`, and `ResolveDispatchability` returns not dispatchable. `blocksDependents` holds the dependents of the item.
+  - `HeldBy` reports the item as held, so `PlaceOnLaneMenu` gives `MenuWaiting`. `ClaimDispatchable` refuses it with `ErrDelivered`.
+  - `ReleaseStaleClaims` and `ReleaseContinuationBindingFor` skip it. `RetireUnbacked` does not retire it as unbacked.
+  - `ReportOrphanDelivered` reports a `delivered` item that no wave record names once as `INBOX_DELIVERED_ORPHAN`. It never releases the item.
+  - The report is built and no code calls it yet. The `EnforceActor` slice calls it. The caller owns the set of ids that it has already reported. So "once per id" holds for the life of that map. A nil map is refused with `ErrBadArgs`.
+  - When the move of a committed item to `delivered/` fails, `ApplyCycleOutcome` holds the item in `quarantine/` and emits `INBOX_DELIVERY_FAILED` with an `end_state` field. When the hold fails, the item stays in `processing/cycle-N/`, the residual drain is skipped and the error names the item. The residual drain never returns it to the inbox root, so no lane draws it. `IsClaimRefusal` is the one predicate over `ErrConsoleRouted`, `ErrWaitingOnDependency` and `ErrDelivered`, and `ClaimPending` and both claim exit mappers use it.
+  - `TestDeliveredState_EachReaderHandlesIt` lists each reader. `TestDeliveredState_EveryItemStateReaderIsInTheTable` fails when a new reader of the item state is not in the list. The integration slice that ends the state is outside this package.
 - **Dispatchability.** `ResolveDispatchability` is the one rule for if a fleet lane can take an id now. Every planner reader asks it: the loop's carried-id prune, the widen's prune, the backlog and the launch gate. The seed, the widen and the refill read that backlog.
   - A pending id is dispatchable unless a declared dep is still pending, processing or in retry (`deps unmet: needs <dep>`). An id with no lifecycle evidence is dispatchable, because not every planned id is inbox-backed. Every other state is not (`consumed: <state>[ <cycle dir>]`).
   - `PendingDispatchability` is the pending branch alone, for the backlog reader. That reader already knows that a root item is pending, so the branch saves a rescan of the inbox once per item.

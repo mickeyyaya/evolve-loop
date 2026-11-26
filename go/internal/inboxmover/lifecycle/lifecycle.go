@@ -65,6 +65,7 @@ var validStates = map[string]bool{
 	"rejected":   true,
 	"retry":      true,
 	"quarantine": true,
+	"delivered":  true,
 }
 
 type LedgerAppender interface {

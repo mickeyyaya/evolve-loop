@@ -353,11 +353,13 @@ var codeSteps = map[signalcenter.Code][]string{
 	CodeItemRoutedConsole:              {"route"},
 	CodeItemFiledConsole:               {"intake"},
 	CodeRouteNotFound:                  {"locate"},
+	CodeDeliveredOrphan:                {"orphan_delivered"},
+	CodeDeliveryFailed:                 {"deliver"},
 }
 
 func TestMover_Codes_RegisteredUnderInbox_DocsNameTheirSteps_NoLedgerDouble(t *testing.T) {
-	if len(codeSteps) != 16 {
-		t.Fatalf("the unit registers 16 codes, the table names %d", len(codeSteps))
+	if len(codeSteps) != 18 {
+		t.Fatalf("the unit registers 18 codes, the table names %d", len(codeSteps))
 	}
 	docs := map[signalcenter.Code]string{}
 	for _, cd := range signalcenter.RegisteredCodes()[signalcenter.ModuleInbox] {

@@ -153,11 +153,8 @@ func promoteDestPath(inboxDir, base, newState string, p PromoteOpts) (string, st
 	case "rejected":
 		destDir := inboxbatch.CycleDir(filepath.Join(inboxDir, "rejected"), cycleOrZero(p.Cycle))
 		return destDir, filepath.Join(destDir, base)
-	case "retry":
-		destDir := filepath.Join(inboxDir, "retry")
-		return destDir, filepath.Join(destDir, base)
-	case "quarantine":
-		destDir := filepath.Join(inboxDir, "quarantine")
+	case "retry", "quarantine", "delivered":
+		destDir := filepath.Join(inboxDir, newState)
 		return destDir, filepath.Join(destDir, base)
 	}
 	return "", ""

@@ -82,23 +82,28 @@ The stage table of the parent spec §3 stays the source for the compose, gate an
 
 ## 3. F2: the delivered inbox state
 
-**Fact.** Post-ship sees `isLanded` false at a delivered ship (the `isLanded` branch of `promoteLandedCycle` in `postship.go`). It releases the item. A second lane then starts on the same work.
+**Fact.** Post-ship sees `isLanded` false at a delivered ship (`promoteInbox` in `go/internal/phases/ship/postship.go`). It releases the item. A second lane then starts on the same work.
 
-**Decision.** A delivered ship moves the inbox item to a new state `delivered`. `delivered` is a value of the existing lifecycle state type, next to `processed`, `rejected`, `retry` and `quarantine` in `validStates` of `go/internal/inboxmover/lifecycle/lifecycle.go`. The state has these rules:
+**Decision.** A delivered ship moves each committed inbox item of the cycle to a new state `delivered`.
+
+The ship reports the delivery to post-ship in the typed field `RunResult.Delivered`. Post-ship passes it as `CycleOutcome.Delivered`. At shadow, the field stays false and the release does not change. `delivered` is a value of the existing lifecycle state type, next to `processed`, `rejected`, `retry` and `quarantine` in `validStates` of `go/internal/inboxmover/lifecycle/lifecycle.go`. The state has these rules:
 
 - The menu builder skips a `delivered` item. So no second lane starts on it.
 - The stale-claim sweep does not release a `delivered` item.
 - `EnforceActor` ends the state. On `merged`, it promotes the item through `Promoter` (§7). On ejection, `Merger.Eject` requeues the item with the brief (§4).
-- A `delivered` item with no member in any wave record is an orphan. The driver reports it once as a failure. It never releases it by itself.
+- A `delivered` item with no member in any wave record is an orphan. `ReportOrphanDelivered` reports it once as the failure `INBOX_DELIVERED_ORPHAN`. It never releases it by itself. The report is built and no code calls it yet. The `EnforceActor` slice calls it.
+- "Once per id" holds for the life of the map that the caller passes in, so a driver that restarts reports each orphan again. A nil map is refused with `ErrBadArgs`.
+- When the move of a committed item to `delivered/` fails, post-ship holds the item in `quarantine/` and emits `INBOX_DELIVERY_FAILED` with `end_state=quarantine`. When the hold also fails, the item stays in `processing/cycle-N/`, the residual drain is skipped, and the signal says `end_state=processing`. The item is not released to the inbox root, so no lane draws it. An operator releases it from `quarantine/`.
+- The item file sits in the flat directory `inbox/delivered/`. A claim cannot take it, and `ClaimDispatchable` refuses it with `ErrDelivered`.
 
 **Readers.** Each reader below branches on the item state. A reader that does not know `delivered` treats it as unknown. The first six are in `go/internal/inboxmover`.
 
 | Reader | What it does with `delivered` |
 |---|---|
-| menu builder | Skips the item. |
-| stale-claim sweep | Does not release the item. |
+| menu builder (`PlaceOnLaneMenu` in `dispatchability.go`) | Skips the item. It gives `MenuWaiting` through `HeldBy`. |
+| stale-claim sweep (`ReleaseStaleClaims` in `claims.go`) | Does not release the item. |
 | `dispatchability.go` | Reports the item as not dispatchable. |
-| `claimstate.go` | Reads `delivered` as a held claim. |
+| `claimstate.go` | Reads `delivered` as a held claim (`HeldBy`). |
 | `continuation_release.go` | Does not release a continuation of the item. |
 | `retire_unbacked.go` | Does not retire the item as unbacked. |
 | `outcome.go` | Maps no outcome to a release of the item. |
