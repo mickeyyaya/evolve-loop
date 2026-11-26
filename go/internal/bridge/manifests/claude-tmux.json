@@ -33,6 +33,7 @@
   },
   "prompt_marker": "❯",
   "transient_regex": "(?i)(api error:\\s*5\\d{2}\\b|server-side issue,? usually temporary)",
+  "shell_count_regex": "·\\s*(?P<count>\\d+)\\s+shells?\\b",
   "default_model": "haiku",
   "default_args": ["--strict-mcp-config"],
   "mcp_config_files": [".mcp.json"],

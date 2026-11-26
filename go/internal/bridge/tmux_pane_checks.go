@@ -18,6 +18,7 @@ func paneProfileFor(lp tmuxLaunch) panestream.PaneProfile {
 		p.BusyLineRegex = m.BusyLineRegex
 		p.TokenLineRegex = m.TokenLineRegex
 		p.ModelLabelRegex = m.ModelLabelRegex
+		p.ShellCountRegex = m.ShellCountRegex
 	}
 	return p
 }
