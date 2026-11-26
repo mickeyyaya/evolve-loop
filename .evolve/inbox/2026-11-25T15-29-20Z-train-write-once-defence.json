@@ -4,7 +4,16 @@
     "Journey rows 10a-10e of card section 11 pass.",
     "100% coverage on each changed function; zero code comments."
   ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2653",
+    "branch": "cycle-cd3ae73e-2653",
+    "snapshot_sha": "1e88893ba7510ef6e5c137d2b76fd24b50cda5c3",
+    "base_sha": "92ab6246c0753563d4fdce0eba19c4c1ce8b6982",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2653/audit-fail-reason.json",
+    "cycle": 2653
+  },
   "created_at": "2026-11-25T15:40:00Z",
+  "failure_count": 1,
   "files": [
     "go/internal/integration",
     "go/internal/phases/ship/deliverable.go"
@@ -12,8 +21,15 @@
   "fix": "Add the enforce-stage admits defence in driver.go, the guard table of card section 10 (R-a to R-c), and ship handling of ErrRecordExists so a ship retry after delivery reads as delivered, not as a failure.",
   "id": "train-write-once-defence",
   "kind": "feature",
+  "last_failure_class": "capability",
+  "last_failure_cycle": 2653,
+  "last_failure_findings": "review gate: phase \"build\" deliverable rejected after 1 correction(s): build handoff floor: 3 deterministic check failure(s) — fix these exactly before handoff:\n  the tests of the changed packages fail under -tags integration, so no changed function is proven:\n    --- FAIL: TestDeliverWriteOnce_AShipRetryUnderANewSHAWithTheSamePatchesReadsAsDelivered (1.62s)\n--- FAIL: TestDeliverWriteOnce_AResumedShipOfTheSameCommitReadsAsDelivered (1.72s)\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/internal/phases/ship\t71.076s\n…-main-red-b78db929.json → processed/\nFAIL\ncoverage: 97.8% of statements\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/internal/phases/ship\t71.076s\nFAIL\n\n  ./acs/cycle2653 (-tags acs): unit tests FAIL\n--- FAIL: TestC2653_005_AShipRetryAfterADeliveryReadsAsDeliveredThroughTheProductionShipRun (1.71s)\n--- FAIL: TestC2653_008_EveryFunctionOfTheChangedFilesIsFullyCovered (35.66s)\n--- FAIL: TestDeliverWriteOnce_AResumedShipOfTheSameCommitReadsAsDelivered (1.66s)\n--- FAIL: TestDeliverWriteOnce_AShipRetryUnderANewSHAWithTheSamePatchesReadsAsDelivered (1.35s)\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/i…\n  ./internal/phases/ship (-tags integration): unit tests FAIL\n--- FAIL: TestDeliverWriteOnce_AShipRetryUnderANewSHAWithTheSamePatchesReadsAsDelivered (1.45s)\n--- FAIL: TestDeliverWriteOnce_AResumedShipOfTheSameCommitReadsAsDelivered (1.48s)\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/internal/phases/ship\t64.427s\n…oted: 2026-11-26T15-31-44Z-fix-main-red-1bace74b.json → processed/\nFAIL\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/internal/phases/ship\t64.427s\nFAIL\n",
+  "last_failure_fingerprint": "text:e6d0a89bf6c9",
+  "last_failure_reason": "cycle-failure-release",
+  "last_failure_rung": "R2",
   "origin": "console",
   "priority_class": "correctness",
+  "retry_plan": "fresh-deep-plan",
   "source": "operator 2026-11-25 asked to enable the merge train; console map of docs/architecture/integration-driver-enforce.md parts 0-8 against code on 2026-11-25 (parts 0, 3, 6 built)",
   "summary": "WriteOnce and ErrRecordExists exist (go/internal/integration/deliverable.go:203-250) and ship picks WriteOnce at enforce (go/internal/phases/ship/deliverable.go:53,87-90), but the enforce admits defence, the guard table of card section 10 and a ship handler for ErrRecordExists are missing (card part 7).",
   "title": "Write-once delivery at enforce gets its admits defence, guard table and ErrRecordExists handling in ship",

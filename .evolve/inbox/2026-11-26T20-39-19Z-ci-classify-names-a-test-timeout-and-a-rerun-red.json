@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Red first: a fixture log with a go test timeout panic classifies as the timeout class, not unknown.",
+    "Red first: a main run whose attempt 1 failed with key K and whose attempt 2 passed makes recurred_on_main yes for K.",
+    "100% coverage on each changed function."
+  ],
+  "created_at": "2026-11-27T00:00:00Z",
+  "files": [
+    "go/internal/ciwatch/classify.go"
+  ],
+  "fix": "Add a timeout class to the classifier for the 'panic: test timed out after' line, with the running test names as its key. Make recurredOn read each completed attempt of a main run, not only the latest, so a red attempt that a re-run turned green still counts as a recurrence.",
+  "id": "ci-classify-names-a-test-timeout-and-a-rerun-red",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console boundary 190, 2026-11-26: PR #1841 classify output",
+  "summary": "On 2026-11-26 evolve ci classify labelled the cmd/evolve darwin red of PR #1841 as class unknown with retry-safe no. The log held a go test timeout panic (panic: test timed out after 30m0s). Main a3b1f16d5 had failed the same way one hour earlier, but recurredOn reads only the latest attempt of each main run, and that attempt was green after the re-run, so recurred_on_main read no.",
+  "title": "evolve ci classify names a go test timeout panic and counts a red attempt that went green on re-run",
+  "weight": 0.7
+}

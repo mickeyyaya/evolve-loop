@@ -15,7 +15,7 @@
   "kind": "hardening",
   "origin": "console",
   "priority_class": "stability",
-  "summary": "On 2026-11-24 the macOS job of PRs 1789 and 1790 failed with panic: test timed out after 30m0s in go/cmd/evolve, inside TestCLIContract_HarnessKillsEachMutantOfDossierShow. Both passed on a rerun of the failed job. The macOS job of main (the whole job, not the package alone) took 14, 20 and 32 minutes on three commits in a row, so runner speed varies by more than two times, and cmd/evolve reaches the 30m DARWIN_TEST_TIMEOUT on a slow runner. The package wall ratchet measures speed-adjusted CPU, so it does not catch a wall-clock overrun on a slow runner. Every batch PR is at risk of a false red.",
+  "summary": "On 2026-11-24 the macOS job of PRs 1789 and 1790 failed with panic: test timed out after 30m0s in go/cmd/evolve, inside TestCLIContract_HarnessKillsEachMutantOfDossierShow. Both passed on a rerun of the failed job. The macOS job of main (the whole job, not the package alone) took 14, 20 and 32 minutes on three commits in a row, so runner speed varies by more than two times, and cmd/evolve reaches the 30m DARWIN_TEST_TIMEOUT on a slow runner. The package wall ratchet measures speed-adjusted CPU, so it does not catch a wall-clock overrun on a slow runner. Every batch PR is at risk of a false red. On 2026-11-26 it recurred two more times: on main a3b1f16d5 and on PR #1841, with the write-cwd, write-in-home and write-in-tmpdir subtests of TestCLIContract_HarnessKillsEachMutantOfDossierShow running at the panic (about 1m39s each). Both went green on a re-run. Incident record: docs/incidents/2026-11-26-cmd-evolve-darwin-suite-at-the-30m-limit.md.",
   "title": "The cmd/evolve darwin tests stay well inside the go test timeout on a slow macOS runner",
-  "weight": 0.7
+  "weight": 0.85
 }
