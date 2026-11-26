@@ -182,7 +182,7 @@ type recordingPaneDriver struct {
 func (recordingPaneDriver) Name() string { return "recording-tmux" }
 
 func (d recordingPaneDriver) Launch(_ context.Context, cfg *Config, deps Deps) (int, error) {
-	*d.env = deps.paneEnv(cfg)
+	*d.env = mustPaneEnv(deps, cfg)
 	*d.bypass = cfg.AllowBypass
 	return ExitOK, nil
 }

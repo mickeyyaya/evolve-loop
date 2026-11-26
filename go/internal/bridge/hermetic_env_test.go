@@ -59,17 +59,20 @@ func TestN1_LauncherClaudeVariablesReachNoSeatAtEnforce(t *testing.T) {
 	t.Setenv("CODEX_HOME", "/Users/cell/.codex-alt")
 	for _, cli := range manifestCLIs(t) {
 		cfg := seatConfig(cli)
-		env := dispatchEnv(Deps{EnvStage: "enforce", Env: map[string]string{"EVOLVE_PROJECT_ROOT": "/repo"}}, cfg)
+		env := mustDispatchEnv(Deps{EnvStage: "enforce", Env: map[string]string{"EVOLVE_PROJECT_ROOT": "/repo"}}, cfg)
 		names := envNames(env)
 		for leak := range launcherLeaks {
 			if slices.Contains(names, leak) {
 				t.Errorf("%s: launcher variable %s reached the seat at enforce", cli, leak)
 			}
 		}
-		for _, want := range []string{"PATH=/opt/fake/bin:/usr/bin", "HOME=/Users/cell", "EVOLVE_PROJECT_ROOT=/repo", ipcenv.DispatchIDKey + "=" + thisDispatch} {
+		for _, want := range []string{"HOME=/Users/cell", "EVOLVE_PROJECT_ROOT=/repo", ipcenv.DispatchIDKey + "=" + thisDispatch} {
 			if !slices.Contains(env, want) {
 				t.Errorf("%s: the seat lost %s; env names %v", cli, want, names)
 			}
+		}
+		if !strings.HasSuffix(pathValue(env), ":/opt/fake/bin:/usr/bin") {
+			t.Errorf("%s: the seat PATH %q must end with the host PATH", cli, pathValue(env))
 		}
 		for k, v := range cfg.Realization.Env {
 			if !slices.Contains(env, k+"="+v) {
@@ -90,7 +93,7 @@ func TestCellEnv_ShadowKeepsTodaysEnvAndReportsEachDroppedNameWithoutItsValue(t 
 	deps := Deps{Signals: center, EnvDrops: &EnvDropLog{}, EnvStage: "shadow"}
 	cfg := seatConfig("claude-tmux")
 
-	env := dispatchEnv(deps, cfg)
+	env := mustDispatchEnv(deps, cfg)
 
 	if !slices.Contains(env, "FOO_LEAK=secret-value-1") {
 		t.Fatal("shadow must keep today's environment for the child")
@@ -136,7 +139,7 @@ func TestCellEnv_EnforceReportsTheDropAsRefused(t *testing.T) {
 		t.Setenv(k, v)
 	}
 	center := signalcenter.New()
-	dispatchEnv(Deps{Signals: center, EnvStage: "enforce"}, seatConfig("codex"))
+	mustDispatchEnv(Deps{Signals: center, EnvStage: "enforce"}, seatConfig("codex"))
 	if len(isolationEvents(center)) != 0 {
 		t.Fatalf("enforce must emit no per-variable violation; got %v", isolationEvents(center))
 	}
@@ -167,8 +170,8 @@ func TestCellEnv_EnforceReportsEachNameSetOncePerProcess(t *testing.T) {
 	}
 	center := signalcenter.New()
 	deps := Deps{Signals: center, EnvDrops: &EnvDropLog{}, EnvStage: "enforce"}
-	dispatchEnv(deps, seatConfig("codex"))
-	dispatchEnv(deps, seatConfig("codex"))
+	mustDispatchEnv(deps, seatConfig("codex"))
+	mustDispatchEnv(deps, seatConfig("codex"))
 	if n := len(envRefusedEvents(center)); n != 1 {
 		t.Fatalf("a second dispatch must stay silent; got %d events", n)
 	}
@@ -253,7 +256,7 @@ func TestCellEnv_OffKeepsTodaysEnvAndStaysSilent(t *testing.T) {
 		t.Setenv(k, v)
 	}
 	center := signalcenter.New()
-	env := dispatchEnv(Deps{Signals: center, EnvStage: "off"}, seatConfig("codex"))
+	env := mustDispatchEnv(Deps{Signals: center, EnvStage: "off"}, seatConfig("codex"))
 	if !slices.Contains(env, "FOO_LEAK=secret-value-1") || len(isolationEvents(center)) != 0 {
 		t.Fatalf("off = today's env and no signal; leak kept=%v events=%d", slices.Contains(env, "FOO_LEAK=secret-value-1"), len(isolationEvents(center)))
 	}
@@ -265,9 +268,9 @@ func TestEnvDropLog_ReportsEachNameOnceForEachFamily(t *testing.T) {
 	}
 	center := signalcenter.New()
 	deps := Deps{Signals: center, EnvDrops: &EnvDropLog{}, EnvStage: "shadow"}
-	dispatchEnv(deps, seatConfig("codex"))
-	dispatchEnv(deps, seatConfig("codex"))
-	dispatchEnv(deps, seatConfig("agy"))
+	mustDispatchEnv(deps, seatConfig("codex"))
+	mustDispatchEnv(deps, seatConfig("codex"))
+	mustDispatchEnv(deps, seatConfig("agy"))
 	count := 0
 	for _, e := range center.Recent() {
 		if e.Code == isolation.ViolationCode(2) && e.Fields["target"] == "FOO_LEAK" {
@@ -320,27 +323,27 @@ func TestProcessEnv_IsTheAllowlistPlusTheManifest(t *testing.T) {
 	}
 	enforcePolicyRoot(t, "enforce")
 	t.Setenv("CLAUDE_CONFIG_DIR", "/Users/cell/.claude-alt")
-	agy := probeEnv(Deps{}, "agy")
+	agy := mustProbeEnv(Deps{}, "agy")
 	if !slices.Contains(agy, agyAutoUpdateOffEnv+"=1") {
 		t.Errorf("a bare agy exec must carry %s=1 from the agy-tmux manifest", agyAutoUpdateOffEnv)
 	}
-	claude := probeEnv(Deps{}, "claude")
+	claude := mustProbeEnv(Deps{}, "claude")
 	if !slices.Contains(claude, "CLAUDE_CONFIG_DIR=/Users/cell/.claude-alt") {
 		t.Error("claude lists CLAUDE_CONFIG_DIR in env_passthrough, so a bare claude exec keeps it")
 	}
 	for _, family := range []string{"agy", "claude", "codex", "no-such-family"} {
-		env := probeEnv(Deps{}, family)
+		env := mustProbeEnv(Deps{}, family)
 		names := envNames(env)
 		for leak := range launcherLeaks {
 			if slices.Contains(names, leak) {
 				t.Errorf("%s: %s reached a bare exec", family, leak)
 			}
 		}
-		if !slices.Contains(env, "PATH=/opt/fake/bin:/usr/bin") || !slices.Contains(env, "HOME=/Users/cell") {
+		if !strings.HasSuffix(pathValue(env), ":/opt/fake/bin:/usr/bin") || !slices.Contains(env, "HOME=/Users/cell") {
 			t.Errorf("%s: a bare exec lost PATH or HOME", family)
 		}
 	}
-	if slices.Contains(probeEnv(Deps{}, "codex"), "CLAUDE_CONFIG_DIR=/Users/cell/.claude-alt") {
+	if slices.Contains(mustProbeEnv(Deps{}, "codex"), "CLAUDE_CONFIG_DIR=/Users/cell/.claude-alt") {
 		t.Error("codex does not list CLAUDE_CONFIG_DIR, so it must not get it")
 	}
 }

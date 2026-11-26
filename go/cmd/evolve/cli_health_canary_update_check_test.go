@@ -18,7 +18,7 @@ func TestCLIHealthCanaryProbe_LaunchesCodexWithItsStartupUpdateCheckOff(t *testi
 	t.Parallel()
 	frames := slices.Repeat([]string{"starting"}, 256)
 	pane := &bridge.FakeTmuxController{CaptureFrames: frames}
-	deps := bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: io.Discard}
+	deps := bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: io.Discard, CellBinRoot: fixedCellBinRoot}
 
 	liveProbeWith(context.Background(), t.TempDir(), "", deps)("codex-tmux")
 
@@ -41,7 +41,7 @@ func TestDefaultLiveProbe_TheCanaryLaunchesTheCLIsOwnDefaultModelAndNeverAChosen
 		t.Run(driver, func(t *testing.T) {
 			t.Parallel()
 			pane := &bridge.FakeTmuxController{CaptureFrames: slices.Repeat([]string{"starting"}, 256)}
-			deps := bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: io.Discard, SeatLogin: seatlogin.Deps{Stat: func(string) (fs.FileInfo, error) { return nil, fs.ErrNotExist }, ReadFile: func(string) ([]byte, error) { return nil, fs.ErrNotExist }}}
+			deps := bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: io.Discard, CellBinRoot: fixedCellBinRoot, SeatLogin: seatlogin.Deps{Stat: func(string) (fs.FileInfo, error) { return nil, fs.ErrNotExist }, ReadFile: func(string) ([]byte, error) { return nil, fs.ErrNotExist }}}
 
 			defaultLiveProbe(context.Background(), t.TempDir(), deps)(driver)
 

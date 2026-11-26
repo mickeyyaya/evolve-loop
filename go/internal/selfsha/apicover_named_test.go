@@ -10,3 +10,9 @@ func TestNamePublicAPI(t *testing.T) {
 		t.Fatal("Of must error on a missing path")
 	}
 }
+
+func TestNamePath(t *testing.T) {
+	if p, err := Path(); err != nil || p == "" {
+		t.Fatalf("Path = %q, %v", p, err)
+	}
+}

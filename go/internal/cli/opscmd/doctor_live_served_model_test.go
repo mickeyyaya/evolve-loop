@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,7 +34,11 @@ func (f *fakeClaudeReply) PasteBuffer(ctx context.Context, session string) error
 	if err := os.WriteFile(filepath.Join(dir, "session.jsonl"), []byte(line), 0o644); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(ws, bridge.LiveSmokeArtifact), []byte("OK\n"), 0o644)
+	entries, err := filepath.Glob(filepath.Join(cellBinRoot, "*", "evolve"))
+	if err != nil || len(entries) != 1 {
+		return fmt.Errorf("want one cell-bin entry under %s, got %v (err %v)", cellBinRoot, entries, err)
+	}
+	return os.WriteFile(filepath.Join(ws, bridge.LiveSmokeArtifact), []byte(entries[0]+"\n"), 0o644)
 }
 
 type servedModelReport struct {
@@ -57,7 +62,7 @@ func TestDoctorLive_ReportsTheModelThatServedTheReplyFromAFakeTranscript(t *test
 		configRoot:         t.TempDir(),
 		model:              "claude-sonnet-5-5",
 	}
-	deps := bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: &errb, TokenResolver: tokenusage.DefaultResolver(pane.configRoot)}
+	deps := bridge.Deps{Tmux: pane, Sleep: func(time.Duration) {}, LookupEnv: func(string) (string, bool) { return "", false }, Stderr: &errb, CellBinRoot: fixedCellBinRoot, TokenResolver: tokenusage.DefaultResolver(pane.configRoot)}
 
 	code := runDoctorLiveWith([]string{"claude-tmux", "--model", "sonnet", "--json"}, &out, deps)
 
@@ -83,5 +88,25 @@ func TestDoctorLive_ADriverThatReportsNoModelPrintsUnreportedAndKeepsItsExitCode
 	}
 	if !strings.Contains(errb.String(), "[doctor] served model: unreported\n") {
 		t.Errorf("stderr lacks the unreported served model line:\n%s", errb.String())
+	}
+}
+
+func TestDoctorLive_AProbeWhoseShellDoesNotResolveEvolveToTheCellBinEntryFails(t *testing.T) {
+	cases := []struct {
+		name     string
+		evolve   bridge.LiveSmokeResult
+		wantCode int
+		wantLine string
+	}{
+		{"another evolve first", bridge.LiveSmokeResult{EvolveEntry: "/cb/x/evolve", EvolveFound: "/usr/local/bin/evolve"}, exitFail, "LIVE NO EVOLVE"},
+		{"no answer", bridge.LiveSmokeResult{EvolveEntry: "/cb/x/evolve"}, exitFail, "LIVE NO EVOLVE"},
+		{"the cell-bin entry", bridge.LiveSmokeResult{EvolveEntry: "/cb/x/evolve", EvolveFound: "/cb/x/evolve"}, exitOK, "LIVE OK"},
+	}
+	for _, tc := range cases {
+		var out, errb bytes.Buffer
+		code := reportDoctorLiveResult(liveOutcome{target: liveProbeTarget{driver: "claude-tmux"}, rc: bridge.ExitOK, evolve: tc.evolve}, &out, &errb)
+		if code != tc.wantCode || !strings.Contains(errb.String(), tc.wantLine) {
+			t.Errorf("%s: exit %d, stderr %q; want exit %d with %q", tc.name, code, errb.String(), tc.wantCode, tc.wantLine)
+		}
 	}
 }

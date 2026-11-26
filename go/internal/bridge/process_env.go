@@ -1,8 +1,8 @@
 package bridge
 
-func probeEnv(deps Deps, bin string) []string {
-	env, _ := deps.cellEnv(&Config{CLI: bin, Agent: "probe", Realization: familyRealization(bin)})
-	return env
+func probeEnv(deps Deps, bin string) ([]string, error) {
+	env, _, err := deps.cellEnv(&Config{CLI: bin, Agent: "probe", Realization: familyRealization(bin)})
+	return env, err
 }
 
 func familyRealization(bin string) Realization {

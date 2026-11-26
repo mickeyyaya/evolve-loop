@@ -79,9 +79,9 @@ func (codexDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, err
 	selection = modelDispatchFromRealization("codex", selection, cfg.Realization)
 	selection = modelDispatchFromExtraArgs("codex", selection, cfg.ExtraFlags)
 	observeModelDispatch(deps, selection)
-	rc, err := deps.Runner(ctx, name, cfg.Worktree, args, dispatchEnv(deps, cfg), bytes.NewReader([]byte(prompt)), stdoutF, stderrF)
+	rc, err := deps.runDispatch(ctx, cfg, dispatchRun{name: name, args: args, stdin: bytes.NewReader([]byte(prompt)), stdout: stdoutF, stderr: stderrF})
 	if err != nil {
-		return ExitMissingBinary, fmt.Errorf("[codex] %w", err)
+		return rc, fmt.Errorf("[codex] %w", err)
 	}
 	fmt.Fprintf(deps.Stderr, "[codex] codex exited rc=%d\n", rc)
 	return rc, nil

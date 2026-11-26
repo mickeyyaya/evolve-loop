@@ -24,12 +24,12 @@ func TestCellEnv_NoGitHubTokenReachesAnyCarrier(t *testing.T) {
 		cfg := isolationConfig(t)
 		cfg.Realization.Env = manifest
 		deps := Deps{EnvStage: stage, Stderr: io.Discard, HostGitConfig: fakeHostGit(nil), Env: pipeline}
-		env, _ := deps.cellEnv(cfg)
+		env, _, _ := deps.cellEnv(cfg)
 		for _, key := range githubTokenKeys {
 			if v, ok := lastEnvValue(env, key); ok {
 				t.Errorf("%s cell env: %s = %q reached the cell", stage, key, v)
 			}
-			if v, ok := lastEnvValue(dispatchEnv(deps, cfg), key); ok {
+			if v, ok := lastEnvValue(mustDispatchEnv(deps, cfg), key); ok {
 				t.Errorf("%s headless env: %s = %q reached the cell", stage, key, v)
 			}
 		}
