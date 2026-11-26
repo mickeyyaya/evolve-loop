@@ -69,6 +69,9 @@ func (l *Landing) Push(ctx context.Context, req PushRequest) (PushResult, error)
 		return out, fail(stepPush, shiperr.CodeArgs, shiperr.ShipClassConfig, "ship: a worktree push names no commit, so ship pushes nothing",
 			shiperr.BranchKey, req.Branch)
 	}
+	if req.DryRun {
+		return out, nil
+	}
 	if attempt := l.send(ctx, req); attempt.failed() {
 		if rerr := l.answerRejection(ctx, req, attempt, &out); rerr != nil {
 			return out, rerr
@@ -139,7 +142,7 @@ func (l *Landing) answerRejection(ctx context.Context, req PushRequest, a pushAt
 		return l.refused(req, a)
 	}
 	rejected := l.rejection(req, a)
-	if req.DryRun || req.RepairAttempted {
+	if req.RepairAttempted {
 		return rejected
 	}
 	out.RepairAttempted = true

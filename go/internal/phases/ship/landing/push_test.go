@@ -247,10 +247,21 @@ func TestPush_RepairDivergedReclassifiesNeedsReaudit(t *testing.T) {
 	}
 }
 
-func TestPush_OnceGuardAndDryRunSkipTheRepair(t *testing.T) {
+func TestPush_ADryRunSendsNoPush(t *testing.T) {
+	for name, site := range map[string]PushSite{"direct": SiteDirect, "pushonly": SitePushOnly} {
+		f := newFakeGit()
+		l, got := newLanding(f)
+		sink, lines := logSink()
+		out, err := l.Push(context.Background(), PushRequest{Branch: testBranch, Site: site, DryRun: true, Log: sink})
+		if err != nil || out != (PushResult{}) || len(f.calls) != 0 || len(*lines) != 0 || len(*got) != 0 {
+			t.Errorf("%s: a dry run sends no git call and returns nothing: %v %+v %v %v %+v", name, err, out, f.calls, *lines, *got)
+		}
+	}
+}
+
+func TestPush_OnceGuardSkipsTheRepair(t *testing.T) {
 	for name, req := range map[string]PushRequest{
 		"once-guard": {Branch: testBranch, Site: SiteDirect, RepairAttempted: true},
-		"dry-run":    {Branch: testBranch, Site: SiteDirect, DryRun: true},
 	} {
 		f := newFakeGit()
 		rejectPush(f)
