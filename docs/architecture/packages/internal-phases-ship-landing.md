@@ -25,4 +25,6 @@
 - The landing reproduces the host's goldens for every scenario it owns. Pinned by `TestPush_ArgvAndLogSequencesMatchTheGoldens`.
 - A green landing emits no signal. A fault emits its code once, and no event is terminal. Pinned by `TestLanding_NeverEmitsShipErrorAndHappyPathsAreSilent`.
 - The repair outcome strings are fixed. Pinned by the postship tests and the `acs/cycle752` pin.
-- `--dry-run` still performs the push. Only the repair is skipped, under a dry run or after the once-guard is spent. Pinned by `TestPush_OnceGuardAndDryRunSkipTheRepair`.
+- A dry run sends no push. `Push` returns before any git call when `DryRun` is set. Pinned by `TestPush_ADryRunSendsNoPush`.
+  - Until 2026-11-26 a dry run still sent the push and only skipped the repair. `ship --push-only --dry-run` then pushed 23 commits to `main` ([incident](../../incidents/2026-11-26-push-only-dry-run-pushed-to-main.md)).
+- The repair is skipped after the once-guard is spent. Pinned by `TestPush_OnceGuardSkipsTheRepair`.

@@ -93,6 +93,10 @@ func runPushOnly(ctx context.Context, opts *Options, res *RunResult) error {
 		return fmt.Errorf("ship --push-only: REFUSED — %d ahead commit(s) lack ship provenance (not in %s, not a sync-main reconcile merge, not a bookkeeping commit of a dossier closeout or an inbox stamp): [%s]. Push-only is a recovery for attested strands, never a guard bypass; land un-provenanced work through a normal `evolve ship`",
 			len(unprovenanced), shipjournal.FileName, strings.Join(unprovenanced, ", "))
 	}
+	if opts.DryRun {
+		res.Logs = append(res.Logs, fmt.Sprintf("[ship] PUSH-ONLY DRY-RUN: would push %d attested commit(s) to origin/%s; nothing was pushed", len(ahead), branch))
+		return nil
+	}
 	if err := pushWithRepair(ctx, opts, res, landing.PushRequest{Branch: branch, Site: landing.SitePushOnly}); err != nil {
 		return err
 	}

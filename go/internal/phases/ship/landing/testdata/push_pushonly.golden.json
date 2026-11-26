@@ -285,24 +285,15 @@
         "diff --cached --quiet [streams]",
         "rev-parse --abbrev-ref HEAD [capture]",
         "fetch origin +refs/heads/main:refs/remotes/origin/main [streams]",
-        "rev-list HEAD ^origin/main [capture]",
-        "push origin main [streams]"
+        "rev-list HEAD ^origin/main [capture]"
       ],
-      "logs": null,
+      "logs": [
+        "[ship] PUSH-ONLY DRY-RUN: would push 1 attested commit(s) to origin/main; nothing was pushed"
+      ],
       "commit_sha": "",
       "repair_attempted": "",
       "repair_outcome": "",
-      "error": {
-        "code": "GIT_PUSH_REJECTED",
-        "class": "transient",
-        "stage": "atomic-ship",
-        "message": "ship --push-only: git push failed (rc=1)",
-        "debug": {
-          "branch": "main",
-          "git_err": "",
-          "git_rc": "1"
-        }
-      }
+      "error": null
     }
   ]
 }
