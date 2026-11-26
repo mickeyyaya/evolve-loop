@@ -14,6 +14,7 @@
   "fix": "Wire the integration driver (I14) at the production composition root, absorbing I11 per decision D34, with every stage key at shadow.",
   "id": "wave-integration-i14-production-driver",
   "kind": "feature",
+  "landed_sha": "fe5038000",
   "origin": "console",
   "priority_class": "correctness",
   "source": "plan docs/plans/wave-integration-2026-10.md I14 and D34; console verification of I11 on 2026-11-24",

@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Red first: at merged, the member item moves from delivered to processed; a deferred id stays open.",
+    "Missing() no longer names Promote.",
+    "100% coverage on each changed function; zero code comments; card section 7 updated in STE."
+  ],
+  "created_at": "2026-11-25T15:40:00Z",
+  "deps": [
+    "train-delivered-inbox-state"
+  ],
+  "files": [
+    "go/internal/integration",
+    "go/internal/mergegate",
+    "go/cmd/evolve/cmd_loop_driver.go"
+  ],
+  "fix": "Add an adapter from DeliverableRecord to mergegate.PromoteInput (decision D7.2: one Promoter, two input strategies) and wire it in productionEnforceActor. rec.Scope is not the promotion set: a deferred id stays open and a marker id is promoted.",
+  "id": "train-production-promoter",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "operator 2026-11-25 asked to enable the merge train; console map of docs/architecture/integration-driver-enforce.md parts 0-8 against code on 2026-11-25 (parts 0, 3, 6 built)",
+  "summary": "EnforceActor.Promote (enforce_actor.go:38) is never set in production. The only implementation, mergegate.Promoter (go/internal/mergegate/promoter.go:29), takes PromoteInput, not a DeliverableRecord (card finding 3, section 7).",
+  "title": "The enforce actor promotes the inbox items of a merged member through the one mergegate promoter",
+  "weight": 0.85
+}

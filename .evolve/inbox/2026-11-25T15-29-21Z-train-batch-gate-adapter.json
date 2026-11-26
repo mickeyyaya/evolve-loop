@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Red first: a red batch test ejects through the batch split and a green one merges.",
+    "Missing() no longer names Gate.",
+    "The fixture soak passes; the BatchTest cost per batch is measured and written to the package note.",
+    "100% coverage on each changed function; zero code comments."
+  ],
+  "created_at": "2026-11-25T15:40:00Z",
+  "files": [
+    "go/internal/integration",
+    "go/cmd/evolve/cmd_integration_l2.go",
+    "go/cmd/evolve/cmd_loop_driver.go",
+    "go/cmd/evolve/cmd_fleet_soak_pool.go"
+  ],
+  "fix": "Build the gate adapter that runs BatchTest (L2) on the composed tree with the overlap tier, wire it into the production LaneBatcher and the L2 path, and run the fixture soak of cmd_fleet_soak_pool.go.",
+  "id": "train-batch-gate-adapter",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "operator 2026-11-25 asked to enable the merge train; console map of docs/architecture/integration-driver-enforce.md parts 0-8 against code on 2026-11-25 (parts 0, 3, 6 built)",
+  "summary": "LaneBatcher.Missing() returns Gate because Composer.Gate is nil (go/internal/integration/lanebatcher.go:23); the L2 path uses l2NoGate (go/cmd/evolve/cmd_integration_l2.go:57). Without it the train would merge an untested composed tree (parent spec slice 4).",
+  "title": "The lane batcher tests each composed batch through a real gate before the train merges it",
+  "weight": 0.85
+}

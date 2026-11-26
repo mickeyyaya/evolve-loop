@@ -12,6 +12,7 @@
   "fix": "Remove the `ci latency check` step from the boundary step list in go/cmd/evolve/cmd_boundary.go. Keep the `wave latency --check` step. Add one test that resolves the verb and the first argument of every boundary step against the registered verbs of the binary, so a step that names a missing verb fails the build.",
   "id": "boundary-step-ci-latency-check-calls-a-missing-verb",
   "kind": "bug",
+  "landed_sha": "71a88079e",
   "origin": "console",
   "priority_class": "stability",
   "summary": "go/cmd/evolve/cmd_boundary.go:237 runs the advisory step `evolve ci latency check` at each boundary. The verb does not exist: `evolve ci` has classify, watch, darwin-set and telemetry only. The T5 item that would build it (latency-gates-t5-ci-trend-gate) was withdrawn by the operator. So the step fails at each boundary and the failure is hidden because the step is advisory. A boundary step that always fails hides a real fault when one occurs. Source: docs/plans/latency-gates-2026-10.md, row T7 (partial).",

@@ -6,6 +6,7 @@
     "A resume does not read routes from a handoff of an earlier attempt."
   ],
   "created_at": "2026-11-23T15:29:59Z",
+  "evidence_verified": false,
   "files": [
     "go/internal/core/stage_evidence.go",
     "go/cmd/evolve/cmd_cycle.go",
@@ -16,7 +17,13 @@
   "kind": "hardening",
   "origin": "console",
   "priority_class": "correctness",
+  "route": "console-manual",
+  "routed_at": "2026-11-25T08:10:41Z",
+  "routed_by": "loop",
+  "routed_cycle": 2642,
+  "routed_reason": "lane triage (cycle 2642) dropped: stale: seal.go has no RoutesMeasured and no held_proposals.stage in Go source; PR 1690 premise not at HEAD",
   "source": "console build of #1690 r3 delta review, 2026-11-23",
+  "stale_drop_count": 1,
   "summary": "The stage seal of a cycle is built in stageSession.finish inside RunCycle, but the cycle routed item ids are written by cycleoutcome.ApplyNoWork only after RunCycle returns (cmd_cycle.go:281). PR #1690 therefore makes the conflict class fail closed: Seal.RoutesMeasured is false and held_proposals.stage reads not ready (conflicts_unmeasured). This item wires the routes in the real order so the conflict class is measured.",
   "title": "The stage seal carries the cycle's routed items, so the held-proposal conflict class is measured and no longer fails closed",
   "weight": 0.6

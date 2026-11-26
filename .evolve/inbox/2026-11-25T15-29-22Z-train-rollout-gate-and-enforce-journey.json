@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "Each H6.1-H6.5 acceptance row of card section 12 is a red-first test.",
+    "The card section 11 journey passes at enforce with Missing() empty.",
+    "The operator flip (plan I9) stays the operator decision; this item does not set the key."
+  ],
+  "created_at": "2026-11-25T15:40:00Z",
+  "deps": [
+    "train-production-eject-ports",
+    "train-production-promoter",
+    "train-write-once-defence",
+    "train-checkpoint-lane-identity",
+    "train-batch-gate-adapter"
+  ],
+  "files": [
+    "go/cmd/evolve/cmd_integration_status.go",
+    "go/internal/integration",
+    "go/internal/gatecontract"
+  ],
+  "fix": "Build H6.1-H6.5: the N/2 clean-wave count over chained pool records, the flip and driver gates that read it, the second-pool hold, and the verified flip record. Add the card section 11 enforce journey with a fake CI and a bare origin.",
+  "id": "train-rollout-gate-and-enforce-journey",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "operator 2026-11-25 asked to enable the merge train; console map of docs/architecture/integration-driver-enforce.md parts 0-8 against code on 2026-11-25 (parts 0, 3, 6 built)",
+  "summary": "Card part 8 (section 12, H6.1-H6.5) is not built: integration status prints a fixed not-ready note (go/cmd/evolve/cmd_integration_status.go:27), and no gate refuses an early flip or holds a second pool. No test drives fleet.integration.stage enforce end to end with Missing() empty.",
+  "title": "The merge train switch counts clean shadow waves, refuses an early flip and passes an enforce journey before the operator flips it",
+  "weight": 0.8
+}

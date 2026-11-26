@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "A parser test reads both rationale and the legacy reasoning field and fails before the change.",
+    "The debugger persona and the parser name the same field.",
+    "The build phase text names the failed-approach field root_cause."
+  ],
+  "created_at": "2026-11-26T00:45:01Z",
+  "files": [
+    "go/internal/phases/debugger/debugger.go",
+    "agents/evolve-debugger.md",
+    "skills/loop/phase3-build.md"
+  ],
+  "fix": "Write a red parser test that reads a decision file with the new field rationale and with the old field reasoning. Rename the field to rationale, keep read support for reasoning for one release, and change agents/evolve-debugger.md:62. In skills/loop/phase3-build.md:222 rename the failed-approach field reasoning to root_cause. A persona-only edit breaks the contract.",
+  "id": "persona-diet-c1-debugger-reasoning-field",
+  "kind": "bug",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "docs/plans/persona-diet-2026-11.md (landed with PR #1799); filed by the console at the boundary 189 on 2026-11-26 as the plan section 6 and 7 say",
+  "summary": "Persona diet C1: go/internal/phases/debugger/debugger.go:40 reads json reasoning, and line 39 already holds root_cause; the persona and the build phase text use reasoning for different things.",
+  "title": "The debugger decision field reasoning is renamed rationale with one release of read support",
+  "weight": 0.6
+}

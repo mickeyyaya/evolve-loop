@@ -3,6 +3,12 @@
     "evolve wave integration status prints the branch, the tip, the open PR, the members, the order and the last flush decision of the integration record",
     "Each compose, ejection, flush and merge emits its SHIP_INTEGRATION_* signal"
   ],
+  "consumed": {
+    "at": "2026-11-25T15:30:33Z",
+    "via": "console-manual",
+    "cycle": "console",
+    "resolution": "built on main per docs/plans/wave-integration-2026-10.md delivery status (2026-11-21); console verified the named code exists on origin/main d6f3bbeb3 at the wave-189 boundary"
+  },
   "created_at": "2026-10-26T19:24:12Z",
   "deps": [
     "wave-integration-i0-deliverable-record"
