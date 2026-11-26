@@ -17,11 +17,11 @@
 
 | | Count |
 |---|---|
-| Incidents mapped | 83 |
-| Distinct failure modes (coverage-map rows) | 136 |
+| Incidents mapped | 84 |
+| Distinct failure modes (coverage-map rows) | 138 |
 | ✅ covered (a test fails if the bug comes back) | 90 |
 | 🟡 partial (related test, doesn't pin the exact mode) | 11 |
-| ❌ none (no regression test) | 35 |
+| ❌ none (no regression test) | 37 |
 | ⛔ untestable (external infra / live CLI) | 0 |
 
 These counts are tallies of the coverage map's rows, so they move with it: a new
@@ -40,6 +40,8 @@ Recounted on 2026-11-21: the 11 records of wave 183 add 11 incidents and 13 rows
 The record of cycle 2583 (2026-11-21) adds 1 incident and 2 rows, both with no test yet.
 
 Recounted on 2026-11-22: the record of a Build floor finding in a TDD file adds one incident and one covered row.
+
+Recounted on 2026-11-26: the record of the cmd/evolve darwin timeout adds 1 incident and 2 rows. Both rows have no test yet, and each names the item that tracks it.
 
 The map now holds 81 incidents and 130 rows. Of these, 89 are covered, 11 are partial and 30 have no test. Before these rows, main held 69 incidents and 115 rows. Of these, 86 were covered, 11 partial and 18 with no test. PR #1597 had flipped two of them to covered.
 
@@ -194,6 +196,8 @@ not the coverage map, which is the hand-maintained per-incident record.
 | [2026-11-21 — wave 185 stalled on the host verification lock](2026-11-21-wave-185-verification-lock-stall.md) | the console watches wake on failure codes and not on a stall | console watch, `cmd/evolve/cmd_wave_watch_events.go` | ❌ | proposal: draft item `wave-watch-wakes-on-a-stall` (not filed yet) |
 | [2026-11-21 — wave 185 stalled on the host verification lock](2026-11-21-wave-185-verification-lock-stall.md) | a fleet width increase has no verification capacity check | `policy/fleet_orchestrator.go`, `hostpressure/decide.go` | ❌ | proposal: draft item `fleet-width-increase-needs-a-capacity-check` (not filed yet) |
 | [2026-11-22 — a Build floor finding in a TDD file had no route to TDD](2026-11-22-build-floor-finding-in-a-tdd-file-had-no-route-to-tdd.md) | the predicate reroute knew only a repeated unit-test failure, so a test-audit finding in `go/acs/cycle<N>/` was corrected at Build, which cannot edit it | `core/predicate_reroute.go` (`tddOwnedFailures`, `tddReroute`), `testaudit/ratchet.go` (`MissingRowPackage`) | ✅ | `core/predicate_reroute_audit_test.go::TestBuildFloor_ATestAuditFindingInACyclePredicateFileRerunsTDDWithTheFindingAtOnce` |
+| [2026-11-26 — the cmd/evolve darwin CI suite reached its 30-minute limit twice](2026-11-26-cmd-evolve-darwin-suite-at-the-30m-limit.md) | The `cmd/evolve` darwin test run is near its 30-minute timeout. Each `DossierShow` mutant subtest takes about 1m39s. These subtests ran at the panic on main `a3b1f16d5` and on PR #1841. | `cmd/evolve/cli_contract_mutants_integration_test.go` | ❌ | item `cmd-evolve-darwin-suite-under-the-30m-limit` (filed 2026-11-26) |
+| [2026-11-26 — the classifier named the timeout red unknown and missed its recurrence](2026-11-26-cmd-evolve-darwin-suite-at-the-30m-limit.md) | `evolve ci classify` has no class for a `go test` timeout panic. `recurredOn` reads the main runs of `MainRunsBefore`. A run that a re-run turned green has no failure keys, so its red is not a recurrence. | `ciwatch/classify.go` (`recurredOn`), `ciwatch/classify_source.go` (`MainRunsBefore`) | ❌ | item `ci-classify-names-a-test-timeout-and-a-rerun-red` (filed 2026-11-26) |
 
 ## Prioritized gap backlog (13-agent sweep; agent confidence in parens)
 

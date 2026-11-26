@@ -22,6 +22,8 @@ func ResolveDispatchability(opts Options, taskID string) Dispatchability {
 		return PendingDispatchability(opts, ds.Deps)
 	case StateUnknown:
 		return Dispatchability{Dispatchable: true}
+	case StateDelivered:
+		return Dispatchability{Reason: "delivered: waits for the integration"}
 	default:
 		return Dispatchability{Reason: consumedReason(ds)}
 	}
@@ -38,7 +40,7 @@ func PendingDispatchability(opts Options, deps []string) Dispatchability {
 
 func blocksDependents(state string) bool {
 	switch state {
-	case StatePending, StateProcessing, StateRetry:
+	case StatePending, StateProcessing, StateRetry, StateDelivered:
 		return true
 	}
 	return false
@@ -67,8 +69,8 @@ func PlaceOnLaneMenu(opts Options, it inboxbatch.Item, isProtected func(string) 
 		return MenuConsole, reason
 	}
 	opts.resolveOpts()
-	if claimDir, _, held := claimHolding(opts.InboxDir, it.ID); held {
-		return MenuWaiting, "held by the claim of " + claimDir
+	if holder, held := HeldBy(opts.InboxDir, it.ID); held {
+		return MenuWaiting, "held by " + holder
 	}
 	if d := PendingDispatchability(opts, it.Deps); !d.Dispatchable {
 		return MenuWaiting, d.Reason
