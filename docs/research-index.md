@@ -899,6 +899,12 @@ approaches / decision / results / retro) — lives at
 |---|---|
 | [plans/cycle-recycle-and-gc-check-2026-11.md](plans/cycle-recycle-and-gc-check-2026-11.md) | Plan for a mandatory recycle step at the end of each cycle. The step writes a thin archive, then releases the cycle resources. It also adds a gc check registry. Each check has a rule, a justification and an action. The facts come from the disk-full event of 2026-11-20. |
 
+## 2026-11-21 — The change digest has one home with pinned git diff settings
+
+| Document | What it records |
+|---|---|
+| [plans/change-digest-has-one-pinned-home-2026-11.md](plans/change-digest-has-one-pinned-home-2026-11.md) | Plan to give the change digest one home in `treestate` with pinned `git diff` flags. It versions the digest, runs a shadow stage, then enforces. A structure test bans a second home. |
+
 ## 2026-11-21 — One verb decides if the running wave is healthy
 
 | Document | What it records |
