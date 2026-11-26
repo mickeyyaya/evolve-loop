@@ -31,6 +31,9 @@ func ReleaseContinuationBindingFor(opts Options, req ReleaseRequest) (continuati
 	if strings.TrimSpace(scopeID) == "" {
 		return continuation.Continuation{}, false, fmt.Errorf("inboxmover: empty scope id is not releasable")
 	}
+	if _, delivered := deliveredAt(opts.InboxDir, scopeID); delivered {
+		return continuation.Continuation{}, false, nil
+	}
 	c, ok, err := continuation.ReadRegistryEntry(opts.ProjectRoot, scopeID)
 	if err != nil {
 		return continuation.Continuation{}, false, fmt.Errorf("inboxmover: continuation registry unreadable while releasing %q: %w", scopeID, err)

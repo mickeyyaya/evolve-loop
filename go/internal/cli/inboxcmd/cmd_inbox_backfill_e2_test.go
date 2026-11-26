@@ -471,6 +471,7 @@ func TestClaimExitCode_MapsEveryClaimOutcome(t *testing.T) {
 		{"move failed", fmt.Errorf("x: %w", inboxmover.ErrMvFailed), 2, ""},
 		{"console routed", inboxmover.ErrConsoleRouted, 3, ""},
 		{"waiting on a dependency", fmt.Errorf("item a: %w", inboxmover.ErrWaitingOnDependency), 4, ""},
+		{"delivered", fmt.Errorf("item a: %w", inboxmover.ErrDelivered), 3, ""},
 		{"an unclassified error", errors.New("disk on fire"), 1, "[inbox-mover] ERROR: disk on fire\n"},
 	}
 	for _, tc := range cases {

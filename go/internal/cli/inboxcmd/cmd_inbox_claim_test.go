@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxtest"
 	"os"
 	"path/filepath"
@@ -135,6 +136,9 @@ func TestReportInboxClaimError_AnUnknownErrorIsAnIOError(t *testing.T) {
 	var stderr bytes.Buffer
 	if rc := reportInboxClaimError(errors.New("disk gone"), &stderr); rc != exitIO || !strings.Contains(stderr.String(), "disk gone") {
 		t.Errorf("rc = %d stderr = %q, want 2 and the cause", rc, stderr.String())
+	}
+	if rc := reportInboxClaimError(fmt.Errorf("item a: %w", inboxmover.ErrDelivered), &stderr); rc != exitRefused {
+		t.Errorf("a delivered item: rc = %d, want %d", rc, exitRefused)
 	}
 	if rc := reportInboxClaimError(inboxmover.ErrBadArgs, &stderr); rc != exitUsage {
 		t.Errorf("a bad argument: rc = %d, want 10", rc)

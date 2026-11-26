@@ -124,6 +124,9 @@ func ReleaseStaleClaims(opts Options, reason string) ([]ClaimRelease, error) {
 	released := []ClaimRelease{}
 	var errs []error
 	for _, it := range list.Items {
+		if _, delivered := deliveredAt(opts.InboxDir, it.ID); delivered {
+			continue
+		}
 		holder := judge.classify(it.Cycle)
 		if holder.Keeps() {
 			continue

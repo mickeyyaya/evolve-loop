@@ -48,7 +48,7 @@ func reportInboxClaimError(err error, stderr io.Writer) int {
 		return exitUsage
 	case errors.Is(err, inboxmover.ErrNotFound):
 		return exitFailed
-	case errors.Is(err, inboxmover.ErrConsoleRouted), errors.Is(err, inboxmover.ErrWaitingOnDependency):
+	case inboxmover.IsClaimRefusal(err):
 		return exitRefused
 	}
 	return exitIO

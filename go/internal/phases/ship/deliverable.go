@@ -76,6 +76,7 @@ func (s *worktreeShip) deliver(commit, pending string) (bool, error) {
 		return false, err
 	}
 	s.result.CommitSHA = commit
+	s.result.Delivered = true
 	s.logf("[ship] DELIVERED: %s holds the record of cycle %d; ship stops before %s", path, rec.Cycle, s.branch)
 	return true, nil
 }

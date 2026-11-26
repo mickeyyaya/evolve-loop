@@ -111,6 +111,8 @@ func claimExitCode(err error, stderr io.Writer) int {
 		return 3
 	case errors.Is(err, inboxmover.ErrWaitingOnDependency):
 		return 4
+	case inboxmover.IsClaimRefusal(err):
+		return 3
 	}
 	fmt.Fprintf(stderr, "[inbox-mover] ERROR: %v\n", err)
 	return 1
