@@ -92,7 +92,7 @@ Not in G4:
 | `go/internal/baseattr` (new) | `Key`, `Reds`, `Verdict`, `ParseGoTest`, `Attributor`, the detached-tree runner | `gitexec`, `sysexec`, `ipcenv`, `lanebudget`, `addedtests`, stdlib |
 | `go/internal/mainstop` (new) | the stop record, its pure transitions, the fix proof, the store | `baseattr`, `adapters/flock`, `paths`, stdlib |
 | `go/internal/core` | the floor adapters, the park route, the build-floor stop opener | adds `baseattr`, `mainstop` |
-| `go/internal/phases/ship` | the ship attribution and the stop check | adds `baseattr`, `mainstop` |
+| `go/internal/phases/ship` | the ship attribution and the stop check | adds `baseattr`, `mainstop`, `ciwatch` |
 | `go/internal/phases/audit/ciparitygate` | the tier and acs-durable attribution | adds `baseattr` |
 | `go/internal/checkpoint` | the reason `main-red` | unchanged imports |
 | `go/internal/inboxrank`, `rankinputs` | the lead list | `rankinputs` adds `mainstop` |
@@ -369,7 +369,11 @@ The park route in `recoverShipErrorRoute`: for `CodeMainRedPark`, call `MainRedB
 - A landing that passes `AdmitFix` releases its green keys. An attribution run that finds each stop key green on the current tip also releases, with `ReleasedBy: "main <sha>"`.
 - Release emits `MAIN_RED_STOP_RELEASED` and moves the fix item to `processed` if it is still open.
 
+The stop opens from the required CI run of `main` only for a test key that a run at the main commit finds red. The rule is in [the plan](../plans/main-red-stop-provable-means-a-lane-can-prove-it-2026-11.md).
+
 ### 7.6 Fix item, signal and bound
+
+A red CI row that no prover can run emits `SHIP_MAIN_RED_CI_UNPROVABLE` once for each main commit. It opens no stop. See [the plan](../plans/main-red-stop-provable-means-a-lane-can-prove-it-2026-11.md).
 
 - `FixItemID` is `fix-main-red-<first 8 of MainSHA>`. Fields: kind `pipeline-repair`, class `correctness`, weight 1.0, the key packages as `files`, acceptance "each key is green on main".
 - `rankinputs.Load` reads the stop. While it holds, `Inputs.Lead` is `[FixItem]`, and `Order` puts lead ids first in the given order. This is data, not a score change.
@@ -427,6 +431,7 @@ New `GateGuarantee` rows in `guards/integrity_surface.go`, in the commit that ad
 - `/go/internal/baseattr/` and `/go/internal/mainstop/`;
 - `/go/internal/core/repo_contract_floor.go` and `/go/internal/core/base_red_floor.go` (the new adapter file);
 - `/go/internal/core/main_red_park.go` and `/go/internal/phases/ship/base_red.go`;
+- `/go/internal/phases/ship/main_red_stop.go` and `/go/internal/phases/ship/main_red_ci.go` (the stop check and the CI source of the stop);
 - `/go/internal/inboxrank/rankinputs/` (the lead list decides what runs first).
 - `/go/internal/integration/stopgate.go`, `/go/internal/selfheal/main_red_hold.go` and `/go/internal/selfheal/main_red_release.go` (section 13).
 
