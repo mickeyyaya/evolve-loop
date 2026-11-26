@@ -109,6 +109,23 @@ func noStageFault(t *testing.T, events []signalcenter.Event) {
 	}
 }
 
+func TestStageLedgerReaderFollowsSymlinkedLedgerToItsStore(t *testing.T) {
+	t.Parallel()
+	realRoot := stageE2ERoot(t)
+	runStageE2ECycle(t, realRoot)
+
+	worktreeRoot := stageE2ERoot(t)
+	link := filepath.Join(worktreeRoot, ".evolve", "ledger.jsonl")
+	if err := os.Symlink(filepath.Join(realRoot, ".evolve", "ledger.jsonl"), link); err != nil {
+		t.Fatal(err)
+	}
+
+	byKey := reportByKey(t, worktreeRoot)
+	if r := byKey[ladderStageKey]; r.Decisions != 1 || r.Error != "" || len(r.IncompleteScopes) != 0 {
+		t.Errorf("symlinked ladder line = %+v, want one counted decision from the target store and no error", r)
+	}
+}
+
 func TestStageReportWithoutChainReadsLedger(t *testing.T) {
 	t.Parallel()
 	root := stageE2ERoot(t)

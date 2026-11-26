@@ -12,7 +12,6 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/acsrunner"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
-	"github.com/mickeyyaya/evolve-loop/go/internal/overlap"
 )
 
 func l2TipRepo(t *testing.T) (integration.Repo, string) {
@@ -85,7 +84,7 @@ func TestL2Adapters_ACommandThatCannotStartIsAHostFailureAndAKilledOneIsNamed(t 
 	}
 }
 
-func TestL2Adapters_TheStageFallsBackToShadowAndTheGateAndVerdictsAnswer(t *testing.T) {
+func TestL2Adapters_TheStageFallsBackToShadowAndTheVerdictsAnswer(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	writeL2Policy(t, root, `{"fleet":{"integration":{"stage":"bogus"}}}`)
@@ -96,9 +95,6 @@ func TestL2Adapters_TheStageFallsBackToShadowAndTheGateAndVerdictsAnswer(t *test
 	writeL2Policy(t, root, enforceL2PolicyJSON)
 	if got := l2Stage(root, io.Discard); got != "enforce" {
 		t.Errorf("l2Stage = %q, want enforce", got)
-	}
-	if err := l2NoGate(context.Background(), "", *new(overlap.Tier)); err != nil {
-		t.Errorf("l2NoGate = %v", err)
 	}
 	v := &tipVerdicts{green: map[string]bool{}}
 	if v.Green("t", "p") {

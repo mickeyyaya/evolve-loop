@@ -139,7 +139,11 @@ func (b *loopBatchCoordinator) productionEnforceActor(repo integration.Repo, poo
 	}
 	env := envOf(b.cfg.ProjectRoot, b.clock())
 	ports := env.ports()
-	composer := integration.Composer{Repo: ports.Repo, Regen: env.regenPort(ports.Repo, b.cfg.ProjectRoot, b.stderr)}
+	composer := integration.Composer{
+		Repo:  ports.Repo,
+		Gate:  l2Gate(l2Checkout(ports.Repo, b.cfg.EvolveDir), env.Run),
+		Regen: env.regenPort(ports.Repo, b.cfg.ProjectRoot, b.stderr),
+	}
 	return integration.EnforceActor{
 		Repo:    repo,
 		Merger:  env.enforceMerger(b.cfg.ProjectRoot, b.stderr),

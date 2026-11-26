@@ -36,7 +36,7 @@ func sysL2Command(ctx context.Context, dir string, argv ...string) (string, int,
 func (e integrationEnv) batchTest(repo integration.Repo, projectRoot string, warn io.Writer) integration.BatchTest {
 	checkout := l2Checkout(repo, paths.EvolveDirOf(projectRoot))
 	return integration.BatchTest{
-		Composer:   integration.Composer{Repo: repo, Stage: l2Stage(projectRoot, warn), Gate: l2NoGate},
+		Composer:   integration.Composer{Repo: repo, Stage: l2Stage(projectRoot, warn), Gate: l2Gate(checkout, e.Run)},
 		Affected:   l2Affected(checkout),
 		Test:       l2PackageTest(checkout, e.Run),
 		Predicates: l2Predicates(checkout),
@@ -54,7 +54,39 @@ func l2Stage(projectRoot string, warn io.Writer) string {
 	return stage
 }
 
-func l2NoGate(context.Context, string, overlap.Tier) error { return nil }
+type gateStep struct {
+	name string
+	argv []string
+}
+
+func l2Gate(checkout integration.Checkout, run integration.Command) integration.Gate {
+	return func(ctx context.Context, tip string, tier overlap.Tier) error {
+		dir, release, err := checkout(ctx, tip)
+		if err != nil {
+			return err
+		}
+		defer release()
+		steps := []gateStep{{name: "build", argv: []string{"go", "build", "./..."}}}
+		if tier == overlap.T3 || tier == overlap.T4 {
+			steps = append(steps, gateStep{name: "vet", argv: []string{"go", "vet", "./..."}})
+		}
+		goDir := filepath.Join(dir, "go")
+		var failures []string
+		for _, step := range steps {
+			_, exit, err := run(ctx, goDir, step.argv...)
+			if err != nil {
+				return acsrunner.HostFailure(err)
+			}
+			if exit != 0 {
+				failures = append(failures, step.name)
+			}
+		}
+		if len(failures) > 0 {
+			return &integration.GateRed{Failures: failures}
+		}
+		return nil
+	}
+}
 
 func l2Checkout(repo integration.Repo, evolveDir string) integration.Checkout {
 	return func(ctx context.Context, tip string) (string, func(), error) {

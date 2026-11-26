@@ -40,7 +40,7 @@ func writeIntegrationStage(t *testing.T, evolveDir, stage string) {
 	writeE2File(t, filepath.Join(evolveDir, "policy.json"), `{"fleet":{"integration":{"stage":"`+stage+`"}}}`)
 }
 
-func TestProductionDriver_CheckRefusesEnforceOnTheProductionCompositionToday(t *testing.T) {
+func TestProductionDriver_CheckRefusesEnforceOnTheProductionCompositionWithoutTheLedgerPorts(t *testing.T) {
 	t.Parallel()
 	b, _ := driverCoordinator(t)
 	b.cfg.Epoch = integration.NewEpochHolder(b.cfg.EvolveDir)
@@ -56,8 +56,8 @@ func TestProductionDriver_CheckRefusesEnforceOnTheProductionCompositionToday(t *
 	if !errors.As(err, &refusal) || refusal.Stage != policy.FleetIntegrationEnforce {
 		t.Fatalf("Check = %v, want a MissingPortError at enforce", err)
 	}
-	if want := []string{"Requeue", "Promote", "Briefs", "Gate"}; !slices.Equal(refusal.Ports, want) {
-		t.Fatalf("missing ports = %v, want %v: the root wires the merge, the plane sync and the batcher, and nothing else", refusal.Ports, want)
+	if want := []string{"Requeue", "Promote", "Briefs"}; !slices.Equal(refusal.Ports, want) {
+		t.Fatalf("missing ports = %v, want %v: the root wires the merge, the plane sync, the batcher and its gate, and nothing else", refusal.Ports, want)
 	}
 }
 

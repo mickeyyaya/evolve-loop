@@ -237,7 +237,9 @@ The file is `stopgate.go`. The design is in [gate-contract-g4-base-red-attributi
 - **The L2 pack (cycle 2442).** `L2Pack` gives six `PackStep` values: repo-contract, cover-changed, cover-strict, build, vet and gofmt. Each step checks out the tip and runs one command in `<checkout>/go`.
   - A non-zero exit is red, and a gofmt listing is red. The first red step ends the pack.
   - A command error is a host failure.
-  - The composer gate of the L2 stays a no-op, because `Check` composes in shadow.
+  - The composer gate of L2 runs `l2Gate`, and `Check` composes in shadow.
+  - `l2Gate` checks out each composed tip, runs `go build` for `T1` and `T2`, and runs `go build` and `go vet` for `T3` and `T4`.
+  - `TestGateSoak_ABatchOfMembersCostsTwoGateCommandsPerMemberAndMergesAll` measured `BatchTest cost per batch: 944 ms` for 4 members.
 
 ## The commit chain of a PR
 
@@ -258,7 +260,7 @@ The files are `consolepr.go`, `train.go` and `deliverable.go`.
 ## The production enforce actor (I14 slice 1)
 
 - **The lane batcher.** `LaneBatcher.For(PendingBatch)` returns the `Merger.Compose` function of one flush. Each call deletes the ref `PoolBranch(pool, index)`, fetches `origin/main` with the explicit refspec, and cuts the branch from the live head. So a recheck, a red split or a second flush cuts from the main of that moment.
-  - The composer stage is always `enforce`. `Missing()` returns `Gate` while the composer has none.
+  - The composer stage is always `enforce`. `Missing()` returns `Gate` only when `Composer.Gate` is nil, and `productionEnforceActor` wires `l2Gate`.
   - Pinned by `TestLaneBatcher_AReCompositionAndASecondFlushCutFromTheLiveOriginMain`.
 - **The compose rule.** `LaneBatcher` calls `Composer.composeAll`, the same loop as the train and the dry plan. It cuts through `Repo.CutFromOrigin`, which `StartBatchFromOrigin` also calls. So the plan and the enforce path cannot differ.
 - **The stop gate.** The production `Merger` comes from `integrationEnv.enforceMerger`, which wraps `CI` and `Main` in the `StopGate` of the train.
@@ -270,4 +272,4 @@ The files are `consolepr.go`, `train.go` and `deliverable.go`.
 - **An ejection with no `Requeue` port** records a `DriverFailure` and returns an error. `LandingFeed` and `EnforceActor.Landing` no longer exist: the window feed lives in `orchestrator.Oversight`.
 - **Persist before return.** `Driver.flush` copies `FlushResult.Batch`, `Members` and `Failures` into the record and adds the decision before it returns a `Flush` error. A merge followed by an error is thus persisted (`TestDriverFlush_AMergeFollowedByAnErrorStillPersistsMerged`).
 - **Telemetry.** `publishFlush` and `fail` name the real stage and the PR of the batch. They stamp `shadow` only at the stage `shadow`. `IsShadow(fields)` reads that stamp.
-- **Limits.** Enforce stays refused until slices 2 and 4 supply the ports and the gate. The batcher fetch has its own refspec until `integration-sync-to-origin-uses-the-mainsync-fetch` lands.
+- **Limits.** Enforce stays refused until slice 2 supplies the ledger ports; slice 4 wired `l2Gate` into the production batcher and L2. The batcher fetch has its own refspec until `integration-sync-to-origin-uses-the-mainsync-fetch` lands.
