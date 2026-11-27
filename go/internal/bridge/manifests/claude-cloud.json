@@ -16,6 +16,7 @@
   "transcript": null,
   "prompt_marker": null,
   "transient_regex": null,
+  "shell_count_regex": null,
   "default_args": [],
   "default_model": null,
   "update_argv": null,

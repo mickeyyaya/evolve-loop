@@ -12,6 +12,11 @@ import (
 
 func publishedSnapshotFor(t *testing.T, pane string) panewatch.Snapshot {
 	t.Helper()
+	return publishedSnapshotForLaunch(t, pane, tmuxLaunch{name: "claude-tmux", session: "evolve-bridge-c7-build-pid1-n1-1", launchCmd: "x", promptMarker: "❯", bootIntervalS: 1})
+}
+
+func publishedSnapshotForLaunch(t *testing.T, pane string, lp tmuxLaunch) panewatch.Snapshot {
+	t.Helper()
 	ws := t.TempDir()
 	pf := writeJSON(t, filepath.Join(ws, "p.txt"), "hi")
 	artifact := filepath.Join(ws, "a")
@@ -33,7 +38,6 @@ func publishedSnapshotFor(t *testing.T, pane string) panewatch.Snapshot {
 		}
 	}
 	deps.Tmux = &fakeTmux{paneSeq: []string{pane}}
-	lp := tmuxLaunch{name: "claude-tmux", session: "evolve-bridge-c7-build-pid1-n1-1", launchCmd: "x", promptMarker: "❯", bootIntervalS: 1}
 	if code, _ := runTmuxREPL(context.Background(), cfg, deps, lp); code != ExitOK {
 		t.Fatalf("code=%d, want ExitOK", code)
 	}
@@ -56,5 +60,14 @@ func TestRunTmuxREPL_PublishesNoShellsWhenTheFooterShowsNone(t *testing.T) {
 	snap := publishedSnapshotFor(t, "● working\n❯\n  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents")
 	if snap.Shells != 0 {
 		t.Errorf("snapshot Shells = %d, want 0 for a footer with no shell: %+v", snap.Shells, snap)
+	}
+}
+
+func TestRunTmuxREPL_PublishesTheAgyBackgroundTaskCountFromTheFooter(t *testing.T) {
+	t.Parallel()
+	lp := tmuxLaunch{name: "agy-tmux", session: "evolve-bridge-c7-build-pid1-n1-2", launchCmd: "x", promptMarker: ">", bootIntervalS: 1}
+	snap := publishedSnapshotForLaunch(t, "● running go test\n>\n? for shortcuts  auto · Gemini 4 Hydrogen · high · 1 task(s) · /tasks", lp)
+	if snap.Shells != 1 {
+		t.Errorf("snapshot Shells = %d, want 1 for an agy footer that shows 1 task(s): %+v", snap.Shells, snap)
 	}
 }

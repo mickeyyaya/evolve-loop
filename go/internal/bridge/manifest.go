@@ -83,6 +83,7 @@ type Manifest struct {
 	BusyLineRegex           string                   `json:"busy_line_regex,omitempty"`
 	TokenLineRegex          string                   `json:"token_line_regex,omitempty"`
 	ModelLabelRegex         string                   `json:"model_label_regex,omitempty"`
+	ShellCountRegex         string                   `json:"shell_count_regex,omitempty"`
 	Stub                    bool                     `json:"stub"`
 	ModelTierMap            map[string]string        `json:"model_tier_map,omitempty"`
 	ModelTierMapFrom        string                   `json:"model_tier_map_from,omitempty"`
