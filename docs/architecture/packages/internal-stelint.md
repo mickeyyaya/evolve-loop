@@ -17,6 +17,7 @@
 
 ## Design
 
+- **One reader of the generated-region markers.** `RegionEdge` returns 1 for a line that begins a `GENERATED:` region, -1 for a line that ends one, and 0 for any other line. Other packages call it, so the marker grammar has one home. Pinned by `TestRegionEdge_ReadsABeginAnEndAndNeitherOfAGeneratedRegion`.
 - **One home for the word list.** `ParseWordTable` reads the table under the heading "House list of words to replace" in `docs/conventions/ste100-writing.md`. The Go code has no copy of the list. A standard without the table, or with a row that has no replacement, is an error.
 - **Blocks first.** `Check` splits a document into paragraphs. A paragraph is a block of text lines between blank lines. A list item is a paragraph, and each table cell is a paragraph.
 - **Three kinds of paragraph.** A numbered list item has the limit of 20 words. The standard calls it a numbered item: a step, or a rule or a decision that other text cites by its number. Other prose has the limit of 25 words. A heading (ATX or setext) is checked against the house list only, with no length rule. Only a prose paragraph becomes a setext heading. A `---` line after a list item is a rule, so the item keeps its length rule.
