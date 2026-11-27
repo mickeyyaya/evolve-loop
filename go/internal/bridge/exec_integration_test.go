@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -54,6 +56,18 @@ func TestExecRunner_Real(t *testing.T) {
 	wantPwd, _ := filepath.EvalSymlinks(dir)
 	if gotPwd != wantPwd {
 		t.Fatalf("subprocess cwd = %q, want dir %q", gotPwd, wantPwd)
+	}
+}
+
+func TestExecRunner_ADescendantHoldingTheOutputOpenIsStillSuccess(t *testing.T) {
+	t.Parallel()
+	var out, errw bytes.Buffer
+	code, err := execRunner(itBoundedContext(t, itLaunchDeadline), "sh", "", []string{"-c", "sleep 30 & echo $!; exit 0"}, os.Environ(), nil, &out, &errw)
+	if pid, perr := strconv.Atoi(strings.TrimSpace(out.String())); perr == nil {
+		t.Cleanup(func() { _ = syscall.Kill(pid, syscall.SIGKILL) })
+	}
+	if code != 0 || err != nil {
+		t.Fatalf("execRunner = (%d, %v), want (0, nil): the command exited 0", code, err)
 	}
 }
 

@@ -202,7 +202,7 @@ func TestRealizeFor_ClaudePCarriesTheDenyListOnce(t *testing.T) {
 	if slices.Contains(flags, "--allowedTools") {
 		t.Fatalf("claude-p emits --allowedTools from the driver; the realization must not repeat it: %v", flags)
 	}
-	args, _ := claudePArgs(&Config{AllowedTools: intent.AllowedTools, Realization: RealizeFor("claude-p", intent)}, "the prompt")
+	args := claudePArgs(&Config{AllowedTools: intent.AllowedTools, Realization: RealizeFor("claude-p", intent)}, "the prompt")
 	denies := 0
 	for _, a := range args {
 		if a == "--disallowedTools" {

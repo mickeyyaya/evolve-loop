@@ -1,0 +1,3 @@
+{"type":"system","subtype":"init","session_id":"s1","model":"claude-sonnet-5-5"}
+{"type":"rate_limit_event","rate_limit_info":{"status":"rejected"}}
+{"type":"result","subtype":"success","is_error":true,"result":"You've hit your limit · resets 3pm (UTC)","session_id":"s1"}

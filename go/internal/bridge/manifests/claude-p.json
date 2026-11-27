@@ -22,6 +22,23 @@
   "prompt_marker": null,
   "default_model": "haiku",
   "default_args": ["--strict-mcp-config"],
+  "model_tier_map_from": "claude-tmux",
+  "params_from": {"cli": "claude-tmux", "keys": ["permission", "settings_scope", "system_prompt_file", "model_tier"]},
+  "named_regexes": {
+    "auth_phrases": "(?i)(invalid api key|not logged in|login expired|oauth token (has expired|revoked)|authentication_error|please run /login)",
+    "usage_wall_line": "(?im)^\\s*(?:error:\\s*)?(?:claude ai usage limit reached|you(?:.?ve| have) (?:hit|reached) your (?:\\w+ )?limit)"
+  },
+  "headless_outcome": {
+    "rules": [
+      {"pattern": "auth_recheck", "source": "result", "regex_from": "claude-tmux:prompt:auth_recheck"},
+      {"pattern": "auth_recheck", "source": "result", "regex_from": "claude-p:regex:auth_phrases"},
+      {"pattern": "auth_recheck", "source": "stderr", "regex_from": "claude-p:regex:auth_phrases"},
+      {"pattern": "rate_limit", "source": "result", "regex_from": "claude-tmux:control:usage"},
+      {"pattern": "rate_limit", "source": "result", "regex_from": "claude-tmux:prompt:rate_limit"},
+      {"pattern": "rate_limit", "source": "result", "regex": "(?i)you(?:.?ve| have) (?:hit|reached) your (?:\\w+ )?limit|rate_limit_error"},
+      {"pattern": "rate_limit", "source": "stderr", "regex_from": "claude-p:regex:usage_wall_line"}
+    ]
+  },
   "params": {
     "effort": {
       "channel": "flag",
