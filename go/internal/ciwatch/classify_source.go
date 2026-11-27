@@ -202,8 +202,16 @@ func (s ghClassifySource) firstParent(ctx context.Context, sha string) (string, 
 }
 
 func (s ghClassifySource) runView(ctx context.Context, id string) (RunStatus, error) {
+	return s.runViewAttempt(ctx, id, 0)
+}
+
+func (s ghClassifySource) runViewAttempt(ctx context.Context, id string, attempt int) (RunStatus, error) {
+	args := []string{"run", "view", id}
+	if attempt > 0 {
+		args = append(args, "--attempt", strconv.Itoa(attempt))
+	}
 	var doc ghRunDoc
-	if err := s.ghJSON(ctx, &doc, "run", "view", id, "--json", classifyRunFields); err != nil {
+	if err := s.ghJSON(ctx, &doc, append(args, "--json", classifyRunFields)...); err != nil {
 		return RunStatus{}, err
 	}
 	return s.withFailures(ctx, doc.status())
@@ -218,8 +226,23 @@ func (s ghClassifySource) LatestRunOn(ctx context.Context, sha string) (RunStatu
 }
 
 func (s ghClassifySource) MainRunsBefore(ctx context.Context, before time.Time, limit int) ([]RunStatus, error) {
-	return s.listRuns(ctx, "--branch", mainBranch, "--status", StatusCompleted,
+	runs, err := s.listRuns(ctx, "--branch", mainBranch, "--status", StatusCompleted,
 		"--created", "<"+before.UTC().Format(time.RFC3339), "--limit", strconv.Itoa(limit))
+	if err != nil {
+		return nil, err
+	}
+	var all []RunStatus
+	for _, r := range runs {
+		all = append(all, r)
+		for attempt := 1; attempt < r.Attempt; attempt++ {
+			prior, err := s.runViewAttempt(ctx, strconv.FormatInt(r.RunID, 10), attempt)
+			if err != nil {
+				return nil, err
+			}
+			all = append(all, prior)
+		}
+	}
+	return all, nil
 }
 
 func (s ghClassifySource) listRuns(ctx context.Context, filters ...string) ([]RunStatus, error) {
@@ -313,19 +336,25 @@ func logText(line string) (job, step, text string, ok bool) {
 	return job, step, strings.TrimSpace(rest), true
 }
 
+const timeoutPanicPrefix = "panic: test timed out after "
+
 type failureParse struct {
-	found   map[string]*FailingTest
-	pending map[string][]string
-	named   map[string]bool
-	jobs    []string
-	makes   map[string]string
-	steps   map[string]string
-	uploads map[string]string
+	found     map[string]*FailingTest
+	pending   map[string][]string
+	running   map[string][]string
+	timedOut  map[string]bool
+	inRunning map[string]bool
+	named     map[string]bool
+	jobs      []string
+	makes     map[string]string
+	steps     map[string]string
+	uploads   map[string]string
 }
 
 func scanLog(log string) *failureParse {
-	p := &failureParse{found: map[string]*FailingTest{}, pending: map[string][]string{}, named: map[string]bool{},
-		makes: map[string]string{}, steps: map[string]string{}, uploads: map[string]string{}}
+	p := &failureParse{found: map[string]*FailingTest{}, pending: map[string][]string{},
+		running: map[string][]string{}, timedOut: map[string]bool{}, inRunning: map[string]bool{},
+		named: map[string]bool{}, makes: map[string]string{}, steps: map[string]string{}, uploads: map[string]string{}}
 	for _, line := range strings.Split(log, "\n") {
 		if job, step, text, ok := logText(line); ok {
 			p.line(job, step, text)
@@ -342,6 +371,7 @@ func (p *failureParse) add(row FailingTest, job string) {
 		if !slices.Contains(prev.Jobs, job) {
 			prev.Jobs = append(prev.Jobs, job)
 		}
+		prev.Timeout = prev.Timeout || row.Timeout
 		return
 	}
 	p.found[key] = &row
@@ -362,35 +392,67 @@ func (p *failureParse) note(job, step, text string) {
 	}
 }
 
+func (p *failureParse) appendUniqueTest(m map[string][]string, job, raw string) {
+	if fields := strings.Fields(raw); len(fields) > 0 {
+		top, _, _ := strings.Cut(fields[0], "/")
+		if !slices.Contains(m[job], top) {
+			m[job] = append(m[job], top)
+		}
+	}
+}
+
 func (p *failureParse) line(job, step, text string) {
 	p.note(job, step, text)
 	if name, isFail := strings.CutPrefix(text, "--- FAIL: "); isFail {
-		if fields := strings.Fields(name); len(fields) > 0 {
-			top, _, _ := strings.Cut(fields[0], "/")
-			if !slices.Contains(p.pending[job], top) {
-				p.pending[job] = append(p.pending[job], top)
-			}
-		}
+		p.appendUniqueTest(p.pending, job, name)
 		return
+	}
+	if strings.HasPrefix(text, timeoutPanicPrefix) {
+		p.timedOut[job] = true
+		p.inRunning[job] = false
+		return
+	}
+	if p.timedOut[job] && text == "running tests:" {
+		p.inRunning[job] = true
+		return
+	}
+	if p.inRunning[job] {
+		if text != "" && !strings.HasPrefix(text, "goroutine ") && !strings.HasPrefix(text, "FAIL") {
+			p.appendUniqueTest(p.running, job, text)
+			return
+		}
+		p.inRunning[job] = false
 	}
 	fields := strings.Fields(text)
 	if len(fields) < 2 || !strings.HasPrefix(text, "FAIL\t") {
 		return
 	}
+	p.flushPackage(job, fields[1])
+}
+
+func (p *failureParse) flushPackage(job, pkg string) {
 	tests := p.pending[job]
 	delete(p.pending, job)
-	if len(tests) == 0 {
-		p.add(FailingTest{Package: fields[1]}, job)
-	}
+	running := p.running[job]
+	delete(p.running, job)
+	timedOut := p.timedOut[job]
+	delete(p.timedOut, job)
+	p.inRunning[job] = false
 	for _, test := range tests {
-		p.add(FailingTest{Package: fields[1], Test: test}, job)
+		p.add(FailingTest{Package: pkg, Test: test}, job)
+	}
+	for _, test := range running {
+		p.add(FailingTest{Package: pkg, Test: test, Timeout: true}, job)
+	}
+	if len(tests) == 0 && len(running) == 0 {
+		p.add(FailingTest{Package: pkg, Timeout: timedOut}, job)
 	}
 }
 
 func (p *failureParse) addUnnamedJobs() {
 	for _, job := range p.jobs {
 		if !p.named[job] {
-			p.add(FailingTest{Step: cmp.Or(p.makes[job], p.steps[job])}, job)
+			p.add(FailingTest{Step: cmp.Or(p.makes[job], p.steps[job]), Timeout: p.timedOut[job]}, job)
 		}
 	}
 }
@@ -399,6 +461,9 @@ func (p *failureParse) addPending() {
 	for _, job := range p.jobs {
 		for _, test := range p.pending[job] {
 			p.add(FailingTest{Test: test}, job)
+		}
+		for _, test := range p.running[job] {
+			p.add(FailingTest{Test: test, Timeout: true}, job)
 		}
 	}
 }
@@ -423,7 +488,7 @@ func attributeFailures(log string, truth []FailingTest, withJSON map[string]bool
 	for _, row := range text {
 		for _, job := range row.Jobs {
 			if !withJSON[p.uploads[job]] {
-				p.add(FailingTest{Package: row.Package, Test: row.Test}, job)
+				p.add(FailingTest{Package: row.Package, Test: row.Test, Timeout: row.Timeout}, job)
 			}
 		}
 	}

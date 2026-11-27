@@ -24,6 +24,7 @@ const (
 	LabelReal          Label = "real"
 	LabelPreExisting   Label = "pre-existing"
 	LabelFlakeEvidence Label = "flake-evidence"
+	LabelTimeout       Label = "timeout"
 	LabelUnknown       Label = "unknown"
 )
 
@@ -42,6 +43,7 @@ type FailingTest struct {
 	Detail  string   `json:"detail,omitempty"`
 	JobID   int64    `json:"job_id,omitempty"`
 	Attempt int      `json:"attempt,omitempty"`
+	Timeout bool     `json:"timeout,omitempty"`
 }
 
 type classifyRule struct {
@@ -275,11 +277,19 @@ func failuresOf(run RunStatus) []FailingTest {
 	return []FailingTest{{Jobs: jobs}}
 }
 
+func classifyFailure(f FailingTest, e Evidence) (Label, string) {
+	label, rule := classify(e)
+	if f.Timeout && label != LabelPreExisting && label != LabelReal {
+		return LabelTimeout, string(LabelTimeout)
+	}
+	return label, rule
+}
+
 func classifyFailures(failures []FailingTest, evidence func(FailingTest) Evidence) []ClassifiedFailure {
 	out := make([]ClassifiedFailure, 0, len(failures))
 	for _, f := range failures {
 		e := evidence(f)
-		label, rule := classify(e)
+		label, rule := classifyFailure(f, e)
 		out = append(out, ClassifiedFailure{FailingTest: f, Evidence: e, Label: label, Rule: rule})
 	}
 	return out

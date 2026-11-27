@@ -365,3 +365,104 @@ func TestParseFailingTests_ReadsTheRenderedTextOfAJSONRun(t *testing.T) {
 		t.Errorf("parseFailingTests:\n got %+v\nwant %+v", got, want)
 	}
 }
+
+func TestClassifyTarget_TimeoutPanicClassifiesAndKeepsPrecedence(t *testing.T) {
+	timeoutLog := ghLog("unit (macos)",
+		"panic: test timed out after 30m0s",
+		"\trunning tests:",
+		"\t\tTestSlowAlpha (30m0s)",
+		"\t\tTestSlowBeta/sub (30m0s)",
+		"",
+		"goroutine 33 [running]:",
+		"FAIL\tm/cmd/evolve\t1800.123s",
+	)
+	touchedLog := ghLog("unit (macos)",
+		"panic: test timed out after 30m0s",
+		"\trunning tests:",
+		"\t\tTestTouchedSlow (30m0s)",
+		"FAIL\tm/touched\t1800.123s",
+	)
+	baseLog := ghLog("unit (macos)",
+		"panic: test timed out after 30m0s",
+		"goroutine 1 [running]:",
+		"FAIL\tm/pkg\t1800.0s",
+	)
+	truncatedLog := ghLog("unit (macos)",
+		"panic: test timed out after 30m0s",
+		"\trunning tests:",
+		"\t\tTestOrphanSlow (30m0s)",
+	)
+	stepOnlyLog := ghLog("unit (macos)", "panic: test timed out after 30m0s")
+	nonTimeoutLog := ghLog("unit (macos)",
+		"running tests:",
+		"\t\tTestPrinted (0s)",
+		"panic: runtime error: index out of range",
+		"FAIL\tm/cmd/evolve\t0.5s",
+	)
+
+	fakeGHExec(t, map[string]string{
+		"run view 501 --json":                                 `{"attempt":1,"conclusion":"failure","createdAt":"2026-10-01T12:00:00Z","databaseId":501,"headSha":"h","status":"completed","url":"u"}`,
+		"run view 501 --log-failed --attempt 1":               timeoutLog + touchedLog + baseLog,
+		"api repos/{owner}/{repo}/actions/runs/501/artifacts": `{"total_count":0,"artifacts":[]}`,
+		"run view 501 --attempt 1 --json jobs":                `{"jobs":[]}`,
+		"api repos/{owner}/{repo}/compare/main...h":           `{"status":"ahead","merge_base_commit":{"sha":"b"},"files":[{"filename":"go/touched/x.go"}]}`,
+		"run list --workflow":                                 `[{"attempt":1,"conclusion":"failure","createdAt":"2026-10-01T11:00:00Z","databaseId":401,"headSha":"b","status":"completed","url":"u401"}]`,
+		"run view 401 --log-failed --attempt 1":               baseLog,
+		"api repos/{owner}/{repo}/actions/runs/401/artifacts": `{"total_count":0,"artifacts":[]}`,
+		"run view 401 --attempt 1 --json jobs":                `{"jobs":[]}`,
+	}, "")
+	rep, err := ClassifyTarget(context.Background(), NewGHClassifySource(".", "m"), Target{TargetRun, "501"}, ClassifyOptions{MainWindow: 5, ModulePath: "m", ModuleDir: "go"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotLabels := map[string]Label{}
+	for _, f := range rep.Failures {
+		gotLabels[f.Package+":"+f.Test] = f.Label
+	}
+	if gotLabels["m/cmd/evolve:TestSlowAlpha"] != LabelTimeout || gotLabels["m/cmd/evolve:TestSlowBeta"] != LabelTimeout {
+		t.Errorf("timeout running tests = %v, want LabelTimeout (%s)", gotLabels, LabelTimeout)
+	}
+	if gotLabels["m/touched:TestTouchedSlow"] != LabelReal {
+		t.Errorf("touched timeout = %v, want real", gotLabels)
+	}
+	if gotLabels["m/pkg:"] != LabelPreExisting {
+		t.Errorf("base-red timeout = %v, want pre-existing", gotLabels)
+	}
+	if trunc := parseFailingTests(truncatedLog); len(trunc) != 1 || trunc[0].Test != "TestOrphanSlow" || !trunc[0].Timeout {
+		t.Errorf("truncated timeout = %+v", trunc)
+	}
+	if step := parseFailingTests(stepOnlyLog); len(step) != 1 || step[0].Step != "Run make test" || !step[0].Timeout {
+		t.Errorf("step-only timeout = %+v", step)
+	}
+	if plain := parseFailingTests(nonTimeoutLog); len(plain) != 1 || plain[0].Test != "" || plain[0].Timeout {
+		t.Errorf("non-timeout log with running tests text = %+v", plain)
+	}
+	attr := attributeFailures(ghLog("jsonjob", "Artifact coverage-a has been successfully uploaded!")+timeoutLog, []FailingTest{{Package: "m/j", Test: "TestJ", Jobs: []string{"coverage-a"}}}, map[string]bool{"coverage-a": true})
+	if len(attr) != 3 || !attr[0].Timeout || attr[2].Timeout {
+		t.Errorf("attributeFailures timeout preservation = %+v", attr)
+	}
+}
+
+func TestNewGHClassifySource_MainRunsBeforeExpandsPriorAttempts(t *testing.T) {
+	answers := map[string]string{
+		"run list --workflow":                                 `[{"attempt":2,"conclusion":"success","createdAt":"2026-10-01T11:00:00Z","databaseId":401,"headSha":"m1","status":"completed","url":"u401"}]`,
+		"run view 401 --attempt 1 --json":                     `{"attempt":1,"conclusion":"failure","createdAt":"2026-10-01T11:00:00Z","databaseId":401,"headSha":"m1","status":"completed","url":"u401"}`,
+		"run view 401 --log-failed --attempt 1":               ghLog("j", "--- FAIL: TestK (0.01s)", "FAIL\tm/p\t0.1s"),
+		"api repos/{owner}/{repo}/actions/runs/401/artifacts": `{"total_count":0,"artifacts":[]}`,
+		"run view 401 --attempt 1 --json jobs":                `{"jobs":[]}`,
+	}
+	fakeGHExec(t, answers, "")
+	before := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
+	runs, err := NewGHClassifySource(".", "m").MainRunsBefore(context.Background(), before, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 2 || runs[1].Attempt != 1 || len(runs[1].FailingTests) != 1 || runs[1].FailingTests[0].Test != "TestK" {
+		t.Fatalf("MainRunsBefore = %+v, want attempt 2 success and attempt 1 failing TestK", runs)
+	}
+
+	fakeGHExec(t, answers, "--attempt 1 --json attempt")
+	if _, err := NewGHClassifySource(".", "m").MainRunsBefore(context.Background(), before, 10); err == nil {
+		t.Fatal("prior attempt view failure must propagate")
+	}
+}
