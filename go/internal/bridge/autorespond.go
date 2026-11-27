@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/launchoutcome"
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge/panestream"
 	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 	"github.com/mickeyyaya/evolve-loop/go/internal/panetrust"
@@ -510,7 +511,7 @@ func (ar *autoResponder) writeEscalation(pane, patternName, reason, session stri
 	}
 	b, _ := json.MarshalIndent(report, "", "  ")
 	_ = os.WriteFile(filepath.Join(ar.workspace, "escalation-report.json"), b, 0o644)
-	fmt.Fprintf(ar.deps.Stderr, "[auto-respond] escalation report written (pattern=%s reason=%s)\n", patternName, reason)
+	fmt.Fprintln(ar.deps.Stderr, launchoutcome.EscalationLine(patternName, reason))
 }
 
 func lastLines(s string, n int) string {

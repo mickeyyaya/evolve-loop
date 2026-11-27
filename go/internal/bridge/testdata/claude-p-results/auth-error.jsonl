@@ -1,0 +1,2 @@
+{"type":"system","subtype":"init","session_id":"s1","model":"claude-sonnet-5-5"}
+{"type":"result","subtype":"success","is_error":true,"result":"Invalid API key · Please run /login","session_id":"s1"}

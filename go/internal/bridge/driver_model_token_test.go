@@ -5,59 +5,57 @@ import (
 	"testing"
 )
 
-func TestClaudePArgs_OmitsUnresolvedModelToken(t *testing.T) {
+func TestClaudePRealization_OmitsUnresolvedModelToken(t *testing.T) {
 	t.Parallel()
 	for _, tok := range unresolvedModelTokens {
 		t.Run(tok, func(t *testing.T) {
-			args, omitted := claudePArgs(&Config{Model: tok}, "prompt")
-			if containsToken(args, "--model") {
-				t.Errorf("claudePArgs(model=%q) emitted --model %v — %q names a tier, not a model; "+
-					"`claude -p --model %s` boots into the fatal \"issue with the selected model\" pane "+
-					"(cycle-262 class). The CLI's own default always beats a fatal boot.", tok, args, tok, tok)
+			r := RealizeFor("claude-p", LaunchIntent{ModelTier: tok})
+			args := claudePArgs(&Config{Model: tok, Realization: r}, "prompt")
+			if tok != "auto" {
+				if !containsToken(args, "--model") {
+					t.Errorf("tier %q must map to a real model through model_tier_map; got %v", tok, args)
+				}
+				return
 			}
-			if omitted != tok {
-				t.Errorf("claudePArgs(model=%q) reported omitted=%q, want %q — suppression must be reported so "+
-					"Launch can log the truth instead of the requested tier", tok, omitted, tok)
+			if containsToken(args, "--model") {
+				t.Errorf("token %q reached the CLI as a model: %v", tok, args)
+			}
+			if r.ModelOmitted != tok {
+				t.Errorf("ModelOmitted = %q, want %q", r.ModelOmitted, tok)
 			}
 		})
 	}
 }
 
-func TestClaudePArgs_EmitsConcreteModel(t *testing.T) {
+func TestClaudePRealization_TierTokenMapsToARealModel(t *testing.T) {
 	t.Parallel()
-	args, omitted := claudePArgs(&Config{Model: "opus"}, "prompt")
-	if !containsToken(args, "--model") || !containsToken(args, "opus") {
-		t.Errorf("claudePArgs(model=opus) = %v, want --model opus — a concrete model must still reach the CLI", args)
-	}
-	if omitted != "" {
-		t.Errorf("claudePArgs(model=opus) reported omitted=%q, want empty", omitted)
+	for tier, want := range map[string]string{"fast": "haiku", "balanced": "sonnet", "deep": "opus", "top": "opus"} {
+		r := RealizeFor("claude-p", LaunchIntent{ModelTier: tier})
+		if !containsRun(r.LaunchFlags, []string{"--model", want}) {
+			t.Errorf("tier %q realized to %v, want --model %s", tier, r.LaunchFlags, want)
+		}
 	}
 }
 
-func TestClaudePArgs_EmptyModelOmitsWithoutClaimingSuppression(t *testing.T) {
+func TestClaudePRealization_EmptyModelSendsNoFlag(t *testing.T) {
 	t.Parallel()
-	args, omitted := claudePArgs(&Config{Model: ""}, "prompt")
-	if containsToken(args, "--model") {
-		t.Errorf("claudePArgs(model=\"\") emitted --model in %v — an empty model must send no flag", args)
-	}
-	if omitted != "" {
-		t.Errorf("claudePArgs(model=\"\") reported omitted=%q, want empty", omitted)
+	r := RealizeFor("claude-p", LaunchIntent{})
+	if containsToken(r.LaunchFlags, "--model") || r.ModelOmitted != "" {
+		t.Errorf("empty model realized to %v omitted=%q, want no flag", r.LaunchFlags, r.ModelOmitted)
 	}
 }
 
 func TestClaudePArgs_PreservesNonModelArgv(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{
-		Model:          "opus",
-		PermissionMode: "plan",
-		AllowedTools:   []string{"Read", "Grep"},
-		ExtraFlags:     []string{"--bare"},
-		Realization:    Realization{LaunchFlags: []string{"--setting-sources", "project"}},
+		AllowedTools: []string{"Read", "Grep"},
+		ExtraFlags:   []string{"--bare"},
+		Realization:  RealizeFor("claude-p", LaunchIntent{Permission: "plan", SettingsScope: "project"}),
 	}
-	args, _ := claudePArgs(cfg, "the prompt")
+	args := claudePArgs(cfg, "the prompt")
 	for _, want := range []string{"-p", "the prompt", "--permission-mode", "plan", "--allowedTools", "Read", "--setting-sources", "--bare"} {
 		if !containsToken(args, want) {
-			t.Errorf("claudePArgs dropped %q during extraction; got %v", want, args)
+			t.Errorf("claudePArgs dropped %q; got %v", want, args)
 		}
 	}
 	if got := strings.Join(args[:2], " "); got != "-p the prompt" {

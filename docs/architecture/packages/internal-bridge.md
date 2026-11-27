@@ -1000,3 +1000,33 @@ Every cell environment holds `PATH=<cell-bin directory>:<host PATH>` at each iso
 - One publish rule serves the fresh root and the repair. It renames the stage into place. When that fails, it moves the old directory aside and renames again. A launch fails only when the directory is still not exact after 8 attempts. A lost race to another launcher is a success. Pinned by `TestCellBinDir_ManyConcurrentLaunchesRepairAPlantedDirectoryAllSucceed`, `TestCellBinDir_APlantedFileBesideTheLinkIsRebuiltToExactlyTheLink` and `TestCellBinDir_TheRootAndTheDirectoryAreOwnerOnly`.
 - `evolve doctor live` asks the cell for `command -v evolve` and fails when the answer is not the `cell-bin` entry. An earlier `evolve` on the user `PATH` shows there.
 - Agent-facing text names only class A verbs of `agentclass`. `TestAgentCorrections_AreClassA` in `internal/core` enforces it.
+
+## The claude-p driver has the same failure signals as claude-tmux
+
+- **The manifest declares how a failed headless run maps to a failure class.**
+  - The `headless_outcome` field of `claude-p.json` holds ordered rules.
+  - Each rule has a `pattern` (`rate_limit` or `auth_recheck`), a `source` (`result` or `stderr`) and a regex.
+  - A regex is written in the rule, or `regex_from` points at a regex that one manifest already owns. The forms are `cli:prompt:name`, `cli:control:name` and `cli:regex:name`. The last form reads the `named_regexes` map of the manifest.
+  - The two login rules share the one named regex `auth_phrases`. The stderr rate-limit rule uses the named regex `usage_wall_line`, which is anchored at the start of a line.
+  - `HeadlessOutcomeSpec.Classify` returns the pattern of the first rule that matches. A rule that does not compile, or a `regex_from` that names nothing, is an error. The driver then keeps the raw exit code and writes a warning.
+- **The driver classifies only a failed exit, and only from error evidence.**
+  - After a non-zero exit, `classifyHeadlessExit` reads the last `result` event of the stdout log and the stderr log.
+  - A `result` event with `is_error` set to false gives no evidence at all, neither from the result nor from stderr. A successful result that names a usage limit does not escalate.
+  - Only the last five non-empty lines of stderr count (`headlessStderrLines`).
+  - When stdout has no `result` event, the evidence is the last plain line of stdout. A line that parses as a stream-json event (a JSON object with a `type`) is never evidence. Such a line can hold text that the model wrote. A stream that crashes during model text with the word `rate_limit_error` stays a plain failure.
+  - On a match the driver writes the same escalation line that the auto-responder writes (`launchoutcome.EscalationLine`) and returns exit 85. The classifier then gives the cause `rate_limit` or `auth_recheck`. The family goes on the bench, and the login wall stops the loop, as on claude-tmux. A failure with no match keeps its exit code.
+  - The exact shape of a real usage-limit result is not verified against a live run. The fixtures under `testdata/claude-p-results/` follow the event types that `observerengine/stream.go` reads. `SOURCE.txt` in that folder says so.
+- **A headless stream run that stops writing gets exit 81.**
+  - The idle watch is armed only when `Config.StreamOutput` is true. A run without stream output prints nothing until the end, so it has no idle kill. Its wall clock is the context of the caller.
+  - `artifactBudget` is the one function that derives the review interval and the number of extends. The tmux wait state and the headless watch both call it. The idle limit is the full budget `interval × (1 + extends)`, the same time that a tmux seat can run without progress.
+  - `idleSource` holds the clock (`Deps.ActivityNow`), the timer (`Deps.After`) and the two log paths. Progress is growth of the total size of `StdoutLog` and `StderrLog`. The watch does not put a writer in front of `exec.Cmd`, so the child writes straight to the files.
+  - At each tick the watcher samples the sizes. Growth sets the time of the last progress. If the idle time is shorter than the budget, the watcher waits for the rest. If it equals the budget, the watcher cancels the context and the driver returns `ExitArtifactTimeout`.
+  - The driver writes the line `launchoutcome.IdleOutputLine`, `[bridge] artifact-timeout: cause=idle_output idle_s=N`. The classifier gives the sub-cause `idle_output` from it.
+  - `execRunner` returns exit 0 when `cmd.Wait` returns `exec.ErrWaitDelay` after a successful exit, as `sysexec.DefaultRunner` does. A descendant that keeps the output open is not a missing binary. Pinned by `TestExecRunner_ADescendantHoldingTheOutputOpenIsStillSuccess`.
+  - Pinned by `TestClaudePLaunch_IdleTimeoutExits81`, `TestClaudePLaunch_NonStreamRunIsNeverIdleWatched`, `TestClaudePLaunch_GrowingOutputKeepsAStreamRunAlive` and `TestIdleWatch_GrowthResetsTheClockAndSilenceFires`.
+- **The manifest projects the launch parameters of claude-tmux.**
+  - `model_tier_map_from` adopts the tier table of `claude-tmux`, so `fast`, `balanced`, `deep` and `top` map to a real model.
+  - `params_from` (`{"cli": "claude-tmux", "keys": [...]}`) adopts the specs of the named params. `claude-p.json` takes `permission`, `settings_scope`, `system_prompt_file` and `model_tier`. `LoadManifest` resolves it through `resolveManifestRefs`. A param that the manifest declares itself wins. A missing source or key is an error. No param spec is copied into `claude-p.json`.
+  - `Realize` builds the flags from these params. The `project` scope sends `--setting-sources project` and the `--settings` JSON.
+  - The driver does not build `--model` or `--permission-mode` itself. `claudePArgs` takes them from `Config.Realization`. The driver writes the system prompt file before the launch (`stateAuthority`).
+  - Pinned by `TestClaudePRealization_SeatFlagsEqualClaudeTmux`, `TestLoadManifest_ParamsFrom_ClaudePProjectsTheClaudeTmuxSeatParams`, `TestResolveParamsFrom`, `TestClaudePRealization_TierTokenMapsToARealModel` and `TestClaudePLaunch_WritesTheSystemPromptFileAndPassesIt`.
