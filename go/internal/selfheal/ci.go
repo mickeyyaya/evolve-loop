@@ -21,6 +21,8 @@ type CIRun struct {
 	Attempt    int
 	Created    time.Time
 	Updated    time.Time
+	Failures   []CIFailure
+	Unread     bool
 }
 
 func (r CIRun) evidence(at time.Time) Evidence {
@@ -59,8 +61,10 @@ func FromCIRuns(runs []CIRun, now time.Time) []Observation {
 		if r.hung(now) {
 			set.add(Observation{Class: ClassCIHang, Subject: mainBranch, Severity: signalcenter.SeverityWarn, Summary: "a CI run on main ran past the hang limit"}, r.evidence(r.Created))
 		}
-		if r.Attempt > 1 && r.Status == completed && r.Conclusion == "success" {
-			set.add(Observation{Class: ClassFlakyTest, Subject: "rerun-green", Severity: signalcenter.SeverityWarn, Summary: "a CI rerun of the same code turned green"}, r.evidence(r.Updated))
+		if r.IsRerunGreen() {
+			for _, o := range r.flakyObservations() {
+				set.add(o, r.evidence(r.Updated))
+			}
 		}
 	}
 	if latest, found := latestMain(runs); found && latest.Conclusion == "failure" {

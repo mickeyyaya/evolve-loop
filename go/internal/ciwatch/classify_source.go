@@ -234,15 +234,25 @@ func (s ghClassifySource) MainRunsBefore(ctx context.Context, before time.Time, 
 	var all []RunStatus
 	for _, r := range runs {
 		all = append(all, r)
-		for attempt := 1; attempt < r.Attempt; attempt++ {
-			prior, err := s.runViewAttempt(ctx, strconv.FormatInt(r.RunID, 10), attempt)
-			if err != nil {
-				return nil, err
-			}
-			all = append(all, prior)
+		prior, err := s.earlierAttempts(ctx, r.RunID, r.Attempt)
+		if err != nil {
+			return nil, err
 		}
+		all = append(all, prior...)
 	}
 	return all, nil
+}
+
+func (s ghClassifySource) earlierAttempts(ctx context.Context, runID int64, attempt int) ([]RunStatus, error) {
+	var out []RunStatus
+	for prior := 1; prior < attempt; prior++ {
+		st, err := s.runViewAttempt(ctx, strconv.FormatInt(runID, 10), prior)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, st)
+	}
+	return out, nil
 }
 
 func (s ghClassifySource) listRuns(ctx context.Context, filters ...string) ([]RunStatus, error) {

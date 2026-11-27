@@ -18,6 +18,7 @@ type Observation struct {
 	Severity  signalcenter.Severity
 	Evidence  []Evidence
 	Protected []string
+	ReproTest string
 	Summary   string
 }
 
