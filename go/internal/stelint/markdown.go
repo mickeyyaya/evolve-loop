@@ -132,6 +132,17 @@ func isFileMarker(line string) bool {
 	return false
 }
 
+func RegionEdge(line string) int {
+	trimmed := strings.TrimSpace(line)
+	switch {
+	case isRegionEnd(trimmed):
+		return -1
+	case isRegionBegin(trimmed):
+		return 1
+	}
+	return 0
+}
+
 func isRegionBegin(trimmed string) bool {
 	return strings.HasPrefix(trimmed, "<!--") && strings.Contains(trimmed, regionMarker) && strings.Contains(trimmed, " BEGIN")
 }

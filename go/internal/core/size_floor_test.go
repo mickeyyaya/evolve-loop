@@ -9,6 +9,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sizeratchet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/testrefs"
 )
 
 func goFunc(name string, lines int) string {
@@ -19,6 +20,7 @@ func sizeFloorRepo(t *testing.T, module string, listed int) (*gittest.Repo, stri
 	t.Helper()
 	repo := gittest.Fixture(t)
 	writeFile(t, filepath.Join(repo.Dir, module, "p", "a.go"), goFunc("F", 55))
+	writeFile(t, filepath.Join(repo.Dir, module, filepath.FromSlash(testrefs.BaselineRelPath)), `{"docs/architecture/a.md":["TestOld"]}`+"\n")
 	if listed > 0 {
 		writeFile(t, filepath.Join(repo.Dir, module, filepath.FromSlash(sizeratchet.OffendersRelPath)), `{"p.F": 60}`+"\n")
 	}

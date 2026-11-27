@@ -1,0 +1,617 @@
+{
+  "docs/architecture/acs-predicate-quality-gate.md": [
+    "TestA_B",
+    "TestA_C",
+    "TestC1005_002",
+    "TestC1062_005",
+    "TestC1062_007",
+    "TestC1108_004",
+    "TestC1108_005",
+    "TestC1222_001",
+    "TestC1222_004",
+    "TestC1241_001",
+    "TestC1241_005",
+    "TestC1313_001",
+    "TestC1469_003",
+    "TestC1488_003",
+    "TestC1580_008",
+    "TestC1678_011",
+    "TestC1718_004",
+    "TestC1737ProbeNoCycleBatchEndSink",
+    "TestC1755_007",
+    "TestC1761_",
+    "TestC1932_001",
+    "TestC1932_004",
+    "TestC2478_001",
+    "TestC2478_002",
+    "TestC442_007",
+    "TestC463_005",
+    "TestC476_002",
+    "TestC566_002",
+    "TestC766_005",
+    "TestC776_009",
+    "TestC786_001",
+    "TestC786_002",
+    "TestC986_003",
+    "TestContract_RequireChallengeToken_CoversTokenConsumingPhases",
+    "TestCurrentCycleScopeReachable",
+    "TestDropIgnoredPaths_QuotePath",
+    "TestDropIgnoredPaths_QuotePathKeepsUnignoredPaths",
+    "TestDropIgnoredPaths_QuotePathMatchesQuotedProbeOutput",
+    "TestEffortDefaults_Matrix",
+    "TestGoLanePatterns_CycleNumberDrift",
+    "TestInvariant_DuplicatePhaseRejected",
+    "TestLaneScopePin_ScoutGoalHashMismatchAbortsBeforeTriage",
+    "TestLineageKey_DatedSnapshotsStayDistinct_KnownLimitation",
+    "TestLoopUnblockProfilesRouteTimeoutPronePhasesToAgy",
+    "TestOllamaListMetadataExceptionDocumented",
+    "TestOllamaListerReachesNoModel",
+    "TestProtectedSurface_FableSkillOverlay",
+    "TestRecordTokenUsage_Tripwire_ClaudeBaseline_Silent",
+    "TestRunACSSuite_NoPredicateTreePassesAndWritesVerdict",
+    "TestSanitizeAdvisorTier_RejectsHighTopAndRawModel",
+    "TestShipDirect_CycleClass_KeepsChurnDiscardAndAddAll",
+    "TestStore",
+    "TestTrivialRebase_CarriesAuditForward",
+    "TestTrivialRebase_FailedComposedGatesRejected",
+    "TestTrivialRebase_PatchIdDriftFallsBackToReaudit",
+    "TestVerify_Scout_MissingChallengeToken_Violation",
+    "TestVerify_Scout_NoTokenFile_FailOpen",
+    "TestVerify_Scout_TokenEchoed_OK",
+    "TestVerify_Scout_WrongToken_Violation",
+    "TestX"
+  ],
+  "docs/architecture/adr/0022-launch-intent-realizer.md": [
+    "TestRun_PerAgentModelEnvKey_AgentKeyedNotPhaseKeyed"
+  ],
+  "docs/architecture/adr/0039-failure-floor-and-failure-signal-contract.md": [
+    "TestResumeLifecycle_LostLandingUsesSameTerminalFloor"
+  ],
+  "docs/architecture/adr/0044-unified-phase-recovery-protocol.md": [
+    "TestEngineLaunch_ASecondDeathReturnsExit81ToTheChain",
+    "TestEngineLaunch_DeadShellGetsOneFreshSessionAndSucceeds",
+    "TestFreshSessionRetry_OneFreshSessionForASessionRecoverableCause",
+    "TestFreshSessionRetry_TheGate"
+  ],
+  "docs/architecture/adr/0052-advisor-maximization.md": [
+    "TestArchitectureSeams_FoundationsExist"
+  ],
+  "docs/architecture/adr/0073-crosslane-mint-registry-guard-exemption.md": [
+    "TestIsScoutEvalMaterialization"
+  ],
+  "docs/architecture/adr/0075-guard-phase-hook-rewire.md": [
+    "TestPhase_AgentDuringCycleDenied"
+  ],
+  "docs/architecture/adr/0082-regression-test-impact-selection-shadow.md": [
+    "TestGenerateACSVerdict_TheShadowStageChangesNoGateDecision",
+    "TestRegressionTIAPolicy_TheBlockIsStrictDecoded",
+    "TestTheCheckedInPolicy_RunsRegressionTIAInShadow"
+  ],
+  "docs/architecture/adr/0094-runtime-corpora-tracked-upstream.md": [
+    "TestC476_002",
+    "TestSanitizeAdvisorTier_RejectsHighTopAndRawModel"
+  ],
+  "docs/architecture/adr/0104-fallback-is-a-property-of-the-bridge-handle.md": [
+    "TestTheCheckedInPolicyPutsAgyInTheLastResortTail"
+  ],
+  "docs/architecture/adr/0105-identity-preserving-fleet-rebase.md": [
+    "TestFleetRebase_Cycle1701Shape_ShipsWithoutBuildOrAudit",
+    "TestRouteRebasedExplanation_BindsTheForkPoint"
+  ],
+  "docs/architecture/adr/0106-logic-first-delivery.md": [
+    "TestTmuxDispatch_PastedPromptEndsWithTheAgentsIdentity"
+  ],
+  "docs/architecture/adr/0114-the-acs-verdict-is-always-written-and-complete.md": [
+    "TestRun_APolicyCannotReplaceTheSuitesOwnExports",
+    "TestVerdictPath_IsTheCycleVerdictFileUnderAnAbsoluteEvolveDir"
+  ],
+  "docs/architecture/adr/0149-a-test-writing-phase-that-states-fail-on-its-own-work-is-retracted-to-its-dispatch-tree.md": [
+    "TestAmplified_Cycle1493PredicatesAreDiscovered"
+  ],
+  "docs/architecture/agent-bridge-dispatch-contract.md": [
+    "TestC1255_001"
+  ],
+  "docs/architecture/audit-2026-06-15-package-map.md": [
+    "TestEveryMutexHasStressTest",
+    "TestSidecarWriter_ConcurrentEmit_NoTornLines"
+  ],
+  "docs/architecture/cell-context-index.md": [
+    "TestContextTune_NoChangeGrantsAPathOutsideTheFixedSources"
+  ],
+  "docs/architecture/code-index-cli.md": [
+    "TestCodeUsage_AggregatesCallsByPhaseAndCommand",
+    "TestCodeVerbLogged_ACallWritesOneRecordWithItsCommandAndPhase",
+    "TestSyncMain_AForeignEditInTheIndexFailsLoudlyAfterTheMergeAndKeepsTheEdit",
+    "TestSyncMain_MovesTheCodeIndexWorktreeToTheNewOriginMain",
+    "TestSyncMain_OnABranchOtherThanMainLeavesTheIndexAlone"
+  ],
+  "docs/architecture/continuation-defect-ledger.md": [
+    "TestC1290_001",
+    "TestC1290_002",
+    "TestC1290_004",
+    "TestC1292_004"
+  ],
+  "docs/architecture/contract-pipeline-test-plan.md": [
+    "TestNew_DefaultVerifyFnIsCatalogAware"
+  ],
+  "docs/architecture/decision-log-modularization.md": [
+    "TestRun_WithCoverFile"
+  ],
+  "docs/architecture/decomposition/01-outcome-recorder.md": [
+    "TestModule_ClosedSetHasOutcome"
+  ],
+  "docs/architecture/decomposition/02-failure-diagnostics.md": [
+    "TestAdoptStructuredFailure",
+    "TestArtifactTimeoutContract_ProjectsTheClassifiersConstants",
+    "TestModule_ClosedSetHasOutcome",
+    "TestWriter_Write_DiagnosisIsSignalledBeforeThePersistFailure"
+  ],
+  "docs/architecture/decomposition/03-carryover-lifecycle.md": [
+    "TestDefectLedger_PrescriptionRowsUseTheCarryoverPrefix",
+    "TestLifecycle_Append_NewTodoIsSignalledAdded",
+    "TestLifecycle_MergeMemo_EachNewEntryIsSignalledAdded",
+    "TestLifecycle_Persist_SameIDDifferentContentIsAMergeConflictSignal",
+    "TestLifecycle_RetireTriageDropped_EachRetiredIDIsSignalled",
+    "TestModule_ClosedSetHasOutcome",
+    "TestRetireTriageDropped_*"
+  ],
+  "docs/architecture/decomposition/03b-failure-learning-engine.md": [
+    "TestRepro1285",
+    "TestTruncateGoal_ProjectsTheCarryoverCap"
+  ],
+  "docs/architecture/decomposition/04-advisor.md": [
+    "TestBuildPlanPrompt_WholeCycleArray",
+    "TestBuildRoutingPrompt_FullSignalsAndTriggers",
+    "TestLaunch_PreflightOrderIsBridgeWorkspaceDepthProfile",
+    "TestLaunch_ProfileLoadFaultWarnsOnceAndAbsenceIsSilent",
+    "TestLaunch_WalksTheProfileFallbackChainAndReportsExhaustion",
+    "TestParseProposal_MalformedJSON",
+    "TestSanitizeAdvisorTier_RejectsHighTopAndRawModel",
+    "TestWriteRecallMemory"
+  ],
+  "docs/architecture/decomposition/06-inboxmover.md": [
+    "TestIntPtr",
+    "TestIntPtr_AcceptsLeadingDigits"
+  ],
+  "docs/architecture/decomposition/07-shipgitops.md": [
+    "TestIntegrate_ArgvAndLogSequencesMatchTheGoldens",
+    "TestIntegrate_DivergedFleet_TransientRebaseNeeded_StampsStep",
+    "TestIntegrate_DivergedNonFleet_PreconditionFFMergeDiverged",
+    "TestIntegrate_ResetThenFFMerge_ArgvOrderAndStreams",
+    "TestIntegrate_RunnerErrorCountsAsDivergence",
+    "TestPush_OnceGuardAndDryRunSkipTheRepair",
+    "TestWorktreeShipIntegrate_BinaryResetFailureIsTheLandingCodeNotStderr",
+    "TestWorktreeShipIntegrate_BinaryResetFailure_WarnsOnStderrToday",
+    "TestWorktreeShipIntegrate_GoldenArgvLogsAndErrors"
+  ],
+  "docs/architecture/decomposition/08-config.md": [
+    "TestApplyEnv_ConditionalMandatoryParseErrorWarns",
+    "TestLoad_UsePhaseRegistry_OnlyTheLiteralZeroDisables",
+    "TestLoader_UseRegistryZeroNeverCallsTheReader",
+    "TestParseSandboxMode_TrimsAndWarnsNamingTheCurrentDefault",
+    "TestRoutingConfigLoader_OneConstructionSite",
+    "TestWireSimulateOrchestrator_ConfigWarningRenders"
+  ],
+  "docs/architecture/decomposition/09-defectledger.md": [
+    "TestSchemaExample_CiteResolvesInTheTree",
+    "TestSecondaryArtifacts_ArmsOnlyOnContinuationWorkspaces"
+  ],
+  "docs/architecture/decomposition/10-bridgeengine.md": [
+    "TestBoundCause_300RunesThenEllipsis",
+    "TestC1562_005",
+    "TestC1562_008",
+    "TestC1580_002_NoNewExitCode",
+    "TestTimeoutCause_KnownIsExactlyTheSevenTokens"
+  ],
+  "docs/architecture/decomposition/11-phaserunner.md": [
+    "TestGoldenWriter_CaptureOnTheBase",
+    "TestLeafTestsNeverSleep",
+    "TestNew_DefaultVerifyFnHonorsPhaseIO",
+    "TestNew_DefaultVerifyFnIsCatalogAware",
+    "TestVerdictEngine_LiteralRunnerBuildsTheEngineOnce"
+  ],
+  "docs/architecture/decomposition/12-phaseobserver.md": [
+    "TestConfig_DeadFieldsHaveNoCaller",
+    "TestEmit_AppendsToEventsFile",
+    "TestGolden_EnvelopeShape",
+    "TestGolden_ReportShape",
+    "TestRunPhaseObserver_FlushesItsCenterOnReturn"
+  ],
+  "docs/architecture/decomposition/13-loopwave.md": [
+    "TestConsumedHasThreeBeliefs",
+    "TestFailedLaneCount_ProjectsToTheLeaf",
+    "TestFailedLanes_CountsErrOrNonZeroExit",
+    "TestPolicyPath_IsTheOneSpelling",
+    "TestPruneConsumed_PreservesKeysAndReturnsOriginalWhenNothingDropped",
+    "TestRefill_PicksHighestWeightNotExcludedWithFleetScopeEnv",
+    "TestSignalCenterFlush_IsWiredAtBothRoots"
+  ],
+  "docs/architecture/decomposition/14-ciparity.md": [
+    "TestAcquireTierLock_PrefersProjectRootOverWorktree",
+    "TestApicoverNewPkgGraduationDefault_TestOnlyPackageNotFlagged",
+    "TestCIParity_CaptureGoldens",
+    "TestChangedScopeForGate_NoModuleShortCircuitsBeforeDerivation",
+    "TestEnvExclusive_BridgeIsExcluded",
+    "TestFirstAttempt",
+    "TestGenuine",
+    "TestIntegrationTier_AttemptOneIsLoggedBeforeTheLockIsSought",
+    "TestTierScope_MixedSkipAndGraduationDeferred_WriteTheStderrLines",
+    "TestTierScope_PureSplitAndEnvExclusiveEventsWithoutStderr",
+    "TestTruncatedButJudged"
+  ],
+  "docs/architecture/decomposition/16-subagentrun.md": [
+    "TestWriteSubprocessLedger_LineAndTipAreByteIdenticalToTheGoldenAndChain"
+  ],
+  "docs/architecture/fleet-landing-queue.md": [
+    "TestEmbedFiles",
+    "TestGoFiles"
+  ],
+  "docs/architecture/gate-contract-g2-hermetic-guard.md": [
+    "TestC2231_001",
+    "TestFlags"
+  ],
+  "docs/architecture/gate-contract-g3-three-state-parity.md": [
+    "TestCovers_ACoveredPatternHasNoUnjudgedTreeReader",
+    "TestGateCheck_AnEntryErrorExitsTwo",
+    "TestGateCheck_RefusesARefNameAndExitsOneOnAnEnforceRed",
+    "TestGatetest_HoldsNoRawGitInitSite",
+    "TestGitAt_SetsTheAuthorAndCommitterDate",
+    "TestGoWorkflow_EveryBaseComesFromTheGateBaseStep",
+    "TestImporters",
+    "TestJudge_ADiffEntryWithNoBaseDidNotJudge",
+    "TestParity_ADateReaderAndAnMtimeReaderFail",
+    "TestParity_AGateThatDiffsAgainstHEADFails",
+    "TestParity_ANoteThatHoldsRootGivesNoProblem",
+    "TestParity_ATreeEntryThatReadsBaseFails",
+    "TestParity_AnIgnoredFileThatADiskWalkerJudgesFails",
+    "TestParity_AnUntrackedAcsDirWithACopiedHelperIsRedInAllStates",
+    "TestParity_EachCallerIsInTheIntegrationTier",
+    "TestParity_EachEntryHasAFixtureAndHoldsParity",
+    "TestParity_TheTestdupFixtureIsRedInEveryState",
+    "TestRatchetCheck_JudgesThroughTheRegistry",
+    "TestRealTree_RefusesADiffEntry",
+    "TestRegistryImporters_AreTheRootAndTheHarness",
+    "TestRepoContractFloor_AnEmptyBaseIsAWarnNotARed",
+    "TestRepoContractFloor_PassesTheLaneBase",
+    "TestRepoContractGate_AnEmptySelectionIsNotAPass",
+    "TestRepoContractPack_AShadowRedIsNotAFloorRed",
+    "TestRepoContractPack_GivesThePackTheRegistrySelection",
+    "TestResult_SplitsEachStageAndOutcome",
+    "TestShipConfig_GetsTheRegistrySelection",
+    "TestShipGate_AShadowRedLogsAndAnEnforceRedBlocks",
+    "TestShipGate_TheRootPathPassesACommitIDNeverHEAD",
+    "TestUnregisteredTests_CountIsTheCeiling",
+    "TestUnregistered_IsEmpty"
+  ],
+  "docs/architecture/harness-self-improvement.md": [
+    "TestEnforceBranchActsAtEnforce",
+    "TestLessonRecordEntryHasScorer",
+    "TestStageGateRefusesEnforceWithoutActor"
+  ],
+  "docs/architecture/interaction-protocol.md": [
+    "TestAskBroker_AdvisorOutputSchemaValidated",
+    "TestAskBroker_BudgetOneConsultPerPhase_CostRecorded",
+    "TestAskBroker_NeverOnBusyPane",
+    "TestE2E_MisplacedArtifact_SalvagedNoRedispatch",
+    "TestLiveFix_IdleGatedViaKindNudge_OncePerDecision",
+    "TestPre85Rung_ReadsAutoRespondReport_NotFinalPane",
+    "TestRedispatch_DirectiveCarriesKernelEvidenceDigest",
+    "TestRules_CannotTouchSeedsOrOtherRules",
+    "TestSalvage_NeverUpgradesVerdict",
+    "TestSalvage_RejectsTraversalSymlinkAbsolute",
+    "TestShadowRule_AutoEnforceAfterNCleanObservations"
+  ],
+  "docs/architecture/llm-isolation.md": [
+    "TestControlFlagLists_OnlyShrink",
+    "TestWriteInputIndex_TheFirstRecordOfTheCycleWinsOverALaterScope"
+  ],
+  "docs/architecture/logic-first-delivery-design.md": [
+    "TestC1678_011",
+    "TestC1736_003"
+  ],
+  "docs/architecture/model-discovery-and-catalog.md": [
+    "TestDefaultRouter_AgyAndAgyClaudeShareOneLister",
+    "TestOnceLister_AFailedListingFailsEveryEntryThatSharesIt"
+  ],
+  "docs/architecture/packages/cmd-evolve-cmdutil.md": [
+    "TestNewPromptsLoader_HonorsEnvOverride"
+  ],
+  "docs/architecture/packages/cmd-evolve.md": [
+    "TestBuildCycleEnv_ResumeAndResetWriteNoEnvName",
+    "TestC10_005",
+    "TestRunGC_LeavesTheGoBuildCacheAloneWithoutAPolicyTTL",
+    "TestTheCheckedInPolicyPutsAgyInTheLastResortTail"
+  ],
+  "docs/architecture/packages/internal-acsrunner.md": [
+    "TestExecCommand_ScrubsTheLaneIPCEnvironment"
+  ],
+  "docs/architecture/packages/internal-adapters-bridge.md": [
+    "TestInjectCorrectionPrefix"
+  ],
+  "docs/architecture/packages/internal-adapters-ledger.md": [
+    "TestC1827_001",
+    "TestC1827_002",
+    "TestC1827_004",
+    "TestVerify_DuplicatePrevHash"
+  ],
+  "docs/architecture/packages/internal-adapters-observer.md": [
+    "TestC2234_004",
+    "TestC2234_006",
+    "TestTmuxPaneProbe_CapturesOnlyTheExactListedSession"
+  ],
+  "docs/architecture/packages/internal-agentmsg.md": [
+    "TestAuthority_AnAddedCaveatCanOnlyNarrowAndNeverWidens",
+    "TestSend_TheRosterNotTheTokenStatesWhoTheDispatchIs"
+  ],
+  "docs/architecture/packages/internal-atomicwrite.md": [
+    "TestC1827_008",
+    "TestC1827_012"
+  ],
+  "docs/architecture/packages/internal-bridge-phaseidentity.md": [
+    "TestAuthority_EveryLineFitsACanonicalModeTTYLine"
+  ],
+  "docs/architecture/packages/internal-bridge.md": [
+    "TestGenerateSBPL_RunSocketIsDeniedToTheAgentAndOpenToTheHost",
+    "TestGenerateSBPL_TheAgentSignalsOnlyItsOwnProcesses",
+    "TestGenerateSBPL_TheAgentWindowGetsItsOwnTerminalAndNoOtherPane",
+    "TestGenerateSBPL_TheCycle1853ProbeGetsItsOwnServerAndLeavesTheRunServerAlive",
+    "TestLadderEffort_AgyCapsALadderEffortAboveFlashHighAndSaysSo",
+    "TestRecordTokenUsage_Tripwire_ACollectorFamilyIsRecognizedInAnyCase",
+    "TestRecordTokenUsage_Tripwire_EmptyCLI_NoPanicStillWarns",
+    "TestTmuxDispatch_PastedPromptEndsWithTheAgentsIdentity"
+  ],
+  "docs/architecture/packages/internal-cliroute.md": [
+    "TestCompile_TheOperatorTableCollapsesTheBuilderOntoTheAuditorWithoutTheL2BuilderEdit",
+    "TestResolve_BuilderBalancedOnAgyEscalatesToClaudeAtDeep",
+    "TestResolve_WalledClaudeAtDeepStepsDownNotToAgyDeep",
+    "TestRoutingHost_JudgesTheCloudSeatByTheHostsOfItsManifest"
+  ],
+  "docs/architecture/packages/internal-cliupdate.md": [
+    "TestUpdate_ASelfUpdateWhoseSmokeFailsHaltsWithoutRunningTheUpdater"
+  ],
+  "docs/architecture/packages/internal-commitgate.md": [
+    "TestInstall"
+  ],
+  "docs/architecture/packages/internal-config.md": [
+    "TestC1141_005",
+    "TestC436_015"
+  ],
+  "docs/architecture/packages/internal-core-auditfacts.md": [
+    "TestGateNames_EveryGateLabelOfGatesGoIsARemedyRowOfTheOneHome"
+  ],
+  "docs/architecture/packages/internal-core.md": [
+    "TestAuditRepairReasonPrefix_IsSingleSourced",
+    "TestBuildFloorReviewer_ChecksErrorFailsOpen",
+    "TestChainBuildFloorChecks",
+    "TestComposePlanPrompt_RealPersonaExistingExampleCarriesTierAndCLI",
+    "TestJudgmentLesson_WiredInLockstepWithFloorRecorder",
+    "TestRealPersonaFrontmatterOutputFormatEnumeratesTierCLI",
+    "TestResumePostDispatchExits_RecordTheirOutcome",
+    "TestRunCycleFromPhase_ARebaseThatProvesTheAuditedChangeShipsWithoutAReAudit",
+    "TestScopeDeltaFloorChecks_ReportsEveryOutOfScopePathWithOneCodedSignal"
+  ],
+  "docs/architecture/packages/internal-cycleoutcome.md": [
+    "TestApplyFailure_TheAuditBlockAloneRoutesTheItem",
+    "TestC1933_004_auditor_eval_existence_rule_names_path_and_rejects_acs"
+  ],
+  "docs/architecture/packages/internal-derived.md": [
+    "TestDarwinSetFile"
+  ],
+  "docs/architecture/packages/internal-evalgate.md": [
+    "TestC1685_015"
+  ],
+  "docs/architecture/packages/internal-evalqualitycheck.md": [
+    "TestC1488_003",
+    "TestC1788_008",
+    "TestC1793_006"
+  ],
+  "docs/architecture/packages/internal-faillearn.md": [
+    "TestWriteInboxItems_CollidingFilenameIsNotSilentlyDropped"
+  ],
+  "docs/architecture/packages/internal-fleet.md": [
+    "TestRunPool_AnExitHookThatRetriesLaunchesTheTodoOnceMore"
+  ],
+  "docs/architecture/packages/internal-gc.md": [
+    "TestApplyWorktrees_SalvageRemoveKeepsARestorableCopyAndTheBranch",
+    "TestC2364_001",
+    "TestC2640_001",
+    "TestC2640_010"
+  ],
+  "docs/architecture/packages/internal-integration.md": [
+    "TestBatchTest_AfterTheL1PrefixCheckTheSearchStillStartsFromTheBase",
+    "TestOutcome",
+    "TestPrefixCheck_AConflictEjectsWithNoGateRunAndTheRestLand",
+    "TestPrefixCheck_AGitFailureStopsTheCheck",
+    "TestPrefixCheck_AtShadowComposesTextuallyAndCallsNoGate",
+    "TestPrefixCheck_PassesAAndABAndFailsABCThenEjectsCWithTheDiffOfAB"
+  ],
+  "docs/architecture/packages/internal-llmroute.md": [
+    "TestC1647_001"
+  ],
+  "docs/architecture/packages/internal-logcompress.md": [
+    "TestC2248_014"
+  ],
+  "docs/architecture/packages/internal-mergegate.md": [
+    "TestDecideCadence"
+  ],
+  "docs/architecture/packages/internal-modelquery.md": [
+    "TestOllamaListMetadataExceptionDocumented",
+    "TestOllamaListerReachesNoModel",
+    "TestOllamaLister_NilRunDefaultsToExecRunner",
+    "TestRunner_CapturesCombinedOutput"
+  ],
+  "docs/architecture/packages/internal-phasecontract.md": [
+    "TestDiagnosis_ProposedMapsALowConfidenceDiagnosisToHaltAndEscalate"
+  ],
+  "docs/architecture/packages/internal-phases-audit-ciparitygate.md": [
+    "TestFleetSoak"
+  ],
+  "docs/architecture/packages/internal-phases-audit.md": [
+    "TestFleetSoak"
+  ],
+  "docs/architecture/packages/internal-phases-runner.md": [
+    "TestRun_PerAgentModelEnvKey_AgentKeyedNotPhaseKeyed"
+  ],
+  "docs/architecture/packages/internal-phases-ship.md": [
+    "TestInnerRunCycleErrorF4"
+  ],
+  "docs/architecture/packages/internal-phasespec.md": [
+    "TestTrackedPhaseDirs_RealTreeExcludesUntrackedDecoy"
+  ],
+  "docs/architecture/packages/internal-policy.md": [
+    "TestLoad_KeysOutsideTheCLIRoutingBlockStayLenient",
+    "TestSelfReviewSkill_IsTheSkillTheCompiledWriterRuleLoadsLast"
+  ],
+  "docs/architecture/packages/internal-repocontract.md": [
+    "TestSelection"
+  ],
+  "docs/architecture/packages/internal-repostate.md": [
+    "TestPresentFiles_AFailingDeletedListingIsAnErrorAfterTheFirstListing"
+  ],
+  "docs/architecture/packages/internal-retryladder.md": [
+    "TestC1973_003"
+  ],
+  "docs/architecture/packages/internal-scopedelta.md": [
+    "TestScopeDeltaFloorChecks_ReportsEveryOutOfScopePathWithOneCodedSignal"
+  ],
+  "docs/architecture/packages/internal-shipwindow.md": [
+    "TestPushWithRepair_ALostShipWindowKeepsTheIntentResumable"
+  ],
+  "docs/architecture/packages/internal-sysexec.md": [
+    "TestC2367_001"
+  ],
+  "docs/architecture/packages/internal-testkey.md": [
+    "TestImports"
+  ],
+  "docs/architecture/packages/internal-treefence.md": [
+    "TestC2357_004",
+    "TestC2357_005"
+  ],
+  "docs/architecture/packages/test-e2e.md": [
+    "TestVersionSmoke"
+  ],
+  "docs/architecture/phase-handoff-contract.md": [
+    "TestC1950_001",
+    "TestC1950_002"
+  ],
+  "docs/architecture/shadow-stage-contract.md": [
+    "TestContractPathsAreProtectedSurface",
+    "TestEmitTIADecision",
+    "TestEnforceBranchActsAtEnforce",
+    "TestHeadPolicyAccepted",
+    "TestLateDecisionNotCounted",
+    "TestPreflightRefusesEnforceWithoutFlipRecord",
+    "TestRegistryRatchet",
+    "TestSpendLimitWouldStopShippedCycles",
+    "TestStageGateRefusesEnforceWithoutActor",
+    "TestStageGateRefusesNotReadyVerdict",
+    "TestStageStatusListsEveryRow"
+  ],
+  "docs/architecture/test-system.md": [
+    "TestEveryMutexHasStressTest"
+  ],
+  "docs/architecture/wave-orchestrator.md": [
+    "TestC1972_002",
+    "TestC1972_007"
+  ],
+  "docs/incidents/2026-08-14-wave4-staging-halt.md": [
+    "TestIgnoredPathsFromAddRefusal_*"
+  ],
+  "docs/incidents/2026-08-26-audit-binding-fail-open.md": [
+    "TestFindLatestAudit_RunIDNoMatch_FallsBackToLatest"
+  ],
+  "docs/incidents/2026-09-14-lane-ship-gate-package-scoped-tests.md": [
+    "TestUserContract"
+  ],
+  "docs/incidents/2026-09-14-ship-gate-inherits-the-lane-ipc-env.md": [
+    "TestWorktreeShipIntegrate_GoldenArgvLogsAndErrors"
+  ],
+  "docs/incidents/2026-09-14-simulate-runs-against-the-checkout.md": [
+    "TestWithDossierCommit_IsTheRootsKnob"
+  ],
+  "docs/incidents/2026-09-26-lane-edited-the-control-plane-through-a-shell-tool.md": [
+    "TestResumeLifecycle_LostLandingUsesSameTerminalFloor"
+  ],
+  "docs/incidents/2026-09-26-lane-sent-work-its-sandbox-denies.md": [
+    "TestHistorianProfile_PassesValidateProfile"
+  ],
+  "docs/incidents/2026-10-06-realtmux-tests-share-a-stale-tmux-server.md": [
+    "TestTmuxPaneProbe_CapturesOnlyTheExactListedSession"
+  ],
+  "docs/incidents/2026-11-09-duplicate-ratchet-misses-staged-predicates.md": [
+    "TestC2231_003",
+    "TestC2231_004"
+  ],
+  "docs/incidents/2026-11-15-lane-commits-turned-main-red-on-lint-and-derived-files.md": [
+    "TestDarwinSetFile"
+  ],
+  "docs/incidents/2026-11-18-faketmux-tests-need-a-ps-binary-that-a-lane-cell-denies.md": [
+    "TestC2513_002"
+  ],
+  "docs/incidents/2026-11-19-cycle-2523-needed-three-audit-rounds-and-a-rebase-before-it-shipped.md": [
+    "TestA",
+    "TestB",
+    "TestC2523_008",
+    "TestC2523_010"
+  ],
+  "docs/incidents/2026-11-19-two-lanes-turned-main-red-with-error-text-tests.md": [
+    "TestC2533_004",
+    "TestC2540_006"
+  ],
+  "docs/incidents/2026-11-20-cycle-2558-turned-main-red-a-third-time.md": [
+    "TestC2558_005",
+    "TestC2558_006"
+  ],
+  "docs/incidents/2026-11-20-salvage-bundles-filled-the-disk-and-hung-a-loop-test.md": [
+    "TestC1270_003"
+  ],
+  "docs/incidents/2026-11-20-tests-and-predicates-that-wait-on-host-time-failed-on-a-loaded-host.md": [
+    "TestC2560_006"
+  ],
+  "docs/incidents/2026-11-20-the-boundary-batch-ejected-pr-1582-on-two-real-failures.md": [
+    "TestC1761_009",
+    "TestC1950_001"
+  ],
+  "docs/incidents/2026-11-21-wave-185-verification-lock-stall.md": [
+    "TestParallelDefault"
+  ],
+  "docs/incidents/2026-11-22-the-tdd-floor-did-not-run-the-test-audit-ratchet.md": [
+    "TestC2599_009_TheAbnormalEventLogParsesByKindAndTime",
+    "TestC2606_010_EvolveGcSparesAnExecutableDirALiveProcessHolds"
+  ],
+  "docs/incidents/REGRESSION-COVERAGE-INDEX.md": [
+    "TestC2558_005",
+    "TestC2558_006",
+    "TestC2560_006"
+  ],
+  "docs/incidents/cycle-1853-tmux-run-server-kill.md": [
+    "TestGenerateSBPL_RunSocketIsDeniedToTheAgentAndOpenToTheHost",
+    "TestGenerateSBPL_TheAgentSignalsOnlyItsOwnProcesses",
+    "TestGenerateSBPL_TheAgentWindowGetsItsOwnTerminalAndNoOtherPane",
+    "TestGenerateSBPL_TheCycle1853ProbeGetsItsOwnServerAndLeavesTheRunServerAlive"
+  ],
+  "docs/operations/batch-integrity-review-2026-08-04.md": [
+    "TestC1258_005",
+    "TestC1285_401",
+    "TestC1287_001",
+    "TestC1287_002",
+    "TestC1292_004",
+    "TestC1313_001",
+    "TestGoLaneSelection_*",
+    "TestPOC_A",
+    "TestPOC_B",
+    "TestPOC_C",
+    "TestPOC_D",
+    "TestTriageClassify_RejectsProtectedSurfaceTopNCard_BraceSyntax",
+    "TestWriteInboxItems_CollidingFilenameIsNotSilentlyDropped"
+  ],
+  "docs/operations/inbox-triage-2026-10-20.md": [
+    "TestScopeDeltaFloorChecks_ReportsEveryOutOfScopePathWithOneCodedSignal"
+  ],
+  "docs/operations/runtime-reference.md": [
+    "TestTheCheckedInPolicyPutsAgyInTheLastResortTail"
+  ],
+  "skills/fable/SKILL.md": [
+    "TestFooWorks"
+  ]
+}
