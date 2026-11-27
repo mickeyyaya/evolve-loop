@@ -16,6 +16,7 @@ var paneVocabularyRules = []paneVocabularyRule{
 	{field: "busy_line_regex", pattern: func(m Manifest) string { return m.BusyLineRegex }, minGroups: 1},
 	{field: "token_line_regex", pattern: func(m Manifest) string { return m.TokenLineRegex }, requiredGroups: []string{"count"}},
 	{field: "model_label_regex", pattern: func(m Manifest) string { return m.ModelLabelRegex }, requiredGroups: []string{"model"}},
+	{field: "shell_count_regex", pattern: func(m Manifest) string { return m.ShellCountRegex }, requiredGroups: []string{"count"}},
 }
 
 func validatePaneVocabulary(cli string, m Manifest) error {

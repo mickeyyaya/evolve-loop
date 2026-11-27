@@ -2,9 +2,14 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/interaction"
 )
+
+var errFindingsSubmitWedged = errors.New("findings submission wedged")
 
 type closeCheckResult struct {
 	findings string
@@ -26,7 +31,7 @@ func (w replWaiter) returnFindingsBeforeClose(state *replWaitState, elapsed int)
 	}
 	base := w.deps.CaptureBaseline(w.cfg)
 	base.worktree = captureWorktreeEvidenceBaseline(w.ctx, w.cfg, w.deps)
-	err := injectText(w.ctx, w.cfg, w.deps, w.launch.session, found.findings)
+	err := w.submitFindings(found.findings)
 	if found.report != nil {
 		found.report(err)
 	}
@@ -38,7 +43,19 @@ func (w replWaiter) returnFindingsBeforeClose(state *replWaitState, elapsed int)
 	state.detector = newCompletionDetector(w.cfg.Completion, w.cfg, w.deps, w.launch, base)
 	state.heldAfterCompletion = true
 	state.attempt, state.intervalStartS = 0, elapsed
+	state.restartIdleBudget(w.recorder, w.deps.Now)
 	return true
+}
+
+func (w replWaiter) submitFindings(findings string) error {
+	if err := injectText(w.ctx, w.cfg, w.deps, w.launch.session, findings); err != nil {
+		return err
+	}
+	outcome := w.verifyInjected("findings", findings)
+	if outcome.Result == interaction.ResultSubmitWedged {
+		return fmt.Errorf("%w (resends=%d)", errFindingsSubmitWedged, outcome.Resends)
+	}
+	return nil
 }
 
 func (w replWaiter) closeCheckWithin(deadline time.Duration) closeCheckResult {

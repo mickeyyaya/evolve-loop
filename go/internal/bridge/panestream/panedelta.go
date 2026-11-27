@@ -26,6 +26,7 @@ type PaneProfile struct {
 	BusyLineRegex   string
 	TokenLineRegex  string
 	ModelLabelRegex string
+	ShellCountRegex string
 }
 
 const (

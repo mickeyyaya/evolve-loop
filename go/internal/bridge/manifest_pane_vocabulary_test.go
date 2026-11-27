@@ -25,6 +25,8 @@ func TestParseManifest_RejectsABrokenPaneVocabularyPattern(t *testing.T) {
 		{"token_line_regex", `Thought (?P<count>[0-9]+`, "does not compile"},
 		{"model_label_regex", `\s{2,}(\S+ · \S+)$`, "names no model group"},
 		{"model_label_regex", `(?P<model>`, "does not compile"},
+		{"shell_count_regex", `· (\d+) tasks`, "names no count group"},
+		{"shell_count_regex", `· (?P<count>\d+`, "does not compile"},
 	}
 	for _, c := range cases {
 		_, err := parseManifestWithStderr("x-tmux", paneVocabularyManifest(c.field, c.pattern), io.Discard)
@@ -40,6 +42,7 @@ func TestParseManifest_AcceptsWellFormedPaneVocabulary(t *testing.T) {
 		{"busy_line_regex", `^\s*([⣾⣽])\s+\S`},
 		{"token_line_regex", `Thought for \S+, (?P<count>[0-9]+)(?P<scale>k?) tokens`},
 		{"model_label_regex", `\s{2,}(?P<model>\S+ · \S+)$`},
+		{"shell_count_regex", `· (?P<count>\d+) tasks`},
 	} {
 		if _, err := parseManifestWithStderr("x-tmux", paneVocabularyManifest(field.name, field.pattern), io.Discard); err != nil {
 			t.Errorf("%s: %v", field.name, err)

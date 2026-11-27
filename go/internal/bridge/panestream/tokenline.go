@@ -111,18 +111,21 @@ func namedGroup(re *syntax.Regexp, name string) *syntax.Regexp {
 	return nil
 }
 
-var footerShells = regexp.MustCompile(`·\s*(\d+)\s+shells?\b`)
-
-func RunningShells(rendered string) int {
-	lines := lastNonBlankLines(stripANSI(rendered), 1)
-	if len(lines) == 0 {
+func RunningShells(rendered string, p PaneProfile) int {
+	re := compiledPattern(p.ShellCountRegex)
+	if re == nil {
 		return 0
 	}
-	m := footerShells.FindStringSubmatch(lines[0])
+	group := re.SubexpIndex("count")
+	lines := lastNonBlankLines(stripANSI(rendered), 1)
+	if group < 0 || len(lines) == 0 {
+		return 0
+	}
+	m := re.FindStringSubmatch(lines[0])
 	if m == nil {
 		return 0
 	}
-	n, err := strconv.Atoi(m[1])
+	n, err := strconv.Atoi(m[group])
 	if err != nil {
 		return 0
 	}

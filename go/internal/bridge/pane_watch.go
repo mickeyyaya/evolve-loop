@@ -50,7 +50,7 @@ func (p *paneWatcher) observe(pane string, now time.Time) {
 		Busy:       panestream.PaneBusy(pane, p.profile),
 		TokenLine:  panestream.LastTokenLine(pane, p.profile.TokenLineRegex),
 		ModelLabel: panestream.ModelLabel(pane, p.profile.ModelLabelRegex),
-		Shells:     panestream.RunningShells(pane),
+		Shells:     panestream.RunningShells(pane, p.profile),
 	}, now)
 	if !changed {
 		return

@@ -9,7 +9,7 @@ func (s *replWaitState) observeIdleClock(elapsed int, captureOK, busy bool) {
 }
 
 func (s *replWaitState) idleCheckpointDue(elapsed int) bool {
-	return !s.nudgeSent && elapsed-max(s.idleSinceS, s.intervalStartS) >= s.idleGraceS
+	return (!s.nudgeSent || s.heldAfterCompletion) && elapsed-max(s.idleSinceS, s.intervalStartS) >= s.idleGraceS
 }
 
 func (s *replWaitState) checkpointDue(elapsed int) bool {
