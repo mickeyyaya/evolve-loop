@@ -388,6 +388,31 @@ func TestRunFork_AShadowStageNeverWaitsForAnOpenEnforceRecord(t *testing.T) {
 	}
 }
 
+func TestWaitHoldTick_TheProductionTimerFiresAndACancelledLoopStopsTheHold(t *testing.T) {
+	t.Parallel()
+	b, _ := driverCoordinator(t)
+	b.holdTicks = nil
+	b.driverTick = time.Millisecond
+	b.ctx = context.Background()
+	if !b.waitHoldTick() {
+		t.Fatal("the production timer of the hold did not fire")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	b.ctx = ctx
+	b.driverTick = time.Hour
+	if b.waitHoldTick() {
+		t.Fatal("a cancelled loop kept the hold waiting")
+	}
+	seamCtx, seamCancel := context.WithCancel(context.Background())
+	seamCancel()
+	b.ctx = seamCtx
+	b.holdTicks = make(chan struct{})
+	if b.waitHoldTick() {
+		t.Fatal("a cancelled loop kept the seam hold waiting")
+	}
+}
+
 func TestChainOf_TheDriverChainCarriesTheLoopSignalCenter(t *testing.T) {
 	t.Parallel()
 	b, _ := driverCoordinator(t)
