@@ -290,4 +290,6 @@ The operator owns Q1 to Q6.
 - **Q5.** Put `claude-p` first in the routing data of one phase as a shadow (A1)? Recommended phase: the one with the lowest cost of a wrong result. The plan does not choose it.
 - **Q6.** Add `onFailure: block` to the four guards (A36)? The console cannot edit gate config.
 
+Measured fact (2026-11-27): the root `AGENTS.md` is 53,652 bytes. The Codex cap for the `AGENTS.md` chain is 32 KiB (32,768 bytes). A codex route needs `AGENTS.md` shrunk below the cap first. The host profiles of `evolve skills check` have no codex entry for this reason.
+
 Two further questions have no owner yet. Does agy offer ACP or a JSON stream (W1.7)? Why does routing prefer tmux over `claude-p` (step 1)?
