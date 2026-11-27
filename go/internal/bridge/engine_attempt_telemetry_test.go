@@ -309,6 +309,13 @@ func TestEngineLaunch_OmittedModelRecordsUnknownCLIDefault(t *testing.T) {
 	t.Parallel()
 	ws := t.TempDir()
 	prof := writeProfile(t, ws, "dispatch-default", "")
+	body, err := os.ReadFile(prof)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(prof, []byte(strings.Replace(string(body), `"model": "haiku"`, `"model": "auto"`, 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	artifact := filepath.Join(ws, "artifact.md")
 	fr := &fakeRunner{writeArtifactPath: artifact, writeArtifactBody: "OK\n"}
 	eng := newTestEngine(Deps{
@@ -319,7 +326,7 @@ func TestEngineLaunch_OmittedModelRecordsUnknownCLIDefault(t *testing.T) {
 	})
 
 	if _, err := eng.Launch(context.Background(), core.BridgeRequest{
-		CLI: "claude-p", Profile: prof, Model: "deep", Prompt: "work",
+		CLI: "claude-p", Profile: prof, Model: "auto", Prompt: "work",
 		Workspace: ws, ArtifactPath: artifact, Agent: "audit",
 	}); err != nil {
 		t.Fatal(err)
@@ -330,7 +337,7 @@ func TestEngineLaunch_OmittedModelRecordsUnknownCLIDefault(t *testing.T) {
 	}
 	for _, call := range fr.calls {
 		for _, arg := range call.args {
-			if arg == "deep" {
+			if arg == "auto" {
 				t.Fatalf("unresolved selector unexpectedly reached argv: %v", call.args)
 			}
 		}

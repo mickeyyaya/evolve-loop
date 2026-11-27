@@ -63,6 +63,14 @@ func livenessOrUnknown(s panestream.LivenessState) string {
 
 const defaultArtifactMaxExtends = 6
 
+func artifactBudget(cfg *Config, deps Deps) (intervalS, maxExtends int) {
+	intervalS = cfg.ArtifactTimeoutS
+	if intervalS <= 0 {
+		intervalS = defaultIfZero(deps.ArtifactTimeoutS, tmuxArtifactTimeoutS)
+	}
+	return intervalS, defaultIfZero(deps.ArtifactMaxExtends, defaultArtifactMaxExtends)
+}
+
 type deterministicReviewer struct {
 	maxExtends int
 }

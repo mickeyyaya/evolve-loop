@@ -183,7 +183,7 @@ func TestCmd_ConvergenceDecide_BadInputExits10(t *testing.T) {
 		"unknown family": {"decide", "--input", write("family.json",
 			`{"loop": "console-lane", "round": 0, "rounds": [{"index": 0, "findings": []}], "judge": {"family": "nosuch-cli", "tier": "deep"}}`)},
 		"family without a tier table": {"decide", "--input", write("tierless.json",
-			`{"loop": "console-lane", "round": 0, "rounds": [{"index": 0, "findings": []}], "fixer": {"family": "claude-p", "tier": "balanced"}}`)},
+			`{"loop": "console-lane", "round": 0, "rounds": [{"index": 0, "findings": []}], "fixer": {"family": "claude-cloud", "tier": "balanced"}}`)},
 		"deferred critical": {"decide", "--input", write("deferred.json",
 			`{"loop": "console-lane", "round": 0, "rounds": [{"index": 0, "findings": [{"id": "c", "severity": "CRITICAL", "status": "DEFERRED"}]}]}`)},
 		"filed critical": {"decide", "--input", write("filed.json",

@@ -1,0 +1,7 @@
+These stream-json result lines are hand-written fixtures. They follow the event types that
+go/internal/observerengine/stream.go reads (system, assistant, result, rate_limit_event)
+and the result-event keys that the Claude Code headless output documents (type, subtype,
+is_error, result, session_id). The usage-limit and the auth-error wording come from the
+messages that the claude-tmux manifest matches (controls.usage.exhausted_regex and the
+auth_recheck prompt). No claude binary produced these lines. The exact result shape of a
+real usage-limit exit is not verified against a live run.
