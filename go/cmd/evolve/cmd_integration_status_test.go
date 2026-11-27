@@ -100,7 +100,7 @@ func TestBuildIntegrationStatus_CountsMembersAndPrintsTheFixedNotes(t *testing.T
 	}
 	ev.Shipped = []int{6, 7, 8}
 
-	rep := buildIntegrationStatus(5, "shadow", ev)
+	rep := buildIntegrationStatus(5, ev, enforceReadyOf(integration.Readiness{}))
 
 	want := map[string]int{"members": 3, "composed": 1, "conflicted": 1, "conflicted_base_ahead": 1, "landed": 1, "shipped": 3}
 	for k, v := range want {
@@ -111,7 +111,7 @@ func TestBuildIntegrationStatus_CountsMembersAndPrintsTheFixedNotes(t *testing.T
 	if len(rep.Members) != 3 || rep.Members[0].Cycle != 6 || rep.Members[2].Cycle != 8 || !rep.Members[0].Landed {
 		t.Errorf("members = %+v, want them in cycle order", rep.Members)
 	}
-	if rep.Order != "order: by delivery time; rank, risk and deps not supplied" || rep.Enforce != "enforce: not ready (no enforce actor)" {
+	if rep.Order != "order: by delivery time; rank, risk and deps not supplied" || rep.Enforce != "enforce ready: 0/2 clean shadow waves (pools none)" {
 		t.Errorf("notes = %q, %q", rep.Order, rep.Enforce)
 	}
 }
@@ -193,7 +193,7 @@ func TestStatusVerb_DefaultsToTheLatestPoolAndPrintsTheText(t *testing.T) {
 		"pool 12: stage shadow, epoch 2, shadow base 1111111, ended true, last cycle 15",
 		"verdict: clean",
 		"order: by delivery time; rank, risk and deps not supplied",
-		"enforce: not ready (no enforce actor)",
+		"enforce ready: 0/2 clean shadow waves (pools none)",
 		"counts: composed=1 landed=1 members=1 shipped=0",
 		"  cycle 13: composed, landed",
 		"  batch 1: integration/p12-b1 base 1111111 tip 1111111 members [13]",
@@ -452,7 +452,7 @@ func TestBuildIntegrationStatus_ARedeliveredMemberIsPrintedAsInformationAndStays
 	t.Parallel()
 	ev := cleanEvidence()
 	ev.Record.Members[6] = integration.MemberState{Status: integration.MemberComposed, PatchIDs: []string{"a"}, Redelivered: []string{"b"}}
-	rep := buildIntegrationStatus(5, "shadow", ev)
+	rep := buildIntegrationStatus(5, ev, enforceReadyOf(integration.Readiness{}))
 	if rep.Verdict != verdictClean {
 		t.Fatalf("verdict = %q (%v), want clean", rep.Verdict, rep.Failed)
 	}

@@ -40,15 +40,18 @@ func (s stageEvidenceSite) shipOpener() ship.StageOpener {
 }
 
 func (s stageEvidenceSite) open(cycle int) *stageevidence.Recorder {
-	scope := stageevidence.CycleScope(cycle)
+	return s.openScope(stageevidence.CycleScope(cycle), s.versionOf(), func(err error) { s.fault(cycle, err) })
+}
+
+func (s stageEvidenceSite) openScope(scope stageevidence.ScopeKey, version func(key string) (string, error), onFault func(error)) *stageevidence.Recorder {
 	return stageevidence.NewRecorder(stageevidence.RecorderConfig{
 		EvolveDir: paths.EvolveDirOf(s.root),
 		Scope:     scope,
 		Session:   stageSessionID(),
 		Build:     stageBuildID(),
 		Lock:      flock.Lock,
-		Version:   s.versionOf(),
-		OnFault:   func(err error) { s.fault(cycle, err) },
+		Version:   version,
+		OnFault:   onFault,
 	})
 }
 
