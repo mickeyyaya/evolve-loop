@@ -66,10 +66,36 @@ func (p Pool) idleCause(t fleet.PoolTransition) IdleCause {
 		return CauseSupplyEmpty
 	case p.hostCapped():
 		return CauseHostPressure
-	case p.Benched != nil && p.Benched():
+	case p.FamilyHolds.refusedCount() > 0:
+		return CauseAdmissionRefused
+	case p.benched():
 		return CauseBench
 	}
 	return CauseAdmissionRefused
+}
+
+func (p Pool) benched() bool { return p.Benched != nil && p.Benched() }
+
+const refusedFieldLimit = 5
+
+func (p Pool) idleFields(cause IdleCause) map[string]string {
+	fields := map[string]string{}
+	refused := p.FamilyHolds.Refused(refusedFieldLimit)
+	if len(refused) == 0 {
+		return fields
+	}
+	ids := make([]string, len(refused))
+	by := make([]string, len(refused))
+	for i, d := range refused {
+		ids[i] = d.ID
+		by[i] = d.ID + " (footprint " + strings.Join(d.Cells, ",") + ", held by " + d.BlockedBy + ")"
+	}
+	fields["refused"] = strings.Join(ids, ",")
+	fields["refused_by"] = strings.Join(by, "; ")
+	if cause == CauseAdmissionRefused && p.benched() {
+		fields["also"] = string(CauseBench)
+	}
+	return fields
 }
 
 func (p Pool) hostCapped() bool {
