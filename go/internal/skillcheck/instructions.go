@@ -16,7 +16,6 @@ const (
 	sharedSource      = "AGENTS.md"
 	digestBegin       = "<!-- instructions-digest BEGIN -->\n"
 	digestEnd         = "<!-- instructions-digest END -->"
-	cliFileByteBudget = 21513
 )
 
 type instructionRender struct {
@@ -28,8 +27,8 @@ type instructionRender struct {
 
 func instructionRenders() []instructionRender {
 	renders := []instructionRender{
-		{target: "CLAUDE.md", source: sharedSource, body: digestBody, byteBudget: cliFileByteBudget},
-		{target: "GEMINI.md", source: sharedSource, body: digestBody, byteBudget: cliFileByteBudget},
+		{target: "CLAUDE.md", source: sharedSource, body: digestBody, byteBudget: hostFileBudget("CLAUDE.md")},
+		{target: "GEMINI.md", source: sharedSource, body: digestBody, byteBudget: hostFileBudget("GEMINI.md")},
 	}
 	for _, reviewer := range []string{"architecture-reviewer", "code-reviewer", "code-simplifier", "go-reviewer"} {
 		renders = append(renders, instructionRender{
