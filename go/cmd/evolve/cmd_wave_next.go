@@ -355,7 +355,7 @@ func recordWave(env waveEnv, plan *wavePlan) (int, error) {
 	}
 	rec := wave.Record{
 		Number: plan.number, RunID: runID, GoalHash: goalhash.Compute(plan.goal), GoalPath: plan.goalPath(), GoalBytes: len(plan.goal),
-		MainSHA: head, CycleFloor: plan.floor, PID: pid, LogPath: logPath, StartedAt: env.now(),
+		MainSHA: head, CycleFloor: plan.floor, PID: pid, LogPath: logPath, StartedAt: env.now(), Focus: splitIDList(plan.args.boundary.focus),
 	}
 	for attempt := 0; attempt < waveRecordAttempts; attempt++ {
 		if err = env.saveRecord(plan.plane.store, rec); err == nil {

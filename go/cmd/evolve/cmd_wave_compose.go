@@ -18,12 +18,14 @@ import (
 func parseWaveNextArgs(args []string) (waveNextArgs, error) {
 	a := waveNextArgs{raw: args}
 	var merge, number string
-	operands, err := cmdutil.Flags().Bools(map[string]*bool{"--dry-run": &a.dryRun, "--json": &a.json}).Values(map[string]*string{"--merge": &merge, "--max-cycles": &a.boundary.maxCycles, "--only": &a.boundary.only, "--exclude": &a.boundary.exclude, "--number": &number, "--project-root": &a.boundary.projectRoot}).Lists(map[string]*[]string{"--note": &a.notes}).Parse(args)
+	operands, err := cmdutil.Flags().Bools(map[string]*bool{"--dry-run": &a.dryRun, "--json": &a.json}).Values(map[string]*string{"--merge": &merge, "--max-cycles": &a.boundary.maxCycles, "--only": &a.boundary.only, "--exclude": &a.boundary.exclude, "--focus": &a.boundary.focus, "--number": &number, "--project-root": &a.boundary.projectRoot}).Lists(map[string]*[]string{"--note": &a.notes}).Parse(args)
 	switch {
 	case err != nil:
 		return a, err
 	case len(operands) > 0:
 		return a, fmt.Errorf("unexpected argument %q", operands[0])
+	case focusWithOnly(a.boundary.focus, a.boundary.only):
+		return a, errFocusWithOnly
 	case slices.ContainsFunc(a.notes, func(n string) bool { return strings.TrimSpace(n) == "" }):
 		return a, errors.New("--note needs a text")
 	}
@@ -71,7 +73,7 @@ func composeWaveGoal(env waveEnv, plan *wavePlan, cfg policy.WaveConfig, standin
 	for _, text := range plan.args.notes {
 		notes = append(notes, wave.Note{Text: strings.TrimSpace(text)})
 	}
-	in := wave.GoalInput{Next: plan.number, Standing: standing, Notes: notes}
+	in := wave.GoalInput{Next: plan.number, Standing: standing, Notes: notes, Focus: splitIDList(plan.args.boundary.focus)}
 	if len(records) == 0 {
 		plan.warnings = append(plan.warnings, "no earlier wave is recorded; the goal has no facts section")
 	} else {
