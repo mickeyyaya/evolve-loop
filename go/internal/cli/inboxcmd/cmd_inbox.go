@@ -56,7 +56,7 @@ func inboxVerbs() []inboxVerb {
 }
 
 func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, deps Deps) int {
-	current.Store(&deps)
+	defer pushHost(deps)()
 	verbs := inboxVerbs()
 	if len(args) == 0 {
 		printInboxUsage(stderr, verbs)

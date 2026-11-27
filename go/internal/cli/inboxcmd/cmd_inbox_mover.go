@@ -19,7 +19,7 @@ func moverOptions(stderr io.Writer) inboxmover.Options {
 }
 
 func RunMover(args []string, _ io.Reader, stdout, stderr io.Writer, deps Deps) int {
-	current.Store(&deps)
+	defer pushHost(deps)()
 	if len(args) == 0 {
 		printInboxMoverUsage(stderr)
 		return 1

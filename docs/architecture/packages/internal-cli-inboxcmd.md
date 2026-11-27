@@ -10,7 +10,7 @@
 
 - `Run(args, stdin, stdout, stderr, deps)` dispatches the verb. `RunMover(args, stdin, stdout, stderr, deps)` runs `inbox-mover`.
 - `go/cmd/evolve/cmd_inbox.go` is the only inbox file left in `main`. It builds `Deps` from the functions of `main` and calls `Run` and `RunMover`.
-- `Deps` has six fields: `QueueGate`, `LaneForbidden`, `PrintVerbJSON`, `HumanWriter`, `CheckRootHasEvolve` and `NewSignalCenter`. Each field is a function that only `main` can build. `Run` and `RunMover` store the value, and a verb reads it through `host()`.
+- `Deps` has six fields: `QueueGate`, `LaneForbidden`, `PrintVerbJSON`, `HumanWriter`, `CheckRootHasEvolve` and `NewSignalCenter`. Each field is a function that only `main` can build. `Run` and `RunMover` install `Deps` with `pushHost` and restore the previous value on return, and a verb reads it through `host()`.
 - The flag helpers `TakeFlagValue` and `TakeProjectRoot` live in `cmd/evolve/cmdutil`, because `main` and this package both use them.
 - `main` calls five exported functions: `ReconcileConsumedFingerprints`, `ReconcileConsumedBindings`, `CheckInboxTrailerBytes`, `ReadInboxItemObject` and `SplitForbidden`.
 

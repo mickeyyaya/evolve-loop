@@ -14,7 +14,7 @@ var inboxVerbNames = []string{
 
 func runInbox(args ...string) (code int, stdout, stderr string) {
 	var out, errb bytes.Buffer
-	code = Run(args, strings.NewReader(""), &out, &errb, Deps{})
+	code = Run(args, strings.NewReader(""), &out, &errb, testDeps())
 	return code, out.String(), errb.String()
 }
 

@@ -32,3 +32,8 @@ func host() Deps {
 	}
 	return Deps{}
 }
+
+func pushHost(deps Deps) func() {
+	prev := current.Swap(&deps)
+	return func() { current.Store(prev) }
+}
