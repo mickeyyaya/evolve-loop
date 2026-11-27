@@ -98,10 +98,14 @@ func buildIDOf(info *debug.BuildInfo, ok bool) string {
 	return "unknown"
 }
 
-func stageLedgerReader(root string) stageevidence.ChainReader {
+func stageEvolveDir(root string) string {
 	evolveDir := paths.EvolveDirOf(root)
 	if real, err := filepath.EvalSymlinks(filepath.Join(evolveDir, "ledger.jsonl")); err == nil {
 		evolveDir = filepath.Dir(real)
 	}
-	return ledger.New(evolveDir).StageChain()
+	return evolveDir
+}
+
+func stageLedgerReader(root string) stageevidence.ChainReader {
+	return ledger.New(stageEvolveDir(root)).StageChain()
 }

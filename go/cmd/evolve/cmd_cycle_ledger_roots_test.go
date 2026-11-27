@@ -19,6 +19,8 @@ func TestUnobservedLedgerRootsArePinned(t *testing.T) {
 		"cmd/evolve/cmd_gc_ledger_seal.go":  {1, "the batch-end gc hook seals the ledger behind gc.ledger_seal (state-growth-caps); the hook has no Signal Center, so the seal anchor is reported on stderr"},
 		"cmd/evolve/cmd_cycle_reaudit.go":   {1, "evolve cycle reaudit appends one audit binding through its own ledger (an operator repair verb outside the orchestrator process)"},
 		"cmd/evolve/cmd_ledger.go":          {6, "evolve ledger verify/seal/rebaseline/anchor/deep-verify/evidence restore: operator repair roots outside the orchestrator process"},
+		"cmd/evolve/cmd_stage_migrate.go":   {1, "evolve stage migrate appends the genesis and grandfather flip records from an operator verb outside the orchestrator process, which holds no Signal Center; a failed append is the verb's error"},
+		"cmd/evolve/cmd_loop_preflight.go":  {1, "the loop preflight reads the stage flip records (a read-only consumer that appends nothing)"},
 		"internal/cli/agentcmd/run.go":      {1, "evolve agent run appends one cycle-0 agent_run entry from an operator process that has no Signal Center; a failed append is exit 3 with the error on stderr and in the JSON envelope (ADR-0152)"},
 		"internal/cli/guardcmd/guard.go":    {1, "the guard chain reads the ledger (a read-only consumer)"},
 		"internal/triagecap/preempt.go":     {1, "the wave plan appends one preempt line through the chained ledger from the planner, which holds no Signal Center; a failed append is a stderr warning and the swap stays planned"},

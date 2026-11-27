@@ -395,7 +395,7 @@ Total for K2 and K4: about 14 new files, 12 edited files and about 56 named test
 5. **K4b.** The ratchet and the protected paths merge. After this, a lane cannot weaken the contract.
 6. **K4c.** The records, the check and the migration verb merge. The check is report-only.
 7. **The migration, by the operator, at a boundary.** Run `evolve stage migrate --dry-run`, read the key list, then run `evolve stage migrate`. Run `evolve stage report` and check that no live key is refused.
-8. **A one-line change to the ratchet** sets `genesis_required` to true. It goes through the protected-path approval. Its precondition: `evolve stage migrate` has printed a genesis record. A crashed migration is finished first, with `evolve stage migrate` or with `--restore-genesis` (D18).
+8. **A two-line change** sets `genesis_required` to true in the ratchet file and `genesisRequiredFloor` to true in `stage_contract_ratchet_test.go`. Then `TestGenesisRequiredIsOneWay` holds the field at true. The change goes through the protected-path approval. Its precondition: `evolve stage migrate` has printed a genesis record. A crashed migration is finished first, with `evolve stage migrate` or with `--restore-genesis` (D18).
 9. **K5.**
 
 Rules for the console:

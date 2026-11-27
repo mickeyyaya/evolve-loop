@@ -1,0 +1,1416 @@
+{
+  "genesis_required": false,
+  "baseline_ceiling": 87,
+  "entries": [
+    {
+      "key": "inbox.curator.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "inbox.curator.trailer.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "gc.remote_sweep.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "gc.sentinel.hold.stage",
+      "rules": [
+        "no-registry-entry",
+        "string-typed-stage",
+        "no-signal",
+        "signal-unregistered",
+        "no-emit-site",
+        "no-would-fields",
+        "would-field-missing"
+      ],
+      "signal": "HOST_WOULD_HOLD",
+      "fields": [
+        "would_hold",
+        "free_bytes",
+        "floor_bytes"
+      ],
+      "emit_sites": [
+        {
+          "path": "internal/hostsentinel/signals.go",
+          "func": "WouldHold",
+          "ref": "CodeWouldHold"
+        }
+      ],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "gc.sentinel.release.stage",
+      "rules": [
+        "no-registry-entry",
+        "string-typed-stage",
+        "no-signal",
+        "signal-unregistered",
+        "no-emit-site",
+        "no-would-fields",
+        "would-field-missing"
+      ],
+      "signal": "HOST_WOULD_RELEASE",
+      "fields": [
+        "scopes",
+        "free_bytes",
+        "cache_bytes"
+      ],
+      "emit_sites": [
+        {
+          "path": "internal/hostsentinel/signals.go",
+          "func": "WouldRelease",
+          "ref": "CodeWouldRelease"
+        }
+      ],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "pr.merge_window.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "workflow.findings_repair.code-review.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "workflow.convergence.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "workflow.convergence.audit_rereview.stage",
+      "rules": [
+        "no-registry-entry",
+        "string-typed-stage",
+        "no-signal",
+        "signal-unregistered",
+        "no-emit-site",
+        "no-would-fields",
+        "would-field-missing"
+      ],
+      "signal": "AUDIT_REREVIEW_SHADOW",
+      "fields": [
+        "stage",
+        "round",
+        "hunks",
+        "late",
+        "would_file",
+        "would_block",
+        "reworded",
+        "filed",
+        "verdict"
+      ],
+      "emit_sites": [
+        {
+          "path": "internal/core/audit_rereview.go",
+          "func": "emitAuditRereviewShadow",
+          "ref": "CodeAuditRereviewShadow"
+        }
+      ],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "workflow.retry_ladder.stage",
+      "rules": [
+        "no-registry-entry",
+        "no-signal",
+        "signal-unregistered",
+        "no-emit-site",
+        "no-would-fields",
+        "would-field-missing"
+      ],
+      "signal": "LADDER_DECISION",
+      "fields": [
+        "next",
+        "action",
+        "fingerprint",
+        "tier"
+      ],
+      "emit_sites": [
+        {
+          "path": "internal/core/retry_ladder.go",
+          "func": "emitLadderDecision",
+          "ref": "CodeLadderDecision"
+        }
+      ],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "workflow.retry_ladder.audit_fix.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "workflow.repair.fixability.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "workflow.cycle_spend.stage",
+      "rules": [
+        "no-registry-entry",
+        "no-signal"
+      ],
+      "signal": "CYCLE_SPEND_SHADOW",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "workflow.builder_selfcheck.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "workflow.supersede.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "swarm.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "failure_disposition.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "merge_gate.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "parallel_evaluate.stage",
+      "rules": [
+        "no-registry-entry",
+        "no-signal",
+        "signal-unregistered"
+      ],
+      "signal": "PARALLEL_EVALUATE_SHADOW",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "catalog.refresh_stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "docs_floor.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "docs_floor.ste_stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "comment_floor.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "comment_floor.history_stage",
+      "rules": [
+        "no-registry-entry",
+        "string-typed-stage",
+        "no-signal",
+        "signal-unregistered",
+        "no-emit-site",
+        "no-would-fields",
+        "would-field-missing"
+      ],
+      "signal": "BUILD_COMMENT_HISTORY_SHADOW",
+      "fields": [
+        "cycle",
+        "count",
+        "entries"
+      ],
+      "emit_sites": [
+        {
+          "path": "internal/core/history_floor.go",
+          "func": "emitHistoryShadow",
+          "ref": "CodeCommentHistoryShadow"
+        }
+      ],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "held_proposals.stage",
+      "rules": [
+        "no-registry-entry",
+        "no-signal",
+        "signal-unregistered",
+        "no-emit-site",
+        "no-would-fields",
+        "would-field-missing"
+      ],
+      "signal": "SHIP_HOLD_SHADOW",
+      "fields": [
+        "cycle",
+        "tree",
+        "reasons"
+      ],
+      "emit_sites": [
+        {
+          "path": "internal/phases/ship/held_proposal_gate.go",
+          "func": "emitShadow",
+          "ref": "CodeHoldShadow"
+        }
+      ],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "cover_changed.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "retrospectives.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "integrity.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "fleet.budget.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "fleet.orchestrator.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "fleet.integration.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "fleet.orchestrator.window.adaptive.stage",
+      "rules": [
+        "no-registry-entry",
+        "string-typed-stage",
+        "no-signal",
+        "signal-unregistered",
+        "no-emit-site",
+        "no-would-fields",
+        "would-field-missing"
+      ],
+      "signal": "LOOP_ORCH_HOST_PRESSURE",
+      "fields": [
+        "old",
+        "new",
+        "sized",
+        "cause",
+        "stage",
+        "applied",
+        "cpus",
+        "load1",
+        "load_per_core",
+        "mem_available_pct",
+        "swap_used_mb",
+        "score"
+      ],
+      "emit_sites": [
+        {
+          "path": "internal/orchestrator/host_pressure.go",
+          "func": "HostPressure",
+          "ref": "CodeHostPressure"
+        }
+      ],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "audit_cascade.stage",
+      "rules": [
+        "no-registry-entry",
+        "no-signal",
+        "signal-unregistered"
+      ],
+      "signal": "AUDIT_CASCADE_SHADOW",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "isolation.i2.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "isolation.i3.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "isolation.i5.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "isolation.i7.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "isolation.i8.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "isolation.i15.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "isolation.context.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "isolation.dispatch_requests.stage",
+      "rules": [
+        "no-registry-entry",
+        "string-typed-stage"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "isolation.inbox_requests.stage",
+      "rules": [
+        "no-registry-entry",
+        "string-typed-stage"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "healing.detector.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "healing.orchestrator.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "healing.validator.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "healing.live_reaction.stage",
+      "rules": [
+        "no-registry-entry"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "boundary.ratchet_merge.stage",
+      "rules": [
+        "no-registry-entry",
+        "string-typed-stage",
+        "no-signal",
+        "signal-unregistered",
+        "no-emit-site",
+        "no-would-fields",
+        "would-field-missing"
+      ],
+      "signal": "CLI_RATCHET_MERGE_DECISION",
+      "fields": [
+        "stage",
+        "pr",
+        "head",
+        "decision",
+        "reason",
+        "head_gate",
+        "content_gate",
+        "scans",
+        "skipped_push",
+        "candidate"
+      ],
+      "emit_sites": [
+        {
+          "path": "cmd/evolve/cmd_boundary_ratchet_record.go",
+          "func": "emitRatchetRecordDecision",
+          "ref": "CodeCLIRatchetMergeDecision"
+        }
+      ],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "healing.repair_cycle.stage",
+      "rules": [
+        "no-registry-entry",
+        "string-typed-stage",
+        "no-signal",
+        "signal-unregistered",
+        "no-emit-site",
+        "no-would-fields",
+        "would-field-missing"
+      ],
+      "signal": "HEALING_REPAIR_ROUTED",
+      "fields": [
+        "stage",
+        "tier",
+        "would_route",
+        "would_refuse_audit"
+      ],
+      "emit_sites": [
+        {
+          "path": "internal/selfheal/repair_item.go",
+          "func": "repairRouted",
+          "ref": "CodeRepairRouted"
+        }
+      ],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "gates.scan_cache_gate",
+      "rules": [
+        "no-registry-entry",
+        "string-typed-stage",
+        "no-signal",
+        "signal-unregistered",
+        "no-emit-site",
+        "no-would-fields",
+        "would-field-missing"
+      ],
+      "signal": "SHIP_SCAN_SHADOW_ESCAPE",
+      "fields": [
+        "package",
+        "key",
+        "tags",
+        "flags",
+        "gate"
+      ],
+      "emit_sites": [
+        {
+          "path": "internal/phases/ship/scanshadow.go",
+          "func": "escape",
+          "ref": "CodeScanShadowEscape"
+        }
+      ],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "handoff.build-audit.stage",
+      "rules": [
+        "no-registry-entry",
+        "string-typed-stage"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "handoff.intent-scout.stage",
+      "rules": [
+        "no-registry-entry",
+        "string-typed-stage"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "handoff.scout-triage.stage",
+      "rules": [
+        "no-registry-entry",
+        "string-typed-stage"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "handoff.tdd-build.stage",
+      "rules": [
+        "no-registry-entry",
+        "string-typed-stage"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    },
+    {
+      "key": "handoff.triage-tdd.stage",
+      "rules": [
+        "no-registry-entry",
+        "string-typed-stage"
+      ],
+      "signal": "",
+      "fields": [],
+      "emit_sites": [],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
+    }
+  ],
+  "violations": [
+    {
+      "key": "inbox.curator.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "inbox.curator.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "inbox.curator.trailer.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "inbox.curator.trailer.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "gc.remote_sweep.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "gc.remote_sweep.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "pr.merge_window.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "pr.merge_window.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "workflow.findings_repair.code-review.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "workflow.findings_repair.code-review.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "workflow.convergence.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "workflow.convergence.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "workflow.retry_ladder.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "workflow.retry_ladder.audit_fix.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "workflow.retry_ladder.audit_fix.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "workflow.repair.fixability.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "workflow.repair.fixability.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "workflow.cycle_spend.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "workflow.cycle_spend.stage",
+      "rule": "signal-unregistered"
+    },
+    {
+      "key": "workflow.cycle_spend.stage",
+      "rule": "no-would-fields"
+    },
+    {
+      "key": "workflow.cycle_spend.stage",
+      "rule": "no-emit-site"
+    },
+    {
+      "key": "workflow.builder_selfcheck.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "workflow.builder_selfcheck.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "workflow.supersede.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "workflow.supersede.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "swarm.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "swarm.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "failure_disposition.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "failure_disposition.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "merge_gate.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "merge_gate.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "parallel_evaluate.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "parallel_evaluate.stage",
+      "rule": "no-would-fields"
+    },
+    {
+      "key": "parallel_evaluate.stage",
+      "rule": "no-emit-site"
+    },
+    {
+      "key": "catalog.refresh_stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "catalog.refresh_stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "docs_floor.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "docs_floor.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "docs_floor.ste_stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "docs_floor.ste_stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "comment_floor.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "comment_floor.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "held_proposals.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "cover_changed.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "cover_changed.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "retrospectives.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "retrospectives.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "integrity.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "integrity.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "fleet.budget.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "fleet.budget.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "fleet.orchestrator.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "fleet.orchestrator.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "fleet.integration.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "fleet.integration.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "audit_cascade.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "audit_cascade.stage",
+      "rule": "no-would-fields"
+    },
+    {
+      "key": "audit_cascade.stage",
+      "rule": "no-emit-site"
+    },
+    {
+      "key": "isolation.i2.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "isolation.i2.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "isolation.i3.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "isolation.i3.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "isolation.i5.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "isolation.i5.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "isolation.i7.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "isolation.i7.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "isolation.i8.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "isolation.i8.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "isolation.i15.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "isolation.i15.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "isolation.context.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "isolation.context.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "isolation.dispatch_requests.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "isolation.inbox_requests.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "healing.detector.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "healing.detector.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "healing.orchestrator.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "healing.orchestrator.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "healing.validator.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "healing.validator.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "healing.live_reaction.stage",
+      "rule": "string-typed-stage"
+    },
+    {
+      "key": "healing.live_reaction.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "handoff.build-audit.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "handoff.intent-scout.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "handoff.scout-triage.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "handoff.tdd-build.stage",
+      "rule": "no-signal"
+    },
+    {
+      "key": "handoff.triage-tdd.stage",
+      "rule": "no-signal"
+    }
+  ]
+}

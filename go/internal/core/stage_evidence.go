@@ -86,9 +86,14 @@ func (s *stageSession) finish(ctx context.Context, retErr error, completed bool,
 	}
 }
 
+func (o *Orchestrator) releaseSeal(seal func()) {
+	defer seal()
+	o.releaseShipWindow()
+}
+
 func (c *cycleRun) releaseRun(cleanup func(preserveWorktree, completedNormally bool), retErr error) {
+	defer func() { c.stage.finish(c.ctx, retErr, c.cycleCompletedNormally, c.result.FinalVerdict) }()
 	cleanup(c.preserveWorktree, c.cycleCompletedNormally)
-	c.stage.finish(c.ctx, retErr, c.cycleCompletedNormally, c.result.FinalVerdict)
 }
 
 func stageExitOf(ctx context.Context, retErr error, completed bool) string {

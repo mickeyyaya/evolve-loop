@@ -24,6 +24,11 @@ The cycle's production composition root, `wireOrchestratorDeps` in `cmd_cycle.go
 - **Stage evidence** (`cmd_stage.go`, `cmd_stage_chain.go`; shadow-contract K2).
   - `stageEvidenceSite` is the composition of the recorder. It builds one `stageevidence.Recorder` for each session. The recorder takes the file lock of the caller. It reads `policy.json` once and gives the decision version of a key from the registry entry. A write fault emits `ORCHESTRATOR_STAGE_EVIDENCE_FAULT`. `coreEvidence` wires the orchestrator and `shipOpener` wires the ship phase and `evolve ship`.
   - `evolve stage verify` and `evolve stage report` read the sealed chain from the ledger. `--chain PATH` still reads a fixture file. A broken ledger or a corrupt stored copy gives the typed errors `ledger-broken` and `corrupt-store`. The verdict is then `not ready` and never partial.
+  - `evolve stage migrate` (`cmd_stage_migrate.go`; shadow-contract K4c) writes one grandfather `stage-flip` record for each key at `enforce` and then one `stage-genesis` record. `--dry-run` prints the keys and writes nothing. A second run with a genesis record prints it and writes nothing.
+  - A crash before the genesis leaves flip records, and the next run finishes the work without duplicates.
+  - `--restore-genesis --reason TEXT` writes the genesis from the existing grandfather records and grandfathers no new key (D18).
+  - The verb holds an exclusive lock file. It refuses with exit 3 when `genesis_required` is true and no genesis exists. No test runs it against a live policy.
+  - `cmd_stage_preflight.go` builds the source of the `stage-contract` preflight check from the effective stages, the ledger and the ratchet file. `loopPreflightOptions` wires it.
 - **The queue of the curation verbs and the `gc` lease** (`cli_queue.go`, `cmd_gc.go`, component X17c, [cli-contract.md](../cli-contract.md) §4.6).
   - `midWaveCall.queueOrRefuse` is the one gate of the five inbox curation verbs and the `cli-routing` writers. With no live run lease it lets the verb run. Inside a phase pane it refuses with exit 3.
   - At stage `shadow` (policy `isolation.i15.stage`, read by `policy.IsolationQueueStage`) it refuses with exit 3 and names the request file. At stage `enforce` it writes the request with `writeQueuedRequest` and exits 4.
