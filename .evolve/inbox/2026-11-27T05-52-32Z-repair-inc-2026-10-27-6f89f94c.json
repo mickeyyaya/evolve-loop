@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "a red test reproduces the incident: Feed the CI detector two rerun-green events whose failing tests differ (for example TestA in run 1, TestB in run 2). Today both produce the one fingerprint flaky-test:rerun-green with subject rerun-green and an empty repro_test. Expected: the subject and fingerprint carry the failing job and test name, so each flaky test opens its own incident with a repro_test."
+  ],
+  "created_at": "2026-11-27T05:52:32Z",
+  "files": [
+    "go/internal/selfheal/ci.go",
+    "go/internal/ciwatch/classify.go"
+  ],
+  "fix": "Repair the incident in a normal repair cycle: scout, a red test that reproduces it, build, audit by another family, ship.",
+  "id": "repair-inc-2026-10-27-6f89f94c",
+  "kind": "pipeline-repair",
+  "origin": "cycle",
+  "priority_class": "stability",
+  "protected_files": [
+    "go/internal/selfheal/ci.go"
+  ],
+  "route": "console",
+  "summary": "a CI rerun of the same code turned green Reproduction: Feed the CI detector two rerun-green events whose failing tests differ (for example TestA in run 1, TestB in run 2). Today both produce the one fingerprint flaky-test:rerun-green with subject rerun-green and an empty repro_test. Expected: the subject and fingerprint carry the failing job and test name, so each flaky test opens its own incident with a repro_test.",
+  "tier": "T2",
+  "title": "Repair the flaky-test incident inc-2026-10-27-6f89f94c",
+  "weight": 0.4
+}

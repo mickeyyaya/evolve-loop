@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "a red test reproduces the incident: Run a build phase on the agy family (any cycle 2632-2654 run, e.g. run 01M8C7YS6TP4HET2D015WV4TW5): the observer emits LIVENESS_PHASE_STALLED for session evolve-bridge-agy-*-build-* with busy=true shells=0 after 600s of no transcript growth; add a regression test in go/internal/adapters/observer that feeds an agy build pane transcript source and asserts the stall decision matches the real pane progress."
+  ],
+  "created_at": "2026-11-26T21:44:36Z",
+  "files": [
+    "go/internal/adapters/observer/stall_signal.go",
+    "go/internal/adapters/observer/core_adapter.go"
+  ],
+  "fix": "Repair the incident in a normal repair cycle: scout, a red test that reproduces it, build, audit by another family, ship.",
+  "id": "repair-inc-2026-10-27-9abfa496",
+  "kind": "pipeline-repair",
+  "origin": "cycle",
+  "priority_class": "stability",
+  "route": "console",
+  "summary": "a phase pane stalled in phase build Reproduction: Run a build phase on the agy family (any cycle 2632-2654 run, e.g. run 01M8C7YS6TP4HET2D015WV4TW5): the observer emits LIVENESS_PHASE_STALLED for session evolve-bridge-agy-*-build-* with busy=true shells=0 after 600s of no transcript growth; add a regression test in go/internal/adapters/observer that feeds an agy build pane transcript source and asserts the stall decision matches the real pane progress.",
+  "tier": "T1",
+  "title": "Repair the stall incident inc-2026-10-27-9abfa496",
+  "weight": 0.4
+}
