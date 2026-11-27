@@ -989,4 +989,10 @@ approaches / decision / results / retro) — lives at
 | [architecture/adr/0169-lesson-yield-is-measured-before-a-lesson-store-is-built.md](architecture/adr/0169-lesson-yield-is-measured-before-a-lesson-store-is-built.md) | ADR-0169, Proposed. It records 12 decisions. The loop measures the lesson read path first. It adopts R1, R3 and R6 at `shadow`, defers R2, R4 and R7, and rejects R5 and R8. It lists the rejected designs A, B and C, each with its ruling fact. |
 | [architecture/harness-self-improvement.md](architecture/harness-self-improvement.md) | The spec of record. It gives the issue, the gap and the solution for C1 to C5. It names the stage keys and signals at `shadow`. It has a guards table and the limits, with the reopen condition of each deferred item. |
 
+## 2026-11-27 — Merge train and lane concurrency
+
+| Document | What it records |
+|---|---|
+| [research/merge-train-lane-concurrency-2026-11.md](research/merge-train-lane-concurrency-2026-11.md) | Why wave 191 ran one lane of five, and what to change. The train of ADR-0147 is a multi-lane design; the one lane came from `--only`, shared packages and the id-family rule of admission. It holds 13 local findings: the self-land load on `main`, 46 ship recoveries in 53 cycles and a shadow eject rate near 3%. It surveys Zuul, SubmitQueue, Trunk and CAID, compares four approaches and lists 8 refinements and 3 operator questions. No plan uses it yet. |
+
 <!-- GENERATED:research-index END -->
