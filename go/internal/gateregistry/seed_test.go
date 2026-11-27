@@ -70,6 +70,7 @@ func TestSeeds_AnUnparsableBaselineIsAnErrorAndNotARed(t *testing.T) {
 		"testdup-ratchet": {"go/.test-dup-baseline": "count=x\n"},
 		"size-ratchet":    {"go/internal/sizeratchet/offenders.json": "["},
 		"raw-git-ratchet": {"go/internal/rawgitratchet/baseline.json": "["},
+		"named-tests":     {"go/internal/testrefs/baseline.json": "["},
 	}
 	for _, name := range enforcedGates {
 		t.Run(name, func(t *testing.T) {

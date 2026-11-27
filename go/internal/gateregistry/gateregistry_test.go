@@ -27,7 +27,7 @@ var firstDebt = []string{
 	"./internal/ipcenv/...",
 }
 
-var enforcedGates = []string{"testdup-ratchet", "size-ratchet", "raw-git-ratchet"}
+var enforcedGates = []string{"testdup-ratchet", "size-ratchet", "raw-git-ratchet", "named-tests"}
 
 var knownPhases = []string{"build", "tdd", "audit", "ship"}
 
