@@ -9,26 +9,36 @@ import (
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/tmuxtest"
 )
 
 func TestMain(m *testing.M) {
-	codexHome, err := os.MkdirTemp("", "evcodexhome")
+	var liveOperatorCodex string
+	if os.Getenv("EVOLVE_BRIDGE_LIVE_CLI") == "1" {
+		var err error
+		liveOperatorCodex, err = operatorCodexHome()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "TestMain: resolve operator CODEX_HOME: %v\n", err)
+			os.Exit(1)
+		}
+	}
+	restoreHome, err := gittest.IsolateHome()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "TestMain: isolate CODEX_HOME: %v\n", err)
+		fmt.Fprintf(os.Stderr, "TestMain: isolate HOME: %v\n", err)
 		os.Exit(1)
 	}
-	if err := seedLiveCodexAuthFromOperator(codexHome); err != nil {
-		fmt.Fprintf(os.Stderr, "TestMain: seed the live codex auth: %v\n", err)
-		os.Exit(1)
-	}
-	if err := os.Setenv("CODEX_HOME", codexHome); err != nil {
-		fmt.Fprintf(os.Stderr, "TestMain: set CODEX_HOME: %v\n", err)
-		os.Exit(1)
+	if liveOperatorCodex != "" {
+		if err := seedLiveCodexAuth(os.Getenv("CODEX_HOME"), liveOperatorCodex); err != nil {
+			fmt.Fprintf(os.Stderr, "TestMain: seed the live codex auth: %v\n", err)
+			_ = restoreHome()
+			os.Exit(1)
+		}
 	}
 	cellBinRoot, err := os.MkdirTemp("", "evcellbin")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "TestMain: isolate the cell-bin root: %v\n", err)
+		_ = restoreHome()
 		os.Exit(1)
 	}
 	bridge.SetCellBinRootForTest(cellBinRoot)
@@ -37,8 +47,8 @@ func TestMain(m *testing.M) {
 	if err := os.RemoveAll(cellBinRoot); err != nil {
 		fmt.Fprintf(os.Stderr, "TestMain: remove %s: %v\n", cellBinRoot, err)
 	}
-	if err := os.RemoveAll(codexHome); err != nil {
-		fmt.Fprintf(os.Stderr, "TestMain: remove %s: %v\n", codexHome, err)
+	if err := restoreHome(); err != nil {
+		fmt.Fprintf(os.Stderr, "TestMain: restore HOME: %v\n", err)
 	}
 	os.Exit(code)
 }

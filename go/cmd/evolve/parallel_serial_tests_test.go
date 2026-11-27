@@ -1022,4 +1022,5 @@ var serialTests = map[string]string{
 	"main.TestLaneIdentity_ASequentialCheckpointAtEnforceStillResumesWithoutAPool":                                         "TDD-owned test calling resumeLaneIdentityCheckpoint which swaps wireOrchestratorDepsFn and sets PATH",
 	"main.TestLaneIdentity_AnEnforceLaneWiredWithAPoolAndAScopeBuildsItsOrchestrator":                                      "TDD-owned test calling wireOrchestratorDeps which sets SetModelCatalogDirFn and runner.DefaultRouter",
 	"main.TestLaneIdentity_AnEnforceLaneWiredWithAScopeAndNoPoolStopsBeforeAnyDispatch":                                    "TDD-owned test calling wireOrchestratorDeps which sets SetModelCatalogDirFn and runner.DefaultRouter",
+	"main.TestPackageHome_IsAScratchDirAndTheDefaultRoutingDoctorReadsUnderIt":                                             "writes and removes .codex/auth.json under the package scratch HOME",
 }
