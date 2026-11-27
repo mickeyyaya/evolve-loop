@@ -37,9 +37,12 @@ type loopBatchCoordinator struct {
 
 	newDriver         func(pool int) (*integration.Driver, error)
 	newEnforceActor   func(repo integration.Repo, pool int) integration.Actor
+	newChain          func(root string) integration.ChainPort
+	waveStore         integration.WaveStore
 	integrationEnvOf  func(root string, now time.Time) integrationEnv
 	driverFinishLimit time.Duration
 	driverTick        time.Duration
+	holdTicks         <-chan struct{}
 	oversightSource   func() (orchestrator.Source, error)
 	hostReader        func() (hostpressure.Reading, error)
 	hostSamples       func([]byte) error

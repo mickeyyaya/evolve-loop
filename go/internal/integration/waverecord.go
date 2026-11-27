@@ -6,6 +6,8 @@ import (
 	"slices"
 	"strconv"
 	"time"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
 const (
@@ -64,6 +66,7 @@ type WaveRecord struct {
 	Pool       int                 `json:"pool"`
 	Epoch      uint64              `json:"epoch"`
 	ShadowBase string              `json:"shadow_base"`
+	Stage      string              `json:"stage,omitempty"`
 	Batches    []IntegrationBatch  `json:"batches,omitempty"`
 	Members    map[int]MemberState `json:"members,omitempty"`
 	Decisions  []FlushRecord       `json:"decisions,omitempty"`
@@ -88,6 +91,9 @@ func (r WaveRecord) Validate() error {
 		return fmt.Errorf("integration: wave record of pool %d has no epoch", r.Pool)
 	case r.LastCycle < 0:
 		return fmt.Errorf("integration: wave record last cycle %d is negative", r.LastCycle)
+	}
+	if r.Stage != "" && r.Stage != policy.FleetIntegrationShadow && r.Stage != policy.FleetIntegrationEnforce {
+		return fmt.Errorf("integration: wave record of pool %d has stage %q", r.Pool, r.Stage)
 	}
 	if err := fullObjectID(r.ShadowBase); err != nil {
 		return fmt.Errorf("integration: wave record shadow base: %w", err)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,8 +49,18 @@ func TestProductionDriver_CheckRefusesEnforceOnTheProductionCompositionWithoutTh
 		t.Fatal(err)
 	}
 
-	if err := d.Check(); err != nil {
-		t.Fatalf("Check at enforce = %v, want nil with every port wired", err)
+	var refusal *integration.RolloutError
+	if err := d.Check(); !errors.As(err, &refusal) || len(refusal.Clean) != 0 {
+		t.Fatalf("Check with 0 clean shadow waves = %v, want RolloutError", err)
+	}
+
+	seedCleanShadowPools(t, b, b.cfg.ProjectRoot, 1, 2)
+	d2, err := b.productionDriver(7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := d2.Check(); err != nil {
+		t.Fatalf("Check at enforce with 2 clean shadow waves = %v, want nil", err)
 	}
 }
 
@@ -108,6 +119,7 @@ func TestProductionDriver_AtEnforceADeliveredLaneRecordReachesMainAndThePlaneEqu
 
 	b, _ := driverCoordinator(t)
 	b.cfg = loopConfig{ProjectRoot: plane.Dir, EvolveDir: evolveDir, Epoch: integration.NewEpochHolder(evolveDir)}
+	seedCleanShadowPools(t, b, plane.Dir, 1, 2)
 	b.newEnforceActor = func(r integration.Repo, _ int) integration.Actor {
 		return integration.EnforceActor{
 			Repo:    r,

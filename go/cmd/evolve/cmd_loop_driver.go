@@ -103,6 +103,7 @@ func (b *loopBatchCoordinator) productionDriver(pool int) (*integration.Driver, 
 	}
 	root := b.cfg.ProjectRoot
 	repo := integration.Repo{Dir: root, Git: integration.SysGit()}
+	chain := b.chainOf(root)
 	base, startup := heldBase(b.ctx, repo)
 	actor := integration.ShadowActor{
 		Composer: integration.ShadowComposer(repo),
@@ -118,12 +119,20 @@ func (b *loopBatchCoordinator) productionDriver(pool int) (*integration.Driver, 
 		Stage:      b.integrationStage,
 		Actors:     integration.StageActors(actor, b.enforceActorOf(repo, pool)),
 		Epoch:      b.cfg.Epoch,
-		Store:      integration.FileWaveStore{Root: root},
+		Clean:      func() integration.Readiness { return readinessOf(b.ctx, root, chain) },
+		Store:      integration.SealedWaveStore{Inner: integration.FileWaveStore{Root: root}, Root: root, Chain: chain, Ctx: b.ctx},
 		Records:    func() integration.RecordSet { return integration.ListRecords(root) },
 		Flush:      integration.DefaultFlushPolicy(),
 		Last:       b.highestCycle,
 		Publish:    b.deps.Signals,
 	}, nil
+}
+
+func (b *loopBatchCoordinator) chainOf(root string) integration.ChainPort {
+	if b.newChain != nil {
+		return b.newChain(root)
+	}
+	return ledgerChain{root: root, signals: b.deps.Signals}
 }
 
 func (b *loopBatchCoordinator) enforceActorOf(repo integration.Repo, pool int) integration.Actor {
@@ -207,7 +216,63 @@ func (b *loopBatchCoordinator) dispatchFleetIteration(
 	return b.settleFork(iteration, fleetConfig, starvation, out)
 }
 
+func (b *loopBatchCoordinator) waveStoreOf() integration.WaveStore {
+	if b.waveStore != nil {
+		return b.waveStore
+	}
+	return integration.FileWaveStore{Root: b.cfg.ProjectRoot}
+}
+
+func (b *loopBatchCoordinator) waitFirstEnforcePool(fc policy.FleetConfig) bool {
+	if !loopwave.ShouldRunPlan(fc) {
+		return true
+	}
+	if stage, err := b.integrationStage(); err != nil || stage != policy.FleetIntegrationEnforce {
+		return true
+	}
+	noted := false
+	for {
+		by, held, err := integration.HeldBy(b.waveStoreOf(), 0)
+		if err != nil {
+			fmt.Fprintf(b.stderr, "[loop] WARN: integration: the pool hold could not read the first enforce pool: %v\n", err)
+			return false
+		}
+		if !held {
+			return true
+		}
+		if !noted {
+			fmt.Fprintf(b.stderr, "[loop] integration: holding pool start until the first enforce pool %d ends; to release the hold, stop the loop and end or repair the wave record of pool %d\n", by, by)
+			noted = true
+		}
+		if !b.waitHoldTick() {
+			return false
+		}
+	}
+}
+
+func (b *loopBatchCoordinator) waitHoldTick() bool {
+	if b.holdTicks != nil {
+		select {
+		case <-b.ctx.Done():
+			return false
+		case <-b.holdTicks:
+			return true
+		}
+	}
+	timer := time.NewTimer(b.driverTickEvery())
+	defer timer.Stop()
+	select {
+	case <-b.ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
+}
+
 func (b *loopBatchCoordinator) runFork(iteration int, fleetConfig policy.FleetConfig, waveBinary string) forkOutcome {
+	if !b.waitFirstEnforcePool(fleetConfig) {
+		return forkOutcome{}
+	}
 	pool := b.mintPoolID(fleetConfig)
 	run := b.startDriver(pool)
 	defer run.finish()
