@@ -17,7 +17,7 @@ import (
 
 func runStage(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "evolve stage: usage: evolve stage <verify <key>|report> [--chain PATH] [--project-root P] [--json]")
+		fmt.Fprintln(stderr, "evolve stage: usage: evolve stage <verify <key>|report|migrate> [--chain PATH] [--project-root P] [--json]")
 		return cliExitUsage
 	}
 	switch args[0] {
@@ -25,6 +25,8 @@ func runStage(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runStageVerify(args[1:], stdout, stderr)
 	case "report":
 		return runStageReport(args[1:], stdout, stderr)
+	case "migrate":
+		return runStageMigrate(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "evolve stage: unknown subcommand %q\n", args[0])
 		return cliExitUsage

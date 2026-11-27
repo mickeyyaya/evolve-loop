@@ -97,3 +97,10 @@
 - **cycle-969 / cycle-1189**: lanes cut from a stale local base failed at push with `GIT_PUSH_REJECTED` after the batch's work was spent. That added the `base-divergence` check (ADR-0081).
 - **Stale-session glob warning replaced.** An earlier server-wide glob warning for leftover `evolve-bridge-*` tmux sessions could enumerate live peers' sessions and could not reap safely. The lease-aware `sessionreaper.ReapOrphans` sweep replaced it; `go/acs/cycle2` pins the removal.
 - **The opt-out cell once diverged.** Before both sites shared `sandbox.ConfinementSatisfied`, `EVOLVE_SANDBOX=off` made bridge dispatch run while preflight blocked. `TestRun_HostCapabilities_SandboxWantedOptOut_WarnsNotHalts` pins the parity.
+
+- **Stage contract check (K4c).** `CheckStageContract` reports the flip records of the stage keys at `enforce`. `Options.StageContract` is the source.
+  - A source that is not set passes.
+  - A source error and a finding give a warning, so the loop starts.
+  - Only the `refuse` mode halts. In that mode `genesis_required` is true and no genesis record exists.
+  - K5 adds refusal for a key with no record.
+  - A test pins the wiring in `cmd/evolve`.

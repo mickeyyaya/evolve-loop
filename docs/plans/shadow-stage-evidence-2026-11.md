@@ -256,10 +256,11 @@ PR links: [#1473](https://github.com/mickeyyaya/evolve-loop/pull/1473), [#1474](
 | Component | Status | Change lists | Open item |
 |---|---|---|---|
 | K1 registry and baseline | partial: the `Shadow` field and the conformance tests are on main. The `StageActor` ports and `TestEnforceBranchActsAtEnforce` do not exist. | [#1473](https://github.com/mickeyyaya/evolve-loop/pull/1473) [`35ad832`](https://github.com/mickeyyaya/evolve-loop/commit/35ad83205) (`go/internal/gatecontract/shadow.go`, `go/internal/gateregistry/stage_conformance_test.go`) | shadow-contract-k1b-stage-actor-ports |
-| K2 evidence recorder and seal | not started: no `stage-evidence-seal` entry and no recorder exist in `go/`. | none | shadow-contract-k2-evidence-seal |
+| K2 evidence recorder and seal | done: the recorder, the seal, the ledger reader, the wiring in `core` and `ship`, and the two emitters are on main. | [#1675](https://github.com/mickeyyaya/evolve-loop/pull/1675), [#1801](https://github.com/mickeyyaya/evolve-loop/pull/1801) | none |
 | K3 `evolve stage verify`, report, version | done, 2026-11-20 | cycle 2554 [`cd9a257`](https://github.com/mickeyyaya/evolve-loop/commit/cd9a257ff), [#1586](https://github.com/mickeyyaya/evolve-loop/pull/1586) [`e7c2a66`](https://github.com/mickeyyaya/evolve-loop/commit/e7c2a666f) | none |
-| K4 protected contract and ratchet | not started: `TestRegistryRatchet` does not exist. | none | shadow-contract-k4-protected-contract |
-| K4b migration | not started: no `evolve stage migrate` and no `TestHeadPolicyAccepted`. | none | none (draft: shadow-contract-k4b-stage-migrate) |
+| K4a typed key list and 6 seeds | done | [#1693](https://github.com/mickeyyaya/evolve-loop/pull/1693) (`go/internal/policy/stage_keys.go`, `go/internal/gateregistry/seed_stage_keys.go`) | none |
+| K4b protected contract and ratchet | built, 2026-11-27: `stage_contract_ratchet.json`, `TestRegistryRatchet`, `TestGenesisRequiredIsOneWay`, `TestContractPathsAreProtectedSurface`. The PR number is not known yet. | this change | none |
+| K4c migration | built, 2026-11-27: `evolve stage migrate`, the flip record kinds, the pure check and the report-only preflight check. The operator has not run the migration. | this change | the operator runs `evolve stage migrate --dry-run`, then `evolve stage migrate` |
 | K5 flip verb and preflight | not started: `cmd_stage.go` has `verify` and `report` only. | none | shadow-contract-k5-stage-flip |
 | F6 delete `nextItemStartRung` | done, 2026-11-20 | [#1536](https://github.com/mickeyyaya/evolve-loop/pull/1536) [`88fce05`](https://github.com/mickeyyaya/evolve-loop/commit/88fce058d), cycle 2552 [`5cd11df`](https://github.com/mickeyyaya/evolve-loop/commit/5cd11df69) | none |
 | F5 cascade and parallel_evaluate signals | done, 2026-11-17 | [#1485](https://github.com/mickeyyaya/evolve-loop/pull/1485) [`2752dfd`](https://github.com/mickeyyaya/evolve-loop/commit/2752dfd0f), [#1542](https://github.com/mickeyyaya/evolve-loop/pull/1542) [`9115443`](https://github.com/mickeyyaya/evolve-loop/commit/911544392) | none |
@@ -270,6 +271,6 @@ PR links: [#1473](https://github.com/mickeyyaya/evolve-loop/pull/1473), [#1474](
 | F3 main-red stop for step keys | not started: the `main-red-stop/v2` schema is only a rejected value in `mainstop/record_test.go:70`. | none | none (draft: shadow-contract-f3-main-red-step-keys) |
 | F7 spend limits | not started: no `TestSpendLimitWouldStopShippedCycles`. | none | shadow-contract-f7-spend-limit-retune |
 
-Seven of 13 components are on main (K3, F6, F5, F5b, F4, F2, F1). K1 is partial. K2, K4, K5 and F7 wait in open inbox items. K4b and F3 are unfinished and have no open inbox item. Follow-up drafts exist for both.
+Nine components are on main (K2, K3, K4a, F6, F5, F5b, F4, F2, F1). K1 is partial. K4b and K4c are built in the change of 2026-11-27 and wait for a merge and for the operator migration. K5 and F7 wait in open inbox items. F3 is unfinished and has no open inbox item.
 
-The chain of evidence (K2) still has no seal, so no new stage can flip on a verified record. The status of ADR-0167 stays "Proposed" and looks stale: some of its fixes are on main.
+The chain of evidence (K2) is sealed in the ledger, but no stage flips on a verified record until K5 exists. The status of ADR-0167 stays "Proposed" and looks stale: some of its fixes are on main.

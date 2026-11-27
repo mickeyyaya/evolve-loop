@@ -21,6 +21,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/preflight"
 	"github.com/mickeyyaya/evolve-loop/go/internal/profiles"
 	"github.com/mickeyyaya/evolve-loop/go/internal/seatlogin"
+	"github.com/mickeyyaya/evolve-loop/go/internal/stageevidence"
 	"github.com/mickeyyaya/evolve-loop/go/internal/swarm"
 )
 
@@ -115,6 +116,8 @@ type Options struct {
 	ReleaseLag    ReleaseLagConfig
 
 	SeatInspect func() seatlogin.Health
+
+	StageContract func() (stageevidence.CheckResult, error)
 }
 
 type resolved struct {
@@ -158,6 +161,8 @@ type resolved struct {
 	releaseLag    ReleaseLagConfig
 
 	seatInspect func() seatlogin.Health
+
+	stageContract func() (stageevidence.CheckResult, error)
 
 	routing *routingOnce
 }
@@ -204,6 +209,7 @@ func resolve(opts Options) (resolved, error) {
 		latestRelease:        opts.LatestRelease,
 		releaseLag:           defaultReleaseLagConfig(opts.ReleaseLag),
 		seatInspect:          opts.SeatInspect,
+		stageContract:        opts.StageContract,
 		routing:              onceRouting(opts.Routing),
 	}
 	if o.stderr == nil {
@@ -242,9 +248,6 @@ func resolve(opts Options) (resolved, error) {
 	if o.probeCLI == nil {
 		o.probeCLI = doctor.Probe
 	}
-	if o.sandboxMode == nil {
-		o.sandboxMode = func() string { return "" }
-	}
 	if o.hostProbe == nil {
 		o.hostProbe = func() preflight.Profile {
 			return preflight.Probe(preflight.Options{
@@ -260,6 +263,9 @@ func resolve(opts Options) (resolved, error) {
 }
 
 func fillProbeDefaults(o *resolved) {
+	if o.sandboxMode == nil {
+		o.sandboxMode = func() string { return "" }
+	}
 	if o.dirWritable == nil {
 		o.dirWritable = defaultDirWritable
 	}
@@ -343,6 +349,7 @@ func Run(opts Options) (Result, error) {
 		checkOverlayTierSelectors(o),
 		checkCLIRouting(o),
 		checkSeatLogin(o),
+		checkStageContract(o),
 	}
 	r := finalize(checks, o.now())
 	r.CLIVersions = o.versionInventory()

@@ -31,3 +31,15 @@
 - `Score` ignores `KindLate` records, records of other versions, and cycles with `Incomplete` outcomes.
 - `Score` sets `Ready` to true only when decisions meet `max(MinDecisions, 1)`, faults stay within limits, `Conflicts` equals zero, and `NotReady` is empty. A decision that carries `would_hold` in an outcome whose `RoutesMeasured` is false sets `NotReady` to `conflicts_unmeasured`.
 - `DecisionVersion` reuses `regressiontia.ModuleLocalReach` to find module-local imports of the decider closure.
+
+## Flip records and the check (K4c)
+
+- `flip.go` defines two ledger record kinds. `stage-flip` holds `{v, key, value, origin, policy_digest, reason}`. `stage-genesis` holds `{v, keys, policy_digest, count}` and an optional `reason`. `Encode` and `ParseFlip` or `ParseGenesis` convert them. A parse error wraps `ErrMalformedFlipRecord`.
+- `FlipRecords` is the read port. It returns a `FlipSet`: each flip record and the first genesis record. The ledger adapter implements it.
+- `Check` is a pure function of one `CheckInput`: the effective stages, a `FlipSet` and `GenesisRequired`. It gives a `Mode` and the `Findings`. It never reads a file.
+  - No genesis and `GenesisRequired` false: `inactive`. Each key at `enforce` with no record is a finding.
+  - Genesis present and `GenesisRequired` false: `report-only`.
+  - Genesis present and `GenesisRequired` true: `active`.
+  - No genesis and `GenesisRequired` true: `refuse`. The first finding has the key `genesis`.
+- A `grandfather` record counts only when its key is in the genesis `keys`. A `verified` record counts for its own key. A record whose value is not `enforce` counts for nothing.
+- `ErrGenesisRequired` names decision D18. `ErrUnresolvedStageKey` names a key that has no effective stage.
