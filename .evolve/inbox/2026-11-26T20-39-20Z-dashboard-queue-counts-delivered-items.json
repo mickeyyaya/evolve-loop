@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Red first: a fixture inbox with one delivered item shows a delivered count of 1 in the queue view.",
+    "The queue view reads its states from the inboxmover state list, and a test fails when a state of that list has no count.",
+    "100% coverage on each changed function."
+  ],
+  "created_at": "2026-11-27T00:00:00Z",
+  "deps": [
+    "train-delivered-inbox-state"
+  ],
+  "files": [
+    "go/internal/dashboard/queue.go"
+  ],
+  "fix": "Count delivered/ in the dashboard queue as its own state, read through the inboxmover state list so that a later state cannot be missed again.",
+  "id": "dashboard-queue-counts-delivered-items",
+  "kind": "fix",
+  "origin": "console",
+  "priority_class": "correctness",
+  "source": "console review of PR #1841 round 2, finding M-A",
+  "summary": "PR #1841 adds the inbox state delivered/ (a lane ship that waits for the integration). The dashboard queue view in go/internal/dashboard/queue.go counts the root, processing, retry and quarantine states but not delivered/, so a delivered item disappears from the dashboard until it is consumed. Round 2 of the #1841 review recorded this as finding M-A.",
+  "title": "The dashboard queue counts the items in the delivered state",
+  "weight": 0.5
+}

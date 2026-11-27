@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "No Go identifier for the count says shell unless it means a claude shell only.",
+    "A snapshot or signal written before the change still reads the same count (a test pins the old key).",
+    "100% coverage on each changed function; zero code comments."
+  ],
+  "created_at": "2026-11-27T00:00:00Z",
+  "deps": [],
+  "files": [
+    "go/internal/bridge/panestream/tokenline.go",
+    "go/internal/bridge/panestream/panedelta.go",
+    "go/internal/panewatch",
+    "go/internal/adapters/observer/stall_signal.go",
+    "go/internal/bridge/manifest.go"
+  ],
+  "fix": "Rename the Go symbols to the concept (for example BackgroundJobs and BackgroundCountRegex). Version or keep the panewatch JSON key and the observer `shells` event field so that readers of older snapshots and signals keep working; read each reader before you change it.",
+  "id": "pane-background-work-count-named-for-the-concept",
+  "kind": "refactor",
+  "origin": "console",
+  "priority_class": "maintainability",
+  "source": "console review of PR #1846, architecture-reviewer finding 3 and code-reviewer MINOR",
+  "summary": "PR #1846 made panestream.RunningShells read agy background tasks (`· N task(s)`) as well as claude shells, through the manifest field shell_count_regex. The Go names (RunningShells, PaneProfile.ShellCountRegex, panewatch.Frame.Shells), the manifest key and the observer event field `shells` still say shells. The review of #1846 recorded the rename as a follow-up because it changes the panewatch snapshot and the observer wire field.",
+  "title": "The pane count of running background work is named for the concept, not for claude shells",
+  "weight": 0.3
+}
