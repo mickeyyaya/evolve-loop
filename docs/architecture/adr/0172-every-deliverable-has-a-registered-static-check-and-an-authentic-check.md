@@ -36,7 +36,7 @@ A passing test is weak evidence. The test can be green on the base, or it can as
 14. A "N/N PASS" line and the TDD red evidence must match a run that the host recorded (V5).
 15. A scheduled run executes the historical ACS packages. Each package is promoted to regression or retired with a record (V6).
 16. Each new V-component (V0, V2 to V6) starts in shadow with its own stage key and gate registry seed.
-17. A new check that can turn existing work red is a stage decision, so it starts at shadow. Only a held proposal or the operator moves a stage to enforce (ADR-0167). A check whose baseline holds every miss of today blocks only a new miss, so it can block at landing (V1, V4).
+17. A new check that can turn existing work red is a stage decision, so it starts at shadow. Only a held proposal or the operator moves a stage to enforce (ADR-0167). A check with a baseline of every miss of today blocks only a new miss. It can block at landing (V1, V4).
 18. Each new deliverable of this design has its own static check and authentic check. The design obeys its own rule.
 19. A ratchet file (class D14) moves one way against the merge base. The existing `sizeratchet.CheckAgainstBase` and the boundary ratchet tests hold that rule, and the registry names them.
 20. A check of a deliverable runs in the host, on files that the builder cannot change.
