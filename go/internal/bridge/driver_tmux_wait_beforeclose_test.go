@@ -17,13 +17,14 @@ const floorFindingsFixture = "The build handoff floor found 1 finding(s).\n  - c
 
 type sessionAgentTmux struct {
 	*FakeTmuxController
-	artifact    string
-	writes      int
-	pasteErrAt  int
-	pasted      []string
-	lastLoaded  string
-	pasteCalls  int
-	rewritesOff bool
+	artifact        string
+	writes          int
+	pasteErrAt      int
+	pasted          []string
+	lastLoaded      string
+	pasteCalls      int
+	rewritesOff     bool
+	deferFirstWrite bool
 }
 
 func (s *sessionAgentTmux) LoadBuffer(ctx context.Context, session, file string) error {
@@ -44,13 +45,23 @@ func (s *sessionAgentTmux) PasteBuffer(ctx context.Context, session string) erro
 		return err
 	}
 	s.pasted = append(s.pasted, s.lastLoaded)
-	if s.writes == 0 {
+	if s.writes == 0 && !s.deferFirstWrite {
 		return s.write("done\n")
 	}
 	if s.rewritesOff {
 		return nil
 	}
 	return s.write("done after the findings\n")
+}
+
+func (s *sessionAgentTmux) SendKeys(ctx context.Context, session, keys string, enter bool) error {
+	if err := s.FakeTmuxController.SendKeys(ctx, session, keys, enter); err != nil {
+		return err
+	}
+	if s.deferFirstWrite && s.writes == 0 && strings.Contains(keys, s.artifact) {
+		return s.write("done\n")
+	}
+	return nil
 }
 
 func (s *sessionAgentTmux) write(body string) error {

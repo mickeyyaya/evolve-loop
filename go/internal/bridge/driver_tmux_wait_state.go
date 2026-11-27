@@ -123,18 +123,29 @@ func newReplWaitState(w replWaiter) *replWaitState {
 }
 
 func (s *replWaitState) recordNudgeOutcome(recorder *interaction.Recorder, now func() time.Time) {
-	if s.nudgeEvent == nil {
-		return
-	}
 	result := interaction.ResultNoEffect
 	if s.completed {
 		result = interaction.ResultArtifactAppeared
+	}
+	s.recordNudgeResult(recorder, now, result)
+}
+
+func (s *replWaitState) recordNudgeResult(recorder *interaction.Recorder, now func() time.Time, result string) {
+	if s.nudgeEvent == nil {
+		return
 	}
 	recorder.Record(interaction.Outcome{
 		Event:     *s.nudgeEvent,
 		Result:    result,
 		LatencyMS: now().Sub(s.nudgeAt).Milliseconds(),
 	})
+}
+
+func (s *replWaitState) restartIdleBudget(recorder *interaction.Recorder, now func() time.Time) {
+	s.recordNudgeResult(recorder, now, interaction.ResultArtifactAppeared)
+	s.nudgeSent = false
+	s.nudgeEvent = nil
+	s.resendWindowS = 0
 }
 
 func (s *replWaitState) takeResendWindowS() int {

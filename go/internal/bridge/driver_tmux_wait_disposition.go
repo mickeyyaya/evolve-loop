@@ -103,13 +103,7 @@ func (w replWaiter) deliverArtifactNudge(state *replWaitState, elapsed int) chec
 		return checkpointStopWaiting
 	}
 	fmt.Fprintf(w.deps.Stderr, "%s %s; sent one-shot nudge: %s\n", w.prefix, nudge.label, nudgeMsg)
-	w.deps.Sleep(submitVerifySettle)
-	nudgePane, captureErr := w.deps.Tmux.CapturePane(w.ctx, w.launch.session, w.launch.bootScrollback)
-	if captureErr != nil {
-		fmt.Fprintf(w.deps.Stderr, "%s submit-verify: nudge NOT verified — capture failed, input-line state unknown: %v\n", w.prefix, captureErr)
-	}
-	outcome := verifySubmitted(w.ctx, w.deps, w.launch, w.prefix, "nudge", nudgePane, nudgeMsg)
-	recordSubmitVerify(w.recorder, w.phaseName, w.cfg.Cycle, "nudge", outcome, pasteOutcome{})
+	outcome := w.verifyInjected("nudge", nudgeMsg)
 	if outcome.Result == interaction.ResultSubmitWedged {
 		state.submitWedged = true
 		state.lastVerdict.Reason = fmt.Sprintf("nudge %s (resends=%d)", outcome.Result, outcome.Resends)

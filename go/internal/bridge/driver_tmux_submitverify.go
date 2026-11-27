@@ -189,3 +189,14 @@ func submitResendScheduleFor(deps Deps) []time.Duration {
 	}
 	return defaultSubmitResendSchedule
 }
+
+func (w replWaiter) verifyInjected(site, payload string) submitVerifyOutcome {
+	w.deps.Sleep(submitVerifySettle)
+	pane, captureErr := w.deps.Tmux.CapturePane(w.ctx, w.launch.session, w.launch.bootScrollback)
+	if captureErr != nil {
+		fmt.Fprintf(w.deps.Stderr, "%s submit-verify: %s NOT verified — capture failed, input-line state unknown: %v\n", w.prefix, site, captureErr)
+	}
+	outcome := verifySubmitted(w.ctx, w.deps, w.launch, w.prefix, site, pane, payload)
+	recordSubmitVerify(w.recorder, w.phaseName, w.cfg.Cycle, site, outcome, pasteOutcome{})
+	return outcome
+}
