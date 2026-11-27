@@ -126,7 +126,7 @@ func parseArgs(args []string, stdin io.Reader) (Invocation, error) {
 		ArtifactPath: artifactPath,
 		Phase:        phase,
 		Prompt:       prompt,
-		Style:        flags.style(),
+		Style:        styleOf(invokedAs, flags),
 		Interactive:  interactive,
 		Model:        flags.model,
 	}, nil
@@ -173,6 +173,16 @@ func scanFlags(args []string) argFlags {
 		}
 	}
 	return f
+}
+
+var invokedAs = filepath.Base(os.Args[0])
+
+func styleOf(name string, f argFlags) string {
+	switch name {
+	case "claude", "codex", "agy":
+		return name
+	}
+	return f.style()
 }
 
 func (f argFlags) style() string {
