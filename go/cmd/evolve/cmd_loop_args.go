@@ -45,6 +45,7 @@ type loopArgFlags struct {
 	logPath           string
 	only              string
 	exclude           string
+	focus             string
 }
 
 func registerLoopArgFlags(fs *flag.FlagSet) *loopArgFlags {
@@ -73,6 +74,7 @@ func registerLoopArgFlags(fs *flag.FlagSet) *loopArgFlags {
 	fs.BoolVar(&lf.relaunch, "relaunch", false, "the launch continues an earlier goal: skip the check of the inbox items that the goal names")
 	fs.StringVar(&lf.logPath, "log", "", "with --detach: the file the detached loop's stdout and stderr are appended to (required with --detach)")
 	fs.StringVar(&lf.only, "only", "", "comma-separated inbox ids: the lanes take only these items (an id no lane can take, or one also in --exclude, exits 10; no inbox file changes)")
+	fs.StringVar(&lf.focus, "focus", "", "comma-separated inbox ids: these items lead the lanes in the order given, and other admissible items fill each free lane (exits 10 with --only; --exclude removes an id)")
 	fs.StringVar(&lf.exclude, "exclude", "", "comma-separated inbox ids: the lanes never take these items (no inbox file changes)")
 	fs.BoolVar(&lf.bypassPolicy, "bypass-policy", false, "use --bypass-policy to bypass policy.json pin enforcement for every phase in this batch (operator escape hatch)")
 	fs.BoolVar(&lf.json, "json", false, "with --detach: print the launch as JSON and no text; the foreground loop prints its JSON result anyway")
@@ -228,6 +230,8 @@ func withDetachLaunch(cfg loopConfig, lf *loopArgFlags, args []string, flagEnd i
 func validateLoopModes(lf *loopArgFlags, stderr io.Writer) int {
 	var conflict string
 	switch {
+	case focusWithOnly(lf.focus, lf.only):
+		conflict = errFocusWithOnly.Error()
 	case lf.detach && lf.preflightOnly:
 		conflict = "--detach and --preflight-only are mutually exclusive"
 	case lf.preflightOnly && lf.skipPreflight:
@@ -318,6 +322,7 @@ func buildLoopConfig(lf *loopArgFlags, goalHash, goalText, strategy string, maxC
 		Relaunch:          lf.relaunch,
 		Only:              splitIDList(lf.only),
 		Exclude:           splitIDList(lf.exclude),
+		Focus:             splitIDList(lf.focus),
 		PerAgentCLI:       perAgentCLI,
 		PerAgentModel:     perAgentModel,
 		Epoch:             integration.NewEpochHolder(lf.evolveDir),

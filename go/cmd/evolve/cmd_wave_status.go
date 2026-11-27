@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
@@ -36,6 +37,7 @@ type waveStatusReport struct {
 	LoopLive      bool                    `json:"loop_live"`
 	PoolLive      *int                    `json:"pool_live,omitempty"`
 	Outcome       string                  `json:"outcome"`
+	Focus         []string                `json:"focus,omitempty"`
 	Cycles        []wave.Cycle            `json:"cycles"`
 	CyclesOmitted int                     `json:"cycles_omitted,omitempty"`
 	LastWave      *waveSummary            `json:"last_wave,omitempty"`
@@ -124,7 +126,7 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 	cur := records[len(records)-1]
 	read, warnings := readWaveOf(plane, cur)
 	cycles, loop := read.Cycles, read.Loop
-	report.Wave, report.RunID, report.PID = cur.Number, cur.RunID, cur.PID
+	report.Wave, report.RunID, report.PID, report.Focus = cur.Number, cur.RunID, cur.PID, cur.Focus
 	report.Warnings = append(report.Warnings, warnings...)
 	report.Warnings = append(report.Warnings, poolPreflightWarnings(loop, cur.StartedAt)...)
 	var startWarning string
@@ -187,6 +189,7 @@ func writeWaveStatusText(w io.Writer, r waveStatusReport) {
 		fmt.Fprintf(w, "pool:    live %d\n", *r.PoolLive)
 	}
 	fmt.Fprintf(w, "outcome: %s\n", r.Outcome)
+	writeWaveFocusText(w, r.Focus)
 	writeWaveMeasuresText(w, r.Measures)
 	if r.Health != nil {
 		fmt.Fprintln(w, r.Health.Line())
@@ -445,4 +448,10 @@ func cyclesAboveFloor(cycles []wave.Cycle, floor int) []wave.Cycle {
 		}
 	}
 	return out
+}
+
+func writeWaveFocusText(w io.Writer, focus []string) {
+	if len(focus) > 0 {
+		fmt.Fprintf(w, "focus:   %s\n", strings.Join(focus, ", "))
+	}
 }

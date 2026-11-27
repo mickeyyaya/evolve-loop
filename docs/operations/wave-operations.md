@@ -13,6 +13,17 @@ This page tells the console (an operator or an LLM) how to run each wave through
 
 - At each check-in, follow [console-checkin-sop.md](console-checkin-sop.md) Part A step by step.
 - To queue a fact for the next goal, run `evolve wave note add "<text>"`. Use one note for each fact. Write it in ASD-STE100. `evolve wave note list --json` shows the queue.
+- To choose which items lead a wave, give `evolve wave next` one of these parameters:
+
+  | Parameter | Meaning |
+  | --- | --- |
+  | `--only IDS` | The lanes take only these items. Each other item waits. A wave of one item runs one lane. |
+  | `--exclude IDS` | The lanes never take these items. |
+  | `--focus IDS` | These items take the first lanes, in the order given. Each other admissible item fills a free lane in its normal rank order. The pool keeps its full width. |
+
+  `--focus` and `--only` together are a usage error (exit 10). `--focus` with `--exclude` removes the excluded id. A focus id waits when admission refuses it or when it shares a file with an earlier focus id. Its lane goes to the next admissible item.
+
+  The focus id takes the next free lane when it is admissible. The focus id takes the next free lane when it is admissible. An absent, consumed or inert focus id gets one WARN line at the launch. The goal text and `evolve wave status` name the focus ids.
 - To see the state, run `evolve wave status --json`. It reads cycle state, signals and landing intents. It does not change anything.
   - The text output has one measures line, for example `measures: width 2/3 · utilization 0.71 · conflicts 0/2`. It gives the realized width over the sized width and the utilization. Then it gives the landed lanes with a rebase or a re-audit over all landed lanes.
   - The next line is the health line, for example `health:  wave 7 · PQ6 0.143/day · top idle cause run_cap · top fail class spec · PQ7 0.500 · PQ8 1.000 · PQ9 0.000` (JSON `health`). It shows the PQ6 to PQ9 numbers of the latest wave. It also shows the idle cause with the largest share. Last, it shows the most frequent fail class of the unshipped cycles. `evolve quality report --scope wave` prints the same line, because both verbs read it from `pipelinerates.ReadWaveView`. A wave with no idle cause or no fail class shows `none`.
