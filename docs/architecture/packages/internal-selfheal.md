@@ -28,10 +28,13 @@ A second pass over the same files opens nothing and publishes nothing.
   | Function | Input | Classes |
   |---|---|---|
   | `FromSignals` | Signal Center events of the channels `errors` and `loop` | `quality` (a `QUALITY_*_BREACH`), `isolation` (a read, exec or write that a cell tried, refused at `enforce`), `stall` (`LIVENESS_PHASE_STALLED`), `system` (`system.failure`), `zero-ship` (`LOOP_ZERO_SHIP_HALT`), `lane-starvation` (`LOOP_ORCH_SUPPLY_SHORT`) |
-  | `FromCIRuns` | the runs of `required.yml` | `main-red`: the newest completed run on `main` failed. `ci-hang`: a run on `main` is open, cancelled or timed out after `HangAfter` (90 minutes). `flaky-test`: a second try of a run turned green. |
+  | `FromCIRuns` | the runs of `required.yml` | `main-red`: the newest completed run on `main` failed. `ci-hang`: a run on `main` is open, cancelled or timed out after `HangAfter` (90 minutes). `flaky-test`: a second try of a run turned green. The `flaky-test` rule is in the note below the table. |
   | `FromCycles` | `run.json`, `triage-decision.json`, `defect-ledger.json`, `failure-decision.json` and the ship journal | `repair-loop`: `RepairLoopAfter` repair rounds and no ship. `claim-churn`: `ChurnAfter` claims of one item after its last ship. `system`: a failure decision with the level `system`. |
   | `FromUsage` | `.evolve/usage-windows.json` and the manifest declaration | `usage-blind` (a CLI that declares usage windows, and its last reading has no window, an error or is older than `UsageStaleAfter`) |
 
+- **The flaky-test subject.** The producer reads the failing tests of the earlier tries into `CIRun.Failures` through the `ciwatch` log reader. Each failing test gives one observation with the subject `rerun-green:<package>.<Test>`. The subject has no job name, so one test that fails in two jobs is one fingerprint. The summary names the jobs.
+- **The flaky-test repro.** The producer sets `ReproTest` to `<path>:<TestName>`. The path is the `_test.go` file of the package that defines the top-level test. The `cmd/evolve` root finds that file in the package directory. When it finds no file, `ReproTest` stays empty.
+- **The flaky-test fallback.** A run whose earlier tries gave no failing test has the subject `rerun-green:run-<run id>`. A failed read of the earlier tries gives one warning and no observation, so a transport error does not change an identity. One pass reads the earlier tries of at most 20 runs, the newest first. The other runs wait for the next pass, with one warning.
 - **The control is no incident.** An `ISOLATION_*` event with `source=launcher` is the launcher that drops a variable from the environment of a cell. That is the I-2 control at work, so it opens no record. Only an action that a cell tried opens a record (`source` `sbpl-report`, `gate` or `parser`). A violation at `shadow` opens no record either.
 - **The fingerprint.** `Observation.Fingerprint` is `<class>:<subject>`. It has no time and no cycle number, so one fault keeps one record. The record id is `inc-<date of the open>-<8 hex of sha256(fingerprint)>`.
 - **The pass.** `Detect(existing, observations, verifier, now)` is level-triggered. It reads the whole window each time and does not depend on one event.
@@ -50,7 +53,7 @@ A second pass over the same files opens nothing and publishes nothing.
   | `retrospective` | a file under `docs/retrospectives/` names the incident id |
   | `record-doc` | `record_doc` is a local path (`filepath.IsLocal`) and a regular file exists there under the root |
 
-  X12 has no repair path, so no record has a `repro_test` yet. So a record stays open until X16 runs a repair. This is the rule of I-14, not a gap.
+  X12 has no repair path, so only a `flaky-test` record that names a test file has a `repro_test` yet. So a record stays open until X16 runs a repair. This is the rule of I-14, not a gap.
 
   The record document is a second document that gates a close, next to the retrospective. A reopened incident keeps its `record_doc`, as D14 of the plan expects. An incident that waits only for its document stays open. So it counts as open for `Pending` and for the main-red precondition of the validator. Rebuild each binary of the loop at the merge boundary before the first `record_doc` is set. An older binary does not know the field, and it drops the field when it rewrites a record.
 - **The record.** `WriteIncident` writes `.evolve/incidents/<id>.json` with `atomicwrite.JSON`. It has the fields of spec §18.2: `id`, `class`, `sources`, `tier`, `state`, `attempts`, `repro_test`, `record_doc`, `opened_at` and `closed_at`. It also has `fingerprint`, `subject`, `severity`, `recurrence`, `reopened`, `summary` and `last_seen_at`. `LoadIncidents` fails on a corrupt record and names its path.

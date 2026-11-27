@@ -15,6 +15,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/bridge"
 	"github.com/mickeyyaya/evolve-loop/go/internal/ciparity"
+	"github.com/mickeyyaya/evolve-loop/go/internal/ciwatch"
 	"github.com/mickeyyaya/evolve-loop/go/internal/incidentkb"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -25,11 +26,12 @@ import (
 )
 
 const (
-	selfhealUsage    = "usage: evolve selfheal incidents|propose|record-doc <incident-id> <path> [--json] [--project-root P]"
-	selfhealExitIn   = 11
-	selfhealCIFields = "databaseId,headBranch,status,conclusion,attempt,createdAt,updatedAt"
-	selfhealCILimit  = "200"
-	selfhealGHWait   = 60 * time.Second
+	selfhealUsage            = "usage: evolve selfheal incidents|propose|record-doc <incident-id> <path> [--json] [--project-root P]"
+	selfhealExitIn           = 11
+	selfhealCIFields         = "databaseId,headBranch,status,conclusion,attempt,createdAt,updatedAt"
+	selfhealCILimit          = "200"
+	selfhealGHWait           = 60 * time.Second
+	selfhealEarlierReadLimit = 20
 )
 
 const (
@@ -46,6 +48,7 @@ type selfhealEnv struct {
 	agent        agentSeat
 	now          func() time.Time
 	gh           func(ctx context.Context, root string, args ...string) (string, error)
+	earlier      func(ctx context.Context, root string, run selfheal.CIRun) ([]selfheal.CIFailure, error)
 	declared     func(family string) bool
 	families     func() []string
 	auditRefused func(root string) (bool, error)
@@ -64,7 +67,7 @@ type selfhealReport struct {
 }
 
 func runSelfheal(args []string, _ io.Reader, stdout, stderr io.Writer) int {
-	return runSelfhealWith(selfhealEnv{agent: runAgentCommand, now: time.Now, gh: ghOutput, declared: bridge.UsageWindowsDeclared, families: bridge.InteractiveFamilies, auditRefused: productionAuditRefused, newCenter: newSelfhealCenter}, args, stdout, stderr)
+	return runSelfhealWith(selfhealEnv{agent: runAgentCommand, now: time.Now, gh: ghOutput, earlier: ghEarlierFailuresVia(ciwatch.EarlierAttemptFailures), declared: bridge.UsageWindowsDeclared, families: bridge.InteractiveFamilies, auditRefused: productionAuditRefused, newCenter: newSelfhealCenter}, args, stdout, stderr)
 }
 
 func newSelfhealCenter(root, evolveDir string, console io.Writer) (*signalcenter.Center, func()) {
@@ -169,7 +172,8 @@ func gatherIncidentEvidence(env selfhealEnv, root string, cfg policy.HealingDete
 	}
 	obs := selfheal.FromSignals(events)
 	var warnings []string
-	runs, err := selfhealCIRuns(env, root, since)
+	runs, runWarnings, err := selfhealCIRuns(env, root, since)
+	warnings = append(warnings, runWarnings...)
 	if err != nil {
 		warnings = append(warnings, "the CI rules did not run: "+err.Error())
 	}
@@ -210,16 +214,16 @@ type ghCIRun struct {
 	UpdatedAt  time.Time `json:"updatedAt"`
 }
 
-func selfhealCIRuns(env selfhealEnv, root string, since time.Time) ([]selfheal.CIRun, error) {
+func selfhealCIRuns(env selfhealEnv, root string, since time.Time) ([]selfheal.CIRun, []string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), selfhealGHWait)
 	defer cancel()
 	out, err := env.gh(ctx, root, "run", "list", "--workflow", ciparity.RequiredWorkflow, "--limit", selfhealCILimit, "--json", selfhealCIFields)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var raw []ghCIRun
 	if err := json.Unmarshal([]byte(out), &raw); err != nil {
-		return nil, fmt.Errorf("gh run list: decode: %w", err)
+		return nil, nil, fmt.Errorf("gh run list: decode: %w", err)
 	}
 	var runs []selfheal.CIRun
 	for _, r := range raw {
@@ -227,7 +231,50 @@ func selfhealCIRuns(env selfhealEnv, root string, since time.Time) ([]selfheal.C
 			runs = append(runs, selfheal.CIRun{ID: r.DatabaseID, Branch: r.HeadBranch, Status: r.Status, Conclusion: r.Conclusion, Attempt: r.Attempt, Created: r.CreatedAt, Updated: r.UpdatedAt})
 		}
 	}
-	return runs, nil
+	return runs, readEarlierTries(ctx, env, root, runs), nil
+}
+
+func readEarlierTries(ctx context.Context, env selfhealEnv, root string, runs []selfheal.CIRun) []string {
+	var order []int
+	for i := range runs {
+		if runs[i].IsRerunGreen() {
+			order = append(order, i)
+		}
+	}
+	slices.SortStableFunc(order, func(a, b int) int { return runs[b].Created.Compare(runs[a].Created) })
+	var warnings []string
+	for n, i := range order {
+		if n >= selfhealEarlierReadLimit {
+			runs[i].Unread = true
+			continue
+		}
+		failures, err := env.earlier(ctx, root, runs[i])
+		runs[i].Failures = failures
+		if err != nil {
+			runs[i].Unread = true
+			warnings = append(warnings, fmt.Sprintf("the earlier tries of CI run %d were not read: %v", runs[i].ID, err))
+		}
+	}
+	if len(order) > selfhealEarlierReadLimit {
+		warnings = append(warnings, fmt.Sprintf("%d rerun-green CI runs were not read in this pass: the limit is %d", len(order)-selfhealEarlierReadLimit, selfhealEarlierReadLimit))
+	}
+	return warnings
+}
+
+type earlierFailuresReader func(ctx context.Context, root string, runID int64, attempt int) ([]ciwatch.FailingTest, error)
+
+func ghEarlierFailuresVia(read earlierFailuresReader) func(context.Context, string, selfheal.CIRun) ([]selfheal.CIFailure, error) {
+	return func(ctx context.Context, root string, run selfheal.CIRun) ([]selfheal.CIFailure, error) {
+		tests, err := read(ctx, root, run.ID, run.Attempt)
+		if err != nil {
+			return nil, err
+		}
+		var out []selfheal.CIFailure
+		for _, t := range tests {
+			out = append(out, selfheal.CIFailure{Jobs: t.Jobs, Package: t.Package, Test: t.Test, Step: t.Step, Repro: resolveReproTest(root, t.Package, t.Test)})
+		}
+		return out, nil
+	}
 }
 
 func publishTransitions(env selfhealEnv, root, stage string, transitions []selfheal.Transition, stderr io.Writer) {
