@@ -190,3 +190,5 @@
 - **Stage.** `workflow.convergence.audit_rereview.stage` is `shadow` by default. It has its own named type, `AuditRereviewStage`, and its own signal `AUDIT_REREVIEW_SHADOW`. A flip of `workflow.convergence.stage` never moves it.
 - **One home.** `ConvergencePolicy.AuditRereview` holds the key, because the strict policy refuses an unknown key. An unknown word warns and resolves to `shadow`.
 - **Pinned by** `TestAuditRereviewStage_DefaultsToShadowAndNeverFollowsTheConvergenceStage` and `TestAuditRereviewStage_ItsOwnKeyFlipsItAlone`.
+
+- **Import rule.** `TestPolicyPackageImportsNeitherLedgerNorScorers` fails when a non-test file of this package imports the ledger adapter, `stageevidence`, `gateregistry` or `gatecontract`. The stage key list and the effective stages need none of them.

@@ -34,7 +34,17 @@
   - It holds each decision field as a string literal.
 
   This differs from the design text, which names function values: a string can break on a rename, and the call check closes the dead-code gap. K1b adds a runtime spy through the port.
-- The conformance tests walk the policy struct by reflection, never the live `policy.json`. They fail for a `(key, rule)` pair that is not in `testdata/stage_violations.json`.
-- The baseline lists 88 pairs: 41 `string-typed-stage` (the stage constants are not unified in this change), and the missing signals, unregistered codes and emit sites. `TestViolationBaselineOnlyShrinks` requires the count to equal `baselineCeiling`, rejects a duplicate and rejects a pair that is no longer a violation. A fix removes its pairs and lowers the ceiling.
+- The conformance tests walk the policy struct by reflection, never the live `policy.json`. They fail for a `(key, rule)` pair that is not in the baseline of `stage_contract_ratchet.json`.
+- The baseline lists 88 pairs: 41 `string-typed-stage` (the stage constants are not unified in this change), and the missing signals, unregistered codes and emit sites. `TestViolationBaselineOnlyShrinks` requires the count to equal `baseline_ceiling` of the ratchet file, rejects a duplicate and rejects a pair that is no longer a violation. A fix removes its pairs and lowers the ceiling. The ceiling is 87 today.
 - Two spec keys have no stage field in the schema and no entry: the ship scan skip and `gates.main_red_stop`.
 - The keys `gc.sentinel.hold.stage` and `gc.sentinel.release.stage` have seeds since 2026-11-21. Their signals are `HOST_WOULD_HOLD` and `HOST_WOULD_RELEASE`. Their closure is `internal/hostsentinel`. The seed test pins each row and checks that each pinned key has an entry.
+
+## The stage contract ratchet (K4b)
+
+- `stage_contract_ratchet.json` is embedded with `go:embed`. `StageRatchet` returns it as a `Ratchet`. The file holds `genesis_required`, `baseline_ceiling`, one `entries` row for each stage key and the `violations` baseline. The old `testdata/stage_violations.json` and the `baselineCeiling` constant are gone. The file is the one home of both.
+- Each entry row holds the rules that the key meets, its signal, its decision fields, its emit sites and its `promotion` numbers. A rule that never ran for the key is not listed. A key with no signal does not meet the four signal rules.
+- `TestRegistryRatchet` fails when the registry has no entry for a listed key. It also fails when a listed rule no longer holds, or when the signal, a field or an emit site is gone. It fails too when a number moves the wrong way.
+- `MaxEscapes`, `MaxFalseStops` and `MaxFalseStopPct` may only fall. `MinDecisions` and `WindowCycles` may only rise. A tighter number or a new entry passes.
+- The test counts the rows, so a new entry needs its row in the same change.
+- `TestGenesisRequiredIsOneWay` pins `genesis_required` against a floor in the test. The value may go from false to true and never back. The operator raises the floor and the file in one change.
+- The ratchet file and its tests are on the protected surface (the `gateregistry` row of the manifest). A lane cannot weaken them.

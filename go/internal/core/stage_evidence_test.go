@@ -368,3 +368,38 @@ func TestAFreshSealDoesNotMeasureRoutesSoAHeldDecisionIsNeverScoredAsZeroConflic
 		t.Errorf("routes measured = %t, ready = %t, not ready = %q; want unmeasured routes, not ready, %q", sealer.seal.RoutesMeasured, scored.Ready, scored.NotReady, stageevidence.ReasonConflictsUnmeasured)
 	}
 }
+
+func TestReleaseRunSealsEvenWhenTheCleanupPanics(t *testing.T) {
+	t.Parallel()
+	_, sealer, opt := stageRig()
+	o := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil), opt)
+	cr := &cycleRun{o: o, ctx: context.Background(), cycle: 9, stage: o.beginStageSession(9)}
+	cr.cycleCompletedNormally = true
+	cr.result.FinalVerdict = VerdictPASS
+	func() {
+		defer func() { _ = recover() }()
+		cr.releaseRun(func(bool, bool) { panic("cleanup crashed") }, nil)
+	}()
+	if len(sealer.requests) != 1 || sealer.requests[0].in.Exit != stageExitCompleted || !sealer.requests[0].in.Shipped {
+		t.Fatalf("seals = %+v, want one completed and shipped seal despite the panic", sealer.requests)
+	}
+}
+
+func TestReleaseSealSealsEvenWhenTheShipWindowReleasePanics(t *testing.T) {
+	t.Parallel()
+	sealed := 0
+	var o *Orchestrator
+	func() {
+		defer func() { _ = recover() }()
+		o.releaseSeal(func() { sealed++ })
+	}()
+	if sealed != 1 {
+		t.Fatalf("sealed %d times, want once although the ship-window release panicked", sealed)
+	}
+	live := NewOrchestrator(&fakeStorage{}, &fakeLedger{}, buildRunners(nil))
+	var order []string
+	live.releaseSeal(func() { order = append(order, "seal") })
+	if len(order) != 1 {
+		t.Fatalf("order = %v, want the seal to run once after a clean release", order)
+	}
+}
