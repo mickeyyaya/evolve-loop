@@ -1,5 +1,5 @@
 ---
-description: "Use when a request needs a deep, multi-source study of current practice before a decision — open source projects, papers, vendor docs, or an online survey that compares our design with others. It splits the question into research angles, runs a live web research for each angle in parallel, keeps the notes with their links, and then writes the design set through docs-write (research dossier, plan with its execution order, ADR and architecture spec) and one inbox item for each component of the plan."
+description: "Use when a request needs a deep, multi-source study of current practice before a decision — open source projects, papers, vendor docs, or an online survey that compares our design with others. It runs an LLM-steered block loop. Seats read through diverse lenses, report their claims at each barrier, and stop on a rule that the lead applies by the band (code checks it once the `evolve research` verbs land). It then writes the design set through docs-write (research dossier, plan, ADR and architecture spec) and one inbox item for each component."
 argument-hint: "<the question, in the words of the person who asked>"
 ---
 
