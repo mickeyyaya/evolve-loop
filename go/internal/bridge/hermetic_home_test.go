@@ -2,33 +2,32 @@ package bridge
 
 import (
 	"context"
-	"errors"
-	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
-func TestPackageHome_IsAScratchDirAndTheDefaultDoctorProbeReadsUnderIt(t *testing.T) {
-	if err := gittest.HermeticHomeError(); err != nil {
-		t.Fatalf("package HOME: %v", err)
+func TestDoctorProbe_ReadsTheInjectedScratchHomeNotTheOperatorHome(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name           string
+		withAuth       bool
+		wantConfigured bool
+	}{
+		{name: "an auth file under the scratch home is read", withAuth: true, wantConfigured: true},
+		{name: "no auth file under the scratch home is not found elsewhere", withAuth: false, wantConfigured: false},
 	}
-	codexDir := filepath.Join(os.Getenv("HOME"), ".codex")
-	if err := os.MkdirAll(codexDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	auth := filepath.Join(codexDir, "auth.json")
-	if err := os.WriteFile(auth, []byte("{}"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := os.Remove(auth); err != nil && !errors.Is(err, os.ErrNotExist) {
-			t.Error(err)
-		}
-	})
-	rep, _ := newTestEngine(Deps{}).Doctor(context.Background(), "codex", false)
-	if len(rep.Results) != 1 || !rep.Results[0].Auth.Configured {
-		t.Fatalf("default doctor probe did not read the scratch home: %+v", rep.Results)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			home := t.TempDir()
+			if tc.withAuth {
+				mkfile(t, filepath.Join(home, ".codex", "auth.json"), "{}")
+			}
+			eng := doctorEngine(map[string]string{"HOME": home}, map[string]bool{"codex": true}, 0, nil)
+			rep, _ := eng.Doctor(context.Background(), "codex", false)
+			if len(rep.Results) != 1 || rep.Results[0].Auth.Configured != tc.wantConfigured {
+				t.Fatalf("doctor probe auth = %+v, want Configured=%v from the injected scratch home", rep.Results, tc.wantConfigured)
+			}
+		})
 	}
 }

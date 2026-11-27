@@ -193,5 +193,4 @@ var serialTests = map[string]string{
 	"bridge.TestLaunch_AmplifiedAuditorKeepsOnlyTheFableSuccessWhenFableLeads":                "swaps seam modelCatalogDirFn through the process-global setter SetModelCatalogDirFn",
 	"bridge.TestClaudeCloudDriver_AManifestThatDoesNotLoadRefusesTheLaunch":                   "swaps seam bridgeManifestDirFn",
 	"bridge.TestLoadManifest_TheCloudSeatKeepsNoTierMapUnderALiveCatalog":                     "swaps seam modelCatalogDirFn",
-	"bridge.TestPackageHome_IsAScratchDirAndTheDefaultDoctorProbeReadsUnderIt":                "writes and removes .codex/auth.json under the package scratch HOME",
 }
