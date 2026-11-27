@@ -108,6 +108,7 @@ func TestInboxCenterlessRootsArePinned(t *testing.T) {
 		"cmd/evolve/cmd_cycle_lane_resume.go":              "the release of a bound scope whose ancestor left no defect ledger, at lane resume — WIRED (Signals: l.signals); listed because its literal names the field",
 		"cmd/evolve/cmd_selfheal_repair.go":                "the filing of a repair item by `evolve selfheal propose` (ADR-0155 X16) — WIRED (Signals: center, the pass Center); listed because its literal names the field",
 		"cmd/evolve/cmd_cycle_retire.go":                   "the release of the claims of a retired paused lane cycle — WIRED (Signals: signals, the root Center); listed because its literal names the field",
+		"cmd/evolve/cmd_loop_driver.go":                    "the production EnforceActor requeue port — WIRED (Signals: b.deps.Signals); listed because its literal names the field",
 		"internal/cli/inboxcmd/cmd_inbox_trailercheck.go":  "operator command `evolve inbox trailer-check`, the read-only dispatch-state probe of each trailer id — never writes",
 	}
 	literalRE := regexp.MustCompile(`inboxmover\.Options\{`)

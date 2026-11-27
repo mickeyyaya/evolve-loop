@@ -166,7 +166,7 @@ func TestEnforceActorMarksAMemberThatMainTookAsMerged(t *testing.T) {
 	a := EnforceActor{
 		Merger: Merger{
 			CI:   stubCI{verdict: Green},
-			Main: &stubMain{head: testSHA},
+			Main: &fakeMain{head: testSHA},
 			Compose: func(_ context.Context, recs []DeliverableRecord) (Composition, error) {
 				return Composition{OnMain: recs}, nil
 			},

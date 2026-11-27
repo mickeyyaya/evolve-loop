@@ -49,11 +49,6 @@ func (c stubCI) Open(_ context.Context, b Batch) (PR, error) { return PR{Number:
 func (c stubCI) Watch(context.Context, PR) (Verdict, error)  { return c.verdict, nil }
 func (c stubCI) Rerun(context.Context, PR) error             { return nil }
 
-type stubMain struct{ head string }
-
-func (m *stubMain) Head(context.Context) (string, error)          { return m.head, nil }
-func (m *stubMain) FastForward(_ context.Context, t string) error { m.head = t; return nil }
-
 func TestStageActors_RegistersEnforceOnlyWhenNonNil(t *testing.T) {
 	t.Parallel()
 	shadow, enforce := &fakeActor{}, &fakeActor{}
@@ -78,7 +73,7 @@ func TestEnforceActor_AnEjectionIsRequeuedWithItsBrief(t *testing.T) {
 	a := EnforceActor{
 		Merger: Merger{
 			CI:   stubCI{verdict: Red},
-			Main: &stubMain{head: testSHA},
+			Main: &fakeMain{head: testSHA},
 			Compose: func(_ context.Context, recs []DeliverableRecord) (Composition, error) {
 				return Composition{Batch: Batch{Base: testSHA, Tip: testSHA}, Kept: recs}, nil
 			},
@@ -300,7 +295,7 @@ func TestEnforceActor_ErrorBranches(t *testing.T) {
 		a := EnforceActor{
 			Merger: Merger{
 				CI:   stubCI{verdict: Green},
-				Main: &stubMain{head: testSHA},
+				Main: &fakeMain{head: testSHA},
 				Compose: func(_ context.Context, _ []DeliverableRecord) (Composition, error) {
 					return Composition{
 						Batch:   Batch{Base: testSHA, Tip: testSHA},

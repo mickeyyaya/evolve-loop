@@ -129,7 +129,7 @@ func TestEnforceActor_AnEjectionPublishesTheEjectedEventWithTheBriefFileOfItsLan
 	a := EnforceActor{
 		Merger: Merger{
 			CI:   stubCI{verdict: Red},
-			Main: &stubMain{head: testSHA},
+			Main: &fakeMain{head: testSHA},
 			Compose: func(_ context.Context, recs []DeliverableRecord) (Composition, error) {
 				return Composition{Batch: Batch{Base: testSHA, Tip: testSHA}, Kept: recs}, nil
 			},

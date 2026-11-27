@@ -48,6 +48,7 @@ type Item struct {
 	Probes            []Probe                    `json:"probes,omitempty"`
 	RetryPlan         json.RawMessage            `json:"retry_plan,omitempty"`
 	FailureFindings   json.RawMessage            `json:"last_failure_findings,omitempty"`
+	BriefPath         string                     `json:"brief_path,omitempty"`
 	CreatedAt         string                     `json:"created_at,omitempty"`
 	PremiseVerifiedAt json.RawMessage            `json:"premise_verified_at,omitempty"`
 	Path              string                     `json:"-"`
@@ -64,13 +65,15 @@ func (it *Item) UnmarshalJSON(raw []byte) error {
 	type record Item
 	type itemRecord struct {
 		record
-		Priority json.RawMessage `json:"priority"`
+		Priority  json.RawMessage `json:"priority"`
+		BriefPath json.RawMessage `json:"brief_path"`
 	}
 	var r itemRecord
 	if err := json.Unmarshal(raw, &r); err != nil {
 		return err
 	}
 	*it = Item(r.record)
+	it.BriefPath = stampText(r.BriefPath)
 	if err := it.readPriority(r.Priority); err != nil {
 		return err
 	}

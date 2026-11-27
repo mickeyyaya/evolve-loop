@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
@@ -149,6 +150,8 @@ func (b *loopBatchCoordinator) productionEnforceActor(repo integration.Repo, poo
 		Merger:  env.enforceMerger(b.cfg.ProjectRoot, b.stderr),
 		Batcher: integration.LaneBatcher{Repo: ports.Repo, Composer: composer, Wave: "p" + strconv.Itoa(pool)},
 		Plane:   integration.PlaneOf(repo),
+		Requeue: inboxmover.Requeuer{Options: inboxmover.Options{ProjectRoot: b.cfg.ProjectRoot, Stderr: b.stderr, Now: b.clock, Signals: b.deps.Signals}},
+		Briefs:  integration.FileBriefStore{Dir: integration.WaveDir(b.cfg.ProjectRoot, strconv.Itoa(pool))},
 		Publish: b.deps.Signals,
 	}
 }

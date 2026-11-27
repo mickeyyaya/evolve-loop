@@ -73,6 +73,7 @@ const (
 	RoutedByField                = "routed_by"
 	EvidenceVerifiedField        = "evidence_verified"
 	StaleDropCountField          = "stale_drop_count"
+	BriefPathField               = "brief_path"
 )
 
 const (
@@ -129,6 +130,7 @@ var fieldRoles = map[string]FieldRole{
 	StaleDropCountField:         loopCounter,
 	ProtectedFilesField:         loopGrowOnly,
 	TierField:                   loopStamp,
+	BriefPathField:              loopStamp,
 
 	PremiseVerifiedAtField:       operatorStamp,
 	PremiseVerifiedSHAField:      operatorStamp,

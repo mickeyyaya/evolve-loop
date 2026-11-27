@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -220,5 +221,28 @@ func TestSignalCodes_EachHomeCodeKeepsItsWireName(t *testing.T) {
 		if string(code) != want {
 			t.Errorf("code = %q, want %q", code, want)
 		}
+	}
+}
+
+func TestFileBriefStore_Write_WritesBriefAndReturnsErrorOnUnwritableDir(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	var store BriefStore = FileBriefStore{Dir: dir}
+	ej := &Ejection{Cycle: 41, Cause: CauseConflict, Paths: []string{"a.txt"}}
+
+	path, err := store.Write(context.Background(), ej)
+
+	if err != nil || path != BriefPath(dir, 41) {
+		t.Fatalf("Write = %q, %v, want %q", path, err, BriefPath(dir, 41))
+	}
+	if text, err := ReadBrief(path); err != nil || !strings.Contains(text, "a.txt") {
+		t.Errorf("ReadBrief(%s) = %q, %v", path, text, err)
+	}
+	blocker := filepath.Join(dir, "file")
+	if err := os.WriteFile(blocker, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (FileBriefStore{Dir: blocker}).Write(context.Background(), ej); err == nil {
+		t.Error("Write under a file = nil, want an error")
 	}
 }

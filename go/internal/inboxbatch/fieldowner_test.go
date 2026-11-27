@@ -12,7 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
 )
 
-var loopStampKeys = []string{"consumed", "continuation", "evidence_verified", "failure_count", "git_sha", "landed_sha", "last_failure_class", "last_failure_cycle", "last_failure_findings", "last_failure_fingerprint", "last_failure_reason", "last_failure_rung", "protected_files", "released_continuations",
+var loopStampKeys = []string{"brief_path", "consumed", "continuation", "evidence_verified", "failure_count", "git_sha", "landed_sha", "last_failure_class", "last_failure_cycle", "last_failure_findings", "last_failure_fingerprint", "last_failure_reason", "last_failure_rung", "protected_files", "released_continuations",
 	"retired_cycle", "retired_reason", "retry_plan", "route", "routed_at", "routed_by", "routed_cycle", "routed_reason", "stale_drop_count", "tier", "unbacked"}
 
 var operatorStampKeys = []string{"intake_override", "premise_verified_at", "premise_verified_evidence", "premise_verified_sha"}
@@ -176,6 +176,7 @@ func TestStampFieldConstants_SpellTheKeysTheInboxHolds(t *testing.T) {
 		{inboxbatch.EvidenceVerifiedField, "evidence_verified"},
 		{inboxbatch.StaleDropCountField, "stale_drop_count"},
 		{inboxbatch.TierField, "tier"},
+		{inboxbatch.BriefPathField, "brief_path"},
 		{inboxbatch.IntakeOverrideField, "intake_override"},
 	} {
 		if pair[0] != pair[1] {

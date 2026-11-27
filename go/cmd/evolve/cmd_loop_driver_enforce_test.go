@@ -56,8 +56,8 @@ func TestProductionDriver_CheckRefusesEnforceOnTheProductionCompositionWithoutTh
 	if !errors.As(err, &refusal) || refusal.Stage != policy.FleetIntegrationEnforce {
 		t.Fatalf("Check = %v, want a MissingPortError at enforce", err)
 	}
-	if want := []string{"Requeue", "Promote", "Briefs"}; !slices.Equal(refusal.Ports, want) {
-		t.Fatalf("missing ports = %v, want %v: the root wires the merge, the plane sync, the batcher and its gate, and nothing else", refusal.Ports, want)
+	if want := []string{"Promote"}; !slices.Equal(refusal.Ports, want) {
+		t.Fatalf("missing ports = %v, want %v: the root wires the merge, the plane sync, the batcher and its gate, and the eject ports", refusal.Ports, want)
 	}
 }
 

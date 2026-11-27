@@ -46,21 +46,27 @@ Part 0 of the split (§13) holds the shadow prerequisite: R-a and R-d. It ranks 
 
 ```go
 type EnforceActor struct {
+    Repo    Repo
     Merger  Merger
     Plane   PlaneSync
-    Landing LandingFeed
+    Batcher Batcher
+    Requeue Requeuer
+    Briefs  BriefStore
     Promote Promoter
+    Publish Publisher
+    Now     func() time.Time
 }
 ```
 
-The `Requeue` and `Briefs` ports of the first draft are removed. `Merger.Eject` does their work (§4).
+The actor keeps the `Requeuer` and `BriefStore` ports for ejections (§4).
 
 | Port | Method set |
 |---|---|
 | `Merger` (exists in `batchpr.go`) | `Land(ctx, recs) (Outcome, error)`. Its fields are `CI`, `Main`, `Compose`, `Heads` and `Eject`. |
 | `PlaneSync` | `Sync(ctx) (SyncOutcome, error)` |
-| `LandingFeed` | `Intent(ctx, rec DeliverableRecord) (LandingIntent, error)` |
-| `Promoter` | `Promote(ctx, cycle int, commitSHA string) error` |
+| `Requeuer` | `Requeue(ctx, rec, briefPath) error` |
+| `BriefStore` | `Write(ctx, ej) (string, error)` |
+| `Promoter` | `Promote(ctx, rec DeliverableRecord) error` |
 
 | Method | What it does at enforce |
 |---|---|
@@ -120,7 +126,7 @@ The ship reports the delivery to post-ship in the typed field `RunResult.Deliver
 **Decision.**
 
 - `inboxbatch.Item` gets a field `BriefPath`. `inboxBatchesSection` renders it into the prompt of the next lane.
-- The enforce eject is `Merger.Eject` filled with requeue-with-brief. It calls `Ejection.WriteBrief`, then returns the item to the queue through `inboxmover` with `BriefPath` set. No `Requeue` port and no `Briefs` port exist. `Train.Brief` is not used, because it serves a PR author.
+- The enforce eject sets `Merger.Eject` to `ejectMember` with the kept `BriefStore` and `Requeuer` ports. `BriefStore` calls `Ejection.WriteBrief`. `Requeuer` returns the item to the queue through `inboxmover` with `BriefPath` set. `Train.Brief` is not used, because it serves a PR author.
 - Each ejection adds one to the failure count of the item. The convergence count of ADR-0126 bounds the retries.
 - The requeue keeps the original item text. The brief is added, never substituted.
 

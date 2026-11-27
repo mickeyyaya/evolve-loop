@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -66,6 +67,14 @@ func (e *Ejection) WriteBrief(dir string) (string, error) {
 		return "", fmt.Errorf("integration: write ejection brief: %w", err)
 	}
 	return path, nil
+}
+
+type FileBriefStore struct {
+	Dir string
+}
+
+func (s FileBriefStore) Write(_ context.Context, ej *Ejection) (string, error) {
+	return ej.WriteBrief(s.Dir)
 }
 
 func (e *Ejection) Fields(briefPath string) map[string]string {

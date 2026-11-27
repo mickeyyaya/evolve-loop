@@ -223,7 +223,7 @@ func skippedFilesNote(warnings []inboxbatch.LoadWarning) string {
 
 func selectableBatchesNote(ready []inboxbatch.Item, ranked []inboxrank.Ranked) string {
 	batches := inboxbatch.Classify(ready, inboxbatch.Config{Order: inboxrank.Sequence(ranked)})
-	rendered := inboxbatch.RenderMarkdown(batches, inboxrank.Labels(ranked))
+	rendered := inboxbatch.RenderMarkdown(batches, itemLabels(inboxrank.Labels(ranked)))
 	if rendered == "" {
 		return ""
 	}
@@ -232,6 +232,16 @@ func selectableBatchesNote(ready []inboxbatch.Item, ranked []inboxrank.Ranked) s
 		"one cycle amortizes the pipeline across them) over cherry-picking single items across batches. " +
 		"Batches come in inbox-rank order, the computed priority `evolve inbox rank` shows, and each item's line gives its score and top factor:\n" +
 		phaseidentity.WrapPasted(rendered)
+}
+
+func itemLabels(base func(inboxbatch.Item) string) func(inboxbatch.Item) string {
+	return func(it inboxbatch.Item) string {
+		s := base(it)
+		if it.BriefPath != "" {
+			return s + ", brief " + inboxbatch.StripControl(it.BriefPath)
+		}
+		return s
+	}
 }
 
 func consoleRoutedNote(console []inboxbatch.Item) string {

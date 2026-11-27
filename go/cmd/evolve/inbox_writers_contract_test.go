@@ -53,6 +53,7 @@ const movesOrRewritesAnExistingItem = "moves or rewrites an item that is already
 var inboxWritersThatFileNothing = map[string]string{
 	"internal/inboxfile":                            "the filing writer: File refuses an item without a known class; autofilers mint through inboxfile",
 	"internal/inboxmover/lifecycle":                 "the lifecycle writer: File refuses an item without a known class (ADR-0121 decision 6); every other write " + movesOrRewritesAnExistingItem,
+	"internal/inboxmover.requeueDeliveredFile":      movesOrRewritesAnExistingItem + " (requeues an ejected delivered item back to the inbox root with its brief_path)",
 	"internal/phases/ship.stage":                    movesOrRewritesAnExistingItem + " (the ship's consumption into consumed/)",
 	"internal/cli/inboxcmd.consumeInboxItem":        movesOrRewritesAnExistingItem + " (evolve inbox consume and the boundary step of evolve inbox curate)",
 	"internal/inboxtest.SeedItems":                  "a test fixture: it seeds items into the temporary inbox of a test, never into the inbox of a project",
