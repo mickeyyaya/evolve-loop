@@ -170,3 +170,17 @@ func TestFacts_SectionNamesTheLoginWallsOfACycle(t *testing.T) {
 		t.Errorf("Section() = %q, want the login wall count", got)
 	}
 }
+
+func TestCompose_FocusIdsLeadTheLanesAndTheOthersFillThem(t *testing.T) {
+	t.Parallel()
+
+	got := wave.Compose(wave.GoalInput{Next: 83, Standing: "Work the inbox.", Focus: []string{"id-one", "id-two"}})
+
+	want := "Wave 83.\n\nWork the inbox.\n\nNo earlier wave is recorded.\n\nFocus items for wave 83: id-one, id-two. These items take the first lanes; other items fill each free lane.\n"
+	if got != want {
+		t.Errorf("Compose() =\n%q\nwant\n%q", got, want)
+	}
+	if plain := wave.Compose(wave.GoalInput{Next: 83, Standing: "Work the inbox."}); strings.Contains(plain, "Focus items") {
+		t.Errorf("a wave with no focus ids names focus items:\n%s", plain)
+	}
+}

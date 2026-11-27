@@ -34,6 +34,7 @@ type Record struct {
 	StartedAt  time.Time  `json:"started_at"`
 	EndedAt    *time.Time `json:"ended_at,omitempty"`
 	Outcome    string     `json:"outcome,omitempty"`
+	Focus      []string   `json:"focus,omitempty"`
 }
 
 type Store struct {

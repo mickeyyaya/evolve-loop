@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	boundaryUsage       = "usage: evolve boundary run [--merge n,...] --goal-text-file F [--max-cycles N] [--only IDS] [--exclude IDS] [--dry-run] [--json] [--project-root P]"
+	boundaryUsage       = "usage: evolve boundary run [--merge n,...] --goal-text-file F [--max-cycles N] [--only IDS] [--exclude IDS] [--focus IDS] [--dry-run] [--json] [--project-root P]"
 	boundaryPrefix      = "evolve boundary run: "
 	boundaryGCLeaseWait = "2m"
 	boundaryLoopLog     = "boundary-loop.log"
@@ -53,6 +53,7 @@ type boundaryArgs struct {
 	goalText, maxCycles string
 	projectRoot         string
 	only, exclude       string
+	focus               string
 	runID               string
 	dryRun              bool
 	json                bool
@@ -158,7 +159,7 @@ func parseBoundaryArgs(args []string) (boundaryArgs, error) {
 	var merge, goalFile string
 	operands, err := cmdutil.Flags().Bools(map[string]*bool{"--dry-run": &a.dryRun, "--json": &a.json}).Values(map[string]*string{
 		"--merge": &merge, "--goal-text-file": &goalFile, "--max-cycles": &a.maxCycles, "--project-root": &a.projectRoot,
-		"--only": &a.only, "--exclude": &a.exclude,
+		"--only": &a.only, "--exclude": &a.exclude, "--focus": &a.focus,
 	}).Parse(args)
 	switch {
 	case err != nil:
@@ -167,6 +168,8 @@ func parseBoundaryArgs(args []string) (boundaryArgs, error) {
 		return a, fmt.Errorf("unexpected argument %q", operands[0])
 	case goalFile == "":
 		return a, errors.New("--goal-text-file is required")
+	case focusWithOnly(a.focus, a.only):
+		return a, errFocusWithOnly
 	}
 	if a.maxCycles != "" {
 		if n, err := strconv.Atoi(a.maxCycles); err != nil || n <= 0 {
@@ -253,6 +256,9 @@ func boundaryLaunchSteps(a boundaryArgs, root string) []boundaryStep {
 	}
 	if a.exclude != "" {
 		launch = append(launch, "--exclude", a.exclude)
+	}
+	if a.focus != "" {
+		launch = append(launch, "--focus", a.focus)
 	}
 	return []boundaryStep{
 		{verb: "loop-stop", args: append([]string{"--release"}, at...)},
