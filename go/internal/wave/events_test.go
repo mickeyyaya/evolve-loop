@@ -1,6 +1,7 @@
 package wave_test
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 
@@ -83,6 +84,7 @@ func TestEvent_String(t *testing.T) {
 		{wave.Event{Kind: wave.EventStopped, Cycle: 7, Detail: "stopped: lane deadline"}, "cycle 7: stopped: lane deadline"},
 		{wave.Event{Kind: wave.EventWaveStarted, Detail: "83"}, "wave 83 started; watch follows it"},
 		{wave.Event{Kind: wave.EventPool, Detail: "LOOP_ORCH_POOL_IDLE: pool idle"}, "LOOP_ORCH_POOL_IDLE: pool idle"},
+		{wave.Event{Kind: wave.EventStall, Trigger: "lane-stalls", Detail: "3 line(s)", Lanes: []string{"lane-1", "lane-2"}, Evidence: []string{".evolve/signals.ndjson"}}, "stall lane-stalls: 3 line(s); lanes lane-1, lane-2; evidence .evolve/signals.ndjson"},
 	}
 	for _, c := range cases {
 		if got := c.event.String(); got != c.want {
@@ -93,11 +95,33 @@ func TestEvent_String(t *testing.T) {
 
 func TestEventKind_IsTheWatchJSONVocabulary(t *testing.T) {
 	t.Parallel()
-	kinds := []wave.EventKind{wave.EventPhase, wave.EventSealed, wave.EventShipped, wave.EventQuotaPaused, wave.EventLoginRequired, wave.EventLoopExit, wave.EventWaveStarted, wave.EventPool, wave.EventStopped}
-	want := []string{"phase", "sealed", "shipped", "quota-paused", "login-required", "loop-exit", "wave-started", "pool", "stopped"}
+	kinds := []wave.EventKind{wave.EventPhase, wave.EventSealed, wave.EventShipped, wave.EventQuotaPaused, wave.EventLoginRequired, wave.EventLoopExit, wave.EventWaveStarted, wave.EventPool, wave.EventStopped, wave.EventStall}
+	want := []string{"phase", "sealed", "shipped", "quota-paused", "login-required", "loop-exit", "wave-started", "pool", "stopped", "stall"}
 	for i, k := range kinds {
 		if string(k) != want[i] {
 			t.Errorf("kind %d = %q, want %q: a watch consumer reads this text", i, k, want[i])
 		}
+	}
+}
+
+func TestEvent_StallJSONRoundTrip(t *testing.T) {
+	t.Parallel()
+	in := wave.Event{
+		Kind:     wave.EventStall,
+		Detail:   "verify-single-flight-unavailable: 20 event(s) in 9 cycle(s); SHARED FAULT",
+		Trigger:  "abnormal-kind",
+		Lanes:    []string{"cycle-2581"},
+		Evidence: []string{".evolve/runs/cycle-2581/abnormal-events.jsonl"},
+	}
+	raw, err := json.Marshal(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out wave.Event
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(out, in) {
+		t.Errorf("round-trip = %+v, want %+v", out, in)
 	}
 }

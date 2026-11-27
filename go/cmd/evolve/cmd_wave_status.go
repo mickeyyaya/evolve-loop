@@ -1,24 +1,33 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
+	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/cmd/evolve/cmdutil"
 	"github.com/mickeyyaya/evolve-loop/go/internal/clihealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/dispatchevents"
 	"github.com/mickeyyaya/evolve-loop/go/internal/heldproposal"
+	"github.com/mickeyyaya/evolve-loop/go/internal/loopchain"
 	"github.com/mickeyyaya/evolve-loop/go/internal/loopwave"
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/pipelinerates"
+	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wave"
+	"github.com/mickeyyaya/evolve-loop/go/internal/wavehealth"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wavemeasure"
 )
 
@@ -308,6 +317,7 @@ type waveWatcher struct {
 	cur            wave.Record
 	prev           wave.Snapshot
 	seen           map[string]bool
+	stallsSeen     map[string]bool
 	asJSON         bool
 	stdout, stderr io.Writer
 	signalOffset   int64
@@ -333,9 +343,116 @@ func (w *waveWatcher) poll() (bool, error) {
 			return false, fmt.Errorf("write: %w", err)
 		}
 	}
+	if err := w.pollStalls(read, loopLive); err != nil {
+		return false, err
+	}
 	done := w.prev.LoopLive && !snap.LoopLive
 	w.prev = snap
 	return done, nil
+}
+
+func (w *waveWatcher) pollStalls(read wave.WaveRead, loopLive bool) error {
+	if !loopLive {
+		return nil
+	}
+	now := w.env.now()
+	var policyWarn bytes.Buffer
+	pol := policy.LoadOrDefaults(filepath.Join(w.plane.evolveDir, "policy.json"), &policyWarn)
+	if msg := strings.TrimSpace(policyWarn.String()); msg != "" {
+		w.warnOnce(msg)
+	}
+	snap := wavehealth.Snapshot{
+		Now:      now,
+		Settings: pol.WaveCheckinSettings(),
+		Loop:     wavehealth.Have(wavehealth.LoopState{Running: true, BrakeHeld: loopchain.BrakeEngaged(w.plane.evolveDir)}),
+	}
+	populated, err := populateWaveHealthSnapshot(w.plane, w.cur, read, snap)
+	if err != nil {
+		w.warnOnce(err.Error())
+	}
+	report := wavehealth.Evaluate(populated)
+	for _, t := range wavehealth.StallFindings(populated, report) {
+		key := stallTriggerKey(t)
+		if w.stallsSeen[key] {
+			continue
+		}
+		e := w.stallWaveEvent(t, read, now)
+		if err := writeWaveEvent(w.stdout, w.cur.Number, e, w.asJSON); err != nil {
+			return fmt.Errorf("write: %w", err)
+		}
+		if w.stallsSeen == nil {
+			w.stallsSeen = map[string]bool{}
+		}
+		w.stallsSeen[key] = true
+	}
+	return nil
+}
+
+func stallTriggerKey(t wavehealth.StallTrigger) string {
+	if t.Kind == "" {
+		return t.Trigger
+	}
+	return t.Trigger + ":" + t.Kind
+}
+
+func (w *waveWatcher) stallWaveEvent(t wavehealth.StallTrigger, read wave.WaveRead, now time.Time) wave.Event {
+	e := wave.Event{
+		Kind:    wave.EventStall,
+		Detail:  t.Detail,
+		Trigger: t.Trigger,
+	}
+	switch t.Trigger {
+	case wavehealth.TriggerNoShip:
+		e.Lanes = wave.OpenLanes(w.cur, signalsUpTo(read.Loop, now))
+		if len(e.Lanes) == 0 {
+			e.Lanes = cycleNamesOf(read.Cycles)
+		}
+		e.Evidence = existingRelPaths(w.plane.root, filepath.Join(w.plane.evolveDir, signalcenter.StreamFileName))
+	case wavehealth.TriggerAbnormal:
+		e.Lanes = cycleNamesFromIDs(t.Cycles)
+		candidates := make([]string, 0, len(t.Cycles))
+		for _, id := range t.Cycles {
+			candidates = append(candidates, filepath.Join(paths.RunWorkspace(w.plane.root, id), dispatchevents.EventsFile))
+		}
+		e.Evidence = existingRelPaths(w.plane.root, candidates...)
+	case wavehealth.TriggerLaneStalls:
+		e.Lanes = t.Lanes
+		e.Evidence = existingRelPaths(w.plane.root, filepath.Join(w.plane.evolveDir, signalcenter.StreamFileName))
+	}
+	return e
+}
+
+func cycleNamesOf(cycles []wave.Cycle) []string {
+	ids := make([]int, len(cycles))
+	for i, c := range cycles {
+		ids[i] = c.ID
+	}
+	sort.Ints(ids)
+	return cycleNamesFromIDs(ids)
+}
+
+func cycleNamesFromIDs(ids []int) []string {
+	out := make([]string, len(ids))
+	for i, id := range ids {
+		out[i] = "cycle-" + strconv.Itoa(id)
+	}
+	return out
+}
+
+func existingRelPaths(root string, candidates ...string) []string {
+	var out []string
+	for _, abs := range candidates {
+		if _, err := os.Stat(abs); err != nil {
+			continue
+		}
+		rel, err := filepath.Rel(root, abs)
+		if err != nil {
+			out = append(out, filepath.ToSlash(abs))
+			continue
+		}
+		out = append(out, filepath.ToSlash(rel))
+	}
+	return out
 }
 
 func (w *waveWatcher) pollSignals() error {
@@ -407,7 +524,7 @@ func (w *waveWatcher) followNewerWave() error {
 	if err := writeWaveEvent(w.stdout, w.cur.Number, e, w.asJSON); err != nil {
 		return fmt.Errorf("write: %w", err)
 	}
-	w.cur, w.prev = newer, wave.Snapshot{LoopLive: true}
+	w.cur, w.prev, w.stallsSeen = newer, wave.Snapshot{LoopLive: true}, nil
 	return nil
 }
 

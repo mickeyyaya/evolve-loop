@@ -616,3 +616,40 @@ func TestEvaluate_A5AZeroLineCountNeverBrakesAndNeverPanics(t *testing.T) {
 	s.Stalls = Have([]StallLine{})
 	wantStep(t, Evaluate(s), "A5", ResultOK, "0 LOOP_ORCH_LANE_STALLED")
 }
+
+func TestStallFindings_ExtractsOnlyBrakingTriggersWithDetails(t *testing.T) {
+	t.Parallel()
+	s := healthy()
+	s.Wave = wave(3*time.Hour, 8, 0, Have(8))
+	s.Abnormal = Have(events(dispatchevents.EventVerifySingleFlightUnavailable, dispatchevents.SeverityWarn, 3, 5))
+	s.Stalls = Have(append(stallLines(3), StallLine{Lane: "lane-0", At: waveStart.Add(55 * time.Minute)}, StallLine{Lane: "", At: waveStart.Add(56 * time.Minute)}))
+	r := Evaluate(s)
+	var got []StallTrigger = StallFindings(s, r)
+	if len(got) != 3 {
+		t.Fatalf("StallFindings = %+v, want 3 triggers", got)
+	}
+	if got[0].Trigger != TriggerNoShip || got[0].Detail == "" {
+		t.Errorf("first trigger = %+v, want %s with detail", got[0], TriggerNoShip)
+	}
+	if got[1].Trigger != TriggerAbnormal || got[1].Kind != string(dispatchevents.EventVerifySingleFlightUnavailable) || len(got[1].Cycles) != 3 {
+		t.Errorf("second trigger = %+v, want %s with 3 cycles", got[1], TriggerAbnormal)
+	}
+	if got[2].Trigger != TriggerLaneStalls || len(got[2].Lanes) != 3 {
+		t.Errorf("third trigger = %+v, want %s with 3 unique lanes", got[2], TriggerLaneStalls)
+	}
+
+	if _, ok := abnormalTrigger(Snapshot{}, Step{ID: "A4"}); ok {
+		t.Errorf("abnormalTrigger with unknown snapshot should return false")
+	}
+	if _, ok := abnormalTrigger(Snapshot{Abnormal: Have([]CycleEvent{})}, Step{ID: "A4"}); ok {
+		t.Errorf("abnormalTrigger with empty tallies should return false")
+	}
+	if lanes := silentStallLaneNames(Snapshot{}); lanes != nil {
+		t.Errorf("silentStallLaneNames with unknown snapshot = %v, want nil", lanes)
+	}
+
+	s.Loop = Have(LoopState{Running: true, BrakeHeld: true})
+	if held := StallFindings(s, Evaluate(s)); len(held) != 0 {
+		t.Errorf("held brake should emit no stall findings, got %+v", held)
+	}
+}

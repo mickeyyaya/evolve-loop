@@ -3,6 +3,7 @@ package wave
 import (
 	"fmt"
 	"sort"
+	"strings"
 )
 
 type EventKind string
@@ -17,6 +18,7 @@ const (
 	EventWaveStarted   EventKind = "wave-started"
 	EventPool          EventKind = "pool"
 	EventStopped       EventKind = "stopped"
+	EventStall         EventKind = "stall"
 )
 
 type Snapshot struct {
@@ -25,9 +27,12 @@ type Snapshot struct {
 }
 
 type Event struct {
-	Kind   EventKind `json:"kind"`
-	Cycle  int       `json:"cycle,omitempty"`
-	Detail string    `json:"detail,omitempty"`
+	Kind     EventKind `json:"kind"`
+	Cycle    int       `json:"cycle,omitempty"`
+	Detail   string    `json:"detail,omitempty"`
+	Trigger  string    `json:"trigger,omitempty"`
+	Lanes    []string  `json:"lanes,omitempty"`
+	Evidence []string  `json:"evidence,omitempty"`
 }
 
 func (e Event) String() string {
@@ -46,9 +51,28 @@ func (e Event) String() string {
 		return e.Detail
 	case EventStopped:
 		return fmt.Sprintf("cycle %d: %s", e.Cycle, e.Detail)
+	case EventStall:
+		return formatStallEvent(e)
 	default:
 		return fmt.Sprintf("cycle %d: %s %s", e.Cycle, e.Kind, e.Detail)
 	}
+}
+
+func formatStallEvent(e Event) string {
+	text := "stall"
+	if e.Trigger != "" {
+		text += " " + e.Trigger
+	}
+	if e.Detail != "" {
+		text += ": " + e.Detail
+	}
+	if len(e.Lanes) > 0 {
+		text += "; lanes " + strings.Join(e.Lanes, ", ")
+	}
+	if len(e.Evidence) > 0 {
+		text += "; evidence " + strings.Join(e.Evidence, ", ")
+	}
+	return text
 }
 
 func Diff(prev, cur Snapshot) []Event {

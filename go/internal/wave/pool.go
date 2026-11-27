@@ -1,6 +1,7 @@
 package wave
 
 import (
+	"sort"
 	"strconv"
 	"time"
 
@@ -96,6 +97,36 @@ func laneCycle(cycles []Cycle, todo string, at time.Time) int {
 		}
 	}
 	return found
+}
+
+func OpenLanes(rec Record, events []signalcenter.Event) []string {
+	run := loopRunOf(rec, nil)
+	open := map[string]int{}
+	for _, e := range events {
+		if !run.holds(e) {
+			continue
+		}
+		todo := e.Fields[todoField]
+		if todo == "" {
+			continue
+		}
+		switch e.Code {
+		case orchestrator.CodeLaneLaunched, orchestrator.CodeLaneBackfilled:
+			open[todo]++
+		case orchestrator.CodeLaneExited:
+			if open[todo] > 0 {
+				open[todo]--
+			}
+		}
+	}
+	var lanes []string
+	for todo, count := range open {
+		if count > 0 {
+			lanes = append(lanes, todo)
+		}
+	}
+	sort.Strings(lanes)
+	return lanes
 }
 
 func RunFrom(rec Record) time.Time { return loopRunOf(rec, nil).from }

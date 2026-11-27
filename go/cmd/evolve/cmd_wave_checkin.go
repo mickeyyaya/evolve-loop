@@ -97,17 +97,25 @@ func (g checkinGatherer) withWave(snap wavehealth.Snapshot, cur wave.Record) (wa
 	snap.Loop = g.loopState(live)
 	read, warnings := readWaveOf(g.plane, cur)
 	writeWaveWarnings(append(warnings, startWarning), g.stderr)
+	var err error
+	if snap, err = populateWaveHealthSnapshot(g.plane, cur, read, snap); err != nil {
+		return snap, err
+	}
+	snap.Failures = g.failures(cur)
+	return snap, nil
+}
+
+func populateWaveHealthSnapshot(plane wavePlaneDirs, cur wave.Record, read wave.WaveRead, snap wavehealth.Snapshot) (wavehealth.Snapshot, error) {
 	facts := wavehealth.WaveFacts{Start: wave.RunFrom(cur), Started: len(read.Cycles), Shipped: len(read.Landed)}
 	if n, ok := wave.PoolLive(cur, nil, signalsUpTo(read.Loop, snap.Now)); ok {
 		facts.PoolLive = wavehealth.Have(n)
 	}
 	snap.Wave = wavehealth.Have(facts)
-	snap.Stalls = wavehealth.Have(stallLinesOf(g.plane.root, read, snap.Now))
+	snap.Stalls = wavehealth.Have(stallLinesOf(plane.root, read, snap.Now))
 	var err error
-	if snap.Abnormal, err = readCycleEvents(g.plane.root, read.Cycles); err != nil {
+	if snap.Abnormal, err = readCycleEvents(plane.root, read.Cycles); err != nil {
 		return snap, err
 	}
-	snap.Failures = g.failures(cur)
 	return snap, nil
 }
 

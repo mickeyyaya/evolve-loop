@@ -49,7 +49,19 @@ This page tells the console (an operator or an LLM) how to run each wave through
   - At enforce, the release runs only `evolve gc --only cache` in process. It takes the gc lease with no wait, and it skips when another gc holds the lease. A live lane keeps its worktree, its sessions and its processes.
   - At enforce, free disk under `gc.disk_floor_gb` holds new lanes. Running lanes continue. The hold clears at `gc.disk_warn_gb`. A held pool shows the idle cause `disk_floor` and never shows underfill.
   - The boundary gc stays unchanged. The sentinel does not replace it.
-- To follow the wave, run `evolve wave watch` under a monitor. It prints one line for each phase change, seal, deadline stop, ship and quota pause. It exits when the loop exits. When a newer wave starts, it prints `wave-started` and follows the newer wave.
+- To follow the wave, run `evolve wave watch` under a monitor. It prints one line for each phase change, seal, deadline stop, ship, stall wake and quota pause. It exits when the loop exits. When a newer wave starts, it prints `wave-started` and follows the newer wave.
+
+### Zero-ship first look
+
+When a wave has zero ships, read `evolve wave watch` first. The watch prints one `stall` line for each trigger below.
+
+| Trigger | Cause | First check |
+|---|---|---|
+| `no-ship` | Wave age and live lanes pass the `wave.checkin` limit with zero ships. | Run `evolve wave checkin --json` and inspect `.evolve/signals.ndjson`. |
+| `abnormal-kind` | One WARN or ERROR kind repeats across cycles in `abnormal-events.jsonl`. | Open `abnormal-events.jsonl` in each cycle directory that the wake names. |
+| `lane-stalls` | Silent `LOOP_ORCH_LANE_STALLED` lines cluster inside the `wave.checkin` window. | Inspect `.evolve/signals.ndjson` and run `evolve wave status` for the named lanes. |
+
+Each `stall` line prints once for each trigger and kind in a wave. Follow Part A of [console-checkin-sop.md](console-checkin-sop.md) when a wake fires.
 
 ## 3. At the boundary
 

@@ -155,3 +155,23 @@ func TestPoolLive_TheLatestPoolSignalOfTheRunGivesTheLiveLanes(t *testing.T) {
 		t.Errorf("PoolLive = %d %t and %d %t, want 2 true and 0 false", live, ok, none, noneOK)
 	}
 }
+
+func TestOpenLanes_ReturnsSortedUnexitedLanesOfTheWaveRun(t *testing.T) {
+	t.Parallel()
+	rec := wave.Record{Number: 7, RunID: clock(-10).Format("20060102T150405Z"), PID: 42, StartedAt: clock(0)}
+	loop := []signalcenter.Event{
+		runEvent(-20, 42, "LOOP_ORCH_LANE_LAUNCHED", "stale", ""),
+		runEvent(-2, 42, "LOOP_ORCH_LANE_LAUNCHED", "lane-b", ""),
+		runEvent(1, 42, "LOOP_ORCH_LANE_LAUNCHED", "lane-a", ""),
+		runEvent(2, 42, "LOOP_ORCH_LANE_BACKFILLED", "lane-c", ""),
+		runEvent(2, 42, "LOOP_ORCH_POOL_IDLE", "", ""),
+		runEvent(3, 42, "LOOP_ORCH_LANE_EXITED", "lane-b", ""),
+		runEvent(4, 7, "LOOP_ORCH_LANE_LAUNCHED", "other-pid", ""),
+	}
+
+	got := wave.OpenLanes(rec, loop)
+	want := []string{"lane-a", "lane-c"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("OpenLanes = %v, want %v", got, want)
+	}
+}

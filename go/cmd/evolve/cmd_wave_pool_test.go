@@ -227,3 +227,170 @@ func TestPollSignals_NoSignalStreamYetIsNotAnError(t *testing.T) {
 		t.Errorf("err = %v, stdout %q, stderr %q, want silence while the stream does not exist", err, stdout.String(), stderr.String())
 	}
 }
+
+func TestWaveWatch_EmitsStallOncePerTriggerAndResetsOnNewerWave(t *testing.T) {
+	t.Parallel()
+	p := newWavePlane(t)
+	if err := p.store().Save(wave.Record{Number: 130, RunID: "r130", PID: 777, LogPath: p.loopLog("r130", 777), StartedAt: waveTestClock}); err != nil {
+		t.Fatal(err)
+	}
+	stalls := poolSignal(1, waveTestClock.Add(5*time.Minute), "WARN", "LOOP_ORCH_LANE_STALLED", "lane a stalled", `"todo":"lane-a"`) +
+		poolSignal(2, waveTestClock.Add(10*time.Minute), "WARN", "LOOP_ORCH_LANE_STALLED", "lane b stalled", `"todo":"lane-b"`) +
+		poolSignal(3, waveTestClock.Add(15*time.Minute), "WARN", "LOOP_ORCH_LANE_STALLED", "lane c stalled", `"todo":"lane-c"`)
+	p.write(".evolve/signals.ndjson", stalls)
+	h := newWaveHarness()
+	h.alive[777] = true
+	now := waveTestClock.Add(20 * time.Minute)
+	h.onSleep = func(n int) {
+		switch n {
+		case 2:
+			if err := p.store().Save(wave.Record{Number: 131, RunID: "r131", PID: 777, LogPath: p.loopLog("r131", 777), StartedAt: waveTestClock.Add(25 * time.Minute)}); err != nil {
+				t.Fatal(err)
+			}
+			p.write(".evolve/signals.ndjson", stalls+
+				poolSignal(4, waveTestClock.Add(26*time.Minute), "WARN", "LOOP_ORCH_LANE_STALLED", "lane a stalled again", `"todo":"lane-a"`)+
+				poolSignal(5, waveTestClock.Add(27*time.Minute), "WARN", "LOOP_ORCH_LANE_STALLED", "lane b stalled again", `"todo":"lane-b"`)+
+				poolSignal(6, waveTestClock.Add(28*time.Minute), "WARN", "LOOP_ORCH_LANE_STALLED", "lane c stalled again", `"todo":"lane-c"`))
+			now = waveTestClock.Add(30 * time.Minute)
+		case 4:
+			h.alive[777] = false
+		}
+	}
+	env := h.env(p.root)
+	env.now = func() time.Time { return now }
+
+	rc := runWaveWith(env, []string{"watch", "--json", "--project-root", p.root}, &h.stdout, &h.stderr)
+	if rc != 0 {
+		t.Fatalf("rc = %d, stderr: %s", rc, h.stderr.String())
+	}
+	var stallEvents []wave.Event
+	for _, line := range strings.Split(strings.TrimSpace(h.stdout.String()), "\n") {
+		var e wave.Event
+		if err := json.Unmarshal([]byte(line), &e); err == nil && e.Kind == wave.EventStall {
+			stallEvents = append(stallEvents, e)
+		}
+	}
+	if len(stallEvents) != 2 {
+		t.Fatalf("stall events = %+v, want 2 (once for wave 130 and once after reset on wave 131)", stallEvents)
+	}
+	if stallEvents[0].Trigger != "lane-stalls" || len(stallEvents[0].Lanes) != 3 {
+		t.Errorf("first stall = %+v, want lane-stalls with 3 lanes", stallEvents[0])
+	}
+}
+
+func TestWaveWatch_CorruptAbnormalEventsWarnsOnceAndKeepsWatching(t *testing.T) {
+	t.Parallel()
+	p := newWavePlane(t)
+	if err := p.store().Save(wave.Record{Number: 130, RunID: "r130", PID: 777, LogPath: p.loopLog("r130", 777), StartedAt: waveTestClock}); err != nil {
+		t.Fatal(err)
+	}
+	p.write(".evolve/runs/cycle-2/abnormal-events.jsonl", "{not-json\n")
+	h := newWaveHarness()
+	h.alive[777] = true
+	now := waveTestClock.Add(20 * time.Minute)
+	h.onSleep = func(n int) {
+		if n == 2 {
+			h.alive[777] = false
+		}
+	}
+	env := h.env(p.root)
+	env.now = func() time.Time { return now }
+
+	rc := runWaveWith(env, []string{"watch", "--project-root", p.root}, &h.stdout, &h.stderr)
+	if rc != 0 || strings.Count(h.stderr.String(), "abnormal-events.jsonl") != 1 {
+		t.Errorf("rc = %d, stderr = %q, want exit 0 and one warning for corrupt abnormal-events.jsonl", rc, h.stderr.String())
+	}
+}
+
+func TestWaveWatch_NoShipAndAbnormalTriggersAndPolicyWarnings(t *testing.T) {
+	t.Parallel()
+	p := newWavePlane(t)
+	if err := p.store().Save(wave.Record{Number: 130, RunID: "r130", PID: 1, LogPath: p.loopLog("r130", 1), StartedAt: waveTestClock}); err != nil {
+		t.Fatal(err)
+	}
+	p.write(".evolve/policy.json", "{not-json")
+	p.write(".evolve/signals.ndjson",
+		poolSignal(1, waveTestClock.Add(1*time.Minute), "INFO", "LOOP_ORCH_POOL_IDLE", "live only", `"live":"4"`))
+	var evBody strings.Builder
+	for c := 1; c <= 3; c++ {
+		for i := 0; i < 5; i++ {
+			fmt.Fprintf(&evBody, `{"event_type":"verify-single-flight-unavailable","timestamp":%q,"source_phase":"verify","severity":"WARN","details":"replay","cycle":%d}`+"\n",
+				waveTestClock.Add(time.Duration(c*10+i)*time.Minute).Format(time.RFC3339), c)
+		}
+		p.write(fmt.Sprintf(".evolve/runs/cycle-%d/abnormal-events.jsonl", c), evBody.String())
+		evBody.Reset()
+	}
+	h := newWaveHarness()
+	h.alive[1] = true
+	now := waveTestClock.Add(130 * time.Minute)
+	h.onSleep = func(n int) {
+		if n == 2 {
+			h.alive[1] = false
+		}
+	}
+	env := h.env(p.root)
+	env.now = func() time.Time { return now }
+
+	rc := runWaveWith(env, []string{"watch", "--json", "--project-root", p.root}, &h.stdout, &h.stderr)
+	if rc != 0 {
+		t.Fatalf("rc = %d, stderr: %s", rc, h.stderr.String())
+	}
+	byTrigger := map[string]wave.Event{}
+	for _, line := range strings.Split(strings.TrimSpace(h.stdout.String()), "\n") {
+		var e wave.Event
+		if err := json.Unmarshal([]byte(line), &e); err == nil && e.Kind == wave.EventStall {
+			byTrigger[e.Trigger] = e
+		}
+	}
+	noShip, ok := byTrigger["no-ship"]
+	if !ok || len(noShip.Lanes) != 3 || len(noShip.Evidence) != 1 {
+		t.Errorf("no-ship event = %+v, want fallback cycle lanes [cycle-1 cycle-2 cycle-3] and signals.ndjson evidence", byTrigger["no-ship"])
+	}
+	abnormal, ok := byTrigger["abnormal-kind"]
+	if !ok || len(abnormal.Lanes) != 3 || len(abnormal.Evidence) != 3 {
+		t.Errorf("abnormal-kind event = %+v, want 3 cycle lanes and 3 evidence files", byTrigger["abnormal-kind"])
+	}
+	if !strings.Contains(h.stderr.String(), "policy.json") {
+		t.Errorf("stderr = %q, want policy.json warning", h.stderr.String())
+	}
+}
+
+func TestWaveWatch_NoShipUsesOpenLanesAndWriteErrorPropagates(t *testing.T) {
+	t.Parallel()
+	p := newWavePlane(t)
+	rec := wave.Record{Number: 130, RunID: "r130", PID: 1, LogPath: p.loopLog("r130", 1), StartedAt: waveTestClock}
+	if err := p.store().Save(rec); err != nil {
+		t.Fatal(err)
+	}
+	p.write(".evolve/signals.ndjson",
+		poolSignal(1, waveTestClock.Add(1*time.Minute), "INFO", "LOOP_ORCH_LANE_LAUNCHED", "launched lane-1", `"todo":"lane-1","live":"4"`))
+	h := newWaveHarness()
+	h.alive[1] = true
+	now := waveTestClock.Add(130 * time.Minute)
+	env := h.env(p.root)
+	env.now = func() time.Time { return now }
+
+	var okOut, okErr bytes.Buffer
+	wOK := &waveWatcher{env: env, plane: wavePlaneDirs{root: p.root, evolveDir: p.evolveDir(), store: p.store()}, cur: rec, prev: wave.Snapshot{LoopLive: true}, seen: map[string]bool{}, stdout: &okOut, stderr: &okErr}
+	if done, err := wOK.poll(); done || err != nil || !strings.Contains(okOut.String(), "lane-1") {
+		t.Fatalf("poll = (%t, %v), stdout = %q, want open lane-1 in stall event", done, err, okOut.String())
+	}
+
+	wFail := &waveWatcher{env: env, plane: wavePlaneDirs{root: p.root, evolveDir: p.evolveDir(), store: p.store()}, cur: rec, prev: wave.Snapshot{LoopLive: true}, seen: map[string]bool{}, stdout: &failingWriter{okWrites: 1}, stderr: io.Discard}
+	if _, err := wFail.poll(); err == nil {
+		t.Errorf("poll with failing writer after signal line should return error")
+	}
+}
+
+func TestExistingRelPaths_HandlesMissingAndUnrelatablePaths(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	existing := filepath.Join(dir, "present.txt")
+	if err := os.WriteFile(existing, []byte("ok"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := existingRelPaths("relative-root", existing, filepath.Join(dir, "absent.txt"))
+	if len(got) != 1 || got[0] != filepath.ToSlash(existing) {
+		t.Errorf("existingRelPaths = %v, want [%s]", got, filepath.ToSlash(existing))
+	}
+}
