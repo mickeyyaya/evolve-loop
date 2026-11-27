@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,20 +19,57 @@ import (
 )
 
 const (
-	verdictClean      = "clean"
-	verdictNotClean   = "not clean"
-	verdictNoEvidence = "no evidence"
+	verdictClean      = integration.PoolClean
+	verdictNotClean   = integration.PoolNotClean
+	verdictNoEvidence = integration.PoolNoEvidence
 
 	integrationStatusUsage = "usage: evolve integration status [--pool N] [--wave N] [--project-root P] [--json]\n  exit 0 = clean, 1 = not clean, no evidence or an unreadable record; 2 = an absent root, an unreadable wave store, or a wave number that the store does not know; 10 = usage"
 	statusOrderNote        = "order: by delivery time; rank, risk and deps not supplied"
-	statusEnforceNote      = "enforce: not ready (no enforce actor)"
 )
 
-type integrationStatusEvidence struct {
-	Found        bool
-	Record       integration.WaveRecord
-	Shipped      []int
-	ReadFailures []string
+type integrationStatusEvidence = integration.PoolEvidence
+
+type enforceReady struct {
+	Clean    int            `json:"clean"`
+	Need     int            `json:"need"`
+	Pools    []int          `json:"pools"`
+	Fault    string         `json:"fault,omitempty"`
+	Excluded map[int]string `json:"excluded,omitempty"`
+}
+
+func enforceReadyOf(r integration.Readiness) enforceReady {
+	out := enforceReady{Clean: len(r.Clean), Need: integration.RolloutNeed, Pools: r.Clean, Excluded: r.Excluded}
+	if out.Pools == nil {
+		out.Pools = []int{}
+	}
+	if len(out.Excluded) == 0 {
+		out.Excluded = nil
+	}
+	if r.Fault != nil {
+		out.Fault = r.Fault.Error()
+	}
+	return out
+}
+
+func (e enforceReady) line() string {
+	return integration.ReadyLine(e.Pools, e.Need)
+}
+
+func (e enforceReady) reasons() []string {
+	var out []string
+	if e.Fault != "" {
+		out = append(out, "enforce ready fault: the evidence chain is unreadable: "+e.Fault)
+	}
+	for _, pool := range slices.Sorted(maps.Keys(e.Excluded)) {
+		out = append(out, fmt.Sprintf("enforce ready excludes pool %d: %s", pool, e.Excluded[pool]))
+	}
+	return out
+}
+
+type statusContext struct {
+	root  string
+	store integration.FileWaveStore
+	ready enforceReady
 }
 
 type integrationStatusMember struct {
@@ -48,6 +86,7 @@ type integrationStatusReport struct {
 	Wave        int                            `json:"wave,omitempty"`
 	Stage       string                         `json:"stage"`
 	Enforce     string                         `json:"enforce"`
+	EnforceInfo enforceReady                   `json:"enforce_ready"`
 	Order       string                         `json:"order"`
 	Verdict     string                         `json:"verdict"`
 	Failed      []string                       `json:"failed,omitempty"`
@@ -76,73 +115,12 @@ func memberLine(m integrationStatusMember) string {
 	return line
 }
 
-func composes(rec integration.WaveRecord) int {
-	n := 0
-	for _, m := range rec.Members {
-		switch m.Status {
-		case integration.MemberComposed, integration.MemberConflicted, integration.MemberConflictedBaseAhead:
-			n++
-		}
-	}
-	return n
-}
+var integrationVerdict = integration.PoolVerdict
 
-func hasWaveEndDecision(rec integration.WaveRecord) bool {
-	return slices.ContainsFunc(rec.Decisions, func(d integration.FlushRecord) bool { return d.Trigger == integration.TriggerWaveEnd })
-}
-
-func pendingAtEnd(rec integration.WaveRecord) []string {
-	var out []string
-	for _, c := range slices.Sorted(maps.Keys(rec.Members)) {
-		if rec.Members[c].Status == integration.MemberPending {
-			out = append(out, fmt.Sprintf("cycle %d is still pending at wave end", c))
-		}
-	}
-	return out
-}
-
-func integrationVerdict(ev integrationStatusEvidence) (string, []string) {
-	var failed []string
-	for _, f := range ev.ReadFailures {
-		failed = append(failed, "unreadable: "+f)
-	}
-	if !ev.Found {
-		return verdictNotClean, append(failed, "no wave record")
-	}
-	rec := ev.Record
-	if !rec.Ended {
-		failed = append(failed, "the wave record has no Ended")
-	}
-	if !hasWaveEndDecision(rec) {
-		failed = append(failed, "the wave record has no wave-end decision")
-	}
-	if rec.LastCycle < 1 {
-		failed = append(failed, "the wave record has no last cycle, so the shipped cycles cannot be counted")
-	}
-	for _, c := range ev.Shipped {
-		if _, ok := rec.Members[c]; !ok {
-			failed = append(failed, fmt.Sprintf("missing record: cycle %d shipped and has no member", c))
-		}
-	}
-	if rec.Ended {
-		failed = append(failed, pendingAtEnd(rec)...)
-	}
-	for _, f := range rec.Failures {
-		failed = append(failed, fmt.Sprintf("driver failure at %s: %s", f.Step, f.Error))
-	}
-	switch {
-	case len(failed) > 0:
-		return verdictNotClean, failed
-	case composes(rec) == 0:
-		return verdictNoEvidence, nil
-	}
-	return verdictClean, nil
-}
-
-func buildIntegrationStatus(pool int, stage string, ev integrationStatusEvidence) integrationStatusReport {
+func buildIntegrationStatus(pool int, ev integrationStatusEvidence, ready enforceReady) integrationStatusReport {
 	verdict, failed := integrationVerdict(ev)
 	rep := integrationStatusReport{
-		Pool: pool, Stage: stage, Enforce: statusEnforceNote, Order: statusOrderNote, Verdict: verdict, Failed: failed,
+		Pool: pool, Enforce: ready.line(), EnforceInfo: ready, Order: statusOrderNote, Verdict: verdict, Failed: failed,
 		Counts: map[string]int{"shipped": len(ev.Shipped)}, Members: []integrationStatusMember{},
 	}
 	rec := ev.Record
@@ -250,8 +228,9 @@ func statusVerb(env integrationEnv, args []string, stdout, stderr io.Writer) int
 		return rc
 	}
 	store := integration.FileWaveStore{Root: root}
+	sc := statusContext{root: root, store: store, ready: enforceReadyOf(readinessOf(context.Background(), root, env.Chain))}
 	if waveNum > 0 {
-		return statusOfWave(root, store, waveNum, asJSON, stdout, stderr)
+		return statusOfWave(sc, waveNum, asJSON, stdout, stderr)
 	}
 	if poolN == 0 {
 		pools := store.Pools()
@@ -261,14 +240,15 @@ func statusVerb(env integrationEnv, args []string, stdout, stderr io.Writer) int
 		}
 		poolN = pools[len(pools)-1]
 	}
-	rep := reportOf(root, store, poolN)
+	rep := reportOf(sc, poolN)
 	return printStatus(rep, asJSON, stdout, stderr)
 }
 
-func reportOf(root string, store integration.FileWaveStore, pool int) integrationStatusReport {
-	rep := buildIntegrationStatus(pool, stageOf(root), gatherEvidence(root, store, pool))
-	rep.Wave = waveOfPool(root, pool)
-	rep.ProjectRoot = root
+func reportOf(sc statusContext, pool int) integrationStatusReport {
+	rep := buildIntegrationStatus(pool, gatherEvidence(sc.root, sc.store, pool), sc.ready)
+	rep.Stage = stageOf(sc.root)
+	rep.Wave = waveOfPool(sc.root, pool)
+	rep.ProjectRoot = sc.root
 	return rep
 }
 
@@ -293,16 +273,16 @@ func statusSelectors(operands []string, pool, waveN string, err error) (int, int
 	return poolN, waveNum, err
 }
 
-func statusOfWave(root string, store integration.FileWaveStore, number int, asJSON bool, stdout, stderr io.Writer) int {
-	bounds, err := waveBoundsOf(root, number)
+func statusOfWave(sc statusContext, number int, asJSON bool, stdout, stderr io.Writer) int {
+	bounds, err := waveBoundsOf(sc.root, number)
 	if err != nil {
 		fmt.Fprintf(stderr, "%s%v\n", integrationPrefix, err)
 		return exitIO
 	}
-	set := integrationStatusWaves{ProjectRoot: root, Wave: number, Pools: []integrationStatusReport{}}
-	for _, p := range store.Pools() {
+	set := integrationStatusWaves{ProjectRoot: sc.root, Wave: number, Pools: []integrationStatusReport{}}
+	for _, p := range sc.store.Pools() {
 		if bounds.Holds(p) {
-			set.Pools = append(set.Pools, reportOf(root, store, p))
+			set.Pools = append(set.Pools, reportOf(sc, p))
 		}
 	}
 	if len(set.Pools) == 0 {
@@ -357,6 +337,9 @@ func printStatus(rep integrationStatusReport, asJSON bool, stdout, stderr io.Wri
 	}
 	fmt.Fprintln(stdout, rep.Order)
 	fmt.Fprintln(stdout, rep.Enforce)
+	for _, reason := range rep.EnforceInfo.reasons() {
+		fmt.Fprintln(stdout, reason)
+	}
 	fmt.Fprintf(stdout, "counts: %s\n", countsLine(rep.Counts))
 	for _, m := range rep.Members {
 		fmt.Fprintln(stdout, memberLine(m))

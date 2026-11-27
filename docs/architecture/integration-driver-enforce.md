@@ -302,15 +302,24 @@ Each row is a red test first. Mutations: remove the `delivered` skip, remove the
 | Id | Rule | Acceptance row |
 |---|---|---|
 | H6.1 | `evolve integration status` prints `enforce ready: N/2 clean shadow waves (pools ...)`. N counts pools with the `clean` verdict of the parent spec §7. | A fixture with one clean and one unclean record prints `1/2` and the clean pool id. |
-| H6.2 | `evolve stage flip` refuses `integration.stage` `enforce` while N < 2. The count is the `Promotion` data of the `integration` registry entry. The driver gate reads the same entry. | With N = 1, the flip and the driver gate refuse `enforce` with a typed error that names N. With N = 2 they accept. |
-| H6.3 | The first enforce pool runs as the only pool. A later pool waits until the first enforce pool ends. | With one enforce pool open, a second pool start is held. After `Ended`, it starts. |
+| H6.2 | The driver gate refuses `enforce` while N < 2. The count is `RolloutCount.Count` in `internal/integration`, cached once per driver. The gate carries the fault and the excluded reasons in `RolloutError`. The refusal of `evolve stage flip` is the item `train-rollout-flip-refusal-and-flip-record`, because the flip verb does not exist yet. | With N = 1, the driver gate refuses `enforce` with a typed error that names N. With N = 2 it accepts. |
+| H6.3 | The first enforce pool runs as the only pool. A later pool waits until the first enforce pool ends. Both the loop hold and the driver gate call `HeldBy`. While held, the loop prints one recovery line per hold. | With one enforce pool open, a second pool start is held and logs the recovery step once. After `Ended`, it starts. |
 
-**Evidence integrity.** The wave record is the evidence of the train. The count N of H6.1 reads only pool records whose digest is committed to the hash chain. A pool record that is missing or edited fails the count. It never counts as clean.
+The pool record has a `Stage` field. The driver writes the stage of each write into it. The first enforce pool is the lowest pool whose record has the stage `enforce`.
+
+**Evidence integrity.** The wave record is the evidence of the train. The count N of H6.1 reads only pool records whose digest is committed to the hash chain. A pool record that is missing, unreadable or edited fails the count. It never counts as clean.
+
+Each persist of a pool record, and its `Ended` write, seals the sha256 of the record file in the hash chain under the pool scope. It uses the caller's context, and the last seal of a pool wins. `RolloutCount.Count` uses a port with two methods, `Seal` and `SealedAll`. Tests use a fake, so `internal/integration` does not import the ledger adapter.
+
+`SealedAll` reads the chain once per count and returns any chain error. Status and `RolloutError` then separate a broken chain from zero clean waves. `Chained` returns true only when the digest of the file on disk equals the last seal of the pool. `ReadyLine` renders the `enforce ready: N/2 ...` line for both `status` and `RolloutError`.
+
+The adapter records each digest under the dedicated key `integration.wave_record` (`wave-record/1`) and seals it with `SealStageEvidence`. We chose option (A), a dedicated key outside the stage registry, because `stageevidence.Score` counts every `KindDecision` on `fleet.integration.stage` toward stage promotion. This keeps `fleet.integration.stage` free of wave-record writes.
 
 The enforce flip writes a verified flip record. The general rule is in [shadow-stage-contract](shadow-stage-contract.md) (rules E1-E4 and C1-C3). This card does not repeat it.
 
 | Id | Rule | Acceptance row |
 |---|---|---|
+| H6.0 | Each write of a pool record seals its digest in the chain. | A sealed record reads chained. The same record edited after the seal, a record with no seal and a missing record each read not chained. |
 | H6.4 | N counts only chained pool records. | A fixture with one clean pool whose record was edited prints `0/2`, and the gate refuses. |
 | H6.5 | The flip writes a verified flip record (C2 of [shadow-stage-contract](shadow-stage-contract.md)). | After the flip, the record exists and its digest verifies in the chain. |
 

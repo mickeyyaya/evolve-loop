@@ -86,6 +86,7 @@ type Driver struct {
 	ShadowBase string
 	Startup    []DriverFailure
 	Stage      func() (string, error)
+	Clean      func() Readiness
 	Actors     map[string]Actor
 	Epoch      EpochReader
 	Store      WaveStore
@@ -95,6 +96,7 @@ type Driver struct {
 	Now        func() time.Time
 	Publish    Publisher
 
+	ready   *Readiness
 	rec     *WaveRecord
 	written WaveRecord
 	resumed bool
@@ -135,6 +137,9 @@ func (d *Driver) actor() (Actor, error) {
 	a, ok := d.Actors[stage]
 	if !ok {
 		return nil, &stepError{stepStage, fmt.Errorf("the stage %q has no actor, so the driver does not start", stage)}
+	}
+	if err := d.admitStage(stage); err != nil {
+		return nil, &stepError{stepStage, err}
 	}
 	if r, ok := a.(readiness); ok {
 		if missing := r.Missing(); len(missing) > 0 {
@@ -250,6 +255,7 @@ func (d *Driver) load() error {
 		d.written = cloneRecord(rec)
 	}
 	rec.Epoch = d.Holder
+	rec.Stage = d.stageLabel()
 	if rec.Members == nil {
 		rec.Members = map[int]MemberState{}
 	}

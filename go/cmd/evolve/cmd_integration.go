@@ -33,6 +33,7 @@ type integrationEnv struct {
 	Wave           string
 	Now            time.Time
 	Derived        func(worktree string) derived.Worktree
+	Chain          integration.ChainPort
 
 	Run    integration.Command
 	Settle func(ctx context.Context) error
@@ -77,6 +78,7 @@ func productionIntegrationEnv(root string, now time.Time) integrationEnv {
 		Wave:           "pr" + now.UTC().Format("20060102t150405"),
 		Now:            now,
 		Derived:        core.DerivedWorktree,
+		Chain:          ledgerChain{root: root},
 		Run:            sysL2Command,
 		Settle:         pauseFor(registrationWait),
 		Emit:           emitIntegrationSignal,
