@@ -6,7 +6,7 @@
 
 ## Design
 
-- `Entries` returns a fresh table of seven entries: `testdup-ratchet`, `size-ratchet`, `raw-git-ratchet`, `empty-tests`, `repo-contract-floor`, `unit-test-floor` and `cover-changed-floor`. Each is at `enforce`.
+- `Entries` returns a fresh table of eight entries: `testdup-ratchet`, `size-ratchet`, `raw-git-ratchet`, `empty-tests`, `named-tests`, `repo-contract-floor`, `unit-test-floor` and `cover-changed-floor`. Each is at `enforce`.
 - The three floor entries have the kind `phase-floor`. Each runs a `core.FloorJudge` through `core.FloorEntryRun`. The judge and the build floor call the same check function.
 - One `floorSpec` value gives the name, the files, the judge and the verified lists of a floor entry. The subject of each is `go/`.
 - `Input.Base` is the base commit of a floor entry. A failed read of the tree or of the base is an error. A lane-only red is a red.
