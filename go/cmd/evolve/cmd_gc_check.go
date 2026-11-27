@@ -19,12 +19,18 @@ func runGCCheckWith(args []string, getwd func() (string, error), abs func(string
 	fs := flag.NewFlagSet("evolve gc check", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	projectRoot := fs.String("project-root", "", "repository root `dir` to check")
+	only := fs.String("only", "", "run only one check from the registry")
 	asJSON := fs.Bool("json", false, "print the check report as JSON")
 	if err := fs.Parse(args); err != nil {
 		return cliExitUsage
 	}
 	if fs.NArg() > 0 {
 		fmt.Fprintf(stderr, "evolve gc check: unexpected argument %q\n", fs.Arg(0))
+		return cliExitUsage
+	}
+	checks, err := gc.SelectChecks(*only)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve gc check: %v\n", err)
 		return cliExitUsage
 	}
 	root := *projectRoot
@@ -50,7 +56,7 @@ func runGCCheckWith(args []string, getwd func() (string, error), abs func(string
 		Policy:      gcPol,
 		Worktrees:   worktreeGCOptions(resolved, evolveDir, gcPol.Worktrees, io.Discard),
 	}
-	report, err := gc.RunChecks(context.Background(), cc, gc.DefaultChecks())
+	report, err := gc.RunChecks(context.Background(), cc, checks)
 	if err != nil {
 		fmt.Fprintf(stderr, "evolve gc check: %v\n", err)
 		return cliExitFailed

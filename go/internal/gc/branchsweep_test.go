@@ -1,6 +1,7 @@
 package gc
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -57,17 +58,6 @@ func (e *branchSweepEnv) land(branch, file string) string {
 	return tip
 }
 
-func (e *branchSweepEnv) end(branch, file string) string {
-	e.t.Helper()
-	stamp := branchSweepOld.Format(time.RFC3339)
-	e.t.Setenv("GIT_AUTHOR_DATE", stamp)
-	e.t.Setenv("GIT_COMMITTER_DATE", stamp)
-	tip := e.commitOn(branch, file)
-	os.Unsetenv("GIT_AUTHOR_DATE")
-	os.Unsetenv("GIT_COMMITTER_DATE")
-	return tip
-}
-
 func (e *branchSweepEnv) tip(branch string) string {
 	out, err := exec.Command("git", "-C", e.repo.Dir, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch).Output()
 	if err != nil {
@@ -103,70 +93,80 @@ func (e *branchSweepEnv) rewriting(match func(args []string) bool, stdout string
 	}
 }
 
-func branchSweepItem(m WorktreeManifest, branch string) (WorktreeItem, bool) {
+func branchSweepPlanItem(m BranchSweepManifest, side BranchSide, branch string) (BranchSweepItem, bool) {
 	for _, it := range m.Items {
-		if it.Branch == branch && it.Action == WorktreeActionDeleteBranch {
+		if it.Side == side && it.Branch == branch && it.Action == BranchActionDelete {
 			return it, true
 		}
 	}
-	return WorktreeItem{}, false
+	return BranchSweepItem{}, false
 }
 
-func TestBranchSweep_PlanAndApplyDeleteLandedAndEndedBranchesAfterBundles(t *testing.T) {
+func TestBranchSweep_PlanAndApplyDeleteLandedAndPRBranchesWithRecords(t *testing.T) {
 	e := newBranchSweepEnv(t)
-	landedTip := e.land("feat/x", "x.txt")
-	endedTip := e.end("feat/old", "old.txt")
-	freshTip := e.commitOn("feat/y", "y.txt")
+	origin := gittest.Bare(t)
+	e.repo.Git("remote", "add", "origin", origin.Dir)
+	e.repo.Git("push", "-q", "origin", "main")
+
+	b2Tip := e.land("console/landed", "x.txt")
+	e.repo.Git("push", "-q", "origin", "main")
+	mergedTip := e.commitOn("console/merged-pr", "m.txt")
+	e.repo.Git("push", "-q", "origin", "console/merged-pr")
+	unownedTip := e.land("feat/unowned", "u.txt")
+	e.repo.Git("push", "-q", "origin", "main")
+	e.repo.Git("branch", "console/empty-new", "main")
 	e.repo.Git("branch", "cycle-9")
 
-	m, err := PlanWorktrees(e.opts)
-	if err != nil {
-		t.Fatalf("PlanWorktrees: %v", err)
-	}
-	for branch, tip := range map[string]string{"feat/x": landedTip, "feat/old": endedTip} {
-		it, ok := branchSweepItem(m, branch)
-		if !ok || !it.Bundle || it.Head != tip {
-			t.Errorf("%s not planned for a bundled delete at %s: %+v", branch, tip, m.Items)
-		}
-	}
-	for _, branch := range []string{"feat/y", "main"} {
-		if _, ok := branchSweepItem(m, branch); ok {
-			t.Errorf("%s planned for delete: %+v", branch, m.Items)
-		}
-	}
-	if it, ok := branchSweepItem(m, "cycle-9"); !ok || it.Bundle {
-		t.Errorf("cycle-9 must keep the unbundled cycle delete: %+v", m.Items)
+	api := &apiRS{prs: []RemotePR{{Number: 7, Branch: "console/merged-pr", State: "MERGED", HeadRefOid: mergedTip}}}
+	var log bytes.Buffer
+	opts := BranchSweepOptions{
+		ProjectRoot: e.repo.Dir,
+		EvolveDir:   e.opts.EvolveDir,
+		Remote:      "origin",
+		Stage:       RemoteStageEnforce,
+		Exec:        sysexec.DefaultRunner,
+		API:         api,
+		Log:         &log,
 	}
 
-	if err := ApplyWorktrees(e.opts, m); err != nil {
-		t.Fatalf("ApplyWorktrees: %v", err)
+	m, err := PlanBranchSweep(context.Background(), opts)
+	if err != nil {
+		t.Fatalf("PlanBranchSweep: %v", err)
 	}
-	for _, branch := range []string{"feat/x", "feat/old", "cycle-9"} {
-		if got := e.tip(branch); got != "" {
-			t.Errorf("%s survived the apply at %s", branch, got)
+	if it, ok := branchSweepPlanItem(m, BranchSideLocal, "console/landed"); !ok || it.Class != "B2" || it.Tip != b2Tip {
+		t.Errorf("console/landed local item = %+v (ok=%v), want B2 at %s", it, ok, b2Tip)
+	}
+	if it, ok := branchSweepPlanItem(m, BranchSideLocal, "console/merged-pr"); !ok || it.Class != "B1" || it.Tip != mergedTip {
+		t.Errorf("console/merged-pr local item = %+v (ok=%v), want B1", it, ok)
+	}
+	if it, ok := branchSweepPlanItem(m, BranchSideRemote, "console/merged-pr"); !ok || it.Class != "B1" || it.Tip != mergedTip {
+		t.Errorf("console/merged-pr remote item = %+v (ok=%v), want B1", it, ok)
+	}
+	for _, kept := range []string{"feat/unowned", "console/empty-new", "cycle-9", "main"} {
+		if _, ok := branchSweepPlanItem(m, BranchSideLocal, kept); ok {
+			t.Errorf("%s planned for delete: %+v", kept, m.Items)
 		}
 	}
-	if got := e.tip("feat/y"); got != freshTip {
-		t.Errorf("feat/y moved to %q, want %s", got, freshTip)
+
+	if err := ApplyBranchSweep(context.Background(), opts, m); err != nil {
+		t.Fatalf("ApplyBranchSweep: %v", err)
 	}
-	if n := len(e.bundles()); n != 2 {
-		t.Fatalf("%d bundle(s), want 2", n)
+	for _, gone := range []string{"console/landed", "console/merged-pr"} {
+		if got := e.tip(gone); got != "" {
+			t.Errorf("%s survived apply at %s", gone, got)
+		}
 	}
-	for _, b := range e.bundles() {
-		if out, err := exec.Command("git", "-C", e.repo.Dir, "bundle", "verify", b).CombinedOutput(); err != nil {
-			t.Errorf("bundle %s does not verify: %v\n%s", b, err, out)
-		}
-		if _, err := readSalvageLeaf(filepath.Dir(b)); err != nil {
-			t.Errorf("salvage list cannot read %s: %v", filepath.Dir(b), err)
-		}
+	if got := e.tip("feat/unowned"); got != unownedTip {
+		t.Errorf("feat/unowned moved to %q, want %s", got, unownedTip)
+	}
+	if len(api.deleted) != 1 || api.deleted[0] != "console/merged-pr" {
+		t.Errorf("remote deleted = %v, want [console/merged-pr]", api.deleted)
 	}
 }
 
-func TestBranchSweep_HookScopeAndMissingEndedLimitPlanNoOtherBranch(t *testing.T) {
+func TestBranchSweep_HookScopePlansNoOtherBranch(t *testing.T) {
 	e := newBranchSweepEnv(t)
-	e.land("feat/x", "x.txt")
-	e.end("feat/old", "old.txt")
-
+	e.land("console/landed", "x.txt")
 	hook := e.opts
 	hook.BranchScope = BranchScopeCycle
 	m, err := PlanWorktrees(hook)
@@ -174,34 +174,32 @@ func TestBranchSweep_HookScopeAndMissingEndedLimitPlanNoOtherBranch(t *testing.T
 		t.Fatal(err)
 	}
 	if len(m.Items) != 0 {
-		t.Errorf("hook scope planned %+v", m.Items)
-	}
-
-	noLimit := e.opts
-	noLimit.EndedAfter = 0
-	m, err = PlanWorktrees(noLimit)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := branchSweepItem(m, "feat/old"); ok {
-		t.Errorf("ended branch planned with no EndedAfter: %+v", m.Items)
-	}
-	if _, ok := branchSweepItem(m, "feat/x"); !ok {
-		t.Errorf("landed branch not planned: %+v", m.Items)
+		t.Errorf("PlanWorktrees planned non-cycle branch: %+v", m.Items)
 	}
 }
 
 func TestBranchSweep_ACheckedOutBranchIsNeverPlanned(t *testing.T) {
 	e := newBranchSweepEnv(t)
-	e.land("feat/held", "h.txt")
-	e.repo.Git("worktree", "add", "-q", filepath.Join(t.TempDir(), "held"), "feat/held")
+	origin := gittest.Bare(t)
+	e.repo.Git("remote", "add", "origin", origin.Dir)
+	e.repo.Git("push", "-q", "origin", "main")
+	tip := e.land("console/held", "h.txt")
+	e.repo.Git("push", "-q", "origin", "main")
+	e.repo.Git("worktree", "add", "-q", filepath.Join(t.TempDir(), "held"), "console/held")
 
-	m, err := PlanWorktrees(e.opts)
+	opts := BranchSweepOptions{
+		ProjectRoot: e.repo.Dir,
+		EvolveDir:   e.opts.EvolveDir,
+		Remote:      "origin",
+		Exec:        sysexec.DefaultRunner,
+		API:         &apiRS{prs: []RemotePR{{Number: 9, Branch: "console/held", State: "MERGED", HeadRefOid: tip}}},
+	}
+	m, err := PlanBranchSweep(context.Background(), opts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := branchSweepItem(m, "feat/held"); ok {
-		t.Errorf("a branch checked out in a worktree was planned: %+v", m.Items)
+	if _, ok := branchSweepPlanItem(m, BranchSideLocal, "console/held"); ok {
+		t.Errorf("checked-out branch was planned: %+v", m.Items)
 	}
 }
 
@@ -211,35 +209,24 @@ func TestBranchSweep_PlanStepFailuresAbortThePlan(t *testing.T) {
 		match func(args []string) bool
 	}{
 		{"worktree list", func(a []string) bool { return len(a) > 1 && a[0] == "worktree" && a[1] == "list" }},
-		{"merged branches", func(a []string) bool { return len(a) > 1 && a[0] == "branch" && a[1] == "--merged" }},
-		{"cycle branch listing", func(a []string) bool { return len(a) == 3 && a[0] == "branch" && a[1] == "--list" }},
-		{"worktree status", func(a []string) bool { return len(a) > 0 && a[0] == "status" }},
-		{"other branch listing", func(a []string) bool { return len(a) == 2 && a[0] == "branch" && a[1] == "--list" }},
-		{"landing check", func(a []string) bool { return slices.Contains(a, "--name-only") }},
-		{"tip read", func(a []string) bool {
-			return len(a) > 0 && a[0] == "rev-parse" && slices.Contains(a, "refs/heads/feat/old")
-		}},
-		{"commit time", func(a []string) bool { return len(a) > 0 && a[0] == "log" }},
+		{"for-each-ref", func(a []string) bool { return len(a) > 0 && a[0] == "for-each-ref" }},
+		{"ls-remote", func(a []string) bool { return len(a) > 0 && a[0] == "ls-remote" }},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			e := newBranchSweepEnv(t)
-			e.end("feat/old", "old.txt")
-			e.repo.Git("worktree", "add", "-q", filepath.Join(e.opts.WorktreeBase, "cycle-aaa-1"), "-b", "cycle-aaa-1")
+			e.commitOn("console/x", "x.txt")
 			e.failing(tc.match)
-			if m, err := PlanWorktrees(e.opts); err == nil || len(m.Items) != 0 {
-				t.Fatalf("PlanWorktrees = %+v, %v; want an error and no items", m, err)
+			opts := BranchSweepOptions{
+				ProjectRoot: e.repo.Dir,
+				EvolveDir:   e.opts.EvolveDir,
+				Exec:        e.opts.Exec,
+				API:         &apiRS{},
+			}
+			if m, err := PlanBranchSweep(context.Background(), opts); err == nil || len(m.Items) != 0 {
+				t.Fatalf("PlanBranchSweep = %+v, %v; want error", m, err)
 			}
 		})
-	}
-}
-
-func TestBranchSweep_AnUnreadableCommitTimeAbortsThePlan(t *testing.T) {
-	e := newBranchSweepEnv(t)
-	e.end("feat/old", "old.txt")
-	e.rewriting(func(a []string) bool { return len(a) > 0 && a[0] == "log" }, "not-a-time\n")
-	if _, err := PlanWorktrees(e.opts); err == nil {
-		t.Fatal("PlanWorktrees accepted an unreadable commit time")
 	}
 }
 
@@ -374,8 +361,8 @@ func TestBranchSweep_ApplyKeepsTheHistoricalDeleteOfASquashLandedBranch(t *testi
 }
 
 func TestBranchSweep_PlanRefusesToRunWithoutAnExecSeam(t *testing.T) {
-	if _, err := PlanWorktrees(WorktreeOptions{BranchScope: BranchScopeAll}); err == nil {
-		t.Fatal("PlanWorktrees ran without Exec")
+	if _, err := PlanBranchSweep(context.Background(), BranchSweepOptions{}); err == nil {
+		t.Fatal("PlanBranchSweep ran without Exec")
 	}
 }
 

@@ -28,13 +28,13 @@ func (w *remoteGCWorld) run(_ context.Context, name, _ string, args, _ []string,
 	w.calls = append(w.calls, line)
 	switch {
 	case name == "git" && args[0] == "ls-remote":
-		_, _ = io.WriteString(stdout, remoteTipGC+"\trefs/heads/feat-x\n")
+		_, _ = io.WriteString(stdout, remoteTipGC+"\trefs/heads/console/feat-x\n")
 	case name == "git" && args[0] == "rev-parse":
 		_, _ = io.WriteString(stdout, remoteTipGC)
 	case name == "git" && args[0] == "bundle" && args[1] == "list-heads":
-		_, _ = io.WriteString(stdout, remoteTipGC+" refs/remotes/origin/feat-x\n")
+		_, _ = io.WriteString(stdout, remoteTipGC+" refs/remotes/origin/console/feat-x\n")
 	case name == "gh" && args[0] == "pr":
-		_, _ = io.WriteString(stdout, `[{"headRefName":"feat-x","headRefOid":"`+remoteTipGC+`","state":"MERGED"}]`)
+		_, _ = io.WriteString(stdout, `[{"number":1,"headRefName":"console/feat-x","headRefOid":"`+remoteTipGC+`","state":"MERGED"}]`)
 	case name == "gh" && args[1] == "-X":
 	case name == "gh":
 		_, _ = io.WriteString(stdout, "[]")
@@ -75,7 +75,7 @@ func TestGCRemoteSweep_ADryRunReportsAtShadowEvenWhenPolicyEnforcesAndCallsNoDel
 	if w.ran("-X DELETE") || w.ran("bundle create") {
 		t.Errorf("a dry run mutated: %v", w.calls)
 	}
-	if !strings.Contains(out.String(), "remote WOULD-DELETE origin/feat-x") || !strings.Contains(out.String(), "1 remote branch(es) would be deleted at stage shadow (0 kept)") {
+	if !strings.Contains(out.String(), "remote WOULD-DELETE origin/console/feat-x") || !strings.Contains(out.String(), "1 remote branch(es) would be deleted at stage shadow (0 kept)") {
 		t.Errorf("stdout = %q", out)
 	}
 }
@@ -87,7 +87,7 @@ func TestGCRemoteSweep_EnforceAppliesTheDeleteAfterTheBundle(t *testing.T) {
 	if failed := r.remoteSweep(t.TempDir(), t.TempDir(), enforcePolicyGC()); failed {
 		t.Fatalf("enforce failed: %s", errOut)
 	}
-	if !w.ran("bundle verify") || !w.ran("-X DELETE repos/{owner}/{repo}/git/refs/heads/feat-x") {
+	if !w.ran("bundle verify") || !w.ran("-X DELETE repos/{owner}/{repo}/git/refs/heads/console/feat-x") {
 		t.Errorf("calls = %v, want a bundle verify and the API delete", w.calls)
 	}
 	if !strings.Contains(out.String(), "remote branch sweep — 1 branch(es) to delete at stage enforce (0 kept)") {
@@ -144,7 +144,7 @@ func TestGCRemoteSweep_AFailedRemoteDeleteFailsTheProjectRun(t *testing.T) {
 	w := &remoteGCWorld{failGit: map[string]bool{"bundle": true}}
 	r, _, errOut := remoteGCRun(w, false)
 	r.exec = func(ctx context.Context, name, dir string, args, env []string, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
-		if name == "git" && args[0] != "ls-remote" && args[0] != "rev-parse" && args[0] != "bundle" && args[0] != "fetch" {
+		if name == "git" && args[0] != "ls-remote" && args[0] != "rev-parse" && args[0] != "bundle" && args[0] != "fetch" && args[0] != "symbolic-ref" {
 			return sysexec.DefaultRunner(ctx, name, dir, args, env, stdin, stdout, stderr)
 		}
 		return w.run(ctx, name, dir, args, env, stdin, stdout, stderr)

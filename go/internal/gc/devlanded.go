@@ -57,15 +57,19 @@ func openPRCause(now time.Time, updates []time.Time) string {
 }
 
 func hasOwnWork(ctx context.Context, tree gitexec.Git, head string) (bool, error) {
-	out, err := tree.Output(ctx, "reflog", "show", "--format=%H", "HEAD")
+	return branchHasOwnWork(ctx, tree, "HEAD", head)
+}
+
+func branchHasOwnWork(ctx context.Context, g gitexec.Git, ref, tip string) (bool, error) {
+	out, err := g.Output(ctx, "reflog", "show", "--format=%H", ref)
 	if err != nil {
-		return false, fmt.Errorf("git reflog show HEAD: %w", err)
+		return false, fmt.Errorf("git reflog show %s: %w", ref, err)
 	}
 	lines := strings.Fields(out)
 	if len(lines) == 0 {
 		return false, nil
 	}
-	return lines[len(lines)-1] != head, nil
+	return lines[len(lines)-1] != tip, nil
 }
 
 func (s *devSweep) mergedTips(ctx context.Context) map[string][]string {

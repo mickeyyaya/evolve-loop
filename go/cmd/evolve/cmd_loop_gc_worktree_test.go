@@ -38,7 +38,7 @@ func gcGit(t *testing.T, dir string, args ...string) string {
 	return string(out)
 }
 
-func gcWorktreeEnv(t *testing.T, mode string) (projectRoot, evolveDir, workspace string) {
+func gcIsolateHost(t *testing.T) string {
 	t.Helper()
 	t.Setenv("TMUX_TMPDIR", t.TempDir())
 	t.Setenv("GOCACHE", t.TempDir())
@@ -61,6 +61,12 @@ func gcWorktreeEnv(t *testing.T, mode string) (projectRoot, evolveDir, workspace
 	binDir := t.TempDir()
 	fakeclitest.Install(t, filepath.Join(binDir, "lsof"), "#!/bin/sh\nprintf 'p1\\nR0\\nn/\\n'\n")
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	return binDir
+}
+
+func gcWorktreeEnv(t *testing.T, mode string) (projectRoot, evolveDir, workspace string) {
+	t.Helper()
+	gcIsolateHost(t)
 	projectRoot = gittest.FromTemplate(t, "cmd-evolve-gc-worktree", func(r *gittest.Repo) error {
 		r.Git("init", "-q", "-b", "main")
 		r.Write("seed.txt", "seed\n")

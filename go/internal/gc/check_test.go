@@ -48,8 +48,8 @@ func TestDefaultChecks_WorktreesScanAndApply(t *testing.T) {
 	writeFile(t, filepath.Join(dirtyWT, "dirty.txt"), "dirty\n")
 
 	checks := DefaultChecks()
-	if len(checks) != 2 || checks[0].Name() != "worktrees" || checks[1].Name() != "temp" {
-		t.Fatalf("DefaultChecks = %v, want worktrees and temp checks", checks)
+	if len(checks) != 3 || checks[0].Name() != "worktrees" || checks[1].Name() != "temp" || checks[2].Name() != "branches" {
+		t.Fatalf("DefaultChecks = %v, want worktrees, temp, and branches checks", checks)
 	}
 
 	cc := CheckContext{
@@ -61,7 +61,7 @@ func TestDefaultChecks_WorktreesScanAndApply(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunChecks: %v", err)
 	}
-	if len(report.Checks) != 2 || report.Checks[0].Name != "worktrees" || report.Checks[1].Name != "temp" {
+	if len(report.Checks) != 3 || report.Checks[0].Name != "worktrees" || report.Checks[1].Name != "temp" || report.Checks[2].Name != "branches" {
 		t.Fatalf("unexpected report: %+v", report)
 	}
 	var got CheckReport = report

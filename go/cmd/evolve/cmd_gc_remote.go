@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -20,35 +21,52 @@ func (r gcRun) remoteSweep(projectRoot, evolveDir string, pol gc.Policy) bool {
 	if r.dryRun {
 		stage = gc.RemoteStageShadow
 	}
-	opts := gc.RemoteSweepOptions{
+	opts := gc.BranchSweepOptions{
 		ProjectRoot: projectRoot,
 		EvolveDir:   evolveDir,
 		Remote:      gcRemoteName,
+		Policy:      pol,
 		Stage:       stage,
 		Exec:        r.exec,
 		API:         gc.GhRemoteAPI{Exec: r.exec, Dir: projectRoot},
 		Log:         r.stdout,
 	}
-	manifest, err := gc.PlanRemoteSweep(ctx, opts)
+	manifest, err := gc.PlanBranchSweep(ctx, opts)
 	if err != nil {
 		fmt.Fprintf(r.stderr, "evolve gc: WARN: remote branch sweep skipped: %v\n", err)
 		return false
 	}
-	planned := gcRemoteDeletes(manifest)
-	r.summary("%d remote branch(es) would be deleted at stage %s (%d kept)", "remote branch sweep — %d branch(es) to delete at stage %s (%d kept)", planned, stage, len(manifest.Items)-planned)
-	if err := gc.ApplyRemoteSweep(ctx, opts, manifest); err != nil {
-		fmt.Fprintf(r.stderr, "evolve gc: remote branch sweep partial: %v\n", err)
+	planned, kept := manifest.RemoteCounts()
+	r.summary("%d remote branch(es) would be deleted at stage %s (%d kept)", "remote branch sweep — %d branch(es) to delete at stage %s (%d kept)", planned, stage, kept)
+	if err := gc.ApplyBranchSweep(ctx, opts, manifest); err != nil {
+		return r.reportBranchSweepErrors(err)
+	}
+	return false
+}
+
+func (r gcRun) reportBranchSweepErrors(err error) bool {
+	var hard []error
+	for _, e := range flattenErrors(err) {
+		if errors.Is(e, gc.ErrRemoteDeleteFailed) {
+			fmt.Fprintf(r.stderr, "evolve gc: WARN: %v\n", e)
+			continue
+		}
+		hard = append(hard, e)
+	}
+	if len(hard) > 0 {
+		fmt.Fprintf(r.stderr, "evolve gc: remote branch sweep partial: %v\n", errors.Join(hard...))
 		return true
 	}
 	return false
 }
 
-func gcRemoteDeletes(m gc.RemoteManifest) int {
-	n := 0
-	for _, it := range m.Items {
-		if it.Action == gc.RemoteActionDelete {
-			n++
+func flattenErrors(err error) []error {
+	if uw, ok := err.(interface{ Unwrap() []error }); ok {
+		var out []error
+		for _, sub := range uw.Unwrap() {
+			out = append(out, flattenErrors(sub)...)
 		}
+		return out
 	}
-	return n
+	return []error{err}
 }

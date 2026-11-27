@@ -3,22 +3,19 @@ package main
 import (
 	"bytes"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/gc"
+	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 )
 
 const (
-	branchSweepLanded = "feat/x"
-	branchSweepEnded  = "feat/old"
-	branchSweepFresh  = "feat/y"
+	branchSweepLanded  = "console/x"
+	branchSweepUnowned = "feat/old"
+	branchSweepFresh   = "console/y"
 )
-
-var branchSweepIdleSince = time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 func branchSweepCommit(t *testing.T, root, branch, file string) string {
 	t.Helper()
@@ -40,35 +37,6 @@ func branchSweepLand(t *testing.T, root, branch, file string) string {
 	return tip
 }
 
-func branchSweepEnd(t *testing.T, root, branch, file string) string {
-	t.Helper()
-	stamp := branchSweepIdleSince.Format(time.RFC3339)
-	t.Setenv("GIT_AUTHOR_DATE", stamp)
-	t.Setenv("GIT_COMMITTER_DATE", stamp)
-	tip := branchSweepCommit(t, root, branch, file)
-	os.Unsetenv("GIT_AUTHOR_DATE")
-	os.Unsetenv("GIT_COMMITTER_DATE")
-	return tip
-}
-
-func branchSweepBundleHolds(t *testing.T, root, branch, tip string) bool {
-	t.Helper()
-	bundles, err := filepath.Glob(filepath.Join(root, ".evolve", "operator-salvage", "*", "refs.bundle"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, b := range bundles {
-		if exec.Command("git", "-C", root, "bundle", "verify", b).Run() != nil {
-			continue
-		}
-		heads := gcGit(t, root, "bundle", "list-heads", b)
-		if strings.Contains(heads, tip+" refs/heads/"+branch) {
-			return true
-		}
-	}
-	return false
-}
-
 func branchSweepOperatorRun(t *testing.T, root string, args ...string) (stdout, stderr string) {
 	t.Helper()
 	var out, errOut bytes.Buffer
@@ -78,12 +46,23 @@ func branchSweepOperatorRun(t *testing.T, root string, args ...string) (stdout, 
 	return out.String(), errOut.String()
 }
 
+func branchSweepInstallEmptyGH(t *testing.T, binDir, root string) {
+	t.Helper()
+	script := "#!/bin/sh\necho '[]'\n"
+	if err := os.WriteFile(filepath.Join(binDir, "gh"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	origin := gittest.Bare(t)
+	gcGit(t, root, "remote", "add", "origin", origin.Dir)
+	gcGit(t, root, "push", "-q", "origin", "main")
+}
+
 func TestBranchSweep_HookNeverDeletesANonCycleBranch(t *testing.T) {
 	for _, mode := range []string{"shadow", "enforce"} {
 		t.Run(mode, func(t *testing.T) {
 			root, evolveDir, workspace := gcWorktreeEnv(t, mode)
 			branchSweepLand(t, root, branchSweepLanded, "x.txt")
-			branchSweepEnd(t, root, branchSweepEnded, "old.txt")
+			branchSweepLand(t, root, branchSweepUnowned, "old.txt")
 
 			var buf bytes.Buffer
 			runGCHook(loopConfig{EvolveDir: evolveDir, ProjectRoot: root}, workspace, &buf)
@@ -95,7 +74,7 @@ func TestBranchSweep_HookNeverDeletesANonCycleBranch(t *testing.T) {
 			if !gcManifestPlansBranchDelete(m, gcOrphanBranch) {
 				t.Errorf("the hook stopped sweeping cycle-* branches: %+v", m.Items)
 			}
-			for _, b := range []string{branchSweepLanded, branchSweepEnded} {
+			for _, b := range []string{branchSweepLanded, branchSweepUnowned} {
 				if gcManifestPlansBranchDelete(m, b) {
 					t.Errorf("the hook planned to delete %s: %+v", b, m.Items)
 				}
@@ -109,31 +88,37 @@ func TestBranchSweep_HookNeverDeletesANonCycleBranch(t *testing.T) {
 
 func TestBranchSweep_OperatorDryRunPlansTheDeletesAndMutatesNothing(t *testing.T) {
 	root, _, _ := gcWorktreeEnv(t, "")
+	binDir := gcIsolateHost(t)
+	branchSweepInstallEmptyGH(t, binDir, root)
 	branchSweepLand(t, root, branchSweepLanded, "x.txt")
-	branchSweepEnd(t, root, branchSweepEnded, "old.txt")
+	gcGit(t, root, "push", "-q", "origin", "main")
 	branchSweepCommit(t, root, branchSweepFresh, "y.txt")
 
 	stdout, _ := branchSweepOperatorRun(t, root, "--dry-run")
 
-	for _, b := range []string{branchSweepLanded, branchSweepEnded} {
-		if !strings.Contains(stdout, "WOULD-DELETE-BRANCH branch="+b) {
-			t.Errorf("--dry-run does not plan to delete %s:\n%s", b, stdout)
-		}
-		if !gcBranchExists(t, root, b) {
-			t.Errorf("--dry-run deleted %s", b)
-		}
+	if !strings.Contains(stdout, "WOULD-DELETE "+branchSweepLanded) {
+		t.Errorf("--dry-run does not plan to delete %s:\n%s", branchSweepLanded, stdout)
 	}
-	if strings.Contains(stdout, "WOULD-DELETE-BRANCH branch="+branchSweepFresh) {
+	if !gcBranchExists(t, root, branchSweepLanded) {
+		t.Errorf("--dry-run deleted %s", branchSweepLanded)
+	}
+	if strings.Contains(stdout, "WOULD-DELETE "+branchSweepFresh) {
 		t.Errorf("--dry-run plans to delete the fresh unlanded branch %s:\n%s", branchSweepFresh, stdout)
 	}
-	if bundles, _ := filepath.Glob(filepath.Join(root, ".evolve", "operator-salvage", "*", "refs.bundle")); len(bundles) != 0 {
-		t.Errorf("--dry-run wrote bundles: %v", bundles)
+	if tsvs, _ := filepath.Glob(filepath.Join(root, ".evolve", "operator-salvage", "branch-gc", "*.tsv")); len(tsvs) != 0 {
+		t.Errorf("--dry-run wrote records: %v", tsvs)
 	}
 }
 
 func TestBranchSweep_OperatorRunDeletesALandedBranchAfterAVerifiedBundle(t *testing.T) {
-	root, _, _ := gcWorktreeEnv(t, "")
+	root, evolveDir, _ := gcWorktreeEnv(t, "")
+	binDir := gcIsolateHost(t)
+	branchSweepInstallEmptyGH(t, binDir, root)
+	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(`{"gc":{"remote_sweep":{"stage":"enforce"}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	tip := branchSweepLand(t, root, branchSweepLanded, "x.txt")
+	gcGit(t, root, "push", "-q", "origin", "main")
 	mainTip := strings.TrimSpace(gcGit(t, root, "rev-parse", "main"))
 
 	stdout, stderr := branchSweepOperatorRun(t, root)
@@ -141,30 +126,43 @@ func TestBranchSweep_OperatorRunDeletesALandedBranchAfterAVerifiedBundle(t *test
 	if gcBranchExists(t, root, branchSweepLanded) {
 		t.Errorf("the operator run left the landed branch %s; stdout=%s stderr=%s", branchSweepLanded, stdout, stderr)
 	}
-	if !branchSweepBundleHolds(t, root, branchSweepLanded, tip) {
-		t.Errorf("no verified refs.bundle under operator-salvage holds %s@%s", branchSweepLanded, tip)
+	tsvs, err := filepath.Glob(filepath.Join(evolveDir, "operator-salvage", "branch-gc", "*.tsv"))
+	if err != nil || len(tsvs) == 0 {
+		t.Fatalf("no branch-gc tsv record written (err=%v)", err)
+	}
+	raw, err := os.ReadFile(tsvs[0])
+	if err != nil || !strings.Contains(string(raw), branchSweepLanded+"\t"+tip) {
+		t.Errorf("tsv = %q (err=%v), want row for %s@%s", string(raw), err, branchSweepLanded, tip)
 	}
 	if got := strings.TrimSpace(gcGit(t, root, "rev-parse", "main")); got != mainTip {
 		t.Errorf("main moved from %s to %s", mainTip, got)
 	}
 }
 
-func TestBranchSweep_OperatorRunDeletesAnEndedBranchAfterAVerifiedBundle(t *testing.T) {
-	root, _, _ := gcWorktreeEnv(t, "")
-	tip := branchSweepEnd(t, root, branchSweepEnded, "old.txt")
-
-	stdout, stderr := branchSweepOperatorRun(t, root)
-
-	if gcBranchExists(t, root, branchSweepEnded) {
-		t.Errorf("the operator run left the ended branch %s; stdout=%s stderr=%s", branchSweepEnded, stdout, stderr)
+func TestBranchSweep_OperatorRunKeepsAnUnownedBranch(t *testing.T) {
+	root, evolveDir, _ := gcWorktreeEnv(t, "")
+	binDir := gcIsolateHost(t)
+	branchSweepInstallEmptyGH(t, binDir, root)
+	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(`{"gc":{"remote_sweep":{"stage":"enforce"}}}`), 0o644); err != nil {
+		t.Fatal(err)
 	}
-	if !branchSweepBundleHolds(t, root, branchSweepEnded, tip) {
-		t.Errorf("no verified refs.bundle under operator-salvage holds %s@%s", branchSweepEnded, tip)
+	unownedTip := branchSweepLand(t, root, branchSweepUnowned, "old.txt")
+	gcGit(t, root, "push", "-q", "origin", "main")
+
+	branchSweepOperatorRun(t, root)
+
+	if got := strings.TrimSpace(gcGit(t, root, "rev-parse", "refs/heads/"+branchSweepUnowned)); got != unownedTip {
+		t.Errorf("unowned branch moved or deleted: got %q, want %s", got, unownedTip)
 	}
 }
 
 func TestBranchSweep_OperatorRunKeepsAFreshUnlandedBranchAndMain(t *testing.T) {
-	root, _, _ := gcWorktreeEnv(t, "")
+	root, evolveDir, _ := gcWorktreeEnv(t, "")
+	binDir := gcIsolateHost(t)
+	branchSweepInstallEmptyGH(t, binDir, root)
+	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(`{"gc":{"remote_sweep":{"stage":"enforce"}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	freshTip := branchSweepCommit(t, root, branchSweepFresh, "y.txt")
 
 	branchSweepOperatorRun(t, root)
@@ -182,17 +180,20 @@ func TestBranchSweep_OperatorRunKeepsAFreshUnlandedBranchAndMain(t *testing.T) {
 
 func TestBranchSweep_OperatorRunKeepsABranchWhenItsBundleCannotBeWritten(t *testing.T) {
 	root, evolveDir, _ := gcWorktreeEnv(t, "")
+	binDir := gcIsolateHost(t)
+	branchSweepInstallEmptyGH(t, binDir, root)
+	if err := os.WriteFile(filepath.Join(evolveDir, "policy.json"), []byte(`{"gc":{"remote_sweep":{"stage":"enforce"}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	landedTip := branchSweepLand(t, root, branchSweepLanded, "x.txt")
-	endedTip := branchSweepEnd(t, root, branchSweepEnded, "old.txt")
+	gcGit(t, root, "push", "-q", "origin", "main")
 	if err := os.WriteFile(gc.OperatorSalvageDir(evolveDir), []byte("not a directory\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	branchSweepOperatorRun(t, root)
 
-	for b, tip := range map[string]string{branchSweepLanded: landedTip, branchSweepEnded: endedTip} {
-		if got := strings.TrimSpace(gcGit(t, root, "rev-parse", "refs/heads/"+b)); got != tip {
-			t.Errorf("%s was deleted or moved although no bundle could be written: tip %q, want %s", b, got, tip)
-		}
+	if got := strings.TrimSpace(gcGit(t, root, "rev-parse", "refs/heads/"+branchSweepLanded)); got != landedTip {
+		t.Errorf("%s was deleted or moved although no record could be written: tip %q, want %s", branchSweepLanded, got, landedTip)
 	}
 }

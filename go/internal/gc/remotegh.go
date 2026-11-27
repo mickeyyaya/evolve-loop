@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -14,30 +15,67 @@ type GhRemoteAPI struct {
 	Dir  string
 }
 
-const ghPullRequestLimit = "1000"
+const (
+	ghPullRequestLimitInt = 1000
+	ghPullRequestLimit    = "1000"
+	ghPullRequestFields   = "number,headRefName,headRefOid,state,closedAt"
+)
 
 func (g GhRemoteAPI) gh(ctx context.Context, args ...string) (string, error) {
 	return sysexec.Output(ctx, g.Exec, g.Dir, "gh", args...)
 }
 
 func (g GhRemoteAPI) PullRequests(ctx context.Context) ([]RemotePR, error) {
-	out, err := g.gh(ctx, "pr", "list", "--state", "all", "--limit", ghPullRequestLimit, "--json", "headRefName,headRefOid,state")
+	prs, _, err := g.AllPullRequests(ctx)
+	return prs, err
+}
+
+func (g GhRemoteAPI) OpenPullRequests(ctx context.Context) ([]RemotePR, bool, error) {
+	return g.listPullRequests(ctx, "--state", "open")
+}
+
+func (g GhRemoteAPI) AllPullRequests(ctx context.Context) ([]RemotePR, bool, error) {
+	return g.listPullRequests(ctx, "--state", "all")
+}
+
+func (g GhRemoteAPI) BranchPullRequests(ctx context.Context, branch string) ([]RemotePR, bool, error) {
+	return g.listPullRequests(ctx, "--head", branch, "--state", "all")
+}
+
+func (g GhRemoteAPI) listPullRequests(ctx context.Context, extra ...string) ([]RemotePR, bool, error) {
+	args := make([]string, 0, len(extra)+6)
+	args = append(args, "pr", "list")
+	args = append(args, extra...)
+	args = append(args, "--limit", ghPullRequestLimit, "--json", ghPullRequestFields)
+	out, err := g.gh(ctx, args...)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	var rows []struct {
-		HeadRefName string `json:"headRefName"`
-		HeadRefOid  string `json:"headRefOid"`
-		State       string `json:"state"`
+		Number      int        `json:"number"`
+		HeadRefName string     `json:"headRefName"`
+		HeadRefOid  string     `json:"headRefOid"`
+		State       string     `json:"state"`
+		ClosedAt    *time.Time `json:"closedAt"`
 	}
 	if err := json.Unmarshal([]byte(out), &rows); err != nil {
-		return nil, fmt.Errorf("gc: decode gh pr list: %w", err)
+		return nil, false, fmt.Errorf("gc: decode gh pr list: %w", err)
 	}
 	prs := make([]RemotePR, 0, len(rows))
 	for _, r := range rows {
-		prs = append(prs, RemotePR{Branch: r.HeadRefName, State: r.State, HeadRefOid: r.HeadRefOid})
+		var closedAt time.Time
+		if r.ClosedAt != nil {
+			closedAt = *r.ClosedAt
+		}
+		prs = append(prs, RemotePR{
+			Number:     r.Number,
+			Branch:     r.HeadRefName,
+			State:      r.State,
+			HeadRefOid: r.HeadRefOid,
+			ClosedAt:   closedAt,
+		})
 	}
-	return prs, nil
+	return prs, len(rows) >= ghPullRequestLimitInt, nil
 }
 
 func (g GhRemoteAPI) RulesetProtects(ctx context.Context, branch string) (bool, error) {

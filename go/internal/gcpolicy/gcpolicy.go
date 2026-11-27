@@ -4,6 +4,8 @@
 package gcpolicy
 
 import (
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/diskfloor"
@@ -36,6 +38,7 @@ type Policy struct {
 	Worktrees    WorktreesPolicy    `json:"worktrees,omitempty"`
 	DevWorktrees DevWorktreesPolicy `json:"dev_worktrees,omitempty"`
 	RemoteSweep  RemoteSweepPolicy  `json:"remote_sweep,omitempty"`
+	Branches     BranchesPolicy     `json:"branches,omitempty"`
 	Sentinel     SentinelPolicy     `json:"sentinel,omitempty"`
 }
 
@@ -179,4 +182,48 @@ func (p Policy) RemoteStage() string {
 		return remoteStageEnforce
 	}
 	return remoteStageShadow
+}
+
+var defaultOwnedBranchPrefixes = []string{
+	"console/",
+	"policy/",
+	"docs/",
+	"inbox/",
+	"integration/",
+	"fix/",
+	"chore/",
+}
+
+const defaultClosedGraceDays = 3
+
+type BranchesPolicy struct {
+	OwnedPrefixes   []string `json:"owned_prefixes,omitempty"`
+	ClosedGraceDays int      `json:"closed_grace_days,omitempty"`
+}
+
+func (b BranchesPolicy) OwnedPrefixList() []string {
+	if len(b.OwnedPrefixes) > 0 {
+		return slices.Clone(b.OwnedPrefixes)
+	}
+	return slices.Clone(defaultOwnedBranchPrefixes)
+}
+
+func (b BranchesPolicy) ClosedGrace() time.Duration {
+	days := b.ClosedGraceDays
+	if days <= 0 {
+		days = defaultClosedGraceDays
+	}
+	return time.Duration(days) * 24 * time.Hour
+}
+
+func (b BranchesPolicy) IsOwned(branch string) bool {
+	if strings.HasPrefix(branch, "cycle-") {
+		return false
+	}
+	for _, prefix := range b.OwnedPrefixList() {
+		if strings.HasPrefix(branch, prefix) {
+			return true
+		}
+	}
+	return false
 }

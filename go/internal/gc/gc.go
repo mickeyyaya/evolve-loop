@@ -20,6 +20,7 @@ type (
 	RunsPolicy         = gcpolicy.RunsPolicy
 	WorktreesPolicy    = gcpolicy.WorktreesPolicy
 	DevWorktreesPolicy = gcpolicy.DevWorktreesPolicy
+	BranchesPolicy     = gcpolicy.BranchesPolicy
 )
 
 type RunDir struct {

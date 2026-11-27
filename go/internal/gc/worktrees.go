@@ -288,12 +288,6 @@ func PlanWorktrees(o WorktreeOptions) (WorktreeManifest, error) {
 	}
 	items = append(items, orphans...)
 
-	others, err := o.otherBranchItems(merged, porcelain)
-	if err != nil {
-		return WorktreeManifest{}, err
-	}
-	items = append(items, others...)
-
 	sortWorktreeItems(items)
 	return WorktreeManifest{Items: items}, nil
 }

@@ -241,8 +241,6 @@ func (r gcRun) project(projectRoot string) int {
 	gcPol := gcBlock(pol)
 	evolveDir := filepath.Join(projectRoot, ".evolve")
 	opts := worktreeGCOptions(projectRoot, evolveDir, gcPol.Worktrees, r.stdout)
-	opts.BranchScope = gc.BranchScopeAll
-	opts.EndedAfter = gcPol.DevWorktrees.ArchiveAfter()
 	r.diskSignals(projectRoot, pol)
 	before, freeErr := looppreflight.DiskFreeBytes(projectRoot)
 	ageOf := continuationAge{maxAge: pol.ContinuationConfig().MaxAgeCycles, loaded: loaded}

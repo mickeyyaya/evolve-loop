@@ -1,6 +1,7 @@
 package gc
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
@@ -28,10 +30,27 @@ const (
 	RemoteActionKeep   RemoteAction = "keep"
 )
 
+var ErrRemoteDeleteFailed = errors.New("remote delete failed")
+
+type remoteDeleteError struct {
+	branch string
+	err    error
+}
+
+func (e remoteDeleteError) Error() string {
+	return fmt.Sprintf("gc: delete remote branch %s: %v", e.branch, e.err)
+}
+
+func (e remoteDeleteError) Unwrap() error { return e.err }
+
+func (e remoteDeleteError) Is(target error) bool { return target == ErrRemoteDeleteFailed }
+
 type RemotePR struct {
+	Number     int
 	Branch     string
 	State      string
 	HeadRefOid string
+	ClosedAt   time.Time
 }
 
 type RemoteAPI interface {
@@ -40,11 +59,19 @@ type RemoteAPI interface {
 	DeleteBranch(ctx context.Context, branch string) error
 }
 
+type CandidatePRAPI interface {
+	OpenPullRequests(ctx context.Context) ([]RemotePR, bool, error)
+	AllPullRequests(ctx context.Context) ([]RemotePR, bool, error)
+	BranchPullRequests(ctx context.Context, branch string) ([]RemotePR, bool, error)
+}
+
 type RemoteItem struct {
 	Branch string       `json:"branch"`
 	Head   string       `json:"head"`
 	Action RemoteAction `json:"action"`
 	Reason string       `json:"reason"`
+	Class  string       `json:"class,omitempty"`
+	PR     int          `json:"pr,omitempty"`
 }
 
 type RemoteManifest struct {
@@ -59,10 +86,12 @@ type RemoteSweepOptions struct {
 	Exec        sysexec.RunFunc
 	API         RemoteAPI
 	Log         io.Writer
+	Stamp       string
 }
 
 const (
 	prStateMerged = "MERGED"
+	prStateClosed = "CLOSED"
 	prStateOpen   = "OPEN"
 )
 
@@ -75,6 +104,10 @@ func (o RemoteSweepOptions) remoteTips(ctx context.Context) (map[string]string, 
 	if err != nil {
 		return nil, err
 	}
+	return parseRemoteHeads(out), nil
+}
+
+func parseRemoteHeads(out string) map[string]string {
 	tips := map[string]string{}
 	for _, line := range strings.Split(out, "\n") {
 		f := strings.Fields(line)
@@ -85,7 +118,101 @@ func (o RemoteSweepOptions) remoteTips(ctx context.Context) (map[string]string, 
 			tips[name] = f[0]
 		}
 	}
-	return tips, nil
+	return tips
+}
+
+type prIndex struct {
+	open   map[string]bool
+	failed map[string]bool
+	merged map[string]RemotePR
+	closed map[string][]RemotePR
+}
+
+func newPRIndex() *prIndex {
+	return &prIndex{
+		open:   map[string]bool{},
+		failed: map[string]bool{},
+		merged: map[string]RemotePR{},
+		closed: map[string][]RemotePR{},
+	}
+}
+
+func (idx *prIndex) add(p RemotePR) {
+	switch p.State {
+	case prStateOpen:
+		idx.open[p.Branch] = true
+	case prStateMerged:
+		key := p.Branch + "@" + p.HeadRefOid
+		if cur, ok := idx.merged[key]; !ok || p.Number > cur.Number {
+			idx.merged[key] = p
+		}
+	case prStateClosed:
+		key := p.Branch + "@" + p.HeadRefOid
+		idx.closed[key] = append(idx.closed[key], p)
+	}
+}
+
+func (idx *prIndex) matchMerged(branch, tip string) (RemotePR, bool) {
+	p, ok := idx.merged[branch+"@"+tip]
+	return p, ok
+}
+
+func (idx *prIndex) matchClosedPastGrace(branch, tip string, now time.Time, grace time.Duration) (RemotePR, bool) {
+	var best RemotePR
+	found := false
+	for _, p := range idx.closed[branch+"@"+tip] {
+		if p.ClosedAt.IsZero() || now.Sub(p.ClosedAt) < grace {
+			continue
+		}
+		if !found || p.ClosedAt.After(best.ClosedAt) {
+			best = p
+			found = true
+		}
+	}
+	return best, found
+}
+
+func loadPRIndex(ctx context.Context, api RemoteAPI, candidates []string) (*prIndex, error) {
+	idx := newPRIndex()
+	capi, ok := api.(CandidatePRAPI)
+	if !ok {
+		prs, err := api.PullRequests(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, p := range prs {
+			idx.add(p)
+		}
+		return idx, nil
+	}
+	openRows, openTrunc, err := capi.OpenPullRequests(ctx)
+	if err != nil {
+		return nil, err
+	}
+	allRows, allTrunc, err := capi.AllPullRequests(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !openTrunc && !allTrunc {
+		for _, p := range openRows {
+			idx.add(p)
+		}
+		for _, p := range allRows {
+			idx.add(p)
+		}
+		return idx, nil
+	}
+	for _, b := range candidates {
+		rows, bTrunc, err := capi.BranchPullRequests(ctx, b)
+		if err != nil || bTrunc {
+			idx.failed[b] = true
+			continue
+		}
+		for _, p := range rows {
+			idx.add(p)
+		}
+	}
+	return idx, nil
 }
 
 func PlanRemoteSweep(ctx context.Context, o RemoteSweepOptions) (RemoteManifest, error) {
@@ -128,6 +255,17 @@ func (o RemoteSweepOptions) judgeRemote(ctx context.Context, branch, tip string,
 	return it
 }
 
+func prMergedReason(num int) string {
+	if num > 0 {
+		return fmt.Sprintf("landed: merged pull request #%d at this tip, saved to a verified bundle first", num)
+	}
+	return "landed: merged pull request at this tip, saved to a verified bundle first"
+}
+
+func prClosedReason(num int) string {
+	return fmt.Sprintf("closed pull request #%d past grace at this tip, archived to ref first", num)
+}
+
 func (o RemoteSweepOptions) rulesetVerdict(ctx context.Context, branch string) (RemoteAction, string) {
 	protected, err := o.API.RulesetProtects(ctx, branch)
 	switch {
@@ -161,14 +299,19 @@ func (o RemoteSweepOptions) applyOne(ctx context.Context, it RemoteItem) error {
 		return fmt.Errorf("gc: refuse to delete remote branch %s: %w", it.Branch, err)
 	}
 	if err := o.API.DeleteBranch(ctx, it.Branch); err != nil {
-		return fmt.Errorf("gc: delete remote branch %s: %w", it.Branch, err)
+		return remoteDeleteError{branch: it.Branch, err: err}
 	}
-	o.logLine("deleted", it)
+	o.logDeleted(it)
 	return nil
 }
 
 func (o RemoteSweepOptions) logLine(verb string, it RemoteItem) {
 	fmt.Fprintf(o.Log, "gc: remote %s %s/%s %.12s (%s)\n", verb, o.Remote, it.Branch, it.Head, it.Reason)
+}
+
+func (o RemoteSweepOptions) logDeleted(it RemoteItem) {
+	fmt.Fprintf(o.Log, "gc: remote deleted %s/%s %.12s (%s) — restore: git push %s %s:refs/heads/%s\n",
+		o.Remote, it.Branch, it.Head, it.Reason, o.Remote, it.Head, it.Branch)
 }
 
 func (o RemoteSweepOptions) saveTip(ctx context.Context, it RemoteItem) error {
@@ -180,8 +323,12 @@ func (o RemoteSweepOptions) saveTip(ctx context.Context, it RemoteItem) error {
 	if err != nil {
 		return err
 	}
-	if got != it.Head {
-		return fmt.Errorf("tip is %q, the plan saw %q", got, it.Head)
+	if strings.TrimSpace(got) != it.Head {
+		return fmt.Errorf("tip is %q, the plan saw %q", strings.TrimSpace(got), it.Head)
+	}
+	if o.Stamp != "" {
+		git := func(_ string, args ...string) (string, error) { return o.remoteGit(ctx, args...) }
+		return recordBranchDelete(git, o.ProjectRoot, o.EvolveDir, o.Stamp, BranchSideRemote, it.Branch, ref, it.Head, it.PR, cmp.Or(it.Class, "B1"))
 	}
 	dir := filepath.Join(OperatorSalvageDir(o.EvolveDir), fmt.Sprintf("remote-%s-%s-%.12s", o.Remote, strings.ReplaceAll(it.Branch, "/", "-"), it.Head))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
