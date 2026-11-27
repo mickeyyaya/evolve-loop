@@ -989,4 +989,13 @@ approaches / decision / results / retro) — lives at
 | [architecture/adr/0169-lesson-yield-is-measured-before-a-lesson-store-is-built.md](architecture/adr/0169-lesson-yield-is-measured-before-a-lesson-store-is-built.md) | ADR-0169, Proposed. It records 12 decisions. The loop measures the lesson read path first. It adopts R1, R3 and R6 at `shadow`, defers R2, R4 and R7, and rejects R5 and R8. It lists the rejected designs A, B and C, each with its ruling fact. |
 | [architecture/harness-self-improvement.md](architecture/harness-self-improvement.md) | The spec of record. It gives the issue, the gap and the solution for C1 to C5. It names the stage keys and signals at `shadow`. It has a guards table and the limits, with the reopen condition of each deferred item. |
 
+## 2026-11-27 — Open source harness architectures: logic and design of 38 projects
+
+| Document | What it records |
+|---|---|
+| [research/oss-harness-architectures-2026-11.md](research/oss-harness-architectures-2026-11.md) | A read of 38 open source harnesses in five families: runtimes, platforms, fleet orchestrators, loops and the knowledge layer. It holds 9 local findings with `path:line`, the survey findings with permalinks, a comparison table, 41 adopt-or-reject decisions (A1 to A41) and 12 refinements. It corrects one claim. A guard fails open only when both binaries are missing, or when the guard exits with a code other than 0 and 2. |
+| [plans/oss-harness-architectures-2026-11.md](plans/oss-harness-architectures-2026-11.md) | The plan. It scores four candidate designs and picks a combined order: the wave concurrency stages A to C run in parallel with the host-event shadow. It lists 18 decisions, the components of five workstreams, the execution order, the targets and the operator questions Q1 to Q6. |
+| [architecture/adr/0170-the-loop-keeps-the-llm-at-the-leaves-and-hardens-its-host-resume-fleet-and-self-edit-edges.md](architecture/adr/0170-the-loop-keeps-the-llm-at-the-leaves-and-hardens-its-host-resume-fleet-and-self-edit-edges.md) | ADR-0170, Proposed. It gives 21 decision rules, the good and bad consequences, and the rejected options with the fact that rules out each one. |
+| [architecture/harness-edge-contracts.md](architecture/harness-edge-contracts.md) | The spec of record for the edges. It defines the typed host events, the durable phase unit, the resume identity, the scoped leases, the self-edit rules and the host profiles. It has a worked example and a table of guards. |
+
 <!-- GENERATED:research-index END -->
