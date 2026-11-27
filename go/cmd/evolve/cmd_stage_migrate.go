@@ -30,13 +30,16 @@ var (
 	errNothingToRestore = errors.New("no grandfather flip record exists, so there is no genesis to restore")
 )
 
-type unresolvedKeyError struct{ Key string }
-
-func (e *unresolvedKeyError) Error() string {
-	return fmt.Sprintf("%v: %s", stageevidence.ErrUnresolvedStageKey, e.Key)
+type unresolvedKeyError struct {
+	error
+	Key string
 }
 
-func (e *unresolvedKeyError) Unwrap() error { return stageevidence.ErrUnresolvedStageKey }
+func newUnresolvedKeyError(key string) *unresolvedKeyError {
+	return &unresolvedKeyError{error: fmt.Errorf("%w: %s", stageevidence.ErrUnresolvedStageKey, key), Key: key}
+}
+
+func (e *unresolvedKeyError) Unwrap() error { return e.error }
 
 type migrateStore interface {
 	stageevidence.FlipRecords
@@ -93,7 +96,7 @@ func planMigration(set stageevidence.FlipSet, req migrateRequest) (migratePlan, 
 	}
 	for key, value := range req.Effective {
 		if value == "" {
-			return migratePlan{}, &unresolvedKeyError{Key: key}
+			return migratePlan{}, newUnresolvedKeyError(key)
 		}
 	}
 	keys := stageevidence.EnforcedKeys(req.Effective)
