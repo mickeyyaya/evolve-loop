@@ -103,6 +103,7 @@ func saveStepsF1(t *testing.T, override ...stepF1) *scriptF1 {
 	defaults := []stepF1{
 		{prefix: "check-ref-format"},
 		{prefix: "rev-parse HEAD", outs: []string{headF1}},
+		{prefix: "ls-files -u"},
 		{prefix: "rev-parse --path-format=absolute --git-path index", outs: []string{index}},
 		{prefix: "add -A"},
 		{prefix: "write-tree", outs: []string{"aaaa", "bbbb"}},
@@ -123,6 +124,7 @@ func TestSaveBackfillF1_EachGitStepFailureEndsTheSaveWithThatErrorAndRecordsNoRe
 		wantNotCalls string
 	}{
 		{"HEAD unreadable", []stepF1{{prefix: "rev-parse HEAD", err: boom}}, "rev-parse HEAD", "write-tree"},
+		{"unmerged check", []stepF1{{prefix: "ls-files -u", err: boom}}, "ls-files -u", "write-tree"},
 		{"staged snapshot", []stepF1{{prefix: "rev-parse --path-format=absolute --git-path index", err: boom}}, "rev-parse --path-format", "write-tree"},
 		{"full snapshot", []stepF1{{prefix: "add -A", err: boom}}, "add -A", "-c commit.gpgsign=false commit-tree"},
 		{"head tree", []stepF1{{prefix: "rev-parse " + headF1 + "^{tree}", err: boom}}, "rev-parse " + headF1, "for-each-ref"},

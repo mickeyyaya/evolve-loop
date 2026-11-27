@@ -63,7 +63,7 @@ func TestKind_ClosedSetAndTerminal(t *testing.T) {
 		KindShipLanded, KindShipError, KindShipWarning, KindShipDelivered, KindShipMerged, KindLoopWarning, KindAdvisorWarning, KindRunnerWarning, KindInboxWarning, KindAuditWarning, KindSystemFailure, KindQuotaPaused, KindLoginRequired, KindBridgeWarning, KindBridgeTripwire,
 		KindPaneLiveness, KindLedgerAppended, KindOutcomeWarning, KindFailureDiagWarning, KindCarryoverWarning, KindFailureLearningWarning, KindConfigWarning, KindObserverWarning, KindGatePassed, KindCycleSealed, KindLoopWave, KindLoopHalt, KindLoopEscalation,
 		KindLoopStarted, KindLoopExit, KindLoopLost, KindListenerPanicked, KindRegistryDrift, KindSinkDropped,
-		KindQualityReading, KindQualityBreach, KindQualityWarning, KindIsolationViolation, KindIsolationContext, KindIsolationRequest, KindIsolationRequestDecision, KindIsolationEnv, KindCLIQueueApplied, KindLadderDecision, KindSelfhealIncident, KindSelfhealDecision, KindControlBypass, KindWaveStarted, KindWaveEnded, KindInboxClaimed, KindInboxReleased, KindCICompleted, KindLoopTick, KindExpectedAbsent, KindHostSentinel}
+		KindQualityReading, KindQualityBreach, KindQualityWarning, KindIsolationViolation, KindIsolationContext, KindIsolationRequest, KindIsolationRequestDecision, KindIsolationEnv, KindCLIQueueApplied, KindCLICheckpointSkipped, KindLadderDecision, KindSelfhealIncident, KindSelfhealDecision, KindControlBypass, KindWaveStarted, KindWaveEnded, KindInboxClaimed, KindInboxReleased, KindCICompleted, KindLoopTick, KindExpectedAbsent, KindHostSentinel}
 	for _, k := range all {
 		if !k.Known() {
 			t.Errorf("%q must be known", k)

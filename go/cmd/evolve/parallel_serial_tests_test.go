@@ -583,6 +583,7 @@ var serialTests = map[string]string{
 	"main.TestRunCheckpoint_RestoreRefusals":                                                                               "swaps seam checkpointClock",
 	"main.TestRunCheckpoint_RetentionComesFromPolicyJSONAndABrokenPolicyNeverPrunes":                                       "swaps seam checkpointClock",
 	"main.TestRunCheckpoint_SaveAllListAndRestoreRoundTrip":                                                                "swaps seam checkpointClock",
+	"main.TestRunCheckpoint_SaveAllMidMergeSkipsConflictAndSavesOthers":                                                    "swaps seam checkpointClock",
 	"main.TestRunCheckpoint_SaveAllReportsAWorktreeThatCannotBeSavedAndKeepsTheRest":                                       "swaps seam checkpointClock",
 	"main.TestRunCheckpoint_SaveDefaultsToTheProjectRootAndRefusesANonWorktree":                                            "swaps seam checkpointClock",
 	"main.TestRunCheckpoint_SaveJSONEncodeFailureExits1":                                                                   "swaps seam checkpointClock",

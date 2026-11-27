@@ -4,13 +4,18 @@
     "The output names the skipped worktree and the reason, and a signal records the skip.",
     "A test makes a worktree with an unmerged entry through internal/gittest, runs save --all, and asserts the other worktrees are saved and the skip is reported."
   ],
+  "consumed": {
+    "at": "2026-11-27T08:10:54Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "continuation": {
-    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2614",
-    "branch": "cycle-cd3ae73e-2614",
-    "snapshot_sha": "73c8ba6417a058c9635330ce48a9127caba127a2",
     "base_sha": "a099157d14664c4483d0db2009b6551b6ded79d6",
+    "branch": "cycle-cd3ae73e-2614",
+    "cycle": 2614,
     "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2614/audit-fail-reason.json",
-    "cycle": 2614
+    "snapshot_sha": "73c8ba6417a058c9635330ce48a9127caba127a2",
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2614"
   },
   "created_at": "2026-11-23T12:54:04Z",
   "failure_count": 1,

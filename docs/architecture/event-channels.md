@@ -111,6 +111,7 @@ Every watcher of the pipeline polls, and no program outside one process can subs
   - `retire`
   - `guard`
   - `ratchet`
+  - `checkpoint`
 - **Role notes.** The role `quality` collects readings ([ADR-0153](adr/0153-quality-is-a-panel-of-separate-indexes-with-intervals-that-the-signal-center-publishes.md)), and `dispatch` checks the dispatch credential ([llm-isolation.md](llm-isolation.md) §7.1.1). The role `agent` is one `evolve agent run` ([agent-run.md](agent-run.md) §7). The role `selfheal` is the incident detector ([llm-isolation.md](llm-isolation.md) §18). A reader marks the records that it makes with `watch`.
 
 ### 2. Channels

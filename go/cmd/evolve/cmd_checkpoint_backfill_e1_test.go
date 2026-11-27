@@ -19,6 +19,7 @@ func TestSaveLine(t *testing.T) {
 		{"pruned and pushed", checkpointSaveRow{SaveResult: wtcheckpoint.SaveResult{Status: "saved", Worktree: "w", Ref: "r", Pruned: []string{"a", "b"}}, Pushed: true}, "saved w r (pruned 2) (pushed)"},
 		{"pushed only", checkpointSaveRow{SaveResult: wtcheckpoint.SaveResult{Status: "saved", Worktree: "w", Ref: "r"}, Pushed: true}, "saved w r (pushed)"},
 		{"one pruned", checkpointSaveRow{SaveResult: wtcheckpoint.SaveResult{Status: "saved", Worktree: "w", Ref: "r", Pruned: []string{"a"}}}, "saved w r (pruned 1)"},
+		{"a skipped worktree", checkpointSaveRow{SaveResult: wtcheckpoint.SaveResult{Status: wtcheckpoint.StatusSkipped, Worktree: "w", Reason: "mid-merge: unmerged index entries"}}, "skipped w mid-merge: unmerged index entries"},
 	}
 	for _, tc := range cases {
 		if got := saveLine(tc.row); got != tc.want {

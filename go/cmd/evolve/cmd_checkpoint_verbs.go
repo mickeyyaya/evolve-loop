@@ -5,10 +5,22 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/wtcheckpoint"
 )
+
+const (
+	roleCheckpoint           = "checkpoint"
+	codeCLICheckpointSkipped = signalcenter.Code("CLI_CHECKPOINT_SKIPPED")
+)
+
+func init() {
+	signalcenter.RegisterCode(signalcenter.ModuleCLI, codeCLICheckpointSkipped, "evolve checkpoint save --all skipped a dev worktree whose index held unmerged entries; fields.worktree and fields.reason name the skipped worktree and cause")
+}
 
 type checkpointSaveRow struct {
 	wtcheckpoint.SaveResult
@@ -49,7 +61,7 @@ func runCheckpointSave(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "evolve checkpoint save: %v\n", pushErr)
 		}
 	}
-	if code := reportSaves(f, rows, stdout, stderr); code != 0 || pushErr != nil {
+	if code := reportSaves(f, *f.projectRoot, rows, stdout, stderr); code != 0 || pushErr != nil {
 		return 1
 	}
 	return 0
@@ -94,7 +106,7 @@ func pushSaved(ctx context.Context, hub wtcheckpoint.Hub, rows []checkpointSaveR
 	return pushed, nil
 }
 
-func reportSaves(f checkpointFlags, rows []checkpointSaveRow, stdout, stderr io.Writer) int {
+func reportSaves(f checkpointFlags, projectRoot string, rows []checkpointSaveRow, stdout, stderr io.Writer) int {
 	code := 0
 	for _, r := range rows {
 		if r.Error != "" {
@@ -102,6 +114,7 @@ func reportSaves(f checkpointFlags, rows []checkpointSaveRow, stdout, stderr io.
 			code = 1
 		}
 	}
+	emitCheckpointSkips(projectRoot, rows, stderr)
 	if *f.asJSON {
 		if !f.emitJSON(stdout, stderr, rows) {
 			return 1
@@ -116,8 +129,42 @@ func reportSaves(f checkpointFlags, rows []checkpointSaveRow, stdout, stderr io.
 	return code
 }
 
+func emitCheckpointSkips(projectRoot string, rows []checkpointSaveRow, stderr io.Writer) {
+	if !hasSkippedSave(rows) {
+		return
+	}
+	if abs, err := filepath.Abs(projectRoot); err == nil {
+		projectRoot = abs
+	}
+	signals, closeSignals := newRoleSignalCenter(roleCheckpoint, projectRoot, paths.EvolveDirOf(projectRoot), stderr)
+	defer closeSignals()
+	for _, r := range rows {
+		if r.Status != wtcheckpoint.StatusSkipped {
+			continue
+		}
+		signals.Emit(signalcenter.Event{
+			Module:   signalcenter.ModuleCLI,
+			Origin:   "evolve.emitCheckpointSkips",
+			Kind:     signalcenter.KindCLICheckpointSkipped,
+			Severity: signalcenter.SeverityWarn,
+			Code:     codeCLICheckpointSkipped,
+			Reason:   fmt.Sprintf("skipped checkpoint save for %s: %s", r.Worktree, r.Reason),
+			Fields:   map[string]string{"worktree": r.Worktree, "reason": r.Reason},
+		})
+	}
+}
+
+func hasSkippedSave(rows []checkpointSaveRow) bool {
+	for _, r := range rows {
+		if r.Status == wtcheckpoint.StatusSkipped {
+			return true
+		}
+	}
+	return false
+}
+
 func saveLine(r checkpointSaveRow) string {
-	line := strings.TrimSpace(fmt.Sprintf("%s %s %s", r.Status, r.Worktree, r.Ref))
+	line := strings.TrimSpace(fmt.Sprintf("%s %s %s", r.Status, r.Worktree, cmp.Or(r.Ref, r.Reason)))
 	if n := len(r.Pruned); n > 0 {
 		line += fmt.Sprintf(" (pruned %d)", n)
 	}

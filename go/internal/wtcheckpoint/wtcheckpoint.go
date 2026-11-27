@@ -24,4 +24,5 @@ const (
 	StatusSaved     Status = "saved"
 	StatusUnchanged Status = "unchanged"
 	StatusClean     Status = "clean"
+	StatusSkipped   Status = "skipped"
 )

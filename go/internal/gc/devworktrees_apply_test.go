@@ -107,6 +107,28 @@ func TestApplyDevWorktrees_ACheckpointSaveFailureRefusesTheArchive(t *testing.T)
 	}
 }
 
+func TestApplyDevWorktrees_ASkippedSaveIsRefusedAndLeavesTheWorkAlone(t *testing.T) {
+	e := newDevEnv(t)
+	dir := e.addDev("merging")
+	writeRepoFile(t, dir, "precious.txt", "do not lose\n")
+	o := e.options(idleOffset)
+	m := e.plan(o)
+	o.Save = func(context.Context, wtcheckpoint.Worktree) (wtcheckpoint.SaveResult, error) {
+		return wtcheckpoint.SaveResult{Worktree: "merging", Dir: dir, Status: wtcheckpoint.StatusSkipped, Reason: "mid-merge: unmerged index entries"}, nil
+	}
+
+	recs, err := e.apply(o, m)
+	if !errors.Is(err, errCheckpointSkipped) {
+		t.Fatalf("err = %v, want %v", err, errCheckpointSkipped)
+	}
+	if len(recs) != 0 {
+		t.Errorf("records = %+v, want none", recs)
+	}
+	if got, rerr := os.ReadFile(filepath.Join(dir, "precious.txt")); rerr != nil || string(got) != "do not lose\n" {
+		t.Errorf("the work file is %q (err %v), want it untouched in place", got, rerr)
+	}
+}
+
 func TestApplyDevWorktrees_TheDefaultSaveLabelsTheCheckpoint(t *testing.T) {
 	e := newDevEnv(t)
 	dir := e.addDev("labelled")

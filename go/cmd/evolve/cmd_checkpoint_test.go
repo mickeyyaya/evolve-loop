@@ -260,3 +260,71 @@ func TestRunCheckpoint_SavePushSendsTheSavedRefAndFailsLoudlyWithoutAnOrigin(t *
 		t.Errorf("origin refs = %q, pushed rows %v; want exactly the one saved ref", got, pushed)
 	}
 }
+
+func TestRunCheckpoint_SaveAllMidMergeSkipsConflictAndSavesOthers(t *testing.T) {
+	tickingCheckpointClock(t)
+	h := newCheckpointHub(t)
+	console := h.worktree("console", "")
+	dirty := h.worktree("dev/dirty", "feat/dirty")
+	h.worktree("dev/clean", "feat/clean")
+	merging := h.worktree("dev/merging", "feat/merging")
+	theirs := h.worktree("aux/theirs", "feat/theirs")
+	writeCheckpointFile(t, theirs, "a.txt", "theirs\n")
+	checkpointGit(t, theirs, "commit", "-qam", "theirs")
+	writeCheckpointFile(t, merging, "a.txt", "ours\n")
+	checkpointGit(t, merging, "commit", "-qam", "ours")
+	if _, _, mc, _ := gitexec.Default(merging).Capture(context.Background(), "merge", "-q", "feat/theirs"); mc != 1 {
+		t.Fatalf("merge exit %d, want conflict (1)", mc)
+	}
+	writeCheckpointFile(t, dirty, "a.txt", "work in progress\n")
+
+	code, out, errOut := runCheckpointCLI("save", "--all", "--project-root", console)
+	if code != 0 {
+		t.Fatalf("save --all exit %d: stdout=%q stderr=%q", code, out, errOut)
+	}
+	if !strings.Contains(out, "skipped merging mid-merge: unmerged index entries") || !strings.Contains(out, "saved dirty refs/checkpoints/dirty/") {
+		t.Errorf("stdout = %q, want skipped merging and saved dirty", out)
+	}
+	if !strings.Contains(errOut, "CLI_CHECKPOINT_SKIPPED") || !strings.Contains(errOut, "merging") {
+		t.Errorf("stderr = %q, want skip signal naming merging", errOut)
+	}
+	if refs := h.refs(); !strings.Contains(refs, "refs/checkpoints/dirty/") || strings.Contains(refs, "refs/checkpoints/merging/") {
+		t.Errorf("refs = %q, want dirty saved and merging skipped", refs)
+	}
+
+	writeCheckpointFile(t, dirty, "a.txt", "more work\n")
+	code, out, errOut = runCheckpointCLI("save", "--all", "--json", "--project-root", console)
+	var rows []checkpointSaveRow
+	if code != 0 || json.Unmarshal([]byte(out), &rows) != nil {
+		t.Fatalf("save --all --json exit %d stdout %q stderr %q", code, out, errOut)
+	}
+	byName := map[string]checkpointSaveRow{}
+	for _, r := range rows {
+		byName[r.Worktree] = r
+	}
+	if r := byName["merging"]; r.Status != wtcheckpoint.StatusSkipped || r.Reason == "" || r.Ref != "" || r.Error != "" {
+		t.Errorf("merging row = %+v, want skipped with reason and no ref or error", r)
+	}
+	if r := byName["dirty"]; r.Status != wtcheckpoint.StatusSaved || r.Ref == "" {
+		t.Errorf("dirty row = %+v, want saved", r)
+	}
+	if r := byName["clean"]; r.Status != wtcheckpoint.StatusClean {
+		t.Errorf("clean row = %+v, want clean", r)
+	}
+
+	h.worktree("dev/bad..name", "feat/bad")
+	code, out, _ = runCheckpointCLI("save", "--all", "--json", "--project-root", console)
+	if code != 1 || json.Unmarshal([]byte(out), &rows) != nil {
+		t.Fatalf("save --all --json with bad..name exit %d stdout %q, want 1", code, out)
+	}
+	byName = map[string]checkpointSaveRow{}
+	for _, r := range rows {
+		byName[r.Worktree] = r
+	}
+	if r := byName["bad..name"]; r.Error == "" {
+		t.Errorf("bad..name row = %+v, want an error", r)
+	}
+	if r := byName["merging"]; r.Status != wtcheckpoint.StatusSkipped {
+		t.Errorf("merging row = %+v, want skipped", r)
+	}
+}

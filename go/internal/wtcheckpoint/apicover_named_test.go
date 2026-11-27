@@ -17,6 +17,8 @@ func TestJSONShapes_AreTheWordsTheCLIPrints(t *testing.T) {
 			`{"ref":"refs/checkpoints/a/20261006T060000Z","reason":"landed"}`},
 		{wtcheckpoint.SaveResult{Worktree: "a", Dir: "/hub/dev/a", Status: wtcheckpoint.StatusClean},
 			`{"worktree":"a","dir":"/hub/dev/a","status":"clean"}`},
+		{wtcheckpoint.SaveResult{Worktree: "a", Dir: "/hub/dev/a", Status: wtcheckpoint.StatusSkipped, Reason: "mid-merge: unmerged index entries"},
+			`{"worktree":"a","dir":"/hub/dev/a","status":"skipped","reason":"mid-merge: unmerged index entries"}`},
 		{wtcheckpoint.Worktree{Dir: "/hub/dev/a", Name: "a"}, `{"dir":"/hub/dev/a","worktree":"a"}`},
 	} {
 		got, err := json.Marshal(tc.value)

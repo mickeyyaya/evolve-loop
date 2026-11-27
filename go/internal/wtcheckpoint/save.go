@@ -20,8 +20,11 @@ type SaveResult struct {
 	Dir      string   `json:"dir"`
 	Status   Status   `json:"status"`
 	Ref      string   `json:"ref,omitempty"`
+	Reason   string   `json:"reason,omitempty"`
 	Pruned   []string `json:"pruned,omitempty"`
 }
+
+const unmergedSkipReason = "mid-merge: unmerged index entries"
 
 func Save(ctx context.Context, w Worktree, o SaveOptions) (SaveResult, error) {
 	s := saver{tree: checkpointIsolatedGit(w.Dir), name: w.Name, opts: o}
@@ -32,6 +35,15 @@ func Save(ctx context.Context, w Worktree, o SaveOptions) (SaveResult, error) {
 	head, err := s.tree.HEAD(ctx)
 	if err != nil {
 		return res, err
+	}
+	unmerged, err := s.hasUnmerged(ctx)
+	if err != nil {
+		return res, err
+	}
+	if unmerged {
+		res.Status = StatusSkipped
+		res.Reason = unmergedSkipReason
+		return res, nil
 	}
 	snap, err := snapshot(ctx, s.tree)
 	if err != nil {
@@ -85,6 +97,14 @@ func (s saver) checkName(ctx context.Context) error {
 		return fmt.Errorf("wtcheckpoint: refused: worktree name %q cannot name a ref under %s", s.name, refPrefix)
 	}
 	return nil
+}
+
+func (s saver) hasUnmerged(ctx context.Context) (bool, error) {
+	out, err := s.tree.Output(ctx, "ls-files", "-u")
+	if err != nil {
+		return false, err
+	}
+	return out != "", nil
 }
 
 type saver struct {

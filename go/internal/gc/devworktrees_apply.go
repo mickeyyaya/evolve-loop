@@ -12,7 +12,10 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/wtcheckpoint"
 )
 
-var errBudgetDeferred = errors.New("gc: the time budget ran out")
+var (
+	errBudgetDeferred    = errors.New("gc: the time budget ran out")
+	errCheckpointSkipped = errors.New("checkpoint save skipped")
+)
 
 const devArchiveTimeout = 2 * time.Minute
 
@@ -103,6 +106,9 @@ func (s *devSweep) saveVerified(ctx context.Context, wt wtcheckpoint.Worktree, p
 	saved, err := s.o.save(ctx, wt)
 	if err != nil {
 		return "", fmt.Errorf("gc: refuse %s: checkpoint save failed, so the work stays in place: %w", wt.Dir, err)
+	}
+	if saved.Status == wtcheckpoint.StatusSkipped {
+		return "", fmt.Errorf("gc: refuse %s: %w (%s), so the work stays in place", wt.Dir, errCheckpointSkipped, saved.Reason)
 	}
 	after, err := tree.DirtyPaths(ctx)
 	if err != nil {

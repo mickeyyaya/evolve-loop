@@ -10,7 +10,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/wtcheckpoint"
 )
 
-func TestSave_FailsLoudlyOnAnUnmergedIndexAndRecordsNothing(t *testing.T) {
+func TestSave_SkipsAnUnmergedIndexAndRecordsNothing(t *testing.T) {
 	t.Parallel()
 	h := newHub(t)
 	w := h.addWorktree("dev/task", "feat/task")
@@ -23,13 +23,16 @@ func TestSave_FailsLoudlyOnAnUnmergedIndexAndRecordsNothing(t *testing.T) {
 		t.Fatal("the fixture merge did not conflict")
 	}
 
-	_, err := wtcheckpoint.Save(context.Background(), w, wtcheckpoint.SaveOptions{Keep: 20, Now: clockAt("20261006T060000Z")})
+	res, err := wtcheckpoint.Save(context.Background(), w, wtcheckpoint.SaveOptions{Keep: 20, Now: clockAt("20261006T060000Z")})
 
-	if err == nil {
-		t.Fatal("Save of a worktree with unmerged paths succeeded")
+	if err != nil {
+		t.Fatalf("Save of a worktree with unmerged paths failed: %v", err)
+	}
+	if res.Status != wtcheckpoint.StatusSkipped || res.Reason == "" || res.Ref != "" {
+		t.Errorf("res = %+v, want skipped with a reason and no ref", res)
 	}
 	if got := refsIn(t, h); got != "" {
-		t.Errorf("refs after a failed save = %s, want none", got)
+		t.Errorf("refs after a skipped save = %s, want none", got)
 	}
 }
 
