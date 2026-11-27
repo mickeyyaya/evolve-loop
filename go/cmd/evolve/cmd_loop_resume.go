@@ -48,6 +48,7 @@ func runResumeBatch(
 		Context:               cycleCtx,
 		DisableWorkspaceGuard: disableWorkspaceGuardForTest,
 		BypassPolicy:          cfg.BypassPolicy,
+		AcceptIdentityChange:  cfg.AcceptIdentityChange,
 	}
 	result, err := orch.RunCycleFromPhase(ctx, req, rp)
 	reapCycleSessions(cfg.ProjectRoot, result.Cycle, stderr)

@@ -17,34 +17,35 @@ import (
 )
 
 type loopArgFlags struct {
-	json              bool
-	projectRoot       string
-	evolveDir         string
-	goalHash          string
-	goalText          string
-	goalFile          string
-	goalFromLast      bool
-	strategy          string
-	maxCyclesFlag     int
-	cyclesFlag        int
-	resume            bool
-	autoResume        bool
-	dryRun            bool
-	reset             bool
-	fingerprint       string
-	consensusAudit    bool
-	forceFresh        bool
-	skipPreflight     bool
-	skipPreflightBoot bool
-	bypassPolicy      bool
-	sandboxOff        string
-	untilInboxEmpty   bool
-	preflightOnly     bool
-	detach            bool
-	relaunch          bool
-	logPath           string
-	only              string
-	exclude           string
+	json                 bool
+	projectRoot          string
+	evolveDir            string
+	goalHash             string
+	goalText             string
+	goalFile             string
+	goalFromLast         bool
+	strategy             string
+	maxCyclesFlag        int
+	cyclesFlag           int
+	resume               bool
+	autoResume           bool
+	dryRun               bool
+	reset                bool
+	fingerprint          string
+	consensusAudit       bool
+	forceFresh           bool
+	skipPreflight        bool
+	skipPreflightBoot    bool
+	bypassPolicy         bool
+	acceptIdentityChange bool
+	sandboxOff           string
+	untilInboxEmpty      bool
+	preflightOnly        bool
+	detach               bool
+	relaunch             bool
+	logPath              string
+	only                 string
+	exclude              string
 }
 
 func registerLoopArgFlags(fs *flag.FlagSet) *loopArgFlags {
@@ -74,6 +75,7 @@ func registerLoopArgFlags(fs *flag.FlagSet) *loopArgFlags {
 	fs.StringVar(&lf.logPath, "log", "", "with --detach: the file the detached loop's stdout and stderr are appended to (required with --detach)")
 	fs.StringVar(&lf.only, "only", "", "comma-separated inbox ids: the lanes take only these items (an id no lane can take, or one also in --exclude, exits 10; no inbox file changes)")
 	fs.StringVar(&lf.exclude, "exclude", "", "comma-separated inbox ids: the lanes never take these items (no inbox file changes)")
+	fs.BoolVar(&lf.acceptIdentityChange, "accept-identity-change", false, "with --resume: resume a cycle although its phase graph, phase contracts or policy changed since the cycle started; the ledger records the override")
 	fs.BoolVar(&lf.bypassPolicy, "bypass-policy", false, "use --bypass-policy to bypass policy.json pin enforcement for every phase in this batch (operator escape hatch)")
 	fs.BoolVar(&lf.json, "json", false, "with --detach: print the launch as JSON and no text; the foreground loop prints its JSON result anyway")
 	fs.StringVar(&lf.sandboxOff, "sandbox-off", "", sandboxOffUsage)
@@ -294,33 +296,34 @@ func flagTokenName(token string) (name string, hasValue bool) {
 
 func buildLoopConfig(lf *loopArgFlags, goalHash, goalText, strategy string, maxCycles, posCycles int, perAgentCLI, perAgentModel map[string]string) loopConfig {
 	return loopConfig{
-		ProjectRoot:       lf.projectRoot,
-		EvolveDir:         lf.evolveDir,
-		GoalHash:          goalHash,
-		GoalText:          goalText,
-		Strategy:          strategy,
-		MaxCycles:         maxCycles,
-		MaxCyclesExplicit: lf.cyclesFlag > 0 || lf.maxCyclesFlag > 0 || posCycles > 0,
-		Resume:            lf.resume,
-		AutoResume:        lf.autoResume,
-		Reset:             lf.reset,
-		Fingerprint:       lf.fingerprint,
-		ConsensusAudit:    lf.consensusAudit,
-		DryRun:            lf.dryRun,
-		ForceFresh:        lf.forceFresh,
-		SkipPreflight:     lf.skipPreflight,
-		SkipPreflightBoot: lf.skipPreflightBoot,
-		BypassPolicy:      lf.bypassPolicy,
-		SandboxOff:        lf.sandboxOff,
-		ChainMode:         lf.untilInboxEmpty,
-		PreflightOnly:     lf.preflightOnly,
-		Detach:            lf.detach,
-		Relaunch:          lf.relaunch,
-		Only:              splitIDList(lf.only),
-		Exclude:           splitIDList(lf.exclude),
-		PerAgentCLI:       perAgentCLI,
-		PerAgentModel:     perAgentModel,
-		Epoch:             integration.NewEpochHolder(lf.evolveDir),
+		ProjectRoot:          lf.projectRoot,
+		EvolveDir:            lf.evolveDir,
+		GoalHash:             goalHash,
+		GoalText:             goalText,
+		Strategy:             strategy,
+		MaxCycles:            maxCycles,
+		MaxCyclesExplicit:    lf.cyclesFlag > 0 || lf.maxCyclesFlag > 0 || posCycles > 0,
+		Resume:               lf.resume,
+		AutoResume:           lf.autoResume,
+		Reset:                lf.reset,
+		Fingerprint:          lf.fingerprint,
+		ConsensusAudit:       lf.consensusAudit,
+		DryRun:               lf.dryRun,
+		ForceFresh:           lf.forceFresh,
+		SkipPreflight:        lf.skipPreflight,
+		SkipPreflightBoot:    lf.skipPreflightBoot,
+		BypassPolicy:         lf.bypassPolicy,
+		AcceptIdentityChange: lf.acceptIdentityChange,
+		SandboxOff:           lf.sandboxOff,
+		ChainMode:            lf.untilInboxEmpty,
+		PreflightOnly:        lf.preflightOnly,
+		Detach:               lf.detach,
+		Relaunch:             lf.relaunch,
+		Only:                 splitIDList(lf.only),
+		Exclude:              splitIDList(lf.exclude),
+		PerAgentCLI:          perAgentCLI,
+		PerAgentModel:        perAgentModel,
+		Epoch:                integration.NewEpochHolder(lf.evolveDir),
 	}
 }
 

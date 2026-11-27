@@ -1017,3 +1017,7 @@ This section holds the durable reasons that the strip removed from the group 4 f
 - **The review record of a PR (`cmd_integration_batch.go`).** `reviewedChange(store, digest, paths)` is the one read, parse and check of a review record. The whole-change lookup and each commit of a chain use it.
   - `reviewedBinder` first looks for the record of the whole change. With no such record and two or more commits, it binds the chain of the records of the commits through `integration.ChainedBinding`. A PR of one commit with no record keeps the old refusal.
   - Pinned by `TestRecordPR_ATwoCommitPRReviewedPerCommitIsRecorded`, `TestRecordPR_AnUnreviewedSecondCommitIsRefusedWithItsNextStep`, `TestRecordPR_AWholeChangeReviewStillBindsAMultiCommitPR` and `TestRecordPR_ATwoCommitPRWithNoRecordNamesItsFirstCommit`.
+
+## The resume identity parameter (W2.2)
+
+`evolve cycle resume` and `evolve loop --resume` take `--accept-identity-change`. The parameter lets a resume go on when the phase graph, the phase contracts or the policy changed since the cycle started. The ledger records the override. `resumeIdentityConfig` reads `resume.identity.stage` from the policy and wires the identity computer into the orchestrator ([internal-core](internal-core.md#resume-identity-w22)).

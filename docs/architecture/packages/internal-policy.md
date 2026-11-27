@@ -190,3 +190,9 @@
 - **Stage.** `workflow.convergence.audit_rereview.stage` is `shadow` by default. It has its own named type, `AuditRereviewStage`, and its own signal `AUDIT_REREVIEW_SHADOW`. A flip of `workflow.convergence.stage` never moves it.
 - **One home.** `ConvergencePolicy.AuditRereview` holds the key, because the strict policy refuses an unknown key. An unknown word warns and resolves to `shadow`.
 - **Pinned by** `TestAuditRereviewStage_DefaultsToShadowAndNeverFollowsTheConvergenceStage` and `TestAuditRereviewStage_ItsOwnKeyFlipsItAlone`.
+
+## resume.identity (W2.2)
+
+- **The key.** `resume.identity.stage` has the type `ResumeIdentityStage`. The words are `off`, `shadow` and `enforce`. The default is `shadow`. Another word is refused when the policy loads.
+- **The home.** The key is the `identity` block of `ResumeConfig`, next to `max_checkpoint_age_h`. `Policy.ResumeIdentityStage` reads it.
+- **The seed.** `internal/gateregistry` seeds the key with the signal `CYCLE_RESUME_IDENTITY_SHADOW`. `internal/core` emits the signal.
