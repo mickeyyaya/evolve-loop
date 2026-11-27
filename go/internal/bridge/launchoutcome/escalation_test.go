@@ -66,3 +66,15 @@ func TestClassify_EscalationPatternIsScopedToExit85(t *testing.T) {
 		t.Errorf("exit 86 cause_code = %q, want respond_loop_guard", out.CauseCode)
 	}
 }
+
+func TestEscalationLine_RoundTripsThroughTheClassifier(t *testing.T) {
+	for _, pattern := range []string{"rate_limit", "auth_recheck"} {
+		out := Classify(ExitUnknownPrompt, nil, EscalationLine(pattern, "escalate")+"\n")
+		if out.CauseCode != pattern {
+			t.Errorf("cause for %s = %q", pattern, out.CauseCode)
+		}
+	}
+	if line := EscalationLine("rate_limit", "escalate"); line != "[auto-respond] escalation report written (pattern=rate_limit reason=escalate)" {
+		t.Errorf("line = %q", line)
+	}
+}

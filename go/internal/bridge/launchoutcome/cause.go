@@ -1,6 +1,7 @@
 package launchoutcome
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -18,13 +19,14 @@ const (
 	TimeoutReviewStop        TimeoutCause = "review_stop"
 	TimeoutReviewPause       TimeoutCause = "review_pause"
 	TimeoutIncomplete        TimeoutCause = "incomplete"
+	TimeoutIdleOutput        TimeoutCause = "idle_output"
 )
 
 func (c TimeoutCause) Known() bool {
 	switch c {
 	case TimeoutContextCancelled, TimeoutPaneLost, TimeoutDetectorError, TimeoutSubmitWedged,
 		TimeoutTransientUpstream, TimeoutReviewStop, TimeoutReviewPause,
-		TimeoutIncomplete:
+		TimeoutIncomplete, TimeoutIdleOutput:
 		return true
 	}
 	return false
@@ -93,7 +95,17 @@ func timeoutCauseCode(stderr string) string {
 	return ""
 }
 
+func IdleOutputLine(idleS int) string {
+	return fmt.Sprintf("[bridge] %scause=%s idle_s=%d", ArtifactTimeoutMarker, TimeoutIdleOutput, idleS)
+}
+
 const escalationMarker = "escalation report written (pattern="
+
+const escalationPrefix = "[auto-respond] "
+
+func EscalationLine(pattern, reason string) string {
+	return escalationPrefix + escalationMarker + pattern + " reason=" + reason + ")"
+}
 
 const exhaustedMarker = "EXHAUSTED: pane shows a quota/rate-limit wall"
 
@@ -103,8 +115,8 @@ func escalationLine(stderr string) string {
 	for _, rawLine := range strings.Split(stderr, "\n") {
 		line := strings.TrimSpace(rawLine)
 		switch {
-		case strings.HasPrefix(line, "[auto-respond] "+escalationMarker) && strings.HasSuffix(line, "reason=escalate)"):
-			return boundCause(strings.TrimPrefix(line, "[auto-respond] "))
+		case strings.HasPrefix(line, escalationPrefix+escalationMarker) && strings.HasSuffix(line, "reason=escalate)"):
+			return boundCause(strings.TrimPrefix(line, escalationPrefix))
 		case exhaustedLineRE.MatchString(line):
 			return boundCause(line[strings.Index(line, exhaustedMarker):])
 		}

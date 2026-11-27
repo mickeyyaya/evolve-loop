@@ -77,12 +77,7 @@ func (r *replWaitResult) recordTokens(pane string) {
 }
 
 func newReplWaitState(w replWaiter) *replWaitState {
-	interval := w.cfg.ArtifactTimeoutS
-	if interval <= 0 {
-		interval = defaultIfZero(w.deps.ArtifactTimeoutS, tmuxArtifactTimeoutS)
-	}
-
-	maxExtends := defaultIfZero(w.deps.ArtifactMaxExtends, defaultArtifactMaxExtends)
+	interval, maxExtends := artifactBudget(w.cfg, w.deps)
 	reviewer := w.deps.Reviewer
 	if reviewer == nil {
 		reviewer = newDeterministicReviewer(maxExtends)

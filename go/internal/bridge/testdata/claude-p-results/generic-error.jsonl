@@ -1,0 +1,2 @@
+{"type":"system","subtype":"init","session_id":"s1","model":"claude-sonnet-5-5"}
+{"type":"result","subtype":"error_during_execution","is_error":true,"result":"Tool Write failed: ENOENT","session_id":"s1"}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -85,6 +86,9 @@ type Manifest struct {
 	ModelLabelRegex         string                   `json:"model_label_regex,omitempty"`
 	ShellCountRegex         string                   `json:"shell_count_regex,omitempty"`
 	Stub                    bool                     `json:"stub"`
+	HeadlessOutcome         *HeadlessOutcomeSpec     `json:"headless_outcome,omitempty"`
+	NamedRegexes            map[string]string        `json:"named_regexes,omitempty"`
+	ParamsFrom              *ParamsFromSpec          `json:"params_from,omitempty"`
 	ModelTierMap            map[string]string        `json:"model_tier_map,omitempty"`
 	ModelTierMapFrom        string                   `json:"model_tier_map_from,omitempty"`
 	ChatGPTSafeModels       []string                 `json:"chatgpt_safe_models,omitempty"`
@@ -115,6 +119,11 @@ const (
 	InstructionInject = "inject"
 )
 
+type ParamsFromSpec struct {
+	CLI  string   `json:"cli"`
+	Keys []string `json:"keys"`
+}
+
 type ControlSpec struct {
 	Send            string                 `json:"send"`
 	Await           string                 `json:"await,omitempty"`
@@ -133,11 +142,19 @@ func LoadManifest(cli string) (Manifest, error) {
 	if err != nil {
 		return m, err
 	}
-	m, err = resolveTierMapFrom(cli, m)
+	m, err = resolveManifestRefs(cli, m)
 	if err != nil {
 		return Manifest{}, err
 	}
 	return overlayManifestCatalog(m), nil
+}
+
+func resolveManifestRefs(cli string, m Manifest) (Manifest, error) {
+	m, err := resolveTierMapFrom(cli, m)
+	if err != nil {
+		return Manifest{}, err
+	}
+	return resolveParamsFrom(cli, m, loadManifestRaw)
 }
 
 func resolveTierMapFrom(cli string, m Manifest) (Manifest, error) {
@@ -155,6 +172,27 @@ func resolveTierMapFrom(cli string, m Manifest) (Manifest, error) {
 	for k, v := range from.ModelTierMap {
 		m.ModelTierMap[k] = v
 	}
+	return m, nil
+}
+
+func resolveParamsFrom(cli string, m Manifest, load func(string) (Manifest, error)) (Manifest, error) {
+	if m.ParamsFrom == nil {
+		return m, nil
+	}
+	from, err := load(m.ParamsFrom.CLI)
+	if err != nil {
+		return Manifest{}, fmt.Errorf("bridge:manifest: cli=%s params_from=%q: %w", cli, m.ParamsFrom.CLI, err)
+	}
+	params := make(map[string]ParamSpec, len(m.Params)+len(m.ParamsFrom.Keys))
+	for _, key := range m.ParamsFrom.Keys {
+		spec, ok := from.Params[key]
+		if !ok {
+			return Manifest{}, fmt.Errorf("bridge:manifest: cli=%s params_from=%q declares no param %q", cli, m.ParamsFrom.CLI, key)
+		}
+		params[key] = spec
+	}
+	maps.Copy(params, m.Params)
+	m.Params = params
 	return m, nil
 }
 
