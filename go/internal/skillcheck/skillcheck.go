@@ -136,6 +136,10 @@ func Run(projectRoot string, write bool, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, mp)
 		drift = true
 	}
+
+	if code := reportHostSkills(projectRoot, stderr); code != 0 {
+		return code
+	}
 	projected, pErr := projectSurfaces(projectRoot, diffs, write, stdout, stderr)
 	if pErr != nil {
 		fmt.Fprintf(stderr, "%v\n", pErr)
@@ -148,6 +152,21 @@ func Run(projectRoot string, write bool, stdout, stderr io.Writer) int {
 	}
 	if !write {
 		fmt.Fprintln(stdout, "[skills] check OK — all phase-facts regions in sync, all commands mirrored, Codex manifests projected, all names match dirs")
+	}
+	return 0
+}
+
+func reportHostSkills(projectRoot string, stderr io.Writer) int {
+	problems, err := hostSkillProblems(projectRoot)
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+	for _, p := range problems {
+		fmt.Fprintln(stderr, p)
+	}
+	if len(problems) > 0 {
+		return 2
 	}
 	return 0
 }
@@ -257,7 +276,12 @@ func Check(projectRoot string) ([]string, error) {
 			drift = append(drift, d.rel)
 		}
 	}
-	return append(append(append(drift, nameErrs...), manifestProblems...), budgetProblems(renderDiffs, instructionRenders())...), nil
+	hostProblems, hErr := hostSkillProblems(projectRoot)
+	if hErr != nil {
+		return nil, hErr
+	}
+	problems := append(append(drift, nameErrs...), manifestProblems...)
+	return append(append(problems, hostProblems...), budgetProblems(renderDiffs, instructionRenders())...), nil
 }
 
 func sortedPhaseSkillNames() []string {
