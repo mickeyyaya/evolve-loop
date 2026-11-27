@@ -163,26 +163,18 @@ Any other `Diverged` raises `_DRIVER_FAILED`. The plane sync refuses `Ahead` onl
 
 ## 7. Finding 3: promotion at merged
 
-**Fact.** `rec.Scope` is not the promotion set. A deferred id must stay open. A marker id must be promoted. Two homes exist today:
+**Fact.** `rec.Scope` is not the promotion set. A deferred id must stay open. At delivery, ship moves only the committed ids of `committedset` into `delivered/`, so a deferred id never enters `delivered/`. `Mover.Promote` searches `processing/cycle-N/` and the inbox root only, so it cannot move a `delivered/` item.
 
-- post-ship `promoteLandedCycle`. It reads the triage decision, the lane-scope pin and the build-report markers from the cycle directory.
-- `Train.complete`, then `closeInbox`, then `Repo.closingIDs` on the commits of the record, then `inboxmover.ReconcileSuperseded`. It reads the set from commit trailers.
-
-**Decision.** One `Promoter` port, owned by `integration`. It takes the cycle, not commits: `Promote(ctx, cycle int, commitSHA string)`. A lane commit carries no `closes-inbox` trailer, so a trailer set is empty for a lane. The port has two input strategies:
-
-- The lane strategy runs the existing `promoteLandedCycle` rules over the cycle-directory artifacts at merge time. The artifacts are the triage body, `DeferredIDs`, `ClosedDroppedIDs`, the verdict, the lane-scope pin and the build-report `Closes-Inbox` markers. `FilterPromotionScope` re-reads the inbox at call time, so the set cannot go stale. The rules move into `inboxmover`, or stay behind the port with a `cmd` implementation.
-- The console strategy supplies the `closes-inbox` trailer ids that `Repo.closingIDs` reads for `Train`.
-
-Post-ship, `Train` and `EnforceActor` all call the port. The cycle directory must outlive the wave until the member is `merged`. The driver does not archive it earlier.
+**Decision.** `integration.EnforceActor` owns the `Promoter` port: `Promote(ctx context.Context, rec DeliverableRecord) error`. `productionEnforceActor` wires `inboxmover.Promoter` into that port. When a member merges, `inboxmover.Promoter.Promote` reads the `committedset` record for `rec.Cycle` and moves each delivered item from `delivered/` to `processed/cycle-N/`. Any deferred id stays open outside `delivered/`. `inboxmover.Promoter` mirrors `inboxmover.Requeuer`, which ends `delivered/` when a member ejects.
 
 | Id | Decision | Because | Rejected option and why |
 |---|---|---|---|
-| D7.1 | The lane set is computed at merge time from the cycle artifacts. | The rules need the artifacts, and the inbox re-read at call time keeps the set current. | Commit trailers for lanes: a lane commit has none, so nothing is promoted. Store the set at delivery: it goes stale. |
-| D7.2 | One `Promoter` implementation with two input strategies. | Three homes make two paths promote different sets for one lane. | Add `PromoteLanded` as a third home: it duplicates the rules. |
+| D7.1 | Compute the promotion set from `committedset` and `delivered/` membership at merge time. | Ship moves only committed non-deferred ids into `delivered/`, so a re-read of `delivered/` excludes deferred ids. | Commit trailers for lanes: a lane commit carries no `closes-inbox` trailer. Use `rec.Scope`: it includes deferred ids. |
+| D7.2 | Wire `inboxmover.Promoter` to `EnforceActor.Promote` in `productionEnforceActor`. | `Mover.Promote` cannot locate items in `delivered/`, and `mergegate.Promoter` has no inbox concept. | Reuse `inboxmover.Promote` or `mergegate.Promoter`: neither handles `delivered/` items. |
 
-**Test.** A lane with one deferred id and one marker id merges at enforce. The marker id is promoted and the deferred id stays open (row 11 of §11).
+**Test.** A merged member moves its item from `delivered` to `processed`, and a deferred id stays open (row 11 of §11). `EnforceActor.Missing()` reports no `Promote`.
 
-**Consequence.** One home for promotion. A deferred id stays open, and a marker id is promoted, on all three paths.
+**Consequence.** One production port moves merged lane items from `delivered` to `processed`, while deferred ids stay open.
 
 ## 8. Finding 4: a rebase on a dirty plane
 

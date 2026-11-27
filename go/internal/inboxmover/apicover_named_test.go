@@ -1,9 +1,12 @@
 package inboxmover
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
 )
 
 func seedInbox(t *testing.T, taskID string) (root, inboxDir string) {
@@ -148,5 +151,16 @@ func TestFindConsumedRecord_NamedExport(t *testing.T) {
 func TestDropReasonTags_AreThePersistedStrings(t *testing.T) {
 	if AlreadyShippedTag != "already-shipped" || ProtectedSurfaceTag != "protected-surface" {
 		t.Errorf("AlreadyShippedTag = %q, ProtectedSurfaceTag = %q, want the strings that inbox records carry", AlreadyShippedTag, ProtectedSurfaceTag)
+	}
+}
+
+func TestPromoter_NamedExport(t *testing.T) {
+	fx := newPromoteFixture(t, map[string]string{"named-item": StateDelivered}, "named-item")
+	var port integration.Promoter = Promoter{Options: Options{ProjectRoot: fx.root}}
+	if err := port.Promote(context.Background(), integration.DeliverableRecord{Cycle: promoteCycle}); err != nil {
+		t.Fatalf("Promoter.Promote = %v", err)
+	}
+	if len(fx.processedFiles(t)) != 1 {
+		t.Errorf("processed files = %v, want 1", fx.processedFiles(t))
 	}
 }

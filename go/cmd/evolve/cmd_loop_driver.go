@@ -145,13 +145,15 @@ func (b *loopBatchCoordinator) productionEnforceActor(repo integration.Repo, poo
 		Gate:  l2Gate(l2Checkout(ports.Repo, b.cfg.EvolveDir), env.Run),
 		Regen: env.regenPort(ports.Repo, b.cfg.ProjectRoot, b.stderr),
 	}
+	inboxOpts := inboxmover.Options{ProjectRoot: b.cfg.ProjectRoot, Stderr: b.stderr, Now: b.clock, Signals: b.deps.Signals}
 	return integration.EnforceActor{
 		Repo:    repo,
 		Merger:  env.enforceMerger(b.cfg.ProjectRoot, b.stderr),
 		Batcher: integration.LaneBatcher{Repo: ports.Repo, Composer: composer, Wave: "p" + strconv.Itoa(pool)},
 		Plane:   integration.PlaneOf(repo),
-		Requeue: inboxmover.Requeuer{Options: inboxmover.Options{ProjectRoot: b.cfg.ProjectRoot, Stderr: b.stderr, Now: b.clock, Signals: b.deps.Signals}},
+		Requeue: inboxmover.Requeuer{Options: inboxOpts},
 		Briefs:  integration.FileBriefStore{Dir: integration.WaveDir(b.cfg.ProjectRoot, strconv.Itoa(pool))},
+		Promote: inboxmover.Promoter{Options: inboxOpts},
 		Publish: b.deps.Signals,
 	}
 }

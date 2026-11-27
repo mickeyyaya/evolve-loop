@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -50,14 +48,8 @@ func TestProductionDriver_CheckRefusesEnforceOnTheProductionCompositionWithoutTh
 		t.Fatal(err)
 	}
 
-	err = d.Check()
-
-	var refusal *integration.MissingPortError
-	if !errors.As(err, &refusal) || refusal.Stage != policy.FleetIntegrationEnforce {
-		t.Fatalf("Check = %v, want a MissingPortError at enforce", err)
-	}
-	if want := []string{"Promote"}; !slices.Equal(refusal.Ports, want) {
-		t.Fatalf("missing ports = %v, want %v: the root wires the merge, the plane sync, the batcher and its gate, and the eject ports", refusal.Ports, want)
+	if err := d.Check(); err != nil {
+		t.Fatalf("Check at enforce = %v, want nil with every port wired", err)
 	}
 }
 
