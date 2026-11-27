@@ -22,7 +22,11 @@ func (v TreeVerifier) ReproGreen(inc Incident) bool {
 		return false
 	}
 	raw, err := os.ReadFile(filepath.Join(v.Root, filepath.FromSlash(path)))
-	return err == nil && strings.Contains(string(raw), "func "+name+"(")
+	return err == nil && DefinesTest(raw, name)
+}
+
+func DefinesTest(src []byte, name string) bool {
+	return name != "" && strings.Contains(string(src), "func "+name+"(")
 }
 
 func (v TreeVerifier) WaveEndedAfter(t time.Time) bool {

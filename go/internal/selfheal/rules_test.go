@@ -112,7 +112,7 @@ func TestFromCIRuns_ARerunThatTurnedGreenIsAFlake(t *testing.T) {
 	firstTry := CIRun{ID: 7, Branch: "docs/x", Status: "completed", Conclusion: "success", Attempt: 1, Created: t0, Updated: t0.Add(time.Hour)}
 	rerunRed := CIRun{ID: 8, Branch: "docs/y", Status: "completed", Conclusion: "failure", Attempt: 2, Created: t0, Updated: t0.Add(time.Hour)}
 	o := onlyObservation(t, FromCIRuns([]CIRun{flake, firstTry, rerunRed}, t0.Add(2*time.Hour)))
-	if o.Fingerprint() != "flaky-test:rerun-green" || len(o.Evidence) != 1 || o.Evidence[0].ID != "ci:40269836920" || !o.Evidence[0].At.Equal(t0.Add(time.Hour)) {
+	if o.Fingerprint() != "flaky-test:rerun-green:run-40269836920" || len(o.Evidence) != 1 || o.Evidence[0].ID != "ci:40269836920" || !o.Evidence[0].At.Equal(t0.Add(time.Hour)) {
 		t.Fatalf("observation %+v", o)
 	}
 }

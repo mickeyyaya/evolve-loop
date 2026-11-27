@@ -95,6 +95,9 @@ func newEvidence(prev Incident, found bool, evidence []Evidence) []Evidence {
 
 func absorb(inc Incident, o Observation, newer []Evidence) Incident {
 	inc.Class, inc.Subject, inc.Summary = o.Class, o.Subject, o.Summary
+	if inc.ReproTest == "" {
+		inc.ReproTest = o.ReproTest
+	}
 	inc.Recurrence += len(newer)
 	sources := slices.Clone(inc.Sources)
 	for _, ev := range newer {
