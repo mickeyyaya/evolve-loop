@@ -25,6 +25,7 @@ func (e *Engine) planFn(count int, release bool) PlanFn {
 			companion := filepath.Join(e.ports.Workspace(lastCycle), triagecap.TriageDecisionName())
 			if data, rerr := os.ReadFile(companion); rerr == nil {
 				data = e.pruneRouted(e.pruneUndispatchable(e.pruneUnselected(data)))
+				data = e.focusPriorDecision(data, count)
 				data = widenNarrowDecision(data, e.roots.EvolveDir, count, e.backlog)
 				return e.preemptBoundary(data, release, released), nil, nil
 			}
@@ -179,7 +180,7 @@ func (e *Engine) preemptBoundary(data []byte, record bool, started map[string]bo
 		}
 	}
 	now := time.Now()
-	swapped, p := triagecap.PreemptLowestSlot(e.roots.EvolveDir, committed, started, e.ports.Protected, e.selector.allows, now)
+	swapped, p := triagecap.PreemptLowestSlot(e.roots.EvolveDir, committed, e.selector.shield(started), e.ports.Protected, e.selector.allows, now)
 	if p == nil {
 		return data
 	}
@@ -189,4 +190,19 @@ func (e *Engine) preemptBoundary(data []byte, record bool, started map[string]bo
 		}
 	}
 	return remarshalFull(data, cards([][]triagecap.FleetCandidate{swapped}))
+}
+
+func (e *Engine) focusPriorDecision(data []byte, count int) []byte {
+	if len(e.selector.Focus) == 0 {
+		return data
+	}
+	d, ok := parseDecision(data)
+	if !ok || len(d.CommittedFloors) > 0 {
+		return data
+	}
+	focus := e.selector.focused(e.backlog())
+	if len(focus) == 0 {
+		return data
+	}
+	return remarshalFull(data, cards([][]triagecap.FleetCandidate{triagecap.WidenTopNToFleetWidth(focus[:1], focus, count)}))
 }
