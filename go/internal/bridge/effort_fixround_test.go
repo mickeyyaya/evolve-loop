@@ -64,7 +64,7 @@ func TestClaudePHeadlessLaunchCarriesTheEffort(t *testing.T) {
 	t.Parallel()
 	cfg := &Config{CLI: "claude-p", Model: "deep"}
 	cfg.Realization = RealizeFor("claude-p", launchIntentFor(cfg, Profile{}, policy.EffortTable{}))
-	args, _ := claudePArgs(cfg, "prompt")
+	args := claudePArgs(cfg, "prompt")
 	if !containsSubsequence(args, []string{"--effort", "medium"}) {
 		t.Fatalf("claude -p argv = %v, want --effort medium", args)
 	}

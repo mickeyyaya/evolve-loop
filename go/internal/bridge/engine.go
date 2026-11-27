@@ -76,6 +76,8 @@ type Deps struct {
 	Binaries              map[string]string
 	Tmux                  TmuxController
 	Sleep                 func(time.Duration)
+	After                 func(time.Duration) <-chan time.Time
+	ActivityNow           func() time.Time
 	SubmitResendSchedule  []time.Duration
 	LookPath              func(file string) (string, error)
 	Reviewer              StopReviewer
@@ -149,9 +151,6 @@ func (d Deps) withDefaults() Deps {
 	if d.Runner == nil {
 		d.Runner = execRunner
 	}
-	if d.Now == nil {
-		d.Now = time.Now
-	}
 	if d.NewChallengeToken == nil {
 		d.NewChallengeToken = defaultChallengeToken
 	}
@@ -166,9 +165,6 @@ func (d Deps) withDefaults() Deps {
 	}
 	if d.Tmux == nil {
 		d.Tmux = execTmux{}
-	}
-	if d.Sleep == nil {
-		d.Sleep = time.Sleep
 	}
 	if d.LookPath == nil {
 		d.LookPath = exec.LookPath
@@ -188,7 +184,24 @@ func (d Deps) withDefaults() Deps {
 	if d.KeychainProbe == nil {
 		d.KeychainProbe = defaultKeychainProbe(d)
 	}
+	d = d.withClockDefaults()
 	d = d.withProcessDefaults()
+	return d
+}
+
+func (d Deps) withClockDefaults() Deps {
+	if d.Now == nil {
+		d.Now = time.Now
+	}
+	if d.Sleep == nil {
+		d.Sleep = time.Sleep
+	}
+	if d.After == nil {
+		d.After = time.After
+	}
+	if d.ActivityNow == nil {
+		d.ActivityNow = time.Now
+	}
 	return d
 }
 
@@ -595,6 +608,9 @@ func execRunner(ctx context.Context, name, dir string, args, env []string,
 		defer func() { _ = os.Remove(pidFile) }()
 	}
 	if err := cmd.Wait(); err != nil {
+		if errors.Is(err, exec.ErrWaitDelay) && cmd.ProcessState != nil && cmd.ProcessState.Success() {
+			return 0, nil
+		}
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
 			return exitErr.ExitCode(), nil
