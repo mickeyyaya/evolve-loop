@@ -331,6 +331,9 @@ func (d *Driver) admits(l ListedRecord) bool {
 	if !known {
 		return true
 	}
+	if stage, err := d.Stage(); err != nil || stage != policy.FleetIntegrationShadow {
+		return false
+	}
 	return l.Pool == d.Pool && m.Status == MemberPending && memberKey(l.Record.Cycle, m.PatchIDs) != MemberKey(l.Record)
 }
 

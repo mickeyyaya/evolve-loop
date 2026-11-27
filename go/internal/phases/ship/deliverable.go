@@ -65,7 +65,11 @@ func (s *worktreeShip) deliver(commit, pending string) (bool, error) {
 			s.logf("[ship] WARN: deliverable record not written: %v - the ship lands as before", err)
 			return false, nil
 		}
-		return false, shipErr(core.CodeStateIO, core.ShipClassTransient, core.StageAtomicShip,
+		class := core.ShipClassTransient
+		if errors.Is(err, integration.ErrRecordExists) {
+			class = core.ShipClassIntegrity
+		}
+		return false, shipErr(core.CodeStateIO, class, core.StageAtomicShip,
 			"ship: deliverable record not written, so ship delivered nothing: "+err.Error(), "commit", commit)
 	}
 	s.emitDelivered(rec, path)

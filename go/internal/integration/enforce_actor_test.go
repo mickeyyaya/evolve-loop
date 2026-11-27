@@ -136,8 +136,13 @@ func TestWriteRecordWith_WriteOnceAndReplaceExisting(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WriteRecordWith WriteOnce: %v", err)
 	}
-	if _, err := WriteRecordWith(dir, rec, writePolicy); !errors.Is(err, ErrRecordExists) {
-		t.Fatalf("second WriteOnce = %v, want ErrRecordExists", err)
+	if got, err := WriteRecordWith(dir, rec, writePolicy); err != nil || got != p {
+		t.Fatalf("same-patch WriteOnce = (%q, %v), want (%q, nil)", got, err, p)
+	}
+	different := rec
+	different.Commits = []CommitIdentity{{SHA: "a2", BaseSHA: "b0", PatchID: "p2"}}
+	if _, err := WriteRecordWith(dir, different, writePolicy); !errors.Is(err, ErrRecordExists) {
+		t.Fatalf("new-patch WriteOnce = %v, want ErrRecordExists", err)
 	}
 	rec.Scope = []string{"go/internal/b"}
 	writePolicy = ReplaceExisting

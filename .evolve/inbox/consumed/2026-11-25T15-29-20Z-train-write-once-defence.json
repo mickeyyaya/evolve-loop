@@ -4,13 +4,18 @@
     "Journey rows 10a-10e of card section 11 pass.",
     "100% coverage on each changed function; zero code comments."
   ],
+  "consumed": {
+    "at": "2026-11-27T01:36:51Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "continuation": {
-    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2653",
-    "branch": "cycle-cd3ae73e-2653",
-    "snapshot_sha": "1e88893ba7510ef6e5c137d2b76fd24b50cda5c3",
     "base_sha": "92ab6246c0753563d4fdce0eba19c4c1ce8b6982",
+    "branch": "cycle-cd3ae73e-2653",
+    "cycle": 2653,
     "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2653/audit-fail-reason.json",
-    "cycle": 2653
+    "snapshot_sha": "1e88893ba7510ef6e5c137d2b76fd24b50cda5c3",
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2653"
   },
   "created_at": "2026-11-25T15:40:00Z",
   "failure_count": 1,
@@ -29,6 +34,18 @@
   "last_failure_rung": "R2",
   "origin": "console",
   "priority_class": "correctness",
+  "released_continuations": [
+    {
+      "base_sha": "92ab6246c0753563d4fdce0eba19c4c1ce8b6982",
+      "branch": "cycle-cd3ae73e-2653",
+      "cycle": 2653,
+      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2653/audit-fail-reason.json",
+      "reason": "ship-consume-",
+      "released_at": "2026-11-27T01:36:51Z",
+      "snapshot_sha": "1e88893ba7510ef6e5c137d2b76fd24b50cda5c3",
+      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2653"
+    }
+  ],
   "retry_plan": "fresh-deep-plan",
   "source": "operator 2026-11-25 asked to enable the merge train; console map of docs/architecture/integration-driver-enforce.md parts 0-8 against code on 2026-11-25 (parts 0, 3, 6 built)",
   "summary": "WriteOnce and ErrRecordExists exist (go/internal/integration/deliverable.go:203-250) and ship picks WriteOnce at enforce (go/internal/phases/ship/deliverable.go:53,87-90), but the enforce admits defence, the guard table of card section 10 and a ship handler for ErrRecordExists are missing (card part 7).",

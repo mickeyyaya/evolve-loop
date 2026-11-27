@@ -212,6 +212,19 @@ var (
 	ErrRecordExists = errors.New("integration: deliverable record already exists")
 )
 
+type RecordRefusedError struct {
+	Member string
+	Path   string
+}
+
+func (e *RecordRefusedError) Error() string {
+	return fmt.Sprintf("%s: %s (%s)", ErrRecordExists, e.Member, e.Path)
+}
+
+func (e *RecordRefusedError) Unwrap() error {
+	return ErrRecordExists
+}
+
 func WriteRecord(dir string, r DeliverableRecord) (string, error) {
 	return WriteRecordWith(dir, r, ReplaceExisting)
 }
@@ -221,14 +234,23 @@ func WriteRecordWith(dir string, r DeliverableRecord, policy WritePolicy) (strin
 	if err := r.Validate(); err != nil {
 		return "", err
 	}
-	return recordFile{Path: r.path(dir), Kind: "deliverable record", Prefix: recordPrefix, Policy: policy}.publish(r)
+	return recordFile{
+		Path:    r.path(dir),
+		Kind:    "deliverable record",
+		Prefix:  recordPrefix,
+		Policy:  policy,
+		Member:  r.Label(),
+		Patches: patchIDsOf(r),
+	}.publish(r)
 }
 
 type recordFile struct {
-	Path   string
-	Kind   string
-	Prefix string
-	Policy WritePolicy
+	Path    string
+	Kind    string
+	Prefix  string
+	Policy  WritePolicy
+	Member  string
+	Patches []string
 }
 
 func (f recordFile) publish(v any) (string, error) {
@@ -247,7 +269,7 @@ func (f recordFile) publish(v any) (string, error) {
 		err := os.Link(tmp, f.Path)
 		_ = os.Remove(tmp)
 		if errors.Is(err, os.ErrExist) {
-			return "", fmt.Errorf("%w: %s", ErrRecordExists, f.Path)
+			return f.existingOutcome()
 		}
 		if err != nil {
 			return "", fmt.Errorf("integration: publish %s: %w", f.Kind, err)
@@ -259,6 +281,14 @@ func (f recordFile) publish(v any) (string, error) {
 		return "", fmt.Errorf("integration: publish %s: %w", f.Kind, err)
 	}
 	return f.Path, nil
+}
+
+func (f recordFile) existingOutcome() (string, error) {
+	existing, err := ReadRecord(f.Path)
+	if err == nil && slices.Equal(patchIDsOf(existing), f.Patches) {
+		return f.Path, nil
+	}
+	return "", &RecordRefusedError{Member: f.Member, Path: f.Path}
 }
 
 var createRecordTemp = os.CreateTemp

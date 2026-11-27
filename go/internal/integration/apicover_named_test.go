@@ -65,6 +65,10 @@ func TestIntegrationRecordExportsAreNamedByAnExecutedAssertion(t *testing.T) {
 	if ErrStaleEpoch == nil || ErrBranchMoved == nil || ErrStaleEpoch == ErrBranchMoved {
 		t.Error("the two adoption errors must be distinct and set")
 	}
+	refused := &RecordRefusedError{Member: "cycle 12", Path: "/tmp/deliverable-12.json"}
+	if !errors.Is(refused, ErrRecordExists) || refused.Unwrap() != ErrRecordExists || len(refused.Error()) == 0 || refused.Member != "cycle 12" || refused.Path != "/tmp/deliverable-12.json" {
+		t.Errorf("RecordRefusedError = %+v", refused)
+	}
 }
 
 func TestConsoleTrainExportsAreNamedByAnExecutedAssertion(t *testing.T) {

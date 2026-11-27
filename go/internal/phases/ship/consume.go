@@ -210,7 +210,7 @@ func (c *itemConsumer) stage(id string) (consumedMove, moveOutcome) {
 		return consumedMove{}, moveFailed
 	}
 	doc[inboxbatch.ConsumedField] = map[string]any{
-		"at":    time.Now().UTC().Format(time.RFC3339),
+		"at":    c.consumedAt(),
 		"via":   "ship",
 		"cycle": c.cid,
 	}
@@ -262,6 +262,21 @@ func (c *itemConsumer) stage(id string) (consumedMove, moveOutcome) {
 		return consumedMove{}, moveFailed
 	}
 	return m, moveStaged
+}
+
+func (c *itemConsumer) consumedAt() string {
+	if c.opts.WorkspacePath == "" {
+		return time.Now().UTC().Format(time.RFC3339)
+	}
+	stampPath := filepath.Join(c.opts.WorkspacePath, "ship-consumed-at.txt")
+	if raw, err := os.ReadFile(stampPath); err == nil {
+		if ts := strings.TrimSpace(string(raw)); ts != "" {
+			return ts
+		}
+	}
+	ts := time.Now().UTC().Format(time.RFC3339)
+	_ = os.WriteFile(stampPath, []byte(ts+"\n"), 0o644)
+	return ts
 }
 
 func readBindingForConsume(opts *Options, res *RunResult, id string) (continuation.Continuation, bool) {
