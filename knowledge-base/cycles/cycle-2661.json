@@ -1,0 +1,294 @@
+{
+  "schema_version": 2,
+  "cycle": 2661,
+  "run_id": "01M8DS71MYTEZXWWPCYMCC5VR0",
+  "goal": "Wave 192.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 191 facts (run 20261126T214239Z): 3 of 3 cycles shipped.\n- Cycle 2656: final verdict PASS. It shipped.\n- Cycle 2657: final verdict PASS. It shipped.\n- Cycle 2658: final verdict PASS. It shipped.\n- Pull requests merged at this boundary: none.\n\nEarlier waves:\n- Wave 188 (run 20261123T125440Z): 11 of 20 cycles shipped.\n- Wave 189 (run 20261125T020616Z): 15 of 20 cycles shipped.\n- Wave 190 (run 20261126T115446Z): 2 of 4 cycles shipped.",
+  "final_verdict": "PASS",
+  "commit_sha": "385a332d8b44739b65e14088b540a2b68988014f",
+  "tree_sha": "07c863429c69e76dd7912936192741dd245fcc2e",
+  "tasks": [
+    "recycle-x11-merged-branches"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 39123,
+      "started_at": "2026-11-27T05:57:03Z",
+      "ended_at": "2026-11-27T05:57:44Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 8,
+        "output": 2418,
+        "cache_read": 192255,
+        "cache_write": 67056
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 36677,
+      "started_at": "2026-11-27T05:58:17Z",
+      "ended_at": "2026-11-27T05:58:55Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 6,
+        "output": 1234,
+        "cache_read": 207959,
+        "cache_write": 40398
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 82628,
+      "started_at": "2026-11-27T05:58:55Z",
+      "ended_at": "2026-11-27T06:14:05Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 16,
+        "output": 3559,
+        "cache_read": 637097,
+        "cache_write": 52904
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 1397748,
+      "started_at": "2026-11-27T06:14:05Z",
+      "ended_at": "2026-11-27T09:05:29Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 349249,
+        "output": 23953,
+        "cache_read": 3082106,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "tdd",
+      "verdict": "PASS",
+      "duration_ms": 258270,
+      "started_at": "2026-11-27T09:05:29Z",
+      "ended_at": "2026-11-27T09:09:50Z",
+      "archetype": "plan",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 22,
+        "output": 9476,
+        "cache_read": 955455,
+        "cache_write": 115042
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 1249158,
+      "started_at": "2026-11-27T09:09:50Z",
+      "ended_at": "2026-11-27T09:47:02Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 217583,
+        "output": 17671,
+        "cache_read": 4897216,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "WARN",
+      "duration_ms": 478811,
+      "started_at": "2026-11-27T09:47:34Z",
+      "ended_at": "2026-11-27T10:20:54Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 36,
+        "output": 20775,
+        "cache_read": 1917027,
+        "cache_write": 91572
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 1585194,
+      "started_at": "2026-11-27T10:21:29Z",
+      "ended_at": "2026-11-27T11:09:49Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 92486,
+        "output": 8621,
+        "cache_read": 600445,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "WARN",
+      "duration_ms": 258820,
+      "started_at": "2026-11-27T11:10:10Z",
+      "ended_at": "2026-11-27T11:32:22Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 24,
+        "output": 14276,
+        "cache_read": 1046287,
+        "cache_write": 73643
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "FAIL",
+      "duration_ms": 220,
+      "started_at": "2026-11-27T11:32:50Z",
+      "ended_at": "2026-11-27T11:32:55Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "build",
+      "verdict": "PASS",
+      "duration_ms": 1373306,
+      "started_at": "2026-11-27T11:32:55Z",
+      "ended_at": "2026-11-27T13:04:13Z",
+      "archetype": "build",
+      "model_source": "advisor",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 255559,
+        "output": 10977,
+        "cache_read": 1629217,
+        "cache_write": 0
+      }
+    },
+    {
+      "name": "audit",
+      "verdict": "PASS",
+      "duration_ms": 490529,
+      "started_at": "2026-11-27T13:04:39Z",
+      "ended_at": "2026-11-27T13:28:37Z",
+      "archetype": "evaluate",
+      "model_source": "advisor",
+      "resolved_model": "deep",
+      "tokens": {
+        "input": 30,
+        "output": 15254,
+        "cache_read": 1488926,
+        "cache_write": 94655
+      }
+    },
+    {
+      "name": "ship",
+      "verdict": "PASS",
+      "duration_ms": 665424,
+      "started_at": "2026-11-27T13:28:57Z",
+      "ended_at": "2026-11-27T13:40:03Z",
+      "archetype": "control",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "explanation_corrections": [
+    "docs/explain/builds/cycle-2661-01m8ds71mytezxwwpcymcc5vr0.md:43 claims compatibility but omits a behavior removal: `evolve gc` no longer deletes idle \"ended\" or unowned-prefix non-cycle branches, because go/cmd/evolve/cmd_gc.go:244 dropped `BranchScopeAll`/`EndedAfter` and go/internal/gc/worktrees.go:288 dropped `otherBranchItems`. docs/explain/builds/cycle-2661-01m8ds71mytezxwwpcymcc5vr0.md:18 describes the B1/B3 classification in go/internal/gc/remotesweep.go:264-299 as live, but `PlanRemoteSweep` has no production caller after go/cmd/evolve/cmd_gc_remote.go:34. Every other material path has its own accurate entry: go/internal/gcpolicy/gcpolicy.go:204 (doc :14), go/internal/gc/gc.go:23 (doc :15), go/internal/gc/check.go:42 (doc :16), go/internal/gc/remotegh.go:45 (doc :17), go/internal/gc/branchsweep.go:147 (doc :19), go/internal/gc/devlanded.go:63 (doc :20), go/internal/gc/worktrees.go:288 (doc :21), go/cmd/evolve/cmd_gc_check.go:31 (doc :22), go/cmd/evolve/cmd_gc_remote.go:47 (doc :23), go/cmd/evolve/cmd_gc.go:244 (doc :24). The SHA256 matches the typed handoff."
+  ],
+  "timing": {
+    "total_ms": 7915908,
+    "phase_count": 13,
+    "retried_count": 0,
+    "longest_phase": "build",
+    "longest_ms": 1585194,
+    "by_archetype_ms": {
+      "build": 5605406,
+      "control": 665644,
+      "evaluate": 1228160,
+      "plan": 416698
+    },
+    "total_tokens": {
+      "input": 915019,
+      "output": 128214,
+      "cache_read": 16653990,
+      "cache_write": 535270
+    },
+    "tokens_by_archetype": {
+      "build": {
+        "input": 914877,
+        "output": 61222,
+        "cache_read": 10208984,
+        "cache_write": 0
+      },
+      "control": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "evaluate": {
+        "input": 90,
+        "output": 50305,
+        "cache_read": 4452240,
+        "cache_write": 259870
+      },
+      "plan": {
+        "input": 52,
+        "output": 16687,
+        "cache_read": 1992766,
+        "cache_write": 275400
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9479185763977923,
+    "hot_phase_count": 11,
+    "hot_phases": [
+      "scout",
+      "triage",
+      "tdd",
+      "build",
+      "tdd",
+      "build",
+      "audit",
+      "build",
+      "audit",
+      "build",
+      "audit"
+    ]
+  },
+  "recalled_lessons": [
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "cycle-93-build-report-commit-sha-fabrication",
+    "inst-L1544b",
+    "cycle-1448-minted-phase-persona-evaporates-when-its-phase-json-lands",
+    "cycle-1486-inert-metadata-promoted-to-executable-input-without-a-trust-boundary-review"
+  ]
+}
