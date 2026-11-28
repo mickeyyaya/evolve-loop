@@ -258,10 +258,10 @@ func TestFocus_FiveLanePoolLaunchesFocusIDsFirstThenOthersInRankOrder(t *testing
 	todos := focusTodos(t, h, Selector{Focus: []string{"first-focus", "second-focus"}}, PoolSupply(fc))
 	m := newLaneMeter()
 	done := runMeteredPool(fc, orchestrator.AdmitByCell(admission.Admitter{Graph: dirCells{}}), todos, m)
-	order := awaitLaunches(t, m, 5, done)
+	awaitLaunches(t, m, 5, done)
 	close(m.release)
 	awaitPool(t, done)
-	if want := []string{"first-focus", "second-focus", "alpha-ready", "bravo-ready", "charlie-ready"}; !slices.Equal(order, want) {
+	if order, want := m.dispatchOrder(), []string{"first-focus", "second-focus", "alpha-ready", "bravo-ready", "charlie-ready"}; !slices.Equal(order, want) {
 		t.Fatalf("launch order = %v, want %v", order, want)
 	}
 }
@@ -288,12 +288,14 @@ func TestFocus_RefusedFocusIDWaitsThenTakesNextFreeLane(t *testing.T) {
 		}
 		return 0, nil
 	}
+	m := newLaneMeter()
 	done := make(chan []fleet.Result, 1)
-	pool := orchestrator.Pool{Target: fc.Count, Concurrency: fc.Concurrency, MaxLanes: fc.Orchestrator.RunMaxLanes, Admit: orchestrator.AdmitByCell(admission.Admitter{Graph: dirCells{}}), Launch: launch}
+	pool := orchestrator.Pool{Target: fc.Count, Concurrency: fc.Concurrency, MaxLanes: fc.Orchestrator.RunMaxLanes, Admit: orchestrator.AdmitByCell(admission.Admitter{Graph: dirCells{}}), Launch: launch, Publish: m.publish}
 	go func() { done <- pool.Run(context.Background(), todos) }()
 
-	first := []string{<-launched, <-launched}
-	if !slices.Equal(first, []string{"first-focus", "alpha-ready"}) {
+	<-launched
+	<-launched
+	if first := m.dispatchOrder(); !slices.Equal(first, []string{"first-focus", "alpha-ready"}) {
 		close(release["first-focus"])
 		close(release["alpha-ready"])
 		t.Fatalf("initial two lanes = %v, want [first-focus alpha-ready] while second-focus waits on shared cell", first)
