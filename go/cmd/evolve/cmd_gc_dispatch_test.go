@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"syscall"
@@ -124,5 +125,43 @@ func TestGCDispatchProcesses_ReadsThePersistedTreeOfADeadDispatch(t *testing.T) 
 	}
 	if strings.Contains(stdout.String(), "STOP pid=903") {
 		t.Errorf("stdout = %q: a shared helper is never stopped by persisted-tree membership alone", stdout.String())
+	}
+}
+
+func TestGCDispatchTreeSnapshot_WarnsOncePerDispatchOnUnreadableDirAndCachesDirectLookup(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".evolve"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(proctree.TreeDir(root), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var snapErr bytes.Buffer
+	lookup := loadDispatchTrees(proctree.TreeDir(root)).recordedTree(&snapErr)
+	if got := lookup(deadDispatch); got != nil {
+		t.Fatalf("first lookup = %v, want nil", got)
+	}
+	if got := lookup(deadDispatch); got != nil {
+		t.Fatalf("second lookup = %v, want nil", got)
+	}
+	if warningsNaming(snapErr.String(), deadDispatch) != 1 {
+		t.Errorf("snapshot stderr = %q, want 1 tag-proof warning", snapErr.String())
+	}
+
+	dir := t.TempDir()
+	if err := os.WriteFile(proctree.TreeFile(dir, deadDispatch), []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, directErr bytes.Buffer
+	direct := newGCRun(context.Background(), true, &stdout, &directErr).recordedTree(dir)
+	if got := direct(deadDispatch); got != nil {
+		t.Fatalf("first direct lookup = %v, want nil", got)
+	}
+	if got := direct(deadDispatch); got != nil {
+		t.Fatalf("second direct lookup = %v, want nil", got)
+	}
+	if warningsNaming(directErr.String(), deadDispatch) != 1 {
+		t.Errorf("direct stderr = %q, want 1 tag-proof warning", directErr.String())
 	}
 }

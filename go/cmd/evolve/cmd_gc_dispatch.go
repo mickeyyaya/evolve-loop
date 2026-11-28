@@ -3,8 +3,10 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"slices"
+	"strings"
 	"syscall"
 	"time"
 
@@ -56,7 +58,9 @@ func (r gcRun) reapDispatches(projectRoot string, ids []string) proctree.Report 
 
 func (r gcRun) dispatchProcesses(projectRoot string, tempTTLHours int) bool {
 	host := gcProcesses()
+	trees := loadDispatchTrees(proctree.TreeDir(projectRoot))
 	o := r.dispatchOptions(host, projectRoot, time.Duration(tempTTLHours)*time.Hour)
+	o.RecordedTree = trees.recordedTree(r.stderr)
 	table, err := host.list(r.ctx)
 	if err != nil {
 		fmt.Fprintf(r.stderr, "evolve gc: dispatch process sweep skipped: %v\n", err)
@@ -76,12 +80,75 @@ func (r gcRun) dispatchProcesses(projectRoot string, tempTTLHours int) bool {
 	if !r.dryRun && len(items) > 0 {
 		failed = r.reportDispatchReap(host.reaper().Reap(r.ctx, proctree.AnyOf(gc.StaleDispatch(o), gc.OrphanLogTail(o))))
 	}
-	return r.treeFiles(host, o, dispatchSnapshot{table: table, planned: plannedProcesses(items)}) || failed
+	return r.treeFiles(host, o, dispatchSnapshot{table: table, planned: plannedProcesses(items), trees: trees}) || failed
 }
 
 type dispatchSnapshot struct {
 	table   []proctree.Process
 	planned []proctree.Process
+	trees   *dispatchTreeSnapshot
+}
+
+type dispatchTreeSnapshot struct {
+	dir    string
+	trees  []proctree.TreeRecord
+	warns  []error
+	err    error
+	byID   map[string][]proctree.Identity
+	warned map[string]bool
+}
+
+func loadDispatchTrees(dir string) *dispatchTreeSnapshot {
+	trees, warns, err := proctree.ListTrees(dir)
+	byID := make(map[string][]proctree.Identity, len(trees))
+	for _, t := range trees {
+		byID[t.Dispatch] = t.Members
+	}
+	return &dispatchTreeSnapshot{
+		dir:    dir,
+		trees:  trees,
+		warns:  warns,
+		err:    err,
+		byID:   byID,
+		warned: make(map[string]bool),
+	}
+}
+
+func (s *dispatchTreeSnapshot) recordedTree(stderr io.Writer) func(string) []proctree.Identity {
+	return func(id string) []proctree.Identity {
+		if members, ok := s.byID[id]; ok {
+			return members
+		}
+		if s.err != nil {
+			s.warnOnce(stderr, id, s.err)
+			return nil
+		}
+		if w := s.warningFor(id); w != nil {
+			s.warnOnce(stderr, id, w)
+		}
+		return nil
+	}
+}
+
+func (s *dispatchTreeSnapshot) warnOnce(stderr io.Writer, id string, err error) {
+	if s.warned[id] {
+		return
+	}
+	s.warned[id] = true
+	fmt.Fprintf(stderr, "evolve gc: WARN: dispatch %q: %v; only the tag proof applies\n", id, err)
+}
+
+func (s *dispatchTreeSnapshot) warningFor(id string) error {
+	file := proctree.TreeFile(s.dir, id)
+	for _, w := range s.warns {
+		msg := w.Error()
+		if strings.HasPrefix(msg, "read dispatch tree "+file+": ") ||
+			strings.HasPrefix(msg, "decode dispatch tree "+file+": ") ||
+			strings.HasPrefix(msg, "dispatch tree "+file+" names dispatch ") {
+			return w
+		}
+	}
+	return nil
 }
 
 func plannedProcesses(items []gc.DispatchProcessItem) []proctree.Process {
@@ -99,23 +166,23 @@ func (r gcRun) reportUnreaped(table []proctree.Process, o gc.DispatchProcessOpti
 }
 
 func (r gcRun) treeFiles(host gcProcessHost, o gc.DispatchProcessOptions, snap dispatchSnapshot) bool {
-	trees, warns, err := proctree.ListTrees(proctree.TreeDir(o.ProjectRoot))
-	if err != nil {
-		fmt.Fprintf(r.stderr, "evolve gc: dispatch tree sweep skipped: %v\n", err)
+	if snap.trees.err != nil {
+		fmt.Fprintf(r.stderr, "evolve gc: dispatch tree sweep skipped: %v\n", snap.trees.err)
 		return true
 	}
-	for _, w := range warns {
+	for _, w := range snap.trees.warns {
 		fmt.Fprintf(r.stderr, "evolve gc: WARN: %v; the file stays\n", w)
 	}
 	table, planned := snap.table, snap.planned
 	if !r.dryRun {
+		var err error
 		if table, err = host.list(r.ctx); err != nil {
 			fmt.Fprintf(r.stderr, "evolve gc: dispatch tree sweep skipped: %v\n", err)
 			return true
 		}
 		planned = nil
 	}
-	stale := gc.StaleTreeFiles(trees, table, o, planned)
+	stale := gc.StaleTreeFiles(snap.trees.trees, table, o, planned)
 	if len(stale) == 0 {
 		return false
 	}
@@ -150,11 +217,18 @@ func gcProcessDetail(it gc.DispatchProcessItem) string {
 }
 
 func (r gcRun) recordedTree(dir string) func(string) []proctree.Identity {
+	cache := make(map[string][]proctree.Identity)
+	seen := make(map[string]bool)
 	return func(id string) []proctree.Identity {
+		if seen[id] {
+			return cache[id]
+		}
+		seen[id] = true
 		tree, err := proctree.LoadTree(dir, id)
 		if err != nil {
 			fmt.Fprintf(r.stderr, "evolve gc: WARN: dispatch %q: %v; only the tag proof applies\n", id, err)
 		}
+		cache[id] = tree
 		return tree
 	}
 }

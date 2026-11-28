@@ -1036,4 +1036,8 @@ var serialTests = map[string]string{
 	"main.TestX11_OwnedPrefixesComeFromPolicy":                                                                             "TDD-owned test calling newWorldX11 which sets env and swaps gcInjectedReapers and gcInjectedProcessHost",
 	"main.TestX11_ShadowPrintsWouldDeleteAndDeletesNothing":                                                                "TDD-owned test calling newWorldX11 which sets env and swaps gcInjectedReapers and gcInjectedProcessHost",
 	"main.TestX11_TheDefaultBranchThatOriginHeadNamesStays":                                                                "TDD-owned test calling newWorldX11 which sets env and swaps gcInjectedReapers and gcInjectedProcessHost",
+	"main.TestGCDispatchReadOnce_ACorruptRecordStillFallsBackToTheTagProofOnce":                                            "TDD-owned test swapping seam gcInjectedProcessHost via gcRunOver",
+	"main.TestGCDispatchReadOnce_ATaggedProcessWithoutARecordWarnsNeverAndStillStops":                                      "TDD-owned test swapping seam gcInjectedProcessHost via gcRunOver",
+	"main.TestGCDispatchReadOnce_RecordsCreatedAfterTheFirstPassWaitForTheNextRun":                                         "TDD-owned test swapping seam gcInjectedProcessHost via withGCProcessHost",
+	"main.TestGCDispatchReadOnce_TheTagProofWarningPrintsOncePerTaggedProcessInEveryMode":                                  "TDD-owned test swapping seam gcInjectedProcessHost via gcRunOver",
 }
