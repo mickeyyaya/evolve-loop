@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -96,7 +97,16 @@ func (m *memWaves) Write(r integration.WaveRecord) error {
 	return nil
 }
 
-func (m *memWaves) Pools() []int { return nil }
+func (m *memWaves) Pools() []int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var pools []int
+	for p := range m.recs {
+		pools = append(pools, p)
+	}
+	slices.Sort(pools)
+	return pools
+}
 
 func stubDriver(actor integration.Actor, stage string, waves integration.WaveStore, pub integration.Publisher) func(pool int) (*integration.Driver, error) {
 	return func(pool int) (*integration.Driver, error) {

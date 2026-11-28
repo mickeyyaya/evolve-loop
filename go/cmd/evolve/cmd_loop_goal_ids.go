@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -12,6 +13,10 @@ import (
 )
 
 const exitGoalNamesInertItems = 10
+
+var errFocusWithOnly = errors.New("--focus and --only are mutually exclusive: --only takes only its items, --focus leads with its items and fills the rest")
+
+func focusWithOnly(focus, only string) bool { return focus != "" && only != "" }
 
 type goalItems struct {
 	inert      []string
@@ -63,7 +68,11 @@ func refuseSelector(cfg loopConfig, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "evolve loop: --only and --exclude both name %s; an id is selected or excluded, never both\n", strings.Join(both, ", "))
 		return exitGoalNamesInertItems
 	}
-	if len(cfg.Only) == 0 || cfg.Resume || cfg.HandedOff || cfg.Relaunch {
+	if cfg.Resume || cfg.HandedOff || cfg.Relaunch {
+		return 0
+	}
+	warnFocusIDs(cfg, stderr)
+	if len(cfg.Only) == 0 {
 		return 0
 	}
 	items, err := classifyInboxIDs(cfg.ProjectRoot, cfg.EvolveDir, cfg.Only, stderr)
@@ -81,6 +90,20 @@ func refuseSelector(cfg loopConfig, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "  %s\n", line)
 	}
 	return exitGoalNamesInertItems
+}
+
+func warnFocusIDs(cfg loopConfig, stderr io.Writer) {
+	if len(cfg.Focus) == 0 {
+		return
+	}
+	items, err := classifyInboxIDs(cfg.ProjectRoot, cfg.EvolveDir, cfg.Focus, stderr)
+	if err != nil {
+		fmt.Fprintf(stderr, "evolve loop: WARN: cannot check the items --focus names: %v\n", err)
+		return
+	}
+	for _, line := range slices.Concat(items.inert, items.consumed, items.absent) {
+		fmt.Fprintf(stderr, "evolve loop: WARN: --focus names an item that no lane can take, so the wave backfills its lane: %s\n", line)
+	}
 }
 
 func idsInBoth(a, b []string) []string {
@@ -168,7 +191,7 @@ func isIDRune(r rune) bool {
 }
 
 func warnSelectorIgnored(cfg loopConfig, stderr io.Writer) {
-	if len(cfg.Only) > 0 || len(cfg.Exclude) > 0 {
-		fmt.Fprintln(stderr, "[loop] WARN: --only and --exclude scope the fleet plan; this batch runs sequential, where the cycle's own triage picks the item")
+	if len(cfg.Only) > 0 || len(cfg.Exclude) > 0 || len(cfg.Focus) > 0 {
+		fmt.Fprintln(stderr, "[loop] WARN: --only, --exclude and --focus scope the fleet plan; this batch runs sequential, where the cycle's own triage picks the item")
 	}
 }

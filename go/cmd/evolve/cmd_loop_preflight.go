@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/ledger"
 	"github.com/mickeyyaya/evolve-loop/go/internal/cliroute"
 	"github.com/mickeyyaya/evolve-loop/go/internal/diskfloor"
 	"github.com/mickeyyaya/evolve-loop/go/internal/looppreflight"
@@ -45,6 +46,7 @@ func loopPreflightOptions(cfg loopConfig, stderr io.Writer) looppreflight.Option
 			CacheTTL:  pol.PreflightConfig().ReleaseCheckTTL,
 		},
 		SeatInspect:   seatInspectFn,
+		StageContract: stageContractSource(stageContractInput{Effective: pol.EffectiveStages, Records: ledger.New(cfg.EvolveDir), GenesisRequired: defaultStageMigrateEnv().genesisRequired}),
 		Routing:       func() (looppreflight.Routing, error) { return preflightRouting(cfg.ProjectRoot) },
 		SandboxMode:   cfg.sandboxMode,
 		UsageEvidence: evidenceSummary(usageEvidenceFn(cfg.ProjectRoot, cfg.EvolveDir, stderr)),

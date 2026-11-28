@@ -206,6 +206,7 @@ var treeReadingSelections = []TestSelection{
 		"TestEveryStageKeyHasRegistryEntry",
 		"TestLiveViolations_NamesAKeyWithNoEntryAndAPlainStringField",
 		"TestNoStringTypedStageField",
+		"TestRegistryRatchet",
 		"TestShadowSignalCarriesWouldFields",
 		"TestSignalViolations_NameEachBrokenShape",
 		"TestStageEntries_AreWellFormed",

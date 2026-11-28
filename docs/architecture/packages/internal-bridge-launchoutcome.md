@@ -34,3 +34,8 @@
 
 - **The zero `Outcome` is `ExitOK`.** It has no error, no cause and no code. Success carries no signal code.
 - **The signal naming rule** `code == "BRIDGE_EXIT_" + upper(name)` is a test, not a computation. The host emits exactly one signal for each failed launch. It emits after the launch-error persist and the boot-strike record. The classified error is the reason.
+
+## The escalation line has one writer
+
+- `EscalationLine(pattern, reason)` builds the line `[auto-respond] escalation report written (pattern=… reason=…)`. The auto-responder and the claude-p driver both call it, and the classifier reads the same marker. The writer and the reader of the line stay in one home. Pinned by `TestEscalationLine_RoundTripsThroughTheClassifier`.
+- `IdleOutputLine(idleS)` builds the line `[bridge] artifact-timeout: cause=idle_output idle_s=N`. The claude-p driver writes it when a stream run writes no output for the full review budget. `TimeoutIdleOutput` is a known `TimeoutCause`, so the ledger sub-cause of the exit 81 is `idle_output`. Pinned by `TestIdleOutputLine`.

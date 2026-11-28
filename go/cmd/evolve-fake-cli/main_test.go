@@ -49,6 +49,27 @@ func TestParseArgs_ClaudeStyle(t *testing.T) {
 	}
 }
 
+func TestStyleOf_TheInvokedNameWinsOverTheFlagGuess(t *testing.T) {
+	t.Parallel()
+	skip := argFlags{skipPerms: true}
+	for _, tc := range []struct {
+		name  string
+		flags argFlags
+		want  string
+	}{
+		{"claude", skip, "claude"},
+		{"agy", argFlags{}, "agy"},
+		{"codex", argFlags{}, "codex"},
+		{"evolve-fake-cli", skip, "agy"},
+		{"evolve-fake-cli", argFlags{isCodexExec: true}, "codex"},
+		{"evolve-fake-cli", argFlags{}, "claude"},
+	} {
+		if got := styleOf(tc.name, tc.flags); got != tc.want {
+			t.Errorf("styleOf(%q, %+v) = %q, want %q", tc.name, tc.flags, got, tc.want)
+		}
+	}
+}
+
 func TestParseArgs_AgyStyle(t *testing.T) {
 	args := []string{"-p", "see /tmp/ws/intent.md", "--dangerously-skip-permissions"}
 	inv, err := parseArgs(args, bytes.NewReader(nil))

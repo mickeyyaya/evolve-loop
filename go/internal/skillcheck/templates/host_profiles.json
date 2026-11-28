@@ -1,0 +1,19 @@
+{
+  "spec_frontmatter": ["name", "description", "license", "compatibility", "metadata", "allowed-tools"],
+  "profiles": [
+    {
+      "name": "claude-code",
+      "skill_root": "skills",
+      "host_frontmatter": ["argument-hint"],
+      "description_limit": 1536,
+      "budgets": [{"file": "CLAUDE.md", "bytes": 16384}]
+    },
+    {
+      "name": "agy",
+      "skill_root": ".agents/skills",
+      "host_frontmatter": ["argument-hint"],
+      "description_limit": 1024,
+      "budgets": [{"file": "GEMINI.md", "bytes": 16384}]
+    }
+  ]
+}

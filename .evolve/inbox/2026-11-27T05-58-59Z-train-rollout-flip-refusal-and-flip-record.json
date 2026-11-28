@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Red first: with N = 1, evolve stage flip integration.stage enforce refuses with a typed error that names N; with N = 2 it accepts.",
+    "Red first: after an accepted flip the flip record exists and its digest verifies in the chain.",
+    "The operator flip (plan I9) stays the operator decision; no test or verb sets the live key.",
+    "100% coverage on each changed function."
+  ],
+  "created_at": "2026-11-27T05:58:59Z",
+  "deps": [
+    "shadow-contract-k5-stage-flip"
+  ],
+  "files": [
+    "go/cmd/evolve/cmd_stage.go",
+    "go/internal/gatecontract"
+  ],
+  "fix": "After K5 lands, register the integration entry Promotion data that the H6.1 count reads, make the flip verb refuse enforce while N < 2 with a typed error that names N, and write the C2 flip record on an accepted flip.",
+  "id": "train-rollout-flip-refusal-and-flip-record",
+  "kind": "feature",
+  "origin": "console",
+  "priority_class": "correctness",
+  "route": "console-manual",
+  "source": "console boundary 191, 2026-11-27: split of train-rollout-gate-and-enforce-journey; evolve stage flip does not exist yet (shadow-contract-k5-stage-flip is unbuilt)",
+  "summary": "docs/architecture/integration-driver-enforce.md section 12 rows H6.2 and H6.5 need the evolve stage flip verb and the C2 flip record of docs/architecture/shadow-stage-contract.md. On 2026-11-27 no flip verb exists in go/cmd/evolve/cmd_stage.go (verbs: verify, report) and no code writes a flip record; the verb is the unbuilt item shadow-contract-k5-stage-flip. The console builds the other parts of train-rollout-gate-and-enforce-journey first: H6.1, H6.3, H6.4 and the driver-gate half of H6.2.",
+  "title": "evolve stage flip refuses integration.stage enforce while fewer than 2 chained clean shadow waves exist, and the flip writes a verified flip record",
+  "weight": 0.75
+}

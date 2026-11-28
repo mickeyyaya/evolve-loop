@@ -8,7 +8,7 @@ selfheal: ""
 fingerprint: ""
 signals: []
 prs: [1841]
-items: [cmd-evolve-darwin-suite-under-the-30m-limit, ci-classify-names-a-test-timeout-and-a-rerun-red]
+items: [cmd-evolve-darwin-tests-stay-clear-of-the-go-test-timeout, ci-classify-names-a-test-timeout-and-a-rerun-red]
 actions: []
 effectiveness:
   metric: {code: "", filters: [], unit: "", since: ""}
@@ -30,8 +30,9 @@ verified_at: ""
 ## Trigger and level
 
 - **Trigger:** on 2026-11-26 the darwin job of required CI failed on main `a3b1f16d5` and then on PR #1841. Both failures were a `go test` timeout panic in the `cmd/evolve` package.
+- **Earlier occurrences:** on 2026-11-24 the macOS job of PRs 1789 and 1790 failed with the same panic in the same test. The item `cmd-evolve-darwin-tests-stay-clear-of-the-go-test-timeout` has tracked the cause since 2026-11-25, and no cycle has built it.
 - **Impact:** main was red for one re-run, and the boundary batch of #1841 waited for one re-run. No wrong code landed.
-- **Level:** record. The failure occurred two times, and it reached main and CI.
+- **Level:** record. The failure occurred four times in three days, and it reached main and CI.
 
 ## Timeline
 
@@ -74,7 +75,7 @@ FAIL	github.com/mickeyyaya/evolve-loop/go/cmd/evolve	1805.645s
 |---|---|---|
 | Re-run the failed jobs | Green both times; it hides the cause | Only as the immediate recovery |
 | Raise the `go test` timeout | It moves the limit and hides the growth. The operator owns the value. | No |
-| Make the mutant harness cheaper (build once, run in parallel, or a separate job) | Removes the cause | Yes: item `cmd-evolve-darwin-suite-under-the-30m-limit` |
+| Make the mutant harness cheaper (build once, run in parallel, or a separate job) | Removes the cause | Yes: item `cmd-evolve-darwin-tests-stay-clear-of-the-go-test-timeout` |
 | Classify a timeout panic and count a red run try that went green | The next recurrence is named, not `unknown` | Yes: item `ci-classify-names-a-test-timeout-and-a-rerun-red` |
 
 ## Actions
@@ -83,7 +84,7 @@ FAIL	github.com/mickeyyaya/evolve-loop/go/cmd/evolve	1805.645s
 _No actions._
 <!-- GENERATED:actions END -->
 
-- Item `cmd-evolve-darwin-suite-under-the-30m-limit`: the darwin job runs in less than 20 minutes, and each mutant stays killed.
+- Item `cmd-evolve-darwin-tests-stay-clear-of-the-go-test-timeout`: the margin report shows at least 10 minutes of margin for `cmd/evolve` on the macOS job, and no timeout value changes. The 2026-11-26 evidence is added to the item, and its weight goes from 0.7 to 0.85.
 - Item `ci-classify-names-a-test-timeout-and-a-rerun-red`: a timeout class, and `recurredOn` reads each run try.
 
 ## Effectiveness
@@ -100,3 +101,4 @@ _No actions._
 
 - When a re-run turns a red green, record the running test of the panic. A second red with the same test is a recurrence, not a flake.
 - A classifier that reads only the final state of a run cannot see a recurrence that a re-run hid.
+- Before you file an item, search the open items for the failing test name. The console filed a duplicate of the 2026-11-25 item, and the inbox review found it.

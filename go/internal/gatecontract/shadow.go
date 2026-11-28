@@ -32,17 +32,17 @@ type StageVerdict struct {
 }
 
 type EmitSite struct {
-	Path string
-	Func string
-	Ref  string
+	Path string `json:"path"`
+	Func string `json:"func"`
+	Ref  string `json:"ref"`
 }
 
 type Promotion struct {
-	MaxEscapes      int
-	MaxFalseStops   int
-	MinDecisions    int
-	WindowCycles    int
-	MaxFalseStopPct int
+	MaxEscapes      int `json:"max_escapes"`
+	MaxFalseStops   int `json:"max_false_stops"`
+	MinDecisions    int `json:"min_decisions"`
+	WindowCycles    int `json:"window_cycles"`
+	MaxFalseStopPct int `json:"max_false_stop_pct"`
 }
 
 type Shadow struct {

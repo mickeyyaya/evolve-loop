@@ -169,6 +169,7 @@ func newDriverRig(pool int, listed ...ListedRecord) *driverRig {
 		Store:   r.store,
 		Records: func() RecordSet { return *r.set },
 		Flush:   FlushPolicy{Cap: 10, MaxAgeMinutes: 600},
+		Clean:   func() Readiness { return Readiness{Clean: []int{1, 2}} },
 		Last:    func(context.Context) (int, error) { return 99, nil },
 		Now:     func() time.Time { return driverNow },
 		Publish: r.sink,

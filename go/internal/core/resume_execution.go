@@ -54,12 +54,11 @@ func (r *resumeExecution) run() (result CycleResult, retErr error) {
 
 	var phaseTimings []phaseTimingEntry
 	completed := false
-	timingOwner := &cycleRun{
-		o: o, ctx: context.Background(), req: req, cycle: cycle,
-		cs: cs, state: state, result: result, stage: o.beginStageSession(cycle),
-	}
+	timingOwner := &cycleRun{o: o, ctx: context.Background(), req: req, cycle: cycle, cs: cs, state: state, result: result, stage: o.beginStageSession(cycle)}
 	r.closeout = timingOwner
-	defer func() { o.releaseShipWindow(); timingOwner.stage.finish(ctx, retErr, completed, result.FinalVerdict) }()
+	defer func() {
+		o.releaseSeal(func() { timingOwner.stage.finish(ctx, retErr, completed, result.FinalVerdict) })
+	}()
 	defer func() {
 		if completed || isParked(retErr) || ctx.Err() != nil {
 			return

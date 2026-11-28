@@ -283,6 +283,7 @@ func newGateTrain(t *testing.T, files ...string) *gateTrain {
 	env.Run = cmds.run
 	b, _ := driverCoordinator(t)
 	b.cfg = loopConfig{ProjectRoot: w.plane.Dir, EvolveDir: evolveDir, Epoch: integration.NewEpochHolder(evolveDir)}
+	seedCleanShadowPools(t, b, w.plane.Dir, 1, 2)
 	b.integrationEnvOf = func(string, time.Time) integrationEnv { return env }
 	b.newEnforceActor = func(r integration.Repo, pool int) integration.Actor {
 		actor, ok := b.productionEnforceActor(r, pool).(integration.EnforceActor)

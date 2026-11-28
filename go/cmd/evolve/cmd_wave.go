@@ -29,7 +29,7 @@ const (
 	waveBuildVerb       = "wave-build"
 	waveWatchPoll       = 5 * time.Second
 	waveStatusMaxCycles = 20
-	waveUsage           = `usage: evolve wave next [--max-cycles N] [--only IDS] [--exclude IDS] [--merge n,...] [--note TEXT]... [--number N] [--dry-run] [--json] [--project-root P]
+	waveUsage           = `usage: evolve wave next [--max-cycles N] [--only IDS] [--exclude IDS] [--focus IDS] [--merge n,...] [--note TEXT]... [--number N] [--dry-run] [--json] [--project-root P]
        evolve wave status [--json] [--project-root P]
        evolve wave supply [--json] [--project-root P]
        evolve wave latency [--wave N | --cycles A-B | --check] [--json] [--project-root P]

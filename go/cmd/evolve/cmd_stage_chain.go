@@ -40,15 +40,18 @@ func (s stageEvidenceSite) shipOpener() ship.StageOpener {
 }
 
 func (s stageEvidenceSite) open(cycle int) *stageevidence.Recorder {
-	scope := stageevidence.CycleScope(cycle)
+	return s.openScope(stageevidence.CycleScope(cycle), s.versionOf(), func(err error) { s.fault(cycle, err) })
+}
+
+func (s stageEvidenceSite) openScope(scope stageevidence.ScopeKey, version func(key string) (string, error), onFault func(error)) *stageevidence.Recorder {
 	return stageevidence.NewRecorder(stageevidence.RecorderConfig{
 		EvolveDir: paths.EvolveDirOf(s.root),
 		Scope:     scope,
 		Session:   stageSessionID(),
 		Build:     stageBuildID(),
 		Lock:      flock.Lock,
-		Version:   s.versionOf(),
-		OnFault:   func(err error) { s.fault(cycle, err) },
+		Version:   version,
+		OnFault:   onFault,
 	})
 }
 
@@ -95,10 +98,14 @@ func buildIDOf(info *debug.BuildInfo, ok bool) string {
 	return "unknown"
 }
 
-func stageLedgerReader(root string) stageevidence.ChainReader {
+func stageEvolveDir(root string) string {
 	evolveDir := paths.EvolveDirOf(root)
 	if real, err := filepath.EvalSymlinks(filepath.Join(evolveDir, "ledger.jsonl")); err == nil {
 		evolveDir = filepath.Dir(real)
 	}
-	return ledger.New(evolveDir).StageChain()
+	return evolveDir
+}
+
+func stageLedgerReader(root string) stageevidence.ChainReader {
+	return ledger.New(stageEvolveDir(root)).StageChain()
 }

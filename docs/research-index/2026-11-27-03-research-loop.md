@@ -1,0 +1,9 @@
+## 2026-11-27 — Research skill: an LLM-steered loop with diverse views and a justified stop rule
+
+| Document | What it records |
+|---|---|
+| [research/research-diversity-and-depth-2026-11.md](research/research-diversity-and-depth-2026-11.md) | A survey of how deep research systems control depth, stops and diversity. It holds 6 local findings with `path:line`, the outside findings with links and evidence labels, 21 adopt-or-reject rows and 15 refinements (R1 to R15). It lists the gaps. It ends with one Decision, Rationale and Alternatives entry for each decision. |
+| [plans/research-diversity-and-depth-2026-11.md](plans/research-diversity-and-depth-2026-11.md) | The plan. It scores four candidate designs and picks the last one: an LLM-steered loop inside a code envelope. The other three are fixed quotas, LLM-only judgment and a code-only saturation loop. It lists 14 decisions, the components C1 to C4 and the operator questions Q1 to Q3. |
+| [architecture/adr/0171-research-is-an-llm-steered-loop-inside-a-code-envelope-gated-in-depth-blocks-by-evidence-coverage.md](architecture/adr/0171-research-is-an-llm-steered-loop-inside-a-code-envelope-gated-in-depth-blocks-by-evidence-coverage.md) | ADR-0171, Proposed. It gives 26 decision rules, the good and bad consequences, and the rejected options with the fact that rules out each one. |
+| [architecture/research-loop.md](architecture/research-loop.md) | The spec of record. It defines the roles, the claim ledger, the barrier report, the tiers, the band rules, the decision verbs and the loop-back marker. It gives the ownership of code and LLM. It has a worked example of one run through two blocks and a table of guards. |
+| [../skills/research/SKILL.md](../skills/research/SKILL.md) | The rebuilt skill. The operating rules and the templates are in `references/loop.md` and `references/ledger.md`. |

@@ -1,7 +1,6 @@
 package gateregistry
 
 import (
-	"encoding/json"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -25,7 +24,6 @@ const (
 	ruleNoEmitSite    = "no-emit-site"
 	ruleNoWouldFields = "no-would-fields"
 	ruleFieldMissing  = "would-field-missing"
-	baselineCeiling   = 87
 	moduleRoot        = "../.."
 )
 
@@ -51,16 +49,6 @@ func schemaStages() []schemaStage {
 		out = append(out, schemaStage{path: key, typeName: walked[key]})
 	}
 	return out
-}
-
-func entryByKey(entries []gatecontract.Entry) map[string]gatecontract.Entry {
-	byKey := map[string]gatecontract.Entry{}
-	for _, e := range entries {
-		if e.Shadow != nil {
-			byKey[e.Shadow.PolicyKey] = e
-		}
-	}
-	return byKey
 }
 
 func emitSiteProblem(root string, site gatecontract.EmitSite, signal signalcenter.Code, fields []string) string {
@@ -194,17 +182,11 @@ func liveViolations(stages []schemaStage, entries []gatecontract.Entry) []violat
 
 func loadBaseline(t *testing.T) []violation {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("testdata", "stage_violations.json"))
-	if err != nil {
-		t.Fatalf("read baseline: %v", err)
+	var out []violation
+	for _, v := range mustRatchet(t).Violations {
+		out = append(out, violation{Key: v.Key, Rule: v.Rule})
 	}
-	var doc struct {
-		Violations []violation `json:"violations"`
-	}
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		t.Fatalf("parse baseline: %v", err)
-	}
-	return doc.Violations
+	return out
 }
 
 func newViolations(actual, baseline []violation, rules ...string) []string {
@@ -231,7 +213,7 @@ func assertNoNewViolations(t *testing.T, rules ...string) {
 	t.Helper()
 	actual := liveViolations(schemaStages(), StageEntries())
 	if fresh := newViolations(actual, loadBaseline(t), rules...); len(fresh) > 0 {
-		t.Errorf("stage keys break the shadow contract and are not in testdata/stage_violations.json:\n%s", strings.Join(fresh, "\n"))
+		t.Errorf("stage keys break the shadow contract and are not in stage_contract_ratchet.json:\n%s", strings.Join(fresh, "\n"))
 	}
 }
 
@@ -267,12 +249,12 @@ func TestShadowSignalCarriesWouldFields(t *testing.T) {
 func TestViolationBaselineOnlyShrinks(t *testing.T) {
 	t.Parallel()
 	baseline := loadBaseline(t)
-	for _, problem := range baselineProblems(baseline, baselineCeiling) {
+	for _, problem := range baselineProblems(baseline, mustRatchet(t).BaselineCeiling) {
 		t.Error(problem)
 	}
 	actual := liveViolations(schemaStages(), StageEntries())
 	if stale := staleBaseline(actual, baseline); len(stale) > 0 {
-		t.Errorf("the baseline lists violations that no longer exist; remove them and lower baselineCeiling:\n%s", strings.Join(stale, "\n"))
+		t.Errorf("the baseline lists violations that no longer exist; remove them and lower baseline_ceiling in stage_contract_ratchet.json:\n%s", strings.Join(stale, "\n"))
 	}
 }
 
@@ -282,7 +264,7 @@ func baselineProblems(baseline []violation, ceiling int) []string {
 		out = append(out, "the baseline holds more violations than the ceiling; it may only shrink")
 	}
 	if len(baseline) < ceiling {
-		out = append(out, "the baseline holds fewer violations than the ceiling; lower baselineCeiling in the same change")
+		out = append(out, "the baseline holds fewer violations than the ceiling; lower baseline_ceiling in stage_contract_ratchet.json in the same change")
 	}
 	seen := map[violation]bool{}
 	for _, v := range baseline {
@@ -313,8 +295,8 @@ func TestBaselineProblems_FlagsAnOverCeilingAnUnderCeilingAndADuplicate(t *testi
 
 func TestBaselineCeiling_EqualsTheBaselineFile(t *testing.T) {
 	t.Parallel()
-	if n := len(loadBaseline(t)); n != baselineCeiling {
-		t.Errorf("baseline holds %d pairs, baselineCeiling is %d", n, baselineCeiling)
+	if ceiling, n := mustRatchet(t).BaselineCeiling, len(loadBaseline(t)); n != ceiling {
+		t.Errorf("baseline holds %d pairs, baseline_ceiling is %d", n, ceiling)
 	}
 }
 

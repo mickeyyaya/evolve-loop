@@ -69,6 +69,7 @@ type GoalInput struct {
 	Last     *Facts
 	Notes    []Note
 	History  []Record
+	Focus    []string
 }
 
 func Compose(in GoalInput) string {
@@ -77,6 +78,9 @@ func Compose(in GoalInput) string {
 		blocks = append(blocks, "No earlier wave is recorded.")
 	} else {
 		blocks = append(blocks, in.Last.Section())
+	}
+	if len(in.Focus) > 0 {
+		blocks = append(blocks, fmt.Sprintf("Focus items for wave %d: %s. These items take the first lanes; other items fill each free lane.", in.Next, strings.Join(in.Focus, ", ")))
 	}
 	if len(in.Notes) > 0 {
 		blocks = append(blocks, bulleted(fmt.Sprintf("Operator notes for wave %d:", in.Next), noteTexts(in.Notes)))

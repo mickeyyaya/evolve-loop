@@ -159,11 +159,14 @@ func newJourneyFixture(t *testing.T, mode string) journeyFixture {
 	t.Helper()
 	origin := gittest.Bare(t)
 	repo := gittest.Fixture(t)
-	repo.Git("commit", "-q", "--allow-empty", "-m", "base")
+	evolveDir := filepath.Join(repo.Dir, ".evolve")
+	writeE2File(t, filepath.Join(evolveDir, "policy.json"), "{}")
+	writeE2File(t, filepath.Join(repo.Dir, "go", "go.mod"), "module fixture\n\ngo 1.22\n")
+	repo.Git("add", ".evolve/policy.json", "go/go.mod")
+	repo.Git("commit", "-q", "-m", "base")
 	repo.Git("remote", "add", "origin", origin.Dir)
 	repo.Git("push", "-q", "origin", "HEAD:refs/heads/main")
 	repo.Git("fetch", "-q", "origin")
-	evolveDir := filepath.Join(repo.Dir, ".evolve")
 	for name, body := range e2TwoItems {
 		writeE2File(t, filepath.Join(evolveDir, "inbox", name), body)
 	}
@@ -196,7 +199,7 @@ func (f journeyFixture) status(t *testing.T, args ...string) (journeyStatus, int
 		t.Fatal("evolve integration status is not a verb")
 	}
 	var stdout, stderr bytes.Buffer
-	env := integrationEnv{Git: integration.SysGit(), Root: f.root}
+	env := integrationEnv{Git: integration.SysGit(), Root: f.root, Chain: ledgerChain{root: f.root}}
 	code := verb(env, append(args, "--json"), &stdout, &stderr)
 	var got journeyStatus
 	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {

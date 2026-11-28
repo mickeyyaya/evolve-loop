@@ -248,8 +248,9 @@ func TestCheck_AnUnlistableSkillsDirectoryIsAnError(t *testing.T) {
 func TestInstructionBudget_TheCheckedInCLIFilesStayWithinTheirByteBudget(t *testing.T) {
 	root := repoRoot(t)
 	for _, target := range []string{"CLAUDE.md", "GEMINI.md"} {
-		if size := len(readRel(t, root, target)); size > cliFileByteBudget {
-			t.Errorf("%s is %d bytes; the budget is %d bytes", target, size, cliFileByteBudget)
+		budget := hostFileBudget(target)
+		if size := len(readRel(t, root, target)); size > budget {
+			t.Errorf("%s is %d bytes; the budget is %d bytes", target, size, budget)
 		}
 	}
 	diffs, err := instructionDiffs(root)
@@ -281,7 +282,7 @@ func TestInstructionBudget_ARenderOverItsBudgetIsAProblem(t *testing.T) {
 
 func TestRunAndCheck_ReportAnOverBudgetCLIFile(t *testing.T) {
 	root := prepareSkillsTree(t)
-	long := strings.Repeat("The pipeline is the only controller. ", cliFileByteBudget/30)
+	long := strings.Repeat("The pipeline is the only controller. ", hostFileBudget("CLAUDE.md")/30)
 	writeRel(t, root, "AGENTS.md", digestBegin+long+"\n"+digestEnd+"\n")
 	writeRel(t, root, "CLAUDE.md", "# Claude\n")
 

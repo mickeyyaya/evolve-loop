@@ -57,6 +57,7 @@ type loopConfig struct {
 	LogPath           string                   `json:"log_path,omitempty"`
 	Only              []string                 `json:"only,omitempty"`
 	Exclude           []string                 `json:"exclude,omitempty"`
+	Focus             []string                 `json:"focus,omitempty"`
 	DetachArgv        []string                 `json:"-"`
 	JSON              bool                     `json:"-"`
 	ResumeWaves       int                      `json:"-"`
