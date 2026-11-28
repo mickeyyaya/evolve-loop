@@ -17,11 +17,11 @@
 
 | | Count |
 |---|---|
-| Incidents mapped | 86 |
-| Distinct failure modes (coverage-map rows) | 141 |
-| ✅ covered (a test fails if the bug comes back) | 92 |
+| Incidents mapped | 87 |
+| Distinct failure modes (coverage-map rows) | 143 |
+| ✅ covered (a test fails if the bug comes back) | 93 |
 | 🟡 partial (related test, doesn't pin the exact mode) | 11 |
-| ❌ none (no regression test) | 38 |
+| ❌ none (no regression test) | 39 |
 | ⛔ untestable (external infra / live CLI) | 0 |
 
 These counts are tallies of the coverage map's rows, so they move with it: a new
@@ -46,6 +46,8 @@ Recounted on 2026-11-26: the record of the cmd/evolve darwin timeout adds 1 inci
 Recounted on 2026-11-27: the record of the inboxcmd Deps leak adds 1 incident and 2 rows. One row is covered by the tests of `ae3a35b30`. The other row has no test yet and names the item that tracks it.
 
 Recounted on 2026-11-28: the record of the focus pool test race adds 1 incident and 1 covered row (PR #1873).
+
+Recounted on 2026-11-28: the record of the production embed from `testdata` adds 1 incident and 2 rows. One row is covered by the guard of PR #1880. The other row has no test yet, and it waits for an operator decision on the scope of the cycle floor.
 
 The map now holds 81 incidents and 130 rows. Of these, 89 are covered, 11 are partial and 30 have no test. Before these rows, main held 69 incidents and 115 rows. Of these, 86 were covered, 11 partial and 18 with no test. PR #1597 had flipped two of them to covered.
 
@@ -205,6 +207,8 @@ not the coverage map, which is the hand-maintained per-incident record.
 | [2026-11-27 — an empty Deps left in the inboxcmd host panicked a parallel test](2026-11-27-inboxcmd-empty-deps-leak-panics-a-parallel-test.md) | Before `ae3a35b30`, `Run` stored its `Deps` in the package global `current` and did not restore it. A test that passed `Deps{}` left a nil `LaneForbidden`, and a parallel test that ran first panicked. | `cli/inboxcmd/deps_isolation_test.go` (`TestRun_AnEmptyDepsDoesNotLeakIntoALaterParallelLint`, `TestRun_RestoresThePreviousHostOnReturn`, `TestRunMover_RestoresThePreviousHostOnReturn`) | ✅ | fixed by `ae3a35b30` (cycle 2662) |
 | [2026-11-27 — the self-heal monitor gives every rerun-green event one fingerprint](2026-11-27-inboxcmd-empty-deps-leak-panics-a-parallel-test.md) | A rerun-green CI event gets the fingerprint `flaky-test:rerun-green` with no job or test name. Two different flaky tests share one incident, and neither gets a repro test. | `selfheal/ci.go` | ❌ | item `repair-inc-2026-10-27-6f89f94c` (filed 2026-11-27) |
 | [2026-11-28 — a focus pool test read the launch order from goroutine sends](2026-11-28-focus-pool-test-read-the-launch-order-from-goroutine-sends.md) | Before PR #1873, the focus tests read the lane order from a channel that each lane goroutine sends to, so the scheduler set the order. A loaded CI runner reversed two lanes. | `loopwave/focus_test.go` (`TestFocus_FiveLanePoolLaunchesFocusIDsFirstThenOthersInRankOrder`, `TestFocus_RefusedFocusIDWaitsThenTakesNextFreeLane`) | ✅ | fixed by PR #1873 |
+| [2026-11-28 — a production file embedded its bench set from testdata](2026-11-28-production-embed-from-testdata-turned-main-red.md) | Before PR #1880, `codeindex/independent.go` embedded three files from `testdata/`. Each tool that copies the tree skips `testdata`, so the copied tree failed to build and the skills drift tests were red on main. | `guards/embed_outside_testdata_test.go` (`TestNoProductionFileEmbedsFromATestdataDirectory`) | ✅ | fixed by PR #1880 |
+| [2026-11-28 — the cycle floor did not run the integration tests of another package](2026-11-28-production-embed-from-testdata-turned-main-red.md) | The floor of cycle 2670 ran only the changed packages. The drift tests in `phases/audit` have the tag `integration`, so the break reached main and only CI saw it. | cycle build floor (package scope) | ❌ | operator decision on the floor scope (not filed) |
 
 ## Prioritized gap backlog (13-agent sweep; agent confidence in parens)
 
