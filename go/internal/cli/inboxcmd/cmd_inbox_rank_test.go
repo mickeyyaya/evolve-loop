@@ -34,7 +34,7 @@ func rankRoot(t *testing.T) string {
 func rankAt(t *testing.T, args ...string) (int, string, string) {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
-	rc := rankInboxAt(cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT"), args, rankClock, &stdout, &stderr)
+	rc := rankInboxAt(cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT"), args, rankClock, &stdout, &stderr, testDeps())
 	return rc, stdout.String(), stderr.String()
 }
 

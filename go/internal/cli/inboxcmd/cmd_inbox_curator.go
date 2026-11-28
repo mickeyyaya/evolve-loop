@@ -51,11 +51,12 @@ type curatorRun struct {
 	git                       gitexec.Git
 	stderr                    io.Writer
 	signals                   *signalcenter.Center
+	deps                      Deps
 	rangeSkipped, applyFailed bool
 	landed                    []string
 }
 
-func runInboxCurate(root string, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+func runInboxCurate(root string, args []string, stdin io.Reader, stdout, stderr io.Writer, deps Deps) int {
 	req, ok := parseInboxCurateArgs(append([]string{"--project-root", root}, args...), stderr)
 	if !ok {
 		fmt.Fprintln(stderr, inboxUsage("curate"))
@@ -69,9 +70,9 @@ func runInboxCurate(root string, args []string, stdin io.Reader, stdout, stderr 
 		fmt.Fprintf(stderr, "inbox curate: %v\n", err)
 		return 2
 	}
-	signals, closeSignals := host().NewSignalCenter("inbox", req.root, filepath.Join(req.root, ".evolve"), stderr)
+	signals, closeSignals := deps.newSignalCenter("inbox", req.root, filepath.Join(req.root, ".evolve"), stderr)
 	defer closeSignals()
-	run := &curatorRun{req: req, cfg: pol.InboxCuratorConfig(), git: gitexec.Default(req.root), stderr: stderr, signals: signals}
+	run := &curatorRun{req: req, cfg: pol.InboxCuratorConfig(), git: gitexec.Default(req.root), stderr: stderr, signals: signals, deps: deps}
 	if req.follow {
 		return run.follow(os.Stdout, stdout)
 	}
@@ -163,7 +164,7 @@ func (r *curatorRun) curate(changes []inboxcurator.Change, backstop bool) (curat
 		return curateReport{}, err
 	}
 	in := inboxcurator.Inputs{
-		Open: open, Changes: changes, History: r.history(open, backstop), IsProtected: host().LaneForbidden(r.req.root, r.stderr), Backstop: backstop,
+		Open: open, Changes: changes, History: r.history(open, backstop), IsProtected: r.deps.laneForbidden(r.req.root, r.stderr), Backstop: backstop,
 		RerouteBuildableKinds: r.cfg.RerouteBuildableKinds,
 		HasOpenPR:             openPRMatcher(r.ctx(), r.req.root, r.stderr),
 		HasTest:               func(name string) bool { return tests[name] || definedByAChange(changes, name) },

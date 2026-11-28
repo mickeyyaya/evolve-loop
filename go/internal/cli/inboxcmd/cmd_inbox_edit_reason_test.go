@@ -23,6 +23,7 @@ func editLines(t *testing.T, root string) int {
 }
 
 func TestCmd_InboxEdit_RefusesAPriorityChangeWithoutAReasonAndChangesNothing(t *testing.T) {
+	t.Parallel()
 	cases := map[string][]string{
 		"weight":                 {"edit", "cli-inbox-show", "--set", "weight=0.7"},
 		"priority class":         {"edit", "cli-inbox-show", "--set", "priority_class=stability"},
@@ -38,7 +39,7 @@ func TestCmd_InboxEdit_RefusesAPriorityChangeWithoutAReasonAndChangesNothing(t *
 			editsBefore := editLines(t, root)
 			var stdout, stderr bytes.Buffer
 
-			rc := runInboxCmd(args, nil, &stdout, &stderr)
+			rc := runInboxCmd(append([]string{"edit", "--project-root", root}, args[1:]...), nil, &stdout, &stderr)
 
 			if rc != 10 || !strings.Contains(stderr.String(), "needs a reason") {
 				t.Errorf("rc = %d stderr = %q, want rc 10 naming the missing reason", rc, stderr.String())
@@ -54,12 +55,13 @@ func TestCmd_InboxEdit_RefusesAPriorityChangeWithoutAReasonAndChangesNothing(t *
 }
 
 func TestCmd_InboxEdit_APriorityChangeWithAReasonRecordsItInTheOneEditLine(t *testing.T) {
+	t.Parallel()
 	for _, set := range []string{"weight=0.7", "priority_class=stability"} {
 		root, path := fileCLIItem(t)
 		editsBefore := editLines(t, root)
 		var stdout, stderr bytes.Buffer
 
-		rc := runInboxCmd([]string{"edit", "cli-inbox-show", "--set", set, "--reason", "operator review"}, nil, &stdout, &stderr)
+		rc := runInboxCmd([]string{"edit", "--project-root", root, "cli-inbox-show", "--set", set, "--reason", "operator review"}, nil, &stdout, &stderr)
 
 		if rc != 0 {
 			t.Fatalf("%s: rc = %d stderr = %q", set, rc, stderr.String())
@@ -76,11 +78,12 @@ func TestCmd_InboxEdit_APriorityChangeWithAReasonRecordsItInTheOneEditLine(t *te
 }
 
 func TestCmd_InboxEdit_ARejectedPriorityClassIsRefusedAndChangesNothing(t *testing.T) {
+	t.Parallel()
 	root, path := fileCLIItem(t)
 	before, _ := os.ReadFile(path)
 	var stdout, stderr bytes.Buffer
 
-	rc := runInboxCmd([]string{"edit", "cli-inbox-show", "--set", "priority_class=not-a-class", "--reason", "typo"}, nil, &stdout, &stderr)
+	rc := runInboxCmd([]string{"edit", "--project-root", root, "cli-inbox-show", "--set", "priority_class=not-a-class", "--reason", "typo"}, nil, &stdout, &stderr)
 
 	if rc != 1 {
 		t.Errorf("rc = %d stderr = %q, want 1", rc, stderr.String())
@@ -94,6 +97,7 @@ func TestCmd_InboxEdit_ARejectedPriorityClassIsRefusedAndChangesNothing(t *testi
 }
 
 func TestCmd_InboxEdit_AReasonlessPriorityEditIsRefusedBeforeTheQueue(t *testing.T) {
+	t.Parallel()
 	root := inboxtest.EmptyRoot(t)
 	queued := false
 	d := queuedDeps()
@@ -110,6 +114,7 @@ func TestCmd_InboxEdit_AReasonlessPriorityEditIsRefusedBeforeTheQueue(t *testing
 }
 
 func TestCmd_InboxEdit_AnUnreadablePolicyFailsALoudlyWithoutChangingTheItem(t *testing.T) {
+	t.Parallel()
 	root, path := fileCLIItem(t)
 	before, _ := os.ReadFile(path)
 	if err := os.WriteFile(filepath.Join(root, ".evolve", "policy.json"), []byte("{not json"), 0o644); err != nil {
@@ -117,7 +122,7 @@ func TestCmd_InboxEdit_AnUnreadablePolicyFailsALoudlyWithoutChangingTheItem(t *t
 	}
 	var stdout, stderr bytes.Buffer
 
-	rc := runInboxCmd([]string{"edit", "cli-inbox-show", "--set", "weight=0.7", "--reason", "operator review"}, nil, &stdout, &stderr)
+	rc := runInboxCmd([]string{"edit", "--project-root", root, "cli-inbox-show", "--set", "weight=0.7", "--reason", "operator review"}, nil, &stdout, &stderr)
 
 	if rc != 2 || !strings.Contains(stderr.String(), "inbox edit:") {
 		t.Errorf("rc = %d stderr = %q, want rc 2 naming the policy fault", rc, stderr.String())

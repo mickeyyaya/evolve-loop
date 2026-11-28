@@ -18,17 +18,17 @@ func TestRunInboxLint_TextNamesTheCitedProtectedBasenamesAndFailsOnEachLoadOrWri
 	contractUnitWrite(t, root, ".evolve/inbox/cites.json", `{"id":"cites","kind":"bug","weight":0.9,"priority_class":"correctness","title":"disposition_gate.go misreads a row","summary":"s"}`)
 	contractUnitWrite(t, root, ".evolve/inbox/plain.json", `{"id":"plain","kind":"bug","weight":0.8,"priority_class":"correctness","title":"the queue renders slowly","summary":"s"}`)
 	var stdout, stderr bytes.Buffer
-	rc := runInboxLint(root, nil, &stdout, &stderr)
+	rc := runInboxLint(root, nil, &stdout, &stderr, testDeps())
 	want := []string{"cites: undeclared surface (cites protected basename: disposition_gate.go)", "plain: undeclared surface"}
 	if rc != exitFailed || !strings.Contains(stdout.String(), want[0]) || !strings.Contains(stdout.String(), want[1]) {
 		t.Fatalf("rc %d stdout %q, want exit 1 and %q", rc, stdout.String(), want)
 	}
-	if rc := runInboxLint(root, []string{"--json"}, &failingWriter{}, &stderr); rc != exitFailed || !strings.Contains(stderr.String(), "inbox lint: encode: ") {
+	if rc := runInboxLint(root, []string{"--json"}, &failingWriter{}, &stderr, testDeps()); rc != exitFailed || !strings.Contains(stderr.String(), "inbox lint: encode: ") {
 		t.Errorf("an unwritable stdout: rc %d stderr %q", rc, stderr.String())
 	}
 	broken := t.TempDir()
 	contractUnitWrite(t, broken, ".evolve/inbox", "a file\n")
-	if rc := runInboxLint(broken, nil, &stdout, &stderr); rc != exitFailed || !strings.Contains(stderr.String(), "inbox lint: ") {
+	if rc := runInboxLint(broken, nil, &stdout, &stderr, testDeps()); rc != exitFailed || !strings.Contains(stderr.String(), "inbox lint: ") {
 		t.Errorf("an unreadable inbox: rc %d stderr %q", rc, stderr.String())
 	}
 }

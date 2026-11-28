@@ -73,13 +73,13 @@ func parsePRWindowArgs(args []string) (prWindowArgs, error) {
 	return a, nil
 }
 
-func runPRWindow(args []string, stdout, stderr io.Writer) int {
+func runPRWindow(args []string, stdout, stderr io.Writer, deps Deps) int {
 	a, err := parsePRWindowArgs(args)
 	if err != nil {
 		fmt.Fprintf(stderr, "%s%v\n%s\n", prWindowPrefix, err, usagePRWindow)
 		return exitUsage
 	}
-	root, err := resolveRoot(a.projectRoot, stderr)
+	root, err := deps.resolveRoot(a.projectRoot, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "%s%v\n", prWindowPrefix, err)
 		return exitIO

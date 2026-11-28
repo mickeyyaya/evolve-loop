@@ -13,9 +13,8 @@ import (
 func fileCLIItem(t *testing.T) (root, path string) {
 	t.Helper()
 	root = inboxtest.EmptyRoot(t)
-	t.Setenv("EVOLVE_PROJECT_ROOT", root)
 	var stdout, stderr bytes.Buffer
-	if rc := runInboxCmd([]string{"add", "--file", "-"}, strings.NewReader(cliInboxItem), &stdout, &stderr); rc != 0 {
+	if rc := runInboxCmd([]string{"add", "--project-root", root, "--file", "-"}, strings.NewReader(cliInboxItem), &stdout, &stderr); rc != 0 {
 		t.Fatalf("add: rc = %d stderr = %q", rc, stderr.String())
 	}
 	matches, err := filepath.Glob(filepath.Join(root, ".evolve", "inbox", "*-cli-inbox-show.json"))
@@ -26,11 +25,12 @@ func fileCLIItem(t *testing.T) (root, path string) {
 }
 
 func TestCmd_InboxEdit_SetWeightRewritesOnlyThatFieldAndRecordsIt(t *testing.T) {
+	t.Parallel()
 	root, path := fileCLIItem(t)
 	before := inboxtest.ItemFields(t, path)
 	var stdout, stderr bytes.Buffer
 
-	rc := runInboxCmd([]string{"edit", "cli-inbox-show", "--set", "weight=0.4", "--reason", "operator review"}, nil, &stdout, &stderr)
+	rc := runInboxCmd([]string{"edit", "--project-root", root, "cli-inbox-show", "--set", "weight=0.4", "--reason", "operator review"}, nil, &stdout, &stderr)
 
 	if rc != 0 {
 		t.Fatalf("rc = %d stderr = %q", rc, stderr.String())
@@ -54,17 +54,18 @@ func TestCmd_InboxEdit_SetWeightRewritesOnlyThatFieldAndRecordsIt(t *testing.T) 
 }
 
 func TestCmd_InboxEdit_RefusesAnUnbackedDepOrAFiledIDAndLeavesTheFile(t *testing.T) {
+	t.Parallel()
 	root, path := fileCLIItem(t)
 	idless := filepath.Join(root, ".evolve", "inbox", "2026-09-27T00-00-00Z-idless.json")
 	if err := os.WriteFile(idless, []byte(`{"title":"filed by hand","weight":0.2}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	for name, args := range map[string][]string{
-		"a dep naming no item": {"edit", "cli-inbox-show", "--add", "deps=no-such-item"},
-		"an id already filed":  {"edit", idless, "--set", "id=cli-inbox-show"},
+		"a dep naming no item": {"edit", "--project-root", root, "cli-inbox-show", "--add", "deps=no-such-item"},
+		"an id already filed":  {"edit", "--project-root", root, idless, "--set", "id=cli-inbox-show"},
 	} {
 		target := path
-		if args[1] == idless {
+		if args[3] == idless {
 			target = idless
 		}
 		before, _ := os.ReadFile(target)
@@ -80,24 +81,25 @@ func TestCmd_InboxEdit_RefusesAnUnbackedDepOrAFiledIDAndLeavesTheFile(t *testing
 		}
 	}
 	var stdout, stderr bytes.Buffer
-	if rc := runInboxCmd([]string{"edit", idless, "--set", "id=hand-filed"}, nil, &stdout, &stderr); rc != 0 || inboxtest.ItemFields(t, idless)["id"] != "hand-filed" {
+	if rc := runInboxCmd([]string{"edit", "--project-root", root, idless, "--set", "id=hand-filed"}, nil, &stdout, &stderr); rc != 0 || inboxtest.ItemFields(t, idless)["id"] != "hand-filed" {
 		t.Errorf("stamping an id-less item named by its path: rc = %d stderr = %q", rc, stderr.String())
 	}
 }
 
 func TestCmd_InboxEdit_RoutesLifecycleFieldsAndMalformedEditsAreUsageErrors(t *testing.T) {
-	_, path := fileCLIItem(t)
+	t.Parallel()
+	root, path := fileCLIItem(t)
 	before, _ := os.ReadFile(path)
 	for _, args := range [][]string{
-		{"edit", "cli-inbox-show", "--set", "route=lane"},
-		{"edit", "cli-inbox-show", "--set", "routed_reason=x"},
-		{"edit", "cli-inbox-show", "--set", "failure_count=0"},
-		{"edit", "cli-inbox-show", "--add", "weight=0.1"},
-		{"edit", "cli-inbox-show", "--set", "weight"},
-		{"edit", "cli-inbox-show", "--set", "=0.4"},
-		{"edit", "cli-inbox-show"},
-		{"edit", "--set", "weight=0.4", "--reason", "operator review"},
-		{"edit", "cli-inbox-show", "--set", "weight=0.4", "extra"},
+		{"edit", "--project-root", root, "cli-inbox-show", "--set", "route=lane"},
+		{"edit", "--project-root", root, "cli-inbox-show", "--set", "routed_reason=x"},
+		{"edit", "--project-root", root, "cli-inbox-show", "--set", "failure_count=0"},
+		{"edit", "--project-root", root, "cli-inbox-show", "--add", "weight=0.1"},
+		{"edit", "--project-root", root, "cli-inbox-show", "--set", "weight"},
+		{"edit", "--project-root", root, "cli-inbox-show", "--set", "=0.4"},
+		{"edit", "--project-root", root, "cli-inbox-show"},
+		{"edit", "--project-root", root, "--set", "weight=0.4", "--reason", "operator review"},
+		{"edit", "--project-root", root, "cli-inbox-show", "--set", "weight=0.4", "extra"},
 	} {
 		var stdout, stderr bytes.Buffer
 		if rc := runInboxCmd(args, nil, &stdout, &stderr); rc != 10 {
@@ -108,12 +110,13 @@ func TestCmd_InboxEdit_RoutesLifecycleFieldsAndMalformedEditsAreUsageErrors(t *t
 		t.Errorf("a usage error changed the item:\n%s", after)
 	}
 	var stdout, stderr bytes.Buffer
-	if rc := runInboxCmd([]string{"edit", "no-such-item", "--set", "weight=0.4", "--reason", "operator review"}, nil, &stdout, &stderr); rc != 1 {
+	if rc := runInboxCmd([]string{"edit", "--project-root", root, "no-such-item", "--set", "weight=0.4", "--reason", "operator review"}, nil, &stdout, &stderr); rc != 1 {
 		t.Errorf("an unknown id: rc = %d, want 1", rc)
 	}
 }
 
 func TestCmd_InboxEdit_AnUnwritableInboxExits2(t *testing.T) {
+	t.Parallel()
 	root, _ := fileCLIItem(t)
 	inbox := filepath.Join(root, ".evolve", "inbox")
 	if err := os.Chmod(inbox, 0o555); err != nil {
@@ -122,16 +125,17 @@ func TestCmd_InboxEdit_AnUnwritableInboxExits2(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chmod(inbox, 0o755) })
 	var stdout, stderr bytes.Buffer
 
-	if rc := runInboxCmd([]string{"edit", "cli-inbox-show", "--set", "weight=0.4", "--reason", "operator review"}, nil, &stdout, &stderr); rc != 2 {
+	if rc := runInboxCmd([]string{"edit", "--project-root", root, "cli-inbox-show", "--set", "weight=0.4", "--reason", "operator review"}, nil, &stdout, &stderr); rc != 2 {
 		t.Errorf("rc = %d, want 2 (stderr=%q)", rc, stderr.String())
 	}
 }
 
 func TestCmd_InboxEdit_ASetValueKeepsEveryEqualsSignAfterTheFirst(t *testing.T) {
-	_, path := fileCLIItem(t)
+	t.Parallel()
+	root, path := fileCLIItem(t)
 	var stdout, stderr bytes.Buffer
 
-	rc := runInboxCmd([]string{"edit", "cli-inbox-show", "--set", "fix=a=b"}, nil, &stdout, &stderr)
+	rc := runInboxCmd([]string{"edit", "--project-root", root, "cli-inbox-show", "--set", "fix=a=b"}, nil, &stdout, &stderr)
 
 	if rc != 0 || inboxtest.ItemFields(t, path)["fix"] != "a=b" {
 		t.Errorf("rc = %d fix = %v stderr = %q, want field fix set to a=b", rc, inboxtest.ItemFields(t, path)["fix"], stderr.String())
@@ -139,12 +143,14 @@ func TestCmd_InboxEdit_ASetValueKeepsEveryEqualsSignAfterTheFirst(t *testing.T) 
 }
 
 func TestCmd_InboxEdit_RefusesToOpenAConsoleOwnedItemToLanes(t *testing.T) {
-	root := inboxtest.CurationRoot(t, map[string]string{"x.json": `{"id":"x","kind":"bug","weight":0.5,"files":["go/internal/guards/phase.go"]}`})
+	t.Parallel()
+	root := inboxtest.EmptyRoot(t)
+	inboxtest.SeedItems(t, root, map[string]string{"x.json": `{"id":"x","kind":"bug","weight":0.5,"files":["go/internal/guards/phase.go"]}`})
 	path := filepath.Join(root, ".evolve", "inbox", "x.json")
 	before, _ := os.ReadFile(path)
 	var stdout, stderr bytes.Buffer
 
-	rc := runInboxCmd([]string{"edit", "x", "--remove", "files=go/internal/guards/phase.go"}, nil, &stdout, &stderr)
+	rc := runInboxCmd([]string{"edit", "--project-root", root, "x", "--remove", "files=go/internal/guards/phase.go"}, nil, &stdout, &stderr)
 
 	if rc != 1 || !strings.Contains(stderr.String(), "evolve inbox route-lane") {
 		t.Errorf("rc = %d stderr = %q, want 1 pointing to route-lane", rc, stderr.String())

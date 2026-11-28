@@ -29,15 +29,15 @@ func withProjectRoot(t *testing.T, root string) {
 }
 
 func TestRunInbox_Consume_MovesItemAndAcksFingerprint(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
-	withProjectRoot(t, root)
 	evolveDir := filepath.Join(root, ".evolve")
 	name := "2026-08-05T08-30-00Z-pipeline-defect-pipeline-blocker.json"
 	itemPath := writePendingItem(t, evolveDir, name,
 		`{"id":"pipeline-blocker","kind":"pipeline-repair","consumed_by":"`+realConsumedByNarrative+`"}`)
 
 	var stdout, stderr bytes.Buffer
-	if rc := runInboxCmd([]string{"consume", itemPath}, nil, &stdout, &stderr); rc != 0 {
+	if rc := runInboxCmd([]string{"consume", "--project-root", root, itemPath}, nil, &stdout, &stderr); rc != 0 {
 		t.Fatalf("rc=%d want 0; stderr=%q", rc, stderr.String())
 	}
 	if _, err := os.Stat(itemPath); err == nil {
@@ -56,14 +56,14 @@ func TestRunInbox_Consume_MovesItemAndAcksFingerprint(t *testing.T) {
 }
 
 func TestRunInbox_Consume_ItemWithoutFingerprintStillMoves(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
-	withProjectRoot(t, root)
 	evolveDir := filepath.Join(root, ".evolve")
 	itemPath := writePendingItem(t, evolveDir, "plain-feature.json",
 		`{"id":"plain-feature","kind":"feature","consumed_by":"console: shipped in #415"}`)
 
 	var stdout, stderr bytes.Buffer
-	if rc := runInboxCmd([]string{"consume", itemPath}, nil, &stdout, &stderr); rc != 0 {
+	if rc := runInboxCmd([]string{"consume", "--project-root", root, itemPath}, nil, &stdout, &stderr); rc != 0 {
 		t.Fatalf("an item with no fingerprint is a normal consumption, not an error: rc=%d stderr=%q", rc, stderr.String())
 	}
 	if _, err := os.Stat(filepath.Join(evolveDir, "inbox", "consumed", "plain-feature.json")); err != nil {
@@ -75,12 +75,12 @@ func TestRunInbox_Consume_ItemWithoutFingerprintStillMoves(t *testing.T) {
 }
 
 func TestRunInbox_Consume_MissingItemReturnsNonZero(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
-	withProjectRoot(t, root)
 	evolveDir := filepath.Join(root, ".evolve")
 
 	var stdout, stderr bytes.Buffer
-	rc := runInboxCmd([]string{"consume", filepath.Join(evolveDir, "inbox", "ghost.json")}, nil, &stdout, &stderr)
+	rc := runInboxCmd([]string{"consume", "--project-root", root, filepath.Join(evolveDir, "inbox", "ghost.json")}, nil, &stdout, &stderr)
 	if rc == 0 {
 		t.Fatal("a missing item path must exit non-zero, never silently succeed")
 	}
@@ -93,11 +93,11 @@ func TestRunInbox_Consume_MissingItemReturnsNonZero(t *testing.T) {
 }
 
 func TestRunInbox_Consume_NoArgReturnsUsage(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
-	withProjectRoot(t, root)
 
 	var stdout, stderr bytes.Buffer
-	if rc := runInboxCmd([]string{"consume"}, nil, &stdout, &stderr); rc == 0 {
+	if rc := runInboxCmd([]string{"consume", "--project-root", root}, nil, &stdout, &stderr); rc == 0 {
 		t.Fatal("`evolve inbox consume` with no item path must exit non-zero")
 	}
 	if !strings.Contains(stderr.String(), "consume") {
@@ -128,15 +128,15 @@ func readConsumedStamp(t *testing.T, path string) consumedStamp {
 }
 
 func TestRunInbox_Consume_WithFlagsStampsConsumedRecord(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
-	withProjectRoot(t, root)
 	evolveDir := filepath.Join(root, ".evolve")
 	name := "2026-09-29T16-00-00Z-flagged-item.json"
 	itemPath := writePendingItem(t, evolveDir, name, `{"id":"flagged-item","kind":"feature"}`)
 
 	var stdout, stderr bytes.Buffer
 	rc := runInboxCmd([]string{
-		"consume", itemPath,
+		"consume", "--project-root", root, itemPath,
 		"--resolution", "shipped in #999",
 		"--cycle", "1776",
 	}, nil, &stdout, &stderr)
@@ -163,14 +163,14 @@ func TestRunInbox_Consume_WithFlagsStampsConsumedRecord(t *testing.T) {
 }
 
 func TestRunInbox_Consume_NoFlagsDefaultsConsumedStamp(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
-	withProjectRoot(t, root)
 	evolveDir := filepath.Join(root, ".evolve")
 	name := "2026-09-29T16-00-01Z-noflag-item.json"
 	itemPath := writePendingItem(t, evolveDir, name, `{"id":"noflag-item","kind":"feature"}`)
 
 	var stdout, stderr bytes.Buffer
-	if rc := runInboxCmd([]string{"consume", itemPath}, nil, &stdout, &stderr); rc != 0 {
+	if rc := runInboxCmd([]string{"consume", "--project-root", root, itemPath}, nil, &stdout, &stderr); rc != 0 {
 		t.Fatalf("rc=%d want 0; stderr=%q", rc, stderr.String())
 	}
 	dest := filepath.Join(evolveDir, "inbox", "consumed", name)
@@ -190,13 +190,13 @@ func TestRunInbox_Consume_NoFlagsDefaultsConsumedStamp(t *testing.T) {
 }
 
 func TestRunInbox_Consume_MissingItemWithFlagsStillFailsAndStampsNothing(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
-	withProjectRoot(t, root)
 	evolveDir := filepath.Join(root, ".evolve")
 
 	var stdout, stderr bytes.Buffer
 	rc := runInboxCmd([]string{
-		"consume", filepath.Join(evolveDir, "inbox", "ghost.json"),
+		"consume", "--project-root", root, filepath.Join(evolveDir, "inbox", "ghost.json"),
 		"--resolution", "shipped in #999",
 		"--cycle", "1776",
 	}, nil, &stdout, &stderr)
@@ -212,6 +212,7 @@ func TestRunInbox_Consume_MissingItemWithFlagsStillFailsAndStampsNothing(t *test
 }
 
 func TestRunInbox_Consume_StampEdgeCases(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name        string
 		body        string
@@ -273,13 +274,12 @@ func TestRunInbox_Consume_StampEdgeCases(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
-			withProjectRoot(t, root)
 			evolveDir := filepath.Join(root, ".evolve")
 			name := "edge-item.json"
 			itemPath := writePendingItem(t, evolveDir, name, tc.body)
 
 			var stdout, stderr bytes.Buffer
-			rc := runInboxCmd(append([]string{"consume"}, tc.flags(itemPath)...), nil, &stdout, &stderr)
+			rc := runInboxCmd(append([]string{"consume", "--project-root", root}, tc.flags(itemPath)...), nil, &stdout, &stderr)
 			if rc != tc.wantRC {
 				t.Fatalf("rc=%d want %d; stderr=%q", rc, tc.wantRC, stderr.String())
 			}
@@ -324,15 +324,15 @@ func TestRunInbox_Consume_StampEdgeCases(t *testing.T) {
 }
 
 func TestRunInbox_Consume_ReconsumeReplacesEarlierStamp(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
-	withProjectRoot(t, root)
 	evolveDir := filepath.Join(root, ".evolve")
 	name := "reconsumed.json"
 	itemPath := writePendingItem(t, evolveDir, name,
 		`{"id":"r","consumed":{"at":"2020-01-01T00:00:00Z","via":"old","cycle":"1","resolution":"stale"}}`)
 
 	var stdout, stderr bytes.Buffer
-	if rc := runInboxCmd([]string{"consume", itemPath, "--cycle", "7", "--resolution", "fresh"}, nil, &stdout, &stderr); rc != 0 {
+	if rc := runInboxCmd([]string{"consume", "--project-root", root, itemPath, "--cycle", "7", "--resolution", "fresh"}, nil, &stdout, &stderr); rc != 0 {
 		t.Fatalf("rc=%d want 0; stderr=%q", rc, stderr.String())
 	}
 	stamp := readConsumedStamp(t, filepath.Join(evolveDir, "inbox", "consumed", name))

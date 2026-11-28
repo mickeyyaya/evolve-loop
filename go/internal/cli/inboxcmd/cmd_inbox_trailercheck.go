@@ -64,7 +64,7 @@ func checkInboxTrailerRange(root, rng string) ([]string, []string, []string, err
 	return closes, refs, violations, nil
 }
 
-func runInboxTrailerCheck(root string, args []string, stdout, stderr io.Writer) int {
+func runInboxTrailerCheck(root string, args []string, stdout, stderr io.Writer, deps Deps) int {
 	rng, asJSON, ok := parseInboxTrailerCheckArgs(args, stderr)
 	if !ok {
 		return exitUsage
@@ -83,7 +83,7 @@ func runInboxTrailerCheck(root string, args []string, stdout, stderr io.Writer) 
 	valid := len(violations) == 0
 	if asJSON {
 		report := trailerCheckReport{Range: rng, Stage: stage, OK: valid, Closes: closes, Refs: refs, Violations: violations}
-		_ = host().PrintVerbJSON("inbox trailer-check", report, stdout, stderr)
+		_ = deps.printVerbJSON("inbox trailer-check", report, stdout, stderr)
 		if !valid && stage == "enforce" {
 			return exitFailed
 		}

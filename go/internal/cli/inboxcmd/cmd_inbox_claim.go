@@ -17,7 +17,7 @@ type inboxClaimResult struct {
 	Path  string `json:"path"`
 }
 
-func runInboxClaim(root string, args []string, stdout, stderr io.Writer) int {
+func runInboxClaim(root string, args []string, stdout, stderr io.Writer, deps Deps) int {
 	cycleText, args, hasCycle, cycleOK := cmdutil.TakeFlagValue(args, "--cycle")
 	flags, operands, ok := splitInboxFlags(args, "--json")
 	cycle, err := strconv.Atoi(cycleText)
@@ -25,7 +25,7 @@ func runInboxClaim(root string, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, inboxUsage("claim"))
 		return exitUsage
 	}
-	opts := inboxmover.Options{ProjectRoot: root, Stderr: stderr, IsProtectedPath: host().LaneForbidden(root, stderr)}
+	opts := inboxmover.Options{ProjectRoot: root, Stderr: stderr, IsProtectedPath: deps.laneForbidden(root, stderr)}
 	res, err := inboxmover.ClaimDispatchable(opts, operands[0], strconv.Itoa(cycle))
 	if rc := reportInboxClaimError(err, stderr); rc != exitOK {
 		return rc

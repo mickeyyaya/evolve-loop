@@ -185,7 +185,7 @@ func TestPRWindow_IOFailuresExitTwo(t *testing.T) {
 	root := windowPlane(t, windowOn)
 	list := writeWindowFile(t, filepath.Join(t.TempDir(), "files"), "docs/a.md")
 	var stderrBuf bytes.Buffer
-	if code := runPRWindow([]string{"--files-from", list, "--project-root", root}, &failingWriter{}, &stderrBuf); code != exitIO || !strings.Contains(stderrBuf.String(), "broken pipe") {
+	if code := runPRWindow([]string{"--files-from", list, "--project-root", root}, &failingWriter{}, &stderrBuf, testDeps()); code != exitIO || !strings.Contains(stderrBuf.String(), "broken pipe") {
 		t.Fatalf("a broken stdout: exit %d, stderr %q", code, stderrBuf.String())
 	}
 }

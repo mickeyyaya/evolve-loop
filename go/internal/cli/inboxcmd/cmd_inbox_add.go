@@ -25,7 +25,7 @@ type inboxAddRequest struct {
 	originSet, allowOverlap, asJSON bool
 }
 
-func runInboxAdd(root string, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+func runInboxAdd(root string, args []string, stdin io.Reader, stdout, stderr io.Writer, deps Deps) int {
 	req, ok := parseInboxAddArgs(args, stderr)
 	if !ok {
 		fmt.Fprintln(stderr, inboxUsage("add"))
@@ -40,17 +40,17 @@ func runInboxAdd(root string, args []string, stdin io.Reader, stdout, stderr io.
 		fmt.Fprintf(stderr, "inbox add: %v\n", err)
 		return 2
 	}
-	signals, closeSignals := host().NewSignalCenter("inbox", root, filepath.Join(root, ".evolve"), stderr)
+	signals, closeSignals := deps.newSignalCenter("inbox", root, filepath.Join(root, ".evolve"), stderr)
 	defer closeSignals()
 	res, err := intakeItem(context.Background(), intakeInput{root: root, raw: raw, req: req, pol: pol,
-		isProtected: host().LaneForbidden(root, stderr), signals: signals, stderr: stderr})
+		isProtected: deps.laneForbidden(root, stderr), signals: signals, stderr: stderr})
 	if err != nil {
 		return intakeFailure(err, stderr)
 	}
-	printFiledRank(root, res.Path, host().HumanWriter(stdout, req.asJSON), stderr)
+	printFiledRank(root, res.Path, deps.humanWriter(stdout, req.asJSON), stderr, deps)
 	warnMonotonicBinaryTargets(raw, stderr)
 	result := inboxWriteResult{Verb: "add", Path: res.Path, Detail: dispatchability(res.ConsoleReason)}
-	return finishInboxWrite(req.asJSON, result, fmt.Sprintf("inbox add: filed %s (%s)", filepath.Base(res.Path), result.Detail), stdout, stderr)
+	return finishInboxWrite(deps, req.asJSON, result, fmt.Sprintf("inbox add: filed %s (%s)", filepath.Base(res.Path), result.Detail), stdout, stderr)
 }
 
 func warnMonotonicBinaryTargets(raw []byte, stderr io.Writer) {
@@ -171,8 +171,8 @@ func reportOverlaps(id string, overlaps []inboxcurator.Overlap, prefix string, s
 
 var filedRankSource = loadRankedInbox
 
-func printFiledRank(root, path string, stdout, stderr io.Writer) {
-	ranked, err := filedRankSource(root, time.Now(), io.Discard)
+func printFiledRank(root, path string, stdout, stderr io.Writer, deps Deps) {
+	ranked, err := filedRankSource(root, time.Now(), io.Discard, deps)
 	if err != nil {
 		fmt.Fprintf(stderr, "inbox add: WARN the rank is not known: %v\n", err)
 		return

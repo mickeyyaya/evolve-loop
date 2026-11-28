@@ -73,18 +73,18 @@ type inboxConsumedStamp struct {
 	Resolution string `json:"resolution"`
 }
 
-func runInboxConsume(root string, args []string, stdout, stderr io.Writer) int {
+func runInboxConsume(root string, args []string, stdout, stderr io.Writer, deps Deps) int {
 	asJSON, args := takeInboxJSON(args)
 	itemPath, stamp, ok := parseInboxConsumeArgs(args, stderr)
 	if !ok {
 		return 10
 	}
 	evolveDir := filepath.Join(root, ".evolve")
-	result, rc := consumeInboxItem(evolveDir, itemPath, stamp, host().HumanWriter(stdout, asJSON), stderr)
+	result, rc := consumeInboxItem(evolveDir, itemPath, stamp, deps.humanWriter(stdout, asJSON), stderr)
 	if rc != exitOK || !asJSON {
 		return rc
 	}
-	return host().PrintVerbJSON("inbox consume", result, stdout, stderr)
+	return deps.printVerbJSON("inbox consume", result, stdout, stderr)
 }
 
 func consumeInboxItem(evolveDir, itemPath string, stamp inboxConsumedStamp, stdout, stderr io.Writer) (inboxWriteResult, int) {

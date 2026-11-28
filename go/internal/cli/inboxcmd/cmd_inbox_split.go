@@ -18,7 +18,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
 
-func runInboxSplit(root string, args []string, stdout, stderr io.Writer) int {
+func runInboxSplit(root string, args []string, stdout, stderr io.Writer, deps Deps) int {
 	fs := flag.NewFlagSet("inbox split", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	asJSON := fs.Bool("json", false, "print the three ids as one JSON object")
@@ -37,7 +37,7 @@ func runInboxSplit(root string, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "inbox split: %v\n", err)
 		return 2
 	}
-	opts := inboxmover.Options{ProjectRoot: *projectRoot, Stderr: stderr, IsProtectedPath: host().LaneForbidden(*projectRoot, stderr),
+	opts := inboxmover.Options{ProjectRoot: *projectRoot, Stderr: stderr, IsProtectedPath: deps.laneForbidden(*projectRoot, stderr),
 		PriorityClasses: pol.InboxPriorityConfig().ClassOrder, Origin: inboxbatch.OriginConsole}
 	res, err := inboxsplit.Accept(newSplitInbox(opts), id, SplitForbidden(opts.IsProtectedPath), *afterConsole)
 	if err != nil {

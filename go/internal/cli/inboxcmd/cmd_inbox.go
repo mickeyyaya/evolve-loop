@@ -22,13 +22,23 @@ import (
 
 type inboxVerb struct {
 	name, synopsis string
-	run            func(root string, args []string, stdin io.Reader, stdout, stderr io.Writer) int
+	run            func(root string, args []string, stdin io.Reader, stdout, stderr io.Writer, deps Deps) int
 }
 
 func inboxVerbs() []inboxVerb {
-	withoutStdin := func(run func(root string, args []string, stdout, stderr io.Writer) int) func(string, []string, io.Reader, io.Writer, io.Writer) int {
-		return func(root string, args []string, _ io.Reader, stdout, stderr io.Writer) int {
+	withoutStdin := func(run func(root string, args []string, stdout, stderr io.Writer, deps Deps) int) func(string, []string, io.Reader, io.Writer, io.Writer, Deps) int {
+		return func(root string, args []string, _ io.Reader, stdout, stderr io.Writer, deps Deps) int {
+			return run(root, args, stdout, stderr, deps)
+		}
+	}
+	withoutDeps := func(run func(root string, args []string, stdout, stderr io.Writer) int) func(string, []string, io.Reader, io.Writer, io.Writer, Deps) int {
+		return func(root string, args []string, _ io.Reader, stdout, stderr io.Writer, _ Deps) int {
 			return run(root, args, stdout, stderr)
+		}
+	}
+	withoutDepsWithStdin := func(run func(root string, args []string, stdin io.Reader, stdout, stderr io.Writer) int) func(string, []string, io.Reader, io.Writer, io.Writer, Deps) int {
+		return func(root string, args []string, stdin io.Reader, stdout, stderr io.Writer, _ Deps) int {
+			return run(root, args, stdin, stdout, stderr)
 		}
 	}
 	return []inboxVerb{
@@ -42,21 +52,20 @@ func inboxVerbs() []inboxVerb {
 		{"verify", "verify <id> --evidence <text> [--json]", withoutStdin(runInboxVerify)},
 		{"withdraw", "withdraw <id> <reason> [--json]", withoutStdin(runInboxWithdraw)},
 		{"claim", "claim <id> --cycle N [--json]   (moves a dispatchable item into processing/cycle-N/)", withoutStdin(runInboxClaim)},
-		{"claims", "claims [--json] [--project-root P]", withoutStdin(runInboxClaims)},
-		{"release", "release <id> <reason> [--keep root|claim] [--json] | release --stale <reason> [--json] [--project-root P]", withoutStdin(runInboxRelease)},
+		{"claims", "claims [--json] [--project-root P]", withoutDeps(runInboxClaims)},
+		{"release", "release <id> <reason> [--keep root|claim] [--json] | release --stale <reason> [--json] [--project-root P]", withoutDeps(runInboxRelease)},
 		{"split", "split <id> [--lane-after-console] [--json] [--project-root P]", withoutStdin(runInboxSplit)},
 		{"route-console", "route-console <id> <reason> <cycle> [--blocked-by <item-id>] [--json]", withoutStdin(runInboxRouteConsole)},
 		{"route-lane", "route-lane <id> <reason> [--blocked-by <item-id>] [--json]", withoutStdin(runInboxRouteLane)},
 		{"consume", "consume <item-path> [--resolution <text>] [--cycle <n>|console] [--json]", withoutStdin(runInboxConsume)},
 		{"curate", "curate [--json] [--apply | --event] [--project-root P]   (--event reads one ship.landed wire record from stdin)", runInboxCurate},
-		{"quarantine", "quarantine list [--json] | quarantine release <id>", runInboxQuarantine},
-		{"ack-fingerprint", "ack-fingerprint <item-path>", withoutStdin(runInboxAckFingerprint)},
+		{"quarantine", "quarantine list [--json] | quarantine release <id>", withoutDepsWithStdin(runInboxQuarantine)},
+		{"ack-fingerprint", "ack-fingerprint <item-path>", withoutDeps(runInboxAckFingerprint)},
 		{"trailer-check", "trailer-check --range <rev-range> [--json] [--project-root P]", withoutStdin(runInboxTrailerCheck)},
 	}
 }
 
 func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, deps Deps) int {
-	defer pushHost(deps)()
 	verbs := inboxVerbs()
 	if len(args) == 0 {
 		printInboxUsage(stderr, verbs)
@@ -75,7 +84,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, deps Deps) in
 			fmt.Fprintln(stderr, inboxUsage(v.name))
 			return exitUsage
 		}
-		return v.run(root, rest, stdin, stdout, stderr)
+		return v.run(root, rest, stdin, stdout, stderr, deps)
 	}
 	printInboxUsage(stderr, verbs)
 	return 10
@@ -96,9 +105,9 @@ func takeInboxJSON(args []string) (bool, []string) {
 	return true, slices.Concat(args[:i], args[i+1:])
 }
 
-func finishInboxWrite(asJSON bool, r inboxWriteResult, human string, stdout, stderr io.Writer) int {
+func finishInboxWrite(deps Deps, asJSON bool, r inboxWriteResult, human string, stdout, stderr io.Writer) int {
 	if asJSON {
-		return host().PrintVerbJSON("inbox "+r.Verb, r, stdout, stderr)
+		return deps.printVerbJSON("inbox "+r.Verb, r, stdout, stderr)
 	}
 	fmt.Fprintln(stdout, human)
 	return exitOK
@@ -126,7 +135,7 @@ type pendingInbox struct {
 	isProtected func(string) bool
 }
 
-func loadPendingInbox(root, verb string, stderr io.Writer) (pendingInbox, error) {
+func loadPendingInbox(root, verb string, stderr io.Writer, deps Deps) (pendingInbox, error) {
 	inboxDir := filepath.Join(root, ".evolve", "inbox")
 	scan, err := inboxbatch.ScanDir(inboxDir)
 	if err != nil {
@@ -134,7 +143,7 @@ func loadPendingInbox(root, verb string, stderr io.Writer) (pendingInbox, error)
 	}
 	printLoadWarnings(stderr, "inbox "+verb, scan.Warnings)
 	opts := inboxmover.Options{InboxDir: inboxDir, Stderr: io.Discard, Companions: policy.FixabilityFor(root, "inbox "+verb, stderr)}
-	return pendingInbox{items: scan.Items, opts: opts, isProtected: host().LaneForbidden(root, stderr)}, nil
+	return pendingInbox{items: scan.Items, opts: opts, isProtected: deps.laneForbidden(root, stderr)}, nil
 }
 
 func printLoadWarnings(stderr io.Writer, prefix string, warns []inboxbatch.LoadWarning) {
@@ -147,12 +156,12 @@ func (p pendingInbox) place(it inboxbatch.Item) (inboxmover.MenuPlace, string) {
 	return inboxmover.PlaceOnLaneMenu(p.opts, it, p.isProtected)
 }
 
-func runInboxBatches(root string, args []string, stdout, stderr io.Writer) int {
+func runInboxBatches(root string, args []string, stdout, stderr io.Writer, deps Deps) int {
 	asJSON, cfg, ok := parseInboxBatchesArgs(args, stderr)
 	if !ok {
 		return 10
 	}
-	inbox, err := loadPendingInbox(root, "batches", stderr)
+	inbox, err := loadPendingInbox(root, "batches", stderr, deps)
 	if err != nil {
 		fmt.Fprintf(stderr, "inbox batches: %v\n", err)
 		return 1
@@ -244,7 +253,7 @@ type inboxLintDoc struct {
 	Undeclared []inboxLintEntry `json:"undeclared"`
 }
 
-func runInboxLint(root string, args []string, stdout, stderr io.Writer) int {
+func runInboxLint(root string, args []string, stdout, stderr io.Writer, deps Deps) int {
 	asJSON := false
 	for _, arg := range args {
 		if arg == "--json" {
@@ -254,7 +263,7 @@ func runInboxLint(root string, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "inbox lint: unknown arg %q\n", arg)
 		return 10
 	}
-	inbox, err := loadPendingInbox(root, "lint", stderr)
+	inbox, err := loadPendingInbox(root, "lint", stderr, deps)
 	if err != nil {
 		fmt.Fprintf(stderr, "inbox lint: %v\n", err)
 		return 1

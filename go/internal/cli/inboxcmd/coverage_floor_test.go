@@ -26,6 +26,7 @@ func runWith(d Deps, root string, args ...string) (int, string, string) {
 }
 
 func TestQueueGate_ReturnsTheQueuedExitCodeFromEveryWriteVerb(t *testing.T) {
+	t.Parallel()
 	root := inboxtest.EmptyRoot(t)
 	cases := map[string][]string{
 		"edit":          {"edit", "x", "--set", "weight=0.4", "--reason", "operator review"},
@@ -42,20 +43,18 @@ func TestQueueGate_ReturnsTheQueuedExitCodeFromEveryWriteVerb(t *testing.T) {
 }
 
 func TestFinishInboxWrite_JSONGoesThroughPrintVerbJSON(t *testing.T) {
+	t.Parallel()
 	var out, errb bytes.Buffer
-	current.Store(ptr(testDeps()))
-	rc := finishInboxWrite(true, inboxWriteResult{Verb: "withdraw", ID: "x"}, "human", &out, &errb)
+	rc := finishInboxWrite(testDeps(), true, inboxWriteResult{Verb: "withdraw", ID: "x"}, "human", &out, &errb)
 	if rc != exitOK || !strings.Contains(out.String(), `"x"`) || strings.Contains(out.String(), "human") {
 		t.Errorf("rc %d out %q", rc, out.String())
 	}
 }
 
-func ptr[T any](v T) *T { return &v }
-
 func TestRunInboxLint_UnknownArgIsAUsageError(t *testing.T) {
 	t.Parallel()
 	var out, errb bytes.Buffer
-	if rc := runInboxLint(t.TempDir(), []string{"--bogus"}, &out, &errb); rc != exitUsage || !strings.Contains(errb.String(), `unknown arg "--bogus"`) {
+	if rc := runInboxLint(t.TempDir(), []string{"--bogus"}, &out, &errb, testDeps()); rc != exitUsage || !strings.Contains(errb.String(), `unknown arg "--bogus"`) {
 		t.Errorf("rc %d stderr %q", rc, errb.String())
 	}
 }
@@ -148,6 +147,7 @@ func TestReconcileConsumedFingerprints_SkipsNonItemsAndWarnsOnUnreadableOnes(t *
 }
 
 func TestRunInboxList_RefusesAProjectRootWithoutAnEvolveDir(t *testing.T) {
+	t.Parallel()
 	d := testDeps()
 	d.CheckRootHasEvolve = func(string, string, io.Writer) int { return 4 }
 	if rc, _, _ := runWith(d, t.TempDir(), "list"); rc != 4 {
@@ -165,12 +165,32 @@ func TestParseInboxCurateArgs_DefaultsTheRootFromTheEnvironment(t *testing.T) {
 }
 
 func TestHost_IsTheZeroDepsBeforeAnyRun(t *testing.T) {
-	prev := current.Load()
-	current.Store(nil)
-	t.Cleanup(func() { current.Store(prev) })
-	if d := host(); d.QueueGate != nil || d.PrintVerbJSON != nil {
-		t.Errorf("host() = %+v, want the zero Deps", d)
+	t.Parallel()
+	var d Deps
+	if rc, queued := d.queueGate("", "edit", nil, false, io.Discard, io.Discard); rc != exitOK || queued {
+		t.Errorf("queueGate = (%d, %v), want (0, false)", rc, queued)
 	}
+	if d.laneForbidden("", io.Discard)("a.go") {
+		t.Error("zero laneForbidden must permit paths by default")
+	}
+	var errb bytes.Buffer
+	if rc := d.printVerbJSON("list", nil, io.Discard, &errb); rc != exitIO || !strings.Contains(errb.String(), "PrintVerbJSON dependency is not wired") {
+		t.Errorf("printVerbJSON = %d stderr %q", rc, errb.String())
+	}
+	if w := d.humanWriter(&errb, true); w != io.Discard {
+		t.Errorf("humanWriter(asJSON=true) = %v, want io.Discard", w)
+	}
+	if w := d.humanWriter(&errb, false); w != &errb {
+		t.Errorf("humanWriter(asJSON=false) = %v, want stdout", w)
+	}
+	if rc := d.checkRootHasEvolve("list", "", io.Discard); rc != exitOK {
+		t.Errorf("checkRootHasEvolve = %d, want 0", rc)
+	}
+	c, closeCenter := d.newSignalCenter("inbox", "", "", io.Discard)
+	if c != nil || closeCenter == nil {
+		t.Fatalf("newSignalCenter = (%v, %v), want nil center and callable close", c, closeCenter != nil)
+	}
+	closeCenter()
 }
 
 func lockedInbox(t *testing.T, body string) string {
@@ -192,6 +212,7 @@ func lockedInbox(t *testing.T, body string) string {
 }
 
 func TestRouteVerbs_AFailedWriteIsAnIOError(t *testing.T) {
+	t.Parallel()
 	body := `{"id":"x","kind":"pipeline-repair","files":["go/internal/cycleclassify/classify.go"]}`
 	if rc, _, stderr := runWith(testDeps(), lockedInbox(t, body), "route-lane", "x", "operator"); rc != exitIO {
 		t.Errorf("route-lane rc %d stderr %q, want %d", rc, stderr, exitIO)

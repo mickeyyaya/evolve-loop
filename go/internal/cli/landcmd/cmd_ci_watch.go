@@ -103,7 +103,7 @@ func (a ciWatchArgs) watchedWorkflows() []string {
 	return []string{ciparity.RequiredWorkflow}
 }
 
-func runCIWatch(args []string, stdout, stderr io.Writer) int {
+func runCIWatch(args []string, stdout, stderr io.Writer, deps Deps) int {
 	a, err := parseCIWatchArgs(args)
 	if a.help && err == nil {
 		fmt.Fprintln(stdout, usageCIWatch)
@@ -113,13 +113,13 @@ func runCIWatch(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "%s%v\n%s\n", ciWatchPrefix, err, usageCIWatch)
 		return exitUsage
 	}
-	root, err := resolveRoot(a.projectRoot, stderr)
+	root, err := deps.resolveRoot(a.projectRoot, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "%s%v\n", ciWatchPrefix, err)
 		return exitIO
 	}
 	ctx := context.Background()
-	signals, closeSignals := newSignalCenter("ci", root, paths.EvolveDirOf(root), stderr)
+	signals, closeSignals := deps.newSignalCenter("ci", root, paths.EvolveDirOf(root), stderr)
 	defer closeSignals()
 	opts, err := ciWatchOptions(ctx, root, a)
 	if err != nil {

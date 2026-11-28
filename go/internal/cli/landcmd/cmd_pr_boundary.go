@@ -69,11 +69,11 @@ func defaultBoundaryPlane(root string) boundaryPlane {
 	}
 }
 
-func runPRBoundary(args []string, stdout, stderr io.Writer) int {
-	return runPRBoundaryWith(defaultBoundaryPlane, args, stdout, stderr)
+func runPRBoundary(args []string, stdout, stderr io.Writer, deps Deps) int {
+	return runPRBoundaryWith(defaultBoundaryPlane, args, stdout, stderr, deps)
 }
 
-func runPRBoundaryWith(planeOf func(string) boundaryPlane, args []string, stdout, stderr io.Writer) int {
+func runPRBoundaryWith(planeOf func(string) boundaryPlane, args []string, stdout, stderr io.Writer, deps Deps) int {
 	var a struct {
 		projectRoot string
 		asJSON      bool
@@ -89,7 +89,7 @@ func runPRBoundaryWith(planeOf func(string) boundaryPlane, args []string, stdout
 		fmt.Fprintf(stderr, "%s%v\n%s\n", prBoundaryPrefix, err, usagePRBoundary)
 		return exitUsage
 	}
-	rep, err := boundaryReport(a.projectRoot, planeOf, stderr)
+	rep, err := boundaryReport(a.projectRoot, planeOf, stderr, deps)
 	if err == nil {
 		err = writePRBoundary(stdout, rep, a.asJSON)
 	}
@@ -103,8 +103,8 @@ func runPRBoundaryWith(planeOf func(string) boundaryPlane, args []string, stdout
 	return exitBoundary
 }
 
-func boundaryReport(projectRoot string, planeOf func(string) boundaryPlane, stderr io.Writer) (prBoundaryReport, error) {
-	root, err := resolveRoot(projectRoot, stderr)
+func boundaryReport(projectRoot string, planeOf func(string) boundaryPlane, stderr io.Writer, deps Deps) (prBoundaryReport, error) {
+	root, err := deps.resolveRoot(projectRoot, stderr)
 	if err != nil {
 		return prBoundaryReport{}, err
 	}

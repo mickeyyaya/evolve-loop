@@ -49,6 +49,7 @@ func protectedDeps(protected string) Deps {
 }
 
 func TestFiler_FilesTheItemWithTheOriginCycleAndTheSource(t *testing.T) {
+	t.Parallel()
 	root := inboxtest.EmptyRoot(t)
 
 	filed, err := fileAs(t, root, agentItem, "request:7/inbox-add-1", testDeps())
@@ -66,6 +67,7 @@ func TestFiler_FilesTheItemWithTheOriginCycleAndTheSource(t *testing.T) {
 }
 
 func TestIntakeItem_UsesTheHostFunctionsOfItsDepsToRouteAProtectedPath(t *testing.T) {
+	t.Parallel()
 	root := inboxtest.EmptyRoot(t)
 	item := strings.Replace(agentItem, "go/internal/fleet/pool.go", "go/internal/guarded/guard.go", 1)
 	deps := protectedDeps("go/internal/guarded/guard.go")
@@ -88,6 +90,7 @@ func TestIntakeItem_UsesTheHostFunctionsOfItsDepsToRouteAProtectedPath(t *testin
 }
 
 func TestFiler_RefusesWhenTheDepsLackAHostFunction(t *testing.T) {
+	t.Parallel()
 	root := inboxtest.EmptyRoot(t)
 	for name, deps := range map[string]Deps{
 		"no lane check":    {NewSignalCenter: testDeps().NewSignalCenter},
@@ -103,6 +106,7 @@ func TestFiler_RefusesWhenTheDepsLackAHostFunction(t *testing.T) {
 }
 
 func TestFiler_RefusesAnItemTheIntakeRefusesWithTheCause(t *testing.T) {
+	t.Parallel()
 	root := inboxtest.EmptyRoot(t)
 	for name, tc := range map[string]struct{ body, why string }{
 		"no fix surface":  {strings.Replace(agentItem, `"files":["go/internal/fleet/pool.go"]`, `"files":[]`, 1), "fix surface"},
@@ -117,6 +121,7 @@ func TestFiler_RefusesAnItemTheIntakeRefusesWithTheCause(t *testing.T) {
 }
 
 func TestFiler_AnItemThatIsNotJSONIsRefused(t *testing.T) {
+	t.Parallel()
 	root := inboxtest.EmptyRoot(t)
 
 	_, err := fileAs(t, root, "not json", "request:7/inbox-add-1", testDeps())
@@ -127,6 +132,7 @@ func TestFiler_AnItemThatIsNotJSONIsRefused(t *testing.T) {
 }
 
 func TestFiler_AnOverlapRefusalCarriesTheTypedOverlapAndNoVerbAdvice(t *testing.T) {
+	t.Parallel()
 	root := inboxtest.EmptyRoot(t)
 	if _, err := fileAs(t, root, poolItem, "request:7/inbox-add-1", testDeps()); err != nil {
 		t.Fatal(err)
@@ -142,6 +148,7 @@ func TestFiler_AnOverlapRefusalCarriesTheTypedOverlapAndNoVerbAdvice(t *testing.
 }
 
 func TestFiler_AnOverlapIsARefusalThatNamesTheOpenItem(t *testing.T) {
+	t.Parallel()
 	root := inboxtest.EmptyRoot(t)
 	if _, err := fileAs(t, root, poolItem, "request:7/inbox-add-1", testDeps()); err != nil {
 		t.Fatal(err)
@@ -156,6 +163,7 @@ func TestFiler_AnOverlapIsARefusalThatNamesTheOpenItem(t *testing.T) {
 }
 
 func TestFiler_AReplayOfTheSameRequestReturnsTheItemAlreadyFiled(t *testing.T) {
+	t.Parallel()
 	root := inboxtest.EmptyRoot(t)
 	first, err := fileAs(t, root, agentItem, "request:7/inbox-add-1", testDeps())
 	if err != nil {
@@ -177,6 +185,7 @@ func TestFiler_AReplayOfTheSameRequestReturnsTheItemAlreadyFiled(t *testing.T) {
 }
 
 func TestFiler_TwoFilersOfTheSameIDFileOneItem(t *testing.T) {
+	t.Parallel()
 	root := inboxtest.EmptyRoot(t)
 	var wg sync.WaitGroup
 	errs := make([]error, 8)
@@ -229,6 +238,7 @@ func TestIntakeItem_VerbAndFilerShareOneIntake(t *testing.T) {
 }
 
 func TestFiler_FilesOnlyUnderTheLockOfTheInbox(t *testing.T) {
+	t.Parallel()
 	root := inboxtest.EmptyRoot(t)
 	release, err := verifylock.AcquireAt(context.Background(), filepath.Join(root, ".evolve", "inbox", inboxfile.LockName), io.Discard)
 	if err != nil {
@@ -268,6 +278,7 @@ func inboxWithMode(t *testing.T, mode os.FileMode) string {
 }
 
 func TestFiler_AnInboxItCannotReadIsAFailureNotARefusal(t *testing.T) {
+	t.Parallel()
 	root := inboxWithMode(t, 0o300)
 
 	_, err := fileAs(t, root, agentItem, "request:7/inbox-add-1", testDeps())
@@ -278,6 +289,7 @@ func TestFiler_AnInboxItCannotReadIsAFailureNotARefusal(t *testing.T) {
 }
 
 func TestFiler_AnInboxItCannotWriteIsAFailureNotARefusal(t *testing.T) {
+	t.Parallel()
 	root := inboxWithMode(t, 0o500)
 
 	_, err := fileAs(t, root, agentItem, "request:7/inbox-add-1", testDeps())
@@ -288,6 +300,7 @@ func TestFiler_AnInboxItCannotWriteIsAFailureNotARefusal(t *testing.T) {
 }
 
 func TestFiler_APolicyThatDoesNotParseIsAFailureNotARefusal(t *testing.T) {
+	t.Parallel()
 	root := inboxtest.EmptyRoot(t)
 	inboxtest.WritePolicy(t, root, `{"isolation":`)
 
@@ -308,6 +321,7 @@ func TestInboxAdd_AnInboxTheVerbCannotReadFailsTheOverlapCheck(t *testing.T) {
 }
 
 func TestRefusedError_NamesTheSentinelAndTheCause(t *testing.T) {
+	t.Parallel()
 	cause := errors.New("kind not listed")
 	err := error(&RefusedError{Cause: "kind \"wish\" is not listed", Err: cause})
 

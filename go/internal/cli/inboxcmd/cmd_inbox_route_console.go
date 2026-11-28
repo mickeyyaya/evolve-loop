@@ -12,7 +12,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
-func runInboxRouteConsole(root string, args []string, stdout, stderr io.Writer) int {
+func runInboxRouteConsole(root string, args []string, stdout, stderr io.Writer, deps Deps) int {
 	asJSON, gateArgs := takeInboxJSON(args)
 	blocker, args, ok := takeBlockedBy(gateArgs)
 	if !ok || len(args) < 3 || strings.TrimSpace(args[0]) == "" || strings.TrimSpace(args[1]) == "" {
@@ -25,7 +25,7 @@ func runInboxRouteConsole(root string, args []string, stdout, stderr io.Writer) 
 		fmt.Fprintf(stderr, "inbox route-console: cycle %q is not a cycle number\n%s\n", args[2], inboxUsage("route-console"))
 		return 10
 	}
-	if rc, queued := host().QueueGate(root, "route-console", gateArgs, asJSON, stdout, stderr); queued {
+	if rc, queued := deps.queueGate(root, "route-console", gateArgs, asJSON, stdout, stderr); queued {
 		return rc
 	}
 	opts := inboxmover.Options{ProjectRoot: root, Stderr: stderr}
@@ -51,5 +51,5 @@ func runInboxRouteConsole(root string, args []string, stdout, stderr io.Writer) 
 		return 2
 	}
 	human := fmt.Sprintf("inbox route-console: %s is console-manual (%s)", id, filepath.Base(res.Path))
-	return finishInboxWrite(asJSON, inboxWriteResult{Verb: "route-console", ID: id, Path: res.Path, Detail: "console-manual"}, human, stdout, stderr)
+	return finishInboxWrite(deps, asJSON, inboxWriteResult{Verb: "route-console", ID: id, Path: res.Path, Detail: "console-manual"}, human, stdout, stderr)
 }

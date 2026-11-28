@@ -25,16 +25,16 @@ type listedItem struct {
 	Reason string          `json:"reason,omitempty"`
 }
 
-func runInboxList(root string, args []string, stdout, stderr io.Writer) int {
+func runInboxList(root string, args []string, stdout, stderr io.Writer, deps Deps) int {
 	filter, asJSON, ok := parseInboxListArgs(args, stderr)
 	if !ok {
 		fmt.Fprintln(stderr, inboxUsage("list"))
 		return 10
 	}
-	if rc := host().CheckRootHasEvolve("inbox list", root, stderr); rc != 0 {
+	if rc := deps.checkRootHasEvolve("inbox list", root, stderr); rc != 0 {
 		return rc
 	}
-	inbox, err := loadPendingInbox(root, "list", stderr)
+	inbox, err := loadPendingInbox(root, "list", stderr, deps)
 	if err != nil {
 		fmt.Fprintf(stderr, "inbox list: %v\n", err)
 		return 2

@@ -77,7 +77,7 @@ func TestRunCI_RoutesWatchAndPrintsItsUsage(t *testing.T) {
 func TestRunCIWatch_InvalidTargetExitsUsage(t *testing.T) {
 	t.Parallel()
 	var stdout, stderr bytes.Buffer
-	if code := runCIWatch([]string{"--sha", "not-hex"}, &stdout, &stderr); code != exitUsage {
+	if code := runCIWatch([]string{"--sha", "not-hex"}, &stdout, &stderr, testDeps()); code != exitUsage {
 		t.Fatalf("code = %d, want %d", code, exitUsage)
 	}
 	if !strings.Contains(stderr.String(), ciWatchPrefix) {
@@ -88,7 +88,7 @@ func TestRunCIWatch_InvalidTargetExitsUsage(t *testing.T) {
 func TestRunCIWatch_NonexistentRootExitsIO(t *testing.T) {
 	t.Parallel()
 	var stdout, stderr bytes.Buffer
-	if code := runCIWatch([]string{"--sha", "1234567", "--project-root", "/nonexistent-path-never-exists"}, &stdout, &stderr); code != exitIO {
+	if code := runCIWatch([]string{"--sha", "1234567", "--project-root", "/nonexistent-path-never-exists"}, &stdout, &stderr, testDeps()); code != exitIO {
 		t.Fatalf("code = %d, want %d", code, exitIO)
 	}
 	if !strings.Contains(stderr.String(), ciWatchPrefix) {

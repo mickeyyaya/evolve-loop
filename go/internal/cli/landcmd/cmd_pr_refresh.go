@@ -24,7 +24,7 @@ var (
 	prRefreshOpHeads = []string{"MERGE_HEAD", "REBASE_HEAD", "CHERRY_PICK_HEAD"}
 )
 
-func runPRRefresh(args []string, stdout, stderr io.Writer) int {
+func runPRRefresh(args []string, stdout, stderr io.Writer, deps Deps) int {
 	var projectRoot string
 	operands, err := cmdutil.Flags().
 		Values(map[string]*string{"--project-root": &projectRoot}).
@@ -33,14 +33,14 @@ func runPRRefresh(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, usagePRRefresh)
 		return exitUsage
 	}
-	root, err := resolveRoot(projectRoot, stderr)
+	root, err := deps.resolveRoot(projectRoot, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "%s%v\n", prRefreshPrefix, err)
 		return exitIO
 	}
 	ctx := context.Background()
 	g := gitexec.Default(root)
-	outputs, err := refreshEntries(ctx, refreshWorktree(root), g)
+	outputs, err := refreshEntries(ctx, deps.refreshWorktree(root), g)
 	if err == nil {
 		err = landRefreshed(ctx, g, outputs, stdout)
 	}

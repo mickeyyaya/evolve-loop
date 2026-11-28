@@ -19,6 +19,7 @@ func runInbox(args ...string) (code int, stdout, stderr string) {
 }
 
 func TestInboxCmdRun(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		args       []string

@@ -57,16 +57,15 @@ func parseCIClassifyArgs(args []string) (ciClassifyArgs, error) {
 }
 
 func RunCI(args []string, stdin io.Reader, stdout, stderr io.Writer, deps Deps) int {
-	current.Store(&deps)
-	return dispatchCI(args, stdin, stdout, stderr)
+	return dispatchCI(args, stdin, stdout, stderr, deps)
 }
 
-func dispatchCI(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+func dispatchCI(args []string, stdin io.Reader, stdout, stderr io.Writer, deps Deps) int {
 	if len(args) > 0 {
 		if args[0] == "docs-tests" {
-			return runCIDocsTests(args[1:], stdin, stdout, stderr)
+			return runCIDocsTests(args[1:], stdin, stdout, stderr, deps)
 		}
-		if run := ciSubverbRunner(args[0]); run != nil {
+		if run := ciSubverbRunner(args[0], deps); run != nil {
 			return run(args[1:], stdout, stderr)
 		}
 	}
@@ -74,16 +73,16 @@ func dispatchCI(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, ciUsage)
 		return exitUsage
 	}
-	return runCIClassify(args[1:], stdout, stderr)
+	return runCIClassify(args[1:], stdout, stderr, deps)
 }
 
-func runCIClassify(args []string, stdout, stderr io.Writer) int {
+func runCIClassify(args []string, stdout, stderr io.Writer, deps Deps) int {
 	a, err := parseCIClassifyArgs(args)
 	if err != nil {
 		fmt.Fprintf(stderr, "%s%v\n%s\n", ciClassifyPrefix, err, ciUsage)
 		return exitUsage
 	}
-	root, err := resolveRoot(a.projectRoot, stderr)
+	root, err := deps.resolveRoot(a.projectRoot, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "%s%v\n", ciClassifyPrefix, err)
 		return exitIO
@@ -117,14 +116,16 @@ func runCIClassify(args []string, stdout, stderr io.Writer) int {
 	return exitRefused
 }
 
-func ciSubverbRunner(name string) func([]string, io.Writer, io.Writer) int {
+func ciSubverbRunner(name string, deps Deps) func([]string, io.Writer, io.Writer) int {
 	switch name {
 	case "watch":
-		return runCIWatch
+		return func(args []string, stdout, stderr io.Writer) int {
+			return runCIWatch(args, stdout, stderr, deps)
+		}
 	case "telemetry":
 		return runCITelemetry
 	case "darwin-set":
-		return host().DarwinSet
+		return deps.DarwinSet
 	}
 	return nil
 }

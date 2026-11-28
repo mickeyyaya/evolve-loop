@@ -15,8 +15,8 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
 
-func curationOptions(root string, stderr io.Writer) inboxmover.Options {
-	return inboxmover.Options{ProjectRoot: root, Stderr: stderr, IsProtectedPath: host().LaneForbidden(root, stderr)}
+func curationOptions(root string, stderr io.Writer, deps Deps) inboxmover.Options {
+	return inboxmover.Options{ProjectRoot: root, Stderr: stderr, IsProtectedPath: deps.laneForbidden(root, stderr)}
 }
 
 func refusedMidWaveAt(root, verb string, stderr io.Writer) bool {
@@ -45,7 +45,7 @@ func curationExitCode(verb string, err error, stderr io.Writer) int {
 	return 2
 }
 
-func runInboxEdit(root string, args []string, stdout, stderr io.Writer) int {
+func runInboxEdit(root string, args []string, stdout, stderr io.Writer, deps Deps) int {
 	asJSON, args := takeInboxJSON(args)
 	req, ok := parseInboxEditArgs(args, stderr)
 	if !ok {
@@ -55,20 +55,20 @@ func runInboxEdit(root string, args []string, stdout, stderr io.Writer) int {
 	if rc := curationExitCode("edit", inboxmover.CheckEdit(req.edits, req.reason), stderr); rc != 0 {
 		return rc
 	}
-	if rc, queued := host().QueueGate(root, "edit", args, asJSON, stdout, stderr); queued {
+	if rc, queued := deps.queueGate(root, "edit", args, asJSON, stdout, stderr); queued {
 		return rc
 	}
 	pol, err := policy.Load(filepath.Join(paths.EvolveDirOf(root), "policy.json"))
 	if err != nil {
 		return curationExitCode("edit", err, stderr)
 	}
-	opts := curationOptions(root, stderr)
+	opts := curationOptions(root, stderr, deps)
 	opts.PriorityClasses = pol.InboxPriorityConfig().ClassOrder
 	path, err := inboxmover.EditBecause(opts, req.target, req.reason, req.edits)
 	if rc := curationExitCode("edit", err, stderr); rc != 0 {
 		return rc
 	}
-	return finishInboxWrite(asJSON, inboxWriteResult{Verb: "edit", Path: path}, "inbox edit: edited "+filepath.Base(path), stdout, stderr)
+	return finishInboxWrite(deps, asJSON, inboxWriteResult{Verb: "edit", Path: path}, "inbox edit: edited "+filepath.Base(path), stdout, stderr)
 }
 
 type inboxEditRequest struct {
@@ -107,25 +107,25 @@ func parseOnePositional(fs *flag.FlagSet, args []string) (string, bool) {
 	return positional, positional != ""
 }
 
-func runInboxWithdraw(root string, args []string, stdout, stderr io.Writer) int {
+func runInboxWithdraw(root string, args []string, stdout, stderr io.Writer, deps Deps) int {
 	asJSON, args := takeInboxJSON(args)
 	if len(args) != 2 || strings.TrimSpace(args[0]) == "" || strings.TrimSpace(args[1]) == "" {
 		fmt.Fprintln(stderr, inboxUsage("withdraw"))
 		return 10
 	}
-	if rc, queued := host().QueueGate(root, "withdraw", args, asJSON, stdout, stderr); queued {
+	if rc, queued := deps.queueGate(root, "withdraw", args, asJSON, stdout, stderr); queued {
 		return rc
 	}
 	id := strings.TrimSpace(args[0])
-	path, err := inboxmover.Withdraw(curationOptions(root, stderr), id, args[1])
+	path, err := inboxmover.Withdraw(curationOptions(root, stderr, deps), id, args[1])
 	if rc := curationExitCode("withdraw", err, stderr); rc != 0 {
 		return rc
 	}
 	human := fmt.Sprintf("inbox withdraw: %s withdrawn (%s removed; the id may be filed again)", id, filepath.Base(path))
-	return finishInboxWrite(asJSON, inboxWriteResult{Verb: "withdraw", ID: id, Path: path}, human, stdout, stderr)
+	return finishInboxWrite(deps, asJSON, inboxWriteResult{Verb: "withdraw", ID: id, Path: path}, human, stdout, stderr)
 }
 
-func runInboxVerify(root string, args []string, stdout, stderr io.Writer) int {
+func runInboxVerify(root string, args []string, stdout, stderr io.Writer, deps Deps) int {
 	asJSON, args := takeInboxJSON(args)
 	fs := flag.NewFlagSet("inbox verify", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -135,13 +135,13 @@ func runInboxVerify(root string, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, inboxUsage("verify"))
 		return 10
 	}
-	if rc, queued := host().QueueGate(root, "verify", args, asJSON, stdout, stderr); queued {
+	if rc, queued := deps.queueGate(root, "verify", args, asJSON, stdout, stderr); queued {
 		return rc
 	}
-	path, err := inboxmover.VerifyPremise(curationOptions(root, stderr), id, *evidence)
+	path, err := inboxmover.VerifyPremise(curationOptions(root, stderr, deps), id, *evidence)
 	if rc := curationExitCode("verify", err, stderr); rc != 0 {
 		return rc
 	}
 	human := fmt.Sprintf("inbox verify: stamped the premise of %s (%s)", id, filepath.Base(path))
-	return finishInboxWrite(asJSON, inboxWriteResult{Verb: "verify", ID: id, Path: path}, human, stdout, stderr)
+	return finishInboxWrite(deps, asJSON, inboxWriteResult{Verb: "verify", ID: id, Path: path}, human, stdout, stderr)
 }

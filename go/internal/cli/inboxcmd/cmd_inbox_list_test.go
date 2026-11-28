@@ -18,10 +18,10 @@ type listedJSON struct {
 	Reason string `json:"reason"`
 }
 
-func listJSON(t *testing.T, args ...string) []listedJSON {
+func listJSON(t *testing.T, root string, args ...string) []listedJSON {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
-	if rc := runInboxCmd(append([]string{"list", "--json"}, args...), nil, &stdout, &stderr); rc != 0 {
+	if rc := runInboxCmd(append([]string{"list", "--project-root", root, "--json"}, args...), nil, &stdout, &stderr); rc != 0 {
 		t.Fatalf("list %v: rc = %d stderr = %q", args, rc, stderr.String())
 	}
 	var out []listedJSON
@@ -41,7 +41,9 @@ func listedIDs(items []listedJSON) []string {
 }
 
 func TestCmd_InboxList_ConsoleStatusIsExactlyWhatBatchesCallsOperatorOwned(t *testing.T) {
-	inboxtest.CurationRoot(t, map[string]string{
+	t.Parallel()
+	root := inboxtest.EmptyRoot(t)
+	inboxtest.SeedItems(t, root, map[string]string{
 		"a.json": readyItem,
 		"b.json": consoleItem,
 		"c.json": waitingItem,
@@ -49,7 +51,7 @@ func TestCmd_InboxList_ConsoleStatusIsExactlyWhatBatchesCallsOperatorOwned(t *te
 		"e.json": `{"id":"protected-one","kind":"bug","weight":0.2,"files":["go/internal/guards/phase.go"]}`,
 	})
 	var stdout, stderr bytes.Buffer
-	if rc := runInboxCmd([]string{"batches", "--json"}, nil, &stdout, &stderr); rc != 0 {
+	if rc := runInboxCmd([]string{"batches", "--project-root", root, "--json"}, nil, &stdout, &stderr); rc != 0 {
 		t.Fatalf("batches: rc = %d", rc)
 	}
 	var batches inboxBatchesDoc
@@ -62,7 +64,7 @@ func TestCmd_InboxList_ConsoleStatusIsExactlyWhatBatchesCallsOperatorOwned(t *te
 	}
 	slices.Sort(want)
 
-	got := listJSON(t, "--status", "console")
+	got := listJSON(t, root, "--status", "console")
 
 	if !slices.Equal(listedIDs(got), want) || len(want) != 3 {
 		t.Errorf("list --status console = %v, batches' operator-owned = %v", listedIDs(got), want)
@@ -75,7 +77,9 @@ func TestCmd_InboxList_ConsoleStatusIsExactlyWhatBatchesCallsOperatorOwned(t *te
 }
 
 func TestCmd_InboxList_FiltersByStatusKindAndRoute(t *testing.T) {
-	inboxtest.CurationRoot(t, map[string]string{
+	t.Parallel()
+	root := inboxtest.EmptyRoot(t)
+	inboxtest.SeedItems(t, root, map[string]string{
 		"a.json": readyItem,
 		"b.json": consoleItem,
 		"c.json": waitingItem,
@@ -92,17 +96,18 @@ func TestCmd_InboxList_FiltersByStatusKindAndRoute(t *testing.T) {
 		"a route":             {[]string{"--route", "console-manual"}, []string{"routed-one"}},
 		"a kind and a status": {[]string{"--kind", "feature", "--status", "console"}, []string{"routed-one"}},
 	} {
-		if got := listedIDs(listJSON(t, tc.args...)); !slices.Equal(got, tc.want) {
+		if got := listedIDs(listJSON(t, root, tc.args...)); !slices.Equal(got, tc.want) {
 			t.Errorf("%s: list = %v, want %v", name, got, tc.want)
 		}
 	}
 }
 
 func TestCmd_InboxList_PrintsOneLinePerItem(t *testing.T) {
-	menuRoot(t)
+	t.Parallel()
+	root := menuRoot(t)
 	var stdout, stderr bytes.Buffer
 
-	rc := runInboxCmd([]string{"list", "--status", "waiting"}, nil, &stdout, &stderr)
+	rc := runInboxCmd([]string{"list", "--project-root", root, "--status", "waiting"}, nil, &stdout, &stderr)
 
 	if rc != 0 || !strings.Contains(stdout.String(), "waiting-one") || !strings.Contains(stdout.String(), "deps unmet: needs ready-one") ||
 		strings.Contains(stdout.String(), "console-one") {
@@ -111,8 +116,9 @@ func TestCmd_InboxList_PrintsOneLinePerItem(t *testing.T) {
 }
 
 func TestCmd_InboxList_RefusesABadFilter(t *testing.T) {
-	menuRoot(t)
-	for _, args := range [][]string{{"list", "--status", "claimed"}, {"list", "extra"}, {"list", "--kind"}} {
+	t.Parallel()
+	root := menuRoot(t)
+	for _, args := range [][]string{{"list", "--project-root", root, "--status", "claimed"}, {"list", "--project-root", root, "extra"}, {"list", "--project-root", root, "--kind"}} {
 		var stdout, stderr bytes.Buffer
 		if rc := runInboxCmd(args, nil, &stdout, &stderr); rc != 10 {
 			t.Errorf("%v: rc = %d, want 10", args, rc)

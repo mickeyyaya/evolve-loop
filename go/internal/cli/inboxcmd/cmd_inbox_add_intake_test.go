@@ -232,16 +232,18 @@ func TestPrintFiledRank_WarnsWhenTheRankIsNotKnown(t *testing.T) {
 	saved := filedRankSource
 	t.Cleanup(func() { filedRankSource = saved })
 	for name, tc := range map[string]struct {
-		source func(string, time.Time, io.Writer) (rankedInbox, error)
+		source func(string, time.Time, io.Writer, Deps) (rankedInbox, error)
 		want   string
 	}{
-		"the rank fails":     {func(string, time.Time, io.Writer) (rankedInbox, error) { return rankedInbox{}, errors.New("no policy") }, "no policy"},
-		"no row is the item": {func(string, time.Time, io.Writer) (rankedInbox, error) { return rankedInbox{}, nil }, "holds no row"},
+		"the rank fails": {func(string, time.Time, io.Writer, Deps) (rankedInbox, error) {
+			return rankedInbox{}, errors.New("no policy")
+		}, "no policy"},
+		"no row is the item": {func(string, time.Time, io.Writer, Deps) (rankedInbox, error) { return rankedInbox{}, nil }, "holds no row"},
 	} {
 		filedRankSource = tc.source
 		var stdout, stderr bytes.Buffer
 
-		printFiledRank("/x", "/x/.evolve/inbox/a.json", &stdout, &stderr)
+		printFiledRank("/x", "/x/.evolve/inbox/a.json", &stdout, &stderr, testDeps())
 
 		if stdout.Len() != 0 || !strings.Contains(stderr.String(), tc.want) {
 			t.Errorf("%s: stdout = %q stderr = %q, want a WARN naming %q", name, stdout.String(), stderr.String(), tc.want)

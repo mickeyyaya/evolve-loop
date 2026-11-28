@@ -9,6 +9,7 @@ import (
 )
 
 func TestApicover_NamesEveryExport(t *testing.T) {
+	t.Parallel()
 	t.Run("Deps and Run", func(t *testing.T) {
 		deps := testDeps()
 		if deps.QueueGate == nil || deps.LaneForbidden == nil || deps.PrintVerbJSON == nil ||

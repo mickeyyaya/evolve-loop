@@ -18,12 +18,15 @@ const (
 )
 
 func menuRoot(t *testing.T) string {
-	return inboxtest.CurationRoot(t, map[string]string{
+	t.Helper()
+	root := inboxtest.EmptyRoot(t)
+	inboxtest.SeedItems(t, root, map[string]string{
 		"2026-09-30T00-00-00Z-ready-one.json":     readyItem,
 		"2026-09-30T00-00-00Z-console-one.json":   consoleItem,
 		"2026-09-30T00-00-00Z-waiting-one.json":   waitingItem,
 		"consumed/2026-09-01T00-00-00Z-gone.json": `{"id":"gone","kind":"feature"}`,
 	})
+	return root
 }
 
 type lifecycleLine struct {
@@ -54,7 +57,8 @@ func lifecycleLines(t *testing.T, root string) []lifecycleLine {
 }
 
 func TestCmd_InboxShow_PrintsTheItemAndItsLaneMenuPlace(t *testing.T) {
-	menuRoot(t)
+	t.Parallel()
+	root := menuRoot(t)
 	for id, want := range map[string][]string{
 		"ready-one":   {"ready", "2026-09-30T00-00-00Z-ready-one.json", "the ready summary"},
 		"console-one": {"console", "pipeline-repair"},
@@ -62,7 +66,7 @@ func TestCmd_InboxShow_PrintsTheItemAndItsLaneMenuPlace(t *testing.T) {
 	} {
 		var stdout, stderr bytes.Buffer
 
-		rc := runInboxCmd([]string{"show", id}, nil, &stdout, &stderr)
+		rc := runInboxCmd([]string{"show", "--project-root", root, id}, nil, &stdout, &stderr)
 
 		if rc != 0 {
 			t.Fatalf("show %s: rc = %d stderr = %q", id, rc, stderr.String())
@@ -76,10 +80,11 @@ func TestCmd_InboxShow_PrintsTheItemAndItsLaneMenuPlace(t *testing.T) {
 }
 
 func TestCmd_InboxShow_JSONCarriesTheWholeItemAndItsPlace(t *testing.T) {
-	menuRoot(t)
+	t.Parallel()
+	root := menuRoot(t)
 	var stdout, stderr bytes.Buffer
 
-	rc := runInboxCmd([]string{"show", "--json", "waiting-one"}, nil, &stdout, &stderr)
+	rc := runInboxCmd([]string{"show", "--project-root", root, "--json", "waiting-one"}, nil, &stdout, &stderr)
 
 	if rc != 0 {
 		t.Fatalf("rc = %d stderr = %q", rc, stderr.String())
@@ -101,18 +106,20 @@ func TestCmd_InboxShow_JSONCarriesTheWholeItemAndItsPlace(t *testing.T) {
 }
 
 func TestCmd_InboxShow_AnIDNotPendingExits1NamingWhereItIs(t *testing.T) {
-	menuRoot(t)
+	t.Parallel()
+	root := menuRoot(t)
 	for id, why := range map[string]string{"gone": "consumed", "never-filed": "no inbox item"} {
 		var stdout, stderr bytes.Buffer
-		if rc := runInboxCmd([]string{"show", id}, nil, &stdout, &stderr); rc != 1 || !strings.Contains(stderr.String(), why) {
+		if rc := runInboxCmd([]string{"show", "--project-root", root, id}, nil, &stdout, &stderr); rc != 1 || !strings.Contains(stderr.String(), why) {
 			t.Errorf("show %s: rc = %d stderr = %q, want 1 naming %q", id, rc, stderr.String(), why)
 		}
 	}
 }
 
 func TestCmd_InboxShow_RefusesAMalformedRequest(t *testing.T) {
-	menuRoot(t)
-	for _, args := range [][]string{{"show"}, {"show", "a", "b"}, {"show", "--bogus", "a"}, {"show", " "}} {
+	t.Parallel()
+	root := menuRoot(t)
+	for _, args := range [][]string{{"show", "--project-root", root}, {"show", "--project-root", root, "a", "b"}, {"show", "--project-root", root, "--bogus", "a"}, {"show", "--project-root", root, " "}} {
 		var stdout, stderr bytes.Buffer
 		if rc := runInboxCmd(args, nil, &stdout, &stderr); rc != 10 {
 			t.Errorf("%v: rc = %d, want 10", args, rc)

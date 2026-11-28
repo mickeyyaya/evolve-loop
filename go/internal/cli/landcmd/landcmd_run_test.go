@@ -16,20 +16,19 @@ const (
 )
 
 func runPR(args ...string) (code int, stdout, stderr string) {
-	defer current.Store(current.Load())
 	var out, errb bytes.Buffer
 	code = RunPR(args, strings.NewReader(""), &out, &errb, Deps{})
 	return code, out.String(), errb.String()
 }
 
 func runCI(args ...string) (code int, stdout, stderr string) {
-	defer current.Store(current.Load())
 	var out, errb bytes.Buffer
 	code = RunCI(args, strings.NewReader(""), &out, &errb, Deps{})
 	return code, out.String(), errb.String()
 }
 
 func TestLandCmdRun(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name       string
 		run        func(args ...string) (int, string, string)

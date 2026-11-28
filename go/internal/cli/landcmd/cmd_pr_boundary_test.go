@@ -76,7 +76,7 @@ func boundaryPlaneOf(gh *fakeBoundaryGH, live []runlease.LiveRun, pool int, pool
 func runPRBoundaryT(t *testing.T, plane func(string) boundaryPlane, args ...string) (int, string, string) {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
-	code := runPRBoundaryWith(plane, args, &stdout, &stderr)
+	code := runPRBoundaryWith(plane, args, &stdout, &stderr, testDeps())
 	return code, stdout.String(), stderr.String()
 }
 

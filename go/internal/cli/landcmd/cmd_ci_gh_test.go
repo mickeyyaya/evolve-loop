@@ -142,11 +142,13 @@ func TestRunCI_ClassifyWarnsWhenTheModuleFileIsMissing(t *testing.T) {
 }
 
 func TestRunCI_DarwinSetRunsTheWiredHostVerb(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	if code := runCICmd([]string{"darwin-set", "check"}, nil, &stdout, &stderr); code != exitUsage {
 		t.Errorf("exit = %d, want the host verb's %d", code, exitUsage)
 	}
-	if ciSubverbRunner("classify") != nil || ciSubverbRunner("watch") == nil || ciSubverbRunner("telemetry") == nil {
+	deps := testDeps()
+	if ciSubverbRunner("classify", deps) != nil || ciSubverbRunner("watch", deps) == nil || ciSubverbRunner("telemetry", deps) == nil {
 		t.Error("ciSubverbRunner must route watch and telemetry and leave classify to the dispatcher")
 	}
 }
@@ -204,37 +206,35 @@ func TestClassifyRedRuns_AClassifyFailureIsNamedPerRun(t *testing.T) {
 }
 
 func TestUnwiredDeps_FallBackToSafeDefaults(t *testing.T) {
-	prev := current.Load()
-	current.Store(nil)
-	t.Cleanup(func() { current.Store(prev) })
+	t.Parallel()
+	var unwired Deps
 
-	if _, err := resolveRoot("", nil); err == nil {
+	if _, err := unwired.resolveRoot("", nil); err == nil {
 		t.Error("resolveRoot must refuse when its dependency is not wired")
 	}
 	var stdout, stderr bytes.Buffer
-	if code := printVerbJSON("pr", map[string]int{"a": 1}, &stdout, &stderr); code != exitIO || !strings.Contains(stderr.String(), "PrintVerbJSON dependency is not wired") {
+	if code := unwired.printVerbJSON("pr", map[string]int{"a": 1}, &stdout, &stderr); code != exitIO || !strings.Contains(stderr.String(), "PrintVerbJSON dependency is not wired") {
 		t.Errorf("printVerbJSON = %d, stderr %q", code, stderr.String())
 	}
-	center, closeCenter := newSignalCenter("ci", "", "", &stderr)
+	center, closeCenter := unwired.newSignalCenter("ci", "", "", &stderr)
 	if center != nil || closeCenter == nil {
 		t.Fatalf("newSignalCenter = (%v, %v), want a nil center and a callable close", center, closeCenter != nil)
 	}
 	closeCenter()
 	root := t.TempDir()
-	if got := refreshWorktree(root); got.Base != "HEAD" || got.Run == nil || got.Git == nil {
+	if got := unwired.refreshWorktree(root); got.Base != "HEAD" || got.Run == nil || got.Git == nil {
 		t.Errorf("refreshWorktree = base %q, run set %v, git set %v; want the core default", got.Base, got.Run != nil, got.Git != nil)
-	}
-	if host().ResolveRoot != nil {
-		t.Error("an unset host must carry no wired dependency")
 	}
 }
 
 func TestWiredDeps_ReachTheHostFunctions(t *testing.T) {
+	t.Parallel()
+	deps := testDeps()
 	var stdout, stderr bytes.Buffer
-	if code := printVerbJSON("pr", map[string]int{"a": 1}, &stdout, &stderr); code != exitOK || !strings.Contains(stdout.String(), `"a":1`) {
+	if code := deps.printVerbJSON("pr", map[string]int{"a": 1}, &stdout, &stderr); code != exitOK || !strings.Contains(stdout.String(), `"a":1`) {
 		t.Errorf("printVerbJSON = %d, stdout %q", code, stdout.String())
 	}
-	center, closeCenter := newSignalCenter("ci", "", "", &stderr)
+	center, closeCenter := deps.newSignalCenter("ci", "", "", &stderr)
 	if center == nil {
 		t.Error("a wired NewSignalCenter must return its center")
 	}

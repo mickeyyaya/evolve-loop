@@ -276,7 +276,7 @@ func TestPRMergeJourney_UpdateBranchTrainWithAPendingNewHead(t *testing.T) {
 	m.updateBranch = a.updateBranch
 	m.fetch = pendingFetch
 	var out, errOut strings.Builder
-	code := mergePRs(m, a, &out, &errOut)
+	code := mergePRs(m, a, &out, &errOut, testDeps())
 	var env struct {
 		Merged       []prMerged `json:"merged"`
 		Refused      string     `json:"refused"`

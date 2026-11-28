@@ -59,17 +59,17 @@ type rankedInbox struct {
 	opts inboxmover.Options
 }
 
-func runInboxRank(root string, args []string, stdout, stderr io.Writer) int {
-	return rankInboxAt(root, args, time.Now(), stdout, stderr)
+func runInboxRank(root string, args []string, stdout, stderr io.Writer, deps Deps) int {
+	return rankInboxAt(root, args, time.Now(), stdout, stderr, deps)
 }
 
-func rankInboxAt(root string, args []string, now time.Time, stdout, stderr io.Writer) int {
+func rankInboxAt(root string, args []string, now time.Time, stdout, stderr io.Writer, deps Deps) int {
 	req, ok := parseInboxRankArgs(args, stderr)
 	if !ok {
 		fmt.Fprintln(stderr, inboxUsage("rank"))
 		return 10
 	}
-	ranked, err := loadRankedInbox(root, now, stderr)
+	ranked, err := loadRankedInbox(root, now, stderr, deps)
 	if err != nil {
 		fmt.Fprintf(stderr, "inbox rank: %v\n", err)
 		return 2
@@ -113,12 +113,12 @@ func parseInboxRankArgs(args []string, stderr io.Writer) (inboxRankRequest, bool
 	return req, false
 }
 
-func loadRankedInbox(root string, now time.Time, stderr io.Writer) (rankedInbox, error) {
+func loadRankedInbox(root string, now time.Time, stderr io.Writer, deps Deps) (rankedInbox, error) {
 	evolveDir := filepath.Join(root, ".evolve")
 	if _, err := policy.Load(filepath.Join(evolveDir, "policy.json")); err != nil {
 		return rankedInbox{}, err
 	}
-	inbox, err := loadPendingInbox(root, "rank", stderr)
+	inbox, err := loadPendingInbox(root, "rank", stderr, deps)
 	if err != nil {
 		return rankedInbox{}, err
 	}

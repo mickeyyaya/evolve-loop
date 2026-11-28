@@ -15,7 +15,7 @@ const (
 	ciDocsTestsPrefix = "evolve ci docs-tests: "
 )
 
-func runCIDocsTests(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+func runCIDocsTests(args []string, stdin io.Reader, stdout, stderr io.Writer, deps Deps) int {
 	var projectRoot string
 	var help bool
 	operands, err := cmdutil.Flags().
@@ -38,7 +38,7 @@ func runCIDocsTests(args []string, stdin io.Reader, stdout, stderr io.Writer) in
 		fmt.Fprintf(stderr, "%s%v\n", ciDocsTestsPrefix, err)
 		return exitIO
 	}
-	root, err := resolveRoot(projectRoot, stderr)
+	root, err := deps.resolveRoot(projectRoot, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "%s%v\n", ciDocsTestsPrefix, err)
 		return exitIO

@@ -67,19 +67,18 @@ func parsePRMergeArgs(args []string) (prMergeArgs, error) {
 }
 
 func RunPR(args []string, _ io.Reader, stdout, stderr io.Writer, deps Deps) int {
-	current.Store(&deps)
-	return dispatchPR(args, stdout, stderr)
+	return dispatchPR(args, stdout, stderr, deps)
 }
 
-func dispatchPR(args []string, stdout, stderr io.Writer) int {
+func dispatchPR(args []string, stdout, stderr io.Writer, deps Deps) int {
 	if len(args) > 0 && args[0] == "window" {
-		return runPRWindow(args[1:], stdout, stderr)
+		return runPRWindow(args[1:], stdout, stderr, deps)
 	}
 	if len(args) > 0 && args[0] == "boundary" {
-		return runPRBoundary(args[1:], stdout, stderr)
+		return runPRBoundary(args[1:], stdout, stderr, deps)
 	}
 	if len(args) > 0 && args[0] == "refresh" {
-		return runPRRefresh(args[1:], stdout, stderr)
+		return runPRRefresh(args[1:], stdout, stderr, deps)
 	}
 	if len(args) == 0 || args[0] != "merge" {
 		fmt.Fprintln(stderr, prUsage+"\n"+usagePRWindow+"\n"+usagePRBoundary+"\n"+usagePRRefresh)
@@ -90,7 +89,7 @@ func dispatchPR(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "%s%v\n%s\n", prMergePrefix, err, prUsage)
 		return exitUsage
 	}
-	root, err := resolveRoot(a.projectRoot, stderr)
+	root, err := deps.resolveRoot(a.projectRoot, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "%s%v\n", prMergePrefix, err)
 		return exitIO
@@ -100,16 +99,16 @@ func dispatchPR(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "%s%v\n", prMergePrefix, err)
 		return exitIO
 	}
-	return mergePRs(m, a, stdout, stderr)
+	return mergePRs(m, a, stdout, stderr, deps)
 }
 
-func mergePRs(m prMerger, a prMergeArgs, stdout, stderr io.Writer) int {
+func mergePRs(m prMerger, a prMergeArgs, stdout, stderr io.Writer, deps Deps) int {
 	if !a.json {
 		return m.mergeAll(context.Background(), a.prs)
 	}
 	m.stdout = io.Discard
 	result, rc := m.merge(context.Background(), a.prs)
-	return max(printVerbJSON("pr merge", result, stdout, stderr), rc)
+	return max(deps.printVerbJSON("pr merge", result, stdout, stderr), rc)
 }
 
 type prMerged struct {

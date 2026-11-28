@@ -27,13 +27,13 @@ type shownItem struct {
 	Item   json.RawMessage `json:"item"`
 }
 
-func runInboxShow(root string, args []string, stdout, stderr io.Writer) int {
+func runInboxShow(root string, args []string, stdout, stderr io.Writer, deps Deps) int {
 	id, asJSON, ok := parseInboxShowArgs(args)
 	if !ok {
 		fmt.Fprintln(stderr, inboxUsage("show"))
 		return 10
 	}
-	inbox, err := loadPendingInbox(root, "show", stderr)
+	inbox, err := loadPendingInbox(root, "show", stderr, deps)
 	if err != nil {
 		fmt.Fprintf(stderr, "inbox show: %v\n", err)
 		return 2

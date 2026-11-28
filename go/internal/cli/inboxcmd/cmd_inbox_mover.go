@@ -9,24 +9,23 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 )
 
-func moverOptions(stderr io.Writer) inboxmover.Options {
+func moverOptions(stderr io.Writer, deps Deps) inboxmover.Options {
 	projectRoot := cmdutil.EnvOrCwd("EVOLVE_PROJECT_ROOT")
 	return inboxmover.Options{
 		ProjectRoot:     projectRoot,
 		Stderr:          stderr,
-		IsProtectedPath: host().LaneForbidden(projectRoot, stderr),
+		IsProtectedPath: deps.laneForbidden(projectRoot, stderr),
 	}
 }
 
 func RunMover(args []string, _ io.Reader, stdout, stderr io.Writer, deps Deps) int {
-	defer pushHost(deps)()
 	if len(args) == 0 {
 		printInboxMoverUsage(stderr)
 		return 1
 	}
 	subcmd := args[0]
 	rest := args[1:]
-	opts := moverOptions(stderr)
+	opts := moverOptions(stderr, deps)
 
 	switch subcmd {
 	case "--help", "-h":

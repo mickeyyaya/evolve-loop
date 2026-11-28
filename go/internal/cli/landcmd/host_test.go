@@ -26,11 +26,6 @@ var (
 	prRefreshWorktree = core.DerivedWorktree
 )
 
-func init() {
-	d := testDeps()
-	current.Store(&d)
-}
-
 func testResolveRoot(projectRoot string, stderr io.Writer) (string, error) {
 	if projectRoot == "" {
 		projectRoot = os.Getenv("EVOLVE_PROJECT_ROOT")

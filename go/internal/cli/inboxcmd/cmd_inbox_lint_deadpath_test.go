@@ -33,7 +33,7 @@ func TestLint_FlagsAPathThatIsGoneOnMain(t *testing.T) {
 	contractUnitWrite(t, repo.Dir, ".evolve/inbox/cites-gone.json", lintItemJSON("cites-gone", "go/internal/live/live.go", "go/internal/gone/gone.go"))
 	var stdout, stderr bytes.Buffer
 
-	rc := runInboxLint(repo.Dir, nil, &stdout, &stderr)
+	rc := runInboxLint(repo.Dir, nil, &stdout, &stderr, testDeps())
 
 	if rc != 0 {
 		t.Errorf("rc = %d, want 0: a dead path is a warning and never fails the lint (stdout %q, stderr %q)", rc, stdout.String(), stderr.String())
@@ -53,7 +53,7 @@ func TestLint_JudgesAPathByTheTrackedTreeNotTheDisk(t *testing.T) {
 	contractUnitWrite(t, repo.Dir, ".evolve/inbox/cites-mixed.json", lintItemJSON("cites-mixed", "go/internal/live", "go/internal/loose.go"))
 	var stdout, stderr bytes.Buffer
 
-	rc := runInboxLint(repo.Dir, nil, &stdout, &stderr)
+	rc := runInboxLint(repo.Dir, nil, &stdout, &stderr, testDeps())
 
 	if rc != 0 {
 		t.Errorf("rc = %d, want 0 (stderr %q)", rc, stderr.String())
@@ -72,7 +72,7 @@ func TestLint_SkipsTheDeadPathCheckWhenTheTrackedTreeIsUnreadable(t *testing.T) 
 	contractUnitWrite(t, root, ".evolve/inbox/cites-gone.json", lintItemJSON("cites-gone", "go/internal/gone/gone.go"))
 	var stdout, stderr bytes.Buffer
 
-	rc := runInboxLint(root, nil, &stdout, &stderr)
+	rc := runInboxLint(root, nil, &stdout, &stderr, testDeps())
 
 	if rc != 0 || strings.Contains(stderr.String(), "is gone on main") {
 		t.Errorf("rc = %d, stderr %q, want exit 0 and no dead-path verdict from a tree that could not be read", rc, stderr.String())
@@ -86,7 +86,7 @@ func TestLint_ADeadPathDoesNotMaskAnUndeclaredSurface(t *testing.T) {
 	contractUnitWrite(t, repo.Dir, ".evolve/inbox/plain.json", `{"id":"plain","kind":"bug","weight":0.8,"priority_class":"correctness","title":"the queue renders slowly","summary":"s"}`)
 	var stdout, stderr bytes.Buffer
 
-	rc := runInboxLint(repo.Dir, nil, &stdout, &stderr)
+	rc := runInboxLint(repo.Dir, nil, &stdout, &stderr, testDeps())
 
 	if rc != exitFailed || !strings.Contains(stdout.String(), "plain: undeclared surface") {
 		t.Errorf("rc = %d, stdout %q, want exit 1 for the undeclared item", rc, stdout.String())
@@ -104,7 +104,7 @@ func TestLint_WarnsOnMissingTitleSummaryOrAcceptanceAndAcceptsCompleteItems(t *t
 	contractUnitWrite(t, root, ".evolve/inbox/structured.json", `{"id":"structured","kind":"pipeline-repair","weight":0.75,"priority_class":"correctness","title":"ok","summary":{"note":"details"},"acceptance":["","done"]}`)
 	var stdout, stderr bytes.Buffer
 
-	rc := runInboxLint(root, nil, &stdout, &stderr)
+	rc := runInboxLint(root, nil, &stdout, &stderr, testDeps())
 
 	if rc != 0 {
 		t.Fatalf("rc = %d, want 0 (stdout=%q stderr=%q)", rc, stdout.String(), stderr.String())
