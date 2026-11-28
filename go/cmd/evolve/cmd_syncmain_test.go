@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/gittest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/runlease"
 )
@@ -466,8 +465,7 @@ func TestSyncMain_RefusesToMergeWhenTheStampsCannotLand(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	hook := filepath.Join(repo, ".git", "hooks", "pre-commit")
-	fakeclitest.Install(t, hook, "#!/bin/sh\nexit 1\n")
+	smInstallHook(t, repo, "pre-commit", "#!/bin/sh\nexit 1\n")
 	headBefore := smHead(t, repo)
 
 	var out, errb bytes.Buffer
@@ -483,6 +481,17 @@ func TestSyncMain_RefusesToMergeWhenTheStampsCannotLand(t *testing.T) {
 		if got := smRead(t, item); !strings.Contains(got, "console-manual") {
 			t.Errorf("%s = %s, want the stamp back in the tree, including the one prepared for a replay", filepath.Base(item), got)
 		}
+	}
+}
+
+func smInstallHook(t *testing.T, repo, name, body string) {
+	t.Helper()
+	hooks := filepath.Join(repo, ".git", "hooks")
+	if err := os.MkdirAll(hooks, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(hooks, name), []byte(body), 0o755); err != nil {
+		t.Fatal(err)
 	}
 }
 

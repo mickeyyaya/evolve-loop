@@ -37,7 +37,11 @@ func TestLoopDetachHelperProcess(t *testing.T) {
 	if mode == "" {
 		return
 	}
-	_ = os.RemoveAll(os.Getenv("TMUX_TMPDIR"))
+	tmuxTmp := os.Getenv("TMUX_TMPDIR")
+	if tmuxTmp == "" {
+		t.Fatal("the helper removes TMUX_TMPDIR, so TestMain must have isolated it first")
+	}
+	_ = os.RemoveAll(tmuxTmp)
 	switch mode {
 	case "lease":
 		writeDetachChildLease(os.Getenv(detachHelperRunsEnv))

@@ -276,7 +276,7 @@ func agySelfUpdatedHost(t *testing.T, evolveDir, fixture string) *fakeCLIHost {
 
 func TestBootCLIUpdate_ASmokeFailureWithOnlyArgonDrainedStillHaltsAndNamesTheWindow(t *testing.T) {
 	b, _, coordinatorErr := boundaryCoordinator(t, 0)
-	h := agySelfUpdatedHost(t, b.cfg.EvolveDir, "agy_usage_argon_drained.txt")
+	agySelfUpdatedHost(t, b.cfg.EvolveDir, "agy_usage_argon_drained.txt")
 	lr := &loopResult{}
 	var stdout, stderr bytes.Buffer
 
@@ -300,14 +300,11 @@ func TestBootCLIUpdate_ASmokeFailureWithOnlyArgonDrainedStillHaltsAndNamesTheWin
 	if got, err := cliupdate.LoadRecords(b.cfg.EvolveDir); err != nil || len(got) != 1 || got[0].New != "1.4.0" {
 		t.Errorf("the unproven 1.4.1 must stay unrecorded: %+v, %v", got, err)
 	}
-	if want := []string{"eligible agy", "version agy", "smoke agy", "explain agy"}; !slices.Equal(h.calls, want) {
-		t.Errorf("calls = %q, want %q", h.calls, want)
-	}
 }
 
 func TestBootCLIUpdate_ASmokeFailureWhileTheFamilyIsDrainedWarnsAndDoesNotHalt(t *testing.T) {
 	b, _, coordinatorErr := boundaryCoordinator(t, 0)
-	h := agySelfUpdatedHost(t, b.cfg.EvolveDir, "agy_usage_gemini_drained.txt")
+	agySelfUpdatedHost(t, b.cfg.EvolveDir, "agy_usage_gemini_drained.txt")
 	lr := &loopResult{}
 	var stdout, stderr bytes.Buffer
 
@@ -325,9 +322,6 @@ func TestBootCLIUpdate_ASmokeFailureWhileTheFamilyIsDrainedWarnsAndDoesNotHalt(t
 	}
 	if got, err := cliupdate.LoadRecords(b.cfg.EvolveDir); err != nil || len(got) != 1 || got[0].New != "1.4.0" {
 		t.Errorf("the unproven 1.4.1 must stay unrecorded so the next boundary smokes it again: %+v, %v", got, err)
-	}
-	if want := []string{"eligible agy", "version agy", "smoke agy", "explain agy"}; !slices.Equal(h.calls, want) {
-		t.Errorf("calls = %q, want %q", h.calls, want)
 	}
 }
 

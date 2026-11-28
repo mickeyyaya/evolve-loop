@@ -47,23 +47,8 @@
     },
     {
       "package": "cmd/evolve",
-      "test": "TestBinaryAnswersSubcommandDep_OnlyAnUnknownCommandIsARefusal",
-      "rule": "unverified-fake"
-    },
-    {
-      "package": "cmd/evolve",
       "test": "TestBlockWithout",
       "rule": "error-text-match"
-    },
-    {
-      "package": "cmd/evolve",
-      "test": "TestBootCLIUpdate_ASmokeFailureWhileTheFamilyIsDrainedWarnsAndDoesNotHalt",
-      "rule": "mock-call-order"
-    },
-    {
-      "package": "cmd/evolve",
-      "test": "TestBootCLIUpdate_ASmokeFailureWithOnlyArgonDrainedStillHaltsAndNamesTheWindow",
-      "rule": "mock-call-order"
     },
     {
       "package": "cmd/evolve",
@@ -137,11 +122,6 @@
     },
     {
       "package": "cmd/evolve",
-      "test": "TestCenterlessConfigLoadSitesArePinned",
-      "rule": "asserts-own-setup"
-    },
-    {
-      "package": "cmd/evolve",
       "test": "TestChainEngines_OneConstructionSite",
       "rule": "single-file-source-pin"
     },
@@ -189,11 +169,6 @@
       "package": "cmd/evolve",
       "test": "TestCycleReauditAuditRunner_DefaultWiresTheAuditPhase",
       "rule": "error-text-match"
-    },
-    {
-      "package": "cmd/evolve",
-      "test": "TestCycleRunJourney_AFleetLaneWithAQuotaFamilyAndALoggedOutFamilyReleasesItsClaimAndNamesBoth",
-      "rule": "mock-call-order"
     },
     {
       "package": "cmd/evolve",
@@ -254,11 +229,6 @@
       "package": "cmd/evolve",
       "test": "TestE2ELiveModelTierMatrix",
       "rule": "skip-hides-error"
-    },
-    {
-      "package": "cmd/evolve",
-      "test": "TestE2E_M4LedgerEntryShapeMatch",
-      "rule": "no-assertion"
     },
     {
       "package": "cmd/evolve",
@@ -367,11 +337,6 @@
     },
     {
       "package": "cmd/evolve",
-      "test": "TestJourneyLaneHelper",
-      "rule": "no-assertion"
-    },
-    {
-      "package": "cmd/evolve",
       "test": "TestLand_ExtractUntrackedRefusesEscapesAndOverwrites",
       "rule": "error-text-match"
     },
@@ -429,11 +394,6 @@
       "package": "cmd/evolve",
       "test": "TestLoadLaneTimes_AMalformedFileIsAnErrorThatNamesIt",
       "rule": "error-text-match"
-    },
-    {
-      "package": "cmd/evolve",
-      "test": "TestLoopDetachHelperProcess",
-      "rule": "no-assertion"
     },
     {
       "package": "cmd/evolve",
@@ -502,11 +462,6 @@
     },
     {
       "package": "cmd/evolve",
-      "test": "TestPlanAndRunPool_TheResupplyPlansTheSameWaveDeeperByTheHeldTodos",
-      "rule": "mock-call-order"
-    },
-    {
-      "package": "cmd/evolve",
       "test": "TestPollSignals_AWriteFailureIsReturnedAndPollPassesItOn",
       "rule": "error-text-match"
     },
@@ -559,11 +514,6 @@
       "package": "cmd/evolve",
       "test": "TestRealTreeRoutingOrder_ThePinReadsTheStageFieldNotPhaseNames",
       "rule": "single-file-source-pin"
-    },
-    {
-      "package": "cmd/evolve",
-      "test": "TestRecordAbsorbedFail_MissingStateIsSoftWarn",
-      "rule": "no-assertion"
     },
     {
       "package": "cmd/evolve",
@@ -779,21 +729,6 @@
       "package": "cmd/evolve",
       "test": "TestSubagentRun_NoInProcessFallbackSignal",
       "rule": "single-file-source-pin"
-    },
-    {
-      "package": "cmd/evolve",
-      "test": "TestSyncMain_AFailedReplayCommitExitsOneAndNamesTheReplay",
-      "rule": "unverified-fake"
-    },
-    {
-      "package": "cmd/evolve",
-      "test": "TestSyncMain_AQuarantineMoveThatCannotBeRecordedRefusesBeforeTheMerge",
-      "rule": "unverified-fake"
-    },
-    {
-      "package": "cmd/evolve",
-      "test": "TestSyncMain_RefusesToMergeWhenTheStampsCannotLand",
-      "rule": "unverified-fake"
     },
     {
       "package": "cmd/evolve",

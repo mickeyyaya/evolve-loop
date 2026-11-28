@@ -185,8 +185,33 @@ Verdict: FAIL
 
 func TestE2E_M4LedgerEntryShapeMatch(t *testing.T) {
 	t.Parallel()
-	if os.Getenv("EVOLVE_E2E_LIVE_LLM") != "1" {
-		t.Skip("EVOLVE_E2E_LIVE_LLM!=1")
+	evolveDir := filepath.Join(t.TempDir(), ".evolve")
+	artifactPath := filepath.Join(evolveDir, "runs", "cycle-1", "scout-report.md")
+	if err := os.MkdirAll(filepath.Dir(artifactPath), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
 	}
-	t.Skip("covered by TestE2E_M4PipelineAgainstLiveLedger — kept as named entrypoint for selective runs")
+	challengeToken := randHex(8)
+	if err := os.WriteFile(artifactPath, []byte(challengeToken+"\n\n# Scout report\nVerdict: PASS\n"), 0o644); err != nil {
+		t.Fatalf("write artifact: %v", err)
+	}
+	ld := ledger.New(evolveDir)
+	if err := ld.Append(context.Background(), core.LedgerEntry{
+		TS:             time.Now().UTC().Format(time.RFC3339),
+		Cycle:          1,
+		Role:           "scout",
+		Kind:           "agent_subprocess",
+		Model:          "haiku",
+		ArtifactPath:   artifactPath,
+		ChallengeToken: challengeToken,
+	}); err != nil {
+		t.Fatalf("ledger append: %v", err)
+	}
+
+	vr, err := ledgerverify.VerifyCycle(context.Background(), ld, 1, ledgerverify.Options{})
+	if err != nil {
+		t.Fatalf("VerifyCycle: %v", err)
+	}
+	if vr.Scout != 1 || vr.OK || len(vr.Missing) < 2 {
+		t.Errorf("verify = scout %d ok %v missing %v, want one scout entry and the builder and auditor missing", vr.Scout, vr.OK, vr.Missing)
+	}
 }

@@ -43,23 +43,14 @@ func TestRoutingConfigLoader_ConstructionSitesArePinned(t *testing.T) {
 
 func TestCenterlessConfigLoadSitesArePinned(t *testing.T) {
 	t.Parallel()
-	want := map[string]bool{
-		"cmd/evolve/cmd_solution.go":     true,
-		"internal/kerneltest/fixture.go": true,
-		"cmd/evolve/cmd_cycle_config.go": true,
+	want := []string{
+		"cmd/evolve/cmd_cycle_config.go",
+		"cmd/evolve/cmd_solution.go",
+		"internal/kerneltest/fixture.go",
 	}
 	hits := nonTestSourcesMatching(t, regexp.MustCompile(`\bconfig\.Load\(`))
-	got := map[string]bool{}
-	for _, h := range hits {
-		got[h] = true
-		if !want[h] {
-			t.Errorf("%s calls the Center-less config.Load( facade: a new site must be declared here or wire a Loader", h)
-		}
-	}
-	for site := range want {
-		if !got[site] {
-			t.Errorf("%s no longer calls config.Load( — update the pinned list", site)
-		}
+	if !reflect.DeepEqual(hits, want) {
+		t.Fatalf("the Center-less config.Load( facade has exactly these sites: a new site must be declared here or wire a Loader, want %v, found in %v", want, hits)
 	}
 }
 

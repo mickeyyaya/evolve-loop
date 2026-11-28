@@ -202,8 +202,9 @@ func TestBinaryAnswersSubcommandDep_OnlyAnUnknownCommandIsARefusal(t *testing.T)
 		{"refuses", `echo 'Error: unknown command "wave" for "evolve"' >&2; exit 1`, `binary does not recognize subcommand "wave"`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			bin := filepath.Join(t.TempDir(), "evolve")
-			fakeclitest.Install(t, bin, "#!/bin/sh\n[ \"$1 $2\" = \"wave --help\" ] || exit 9\n"+tc.body+"\n")
+			dir := t.TempDir()
+			fakeclitest.Install(t, filepath.Join(dir, "evolve"), "#!/bin/sh\n[ \"$1 $2\" = \"wave --help\" ] || exit 9\n"+tc.body+"\n")
+			bin := filepath.Join(dir, "evolve")
 
 			err := binaryAnswersSubcommandDep(bin, "wave")
 

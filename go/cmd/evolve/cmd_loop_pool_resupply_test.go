@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -19,26 +20,30 @@ import (
 func TestPlanAndRunPool_TheResupplyPlansTheSameWaveDeeperByTheHeldTodos(t *testing.T) {
 	t.Parallel()
 	fc := policy.FleetConfig{Count: 2, PlanSource: "triage", Orchestrator: policy.OrchestratorConfig{Stage: "enforce", ScanK: 5}}
-	type call struct{ depth, wave int }
-	var calls []call
 	plan := func(depth int) poolPlanFn {
 		return func(_ context.Context, wave int) ([]fleet.Todo, error) {
-			calls = append(calls, call{depth, wave})
-			return []fleet.Todo{{ID: "ready"}}, nil
+			return []fleet.Todo{{ID: fmt.Sprintf("depth%d-wave%d", depth, wave)}}, nil
 		}
 	}
+	var firstBacklog, resupplied []fleet.Todo
 	run := func(_ context.Context, backlog []fleet.Todo, resupply poolSupplyFn) []fleet.Result {
-		if _, err := resupply([]fleet.Todo{{ID: "a"}, {ID: "b"}, {ID: "c"}}); err != nil {
+		firstBacklog = backlog
+		fresh, err := resupply([]fleet.Todo{{ID: "a"}, {ID: "b"}, {ID: "c"}})
+		if err != nil {
 			t.Fatalf("resupply error = %v", err)
 		}
+		resupplied = fresh
 		return make([]fleet.Result, len(backlog)+1)
 	}
 	ran, results, err := planAndRunPool(context.Background(), fc, func() error { return nil }, plan, run, 7)
 	if err != nil || !ran || len(results) != 2 {
 		t.Fatalf("ran=%v results=%d err=%v, want a run whose results cover the resupplied todo", ran, len(results), err)
 	}
-	if want := []call{{5, 7}, {8, 7}}; !reflect.DeepEqual(calls, want) {
-		t.Errorf("plan calls = %v, want %v: the resupply plans wave 7 at the supply depth plus the 3 held todos", calls, want)
+	if len(firstBacklog) != 1 || firstBacklog[0].ID != "depth5-wave7" {
+		t.Errorf("first backlog = %v, want wave 7 planned at the supply depth 5", firstBacklog)
+	}
+	if len(resupplied) != 1 || resupplied[0].ID != "depth8-wave7" {
+		t.Errorf("resupplied = %v, want wave 7 planned at the supply depth plus the 3 held todos", resupplied)
 	}
 }
 

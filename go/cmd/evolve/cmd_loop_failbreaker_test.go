@@ -113,6 +113,10 @@ func TestRecordAbsorbedFail_MissingStateIsSoftWarn(t *testing.T) {
 	cfg := loopConfig{ProjectRoot: projectRoot, EvolveDir: filepath.Join(projectRoot, ".evolve")}
 	var stderr bytes.Buffer
 	recordAbsorbedFail(cfg, 1, &stderr)
+
+	if stderr.Len() != 0 {
+		t.Fatalf("a missing state.json is a soft skip and must not warn, stderr=%q", stderr.String())
+	}
 }
 
 type failingOrch struct {

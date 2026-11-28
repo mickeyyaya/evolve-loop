@@ -6,8 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/mickeyyaya/evolve-loop/go/internal/fakeclitest"
 )
 
 func smClaim(t *testing.T, repo, name string, cycle string) string {
@@ -92,7 +90,7 @@ func TestSyncMain_AFailedReplayCommitExitsOneAndNamesTheReplay(t *testing.T) {
 	if err := os.WriteFile(item, []byte(`{"id":"x","weight":0.5,"route":"console-manual"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	fakeclitest.Install(t, filepath.Join(repo, ".git", "hooks", "commit-msg"), "#!/bin/sh\ngrep -q replayed \"$1\" && exit 1\nexit 0\n")
+	smInstallHook(t, repo, "commit-msg", "#!/bin/sh\ngrep -q replayed \"$1\" && exit 1\nexit 0\n")
 
 	var out, errb bytes.Buffer
 	code := runSyncMain([]string{"--project-root", repo}, nil, &out, &errb)
@@ -145,7 +143,7 @@ func TestSyncMain_AQuarantineMoveThatCannotBeRecordedRefusesBeforeTheMerge(t *te
 	if err := os.Rename(item, quarantined); err != nil {
 		t.Fatal(err)
 	}
-	fakeclitest.Install(t, filepath.Join(repo, ".git", "hooks", "pre-commit"), "#!/bin/sh\nexit 1\n")
+	smInstallHook(t, repo, "pre-commit", "#!/bin/sh\nexit 1\n")
 	headBefore := smHead(t, repo)
 
 	var out, errb bytes.Buffer

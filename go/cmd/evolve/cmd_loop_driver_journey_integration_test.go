@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -39,6 +40,9 @@ const (
 
 func TestJourneyLaneHelper(t *testing.T) {
 	t.Parallel()
+	if got, want := laneArgsAfterSeparator([]string{"lane", "-test.count=1", "--", "--cycle", "7"}), []string{"--cycle", "7"}; !slices.Equal(got, want) {
+		t.Errorf("laneArgsAfterSeparator = %q, want the arguments after the separator %q", got, want)
+	}
 	mode := os.Getenv(journeyLaneEnv)
 	if mode == "" {
 		return

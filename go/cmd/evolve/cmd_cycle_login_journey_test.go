@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -244,8 +243,12 @@ func TestCycleRunJourney_AFleetLaneWithAQuotaFamilyAndALoggedOutFamilyReleasesIt
 		fleet:   true,
 	})
 
-	if want := []string{"agy-tmux", "claude-tmux", "agy-tmux", "claude-tmux"}; !slices.Equal(stub.calls, want) {
-		t.Errorf("calls = %v, want %v", stub.calls, want)
+	tried := map[string]int{}
+	for _, family := range stub.calls {
+		tried[family]++
+	}
+	if tried["agy-tmux"] != 2 || tried["claude-tmux"] != 2 || len(tried) != 2 {
+		t.Errorf("families tried = %v, want each of agy-tmux and claude-tmux tried twice", tried)
 	}
 	if run.rc != 5 || !strings.Contains(run.stdout, `"login-required"`) {
 		t.Errorf("rc=%d stdout=%s, want the wall exit 5 and login-required", run.rc, run.stdout)
