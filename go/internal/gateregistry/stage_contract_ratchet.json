@@ -1061,6 +1061,39 @@
         "window_cycles": 0,
         "max_false_stop_pct": 0
       }
+    },
+    {
+      "key": "resume.identity.stage",
+      "rules": [
+        "no-registry-entry",
+        "string-typed-stage",
+        "no-signal",
+        "signal-unregistered",
+        "no-emit-site",
+        "no-would-fields",
+        "would-field-missing"
+      ],
+      "signal": "CYCLE_RESUME_IDENTITY_SHADOW",
+      "fields": [
+        "stage",
+        "parts",
+        "recorded",
+        "current"
+      ],
+      "emit_sites": [
+        {
+          "path": "internal/core/resume_identity.go",
+          "func": "emitResumeIdentityShadow",
+          "ref": "CodeResumeIdentityShadow"
+        }
+      ],
+      "promotion": {
+        "max_escapes": 0,
+        "max_false_stops": 0,
+        "min_decisions": 0,
+        "window_cycles": 0,
+        "max_false_stop_pct": 0
+      }
     }
   ],
   "violations": [

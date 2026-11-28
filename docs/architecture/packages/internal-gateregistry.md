@@ -48,3 +48,4 @@
 - The test counts the rows, so a new entry needs its row in the same change.
 - `TestGenesisRequiredIsOneWay` pins `genesis_required` against a floor in the test. The value may go from false to true and never back. The operator raises the floor and the file in one change.
 - The ratchet file and its tests are on the protected surface (the `gateregistry` row of the manifest). A lane cannot weaken them.
+- The key `resume.identity.stage` has a seed since W2.2. Its signal is `CYCLE_RESUME_IDENTITY_SHADOW`. The emit site is `emitResumeIdentityShadow` in `internal/core/resume_identity.go`. Its closure is `internal/cycleidentity`. The seed test pins the row.
