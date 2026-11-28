@@ -17,9 +17,9 @@
 
 | | Count |
 |---|---|
-| Incidents mapped | 85 |
-| Distinct failure modes (coverage-map rows) | 140 |
-| ✅ covered (a test fails if the bug comes back) | 91 |
+| Incidents mapped | 86 |
+| Distinct failure modes (coverage-map rows) | 141 |
+| ✅ covered (a test fails if the bug comes back) | 92 |
 | 🟡 partial (related test, doesn't pin the exact mode) | 11 |
 | ❌ none (no regression test) | 38 |
 | ⛔ untestable (external infra / live CLI) | 0 |
@@ -44,6 +44,8 @@ Recounted on 2026-11-22: the record of a Build floor finding in a TDD file adds 
 Recounted on 2026-11-26: the record of the cmd/evolve darwin timeout adds 1 incident and 2 rows. Both rows have no test yet, and each names the item that tracks it.
 
 Recounted on 2026-11-27: the record of the inboxcmd Deps leak adds 1 incident and 2 rows. One row is covered by the tests of `ae3a35b30`. The other row has no test yet and names the item that tracks it.
+
+Recounted on 2026-11-28: the record of the focus pool test race adds 1 incident and 1 covered row (PR #1873).
 
 The map now holds 81 incidents and 130 rows. Of these, 89 are covered, 11 are partial and 30 have no test. Before these rows, main held 69 incidents and 115 rows. Of these, 86 were covered, 11 partial and 18 with no test. PR #1597 had flipped two of them to covered.
 
@@ -202,6 +204,7 @@ not the coverage map, which is the hand-maintained per-incident record.
 | [2026-11-26 — the classifier named the timeout red unknown and missed its recurrence](2026-11-26-cmd-evolve-darwin-suite-at-the-30m-limit.md) | `evolve ci classify` has no class for a `go test` timeout panic. `recurredOn` reads the main runs of `MainRunsBefore`. A run that a re-run turned green has no failure keys, so its red is not a recurrence. | `ciwatch/classify.go` (`recurredOn`), `ciwatch/classify_source.go` (`MainRunsBefore`) | ❌ | item `ci-classify-names-a-test-timeout-and-a-rerun-red` (filed 2026-11-26) |
 | [2026-11-27 — an empty Deps left in the inboxcmd host panicked a parallel test](2026-11-27-inboxcmd-empty-deps-leak-panics-a-parallel-test.md) | Before `ae3a35b30`, `Run` stored its `Deps` in the package global `current` and did not restore it. A test that passed `Deps{}` left a nil `LaneForbidden`, and a parallel test that ran first panicked. | `cli/inboxcmd/deps_isolation_test.go` (`TestRun_AnEmptyDepsDoesNotLeakIntoALaterParallelLint`, `TestRun_RestoresThePreviousHostOnReturn`, `TestRunMover_RestoresThePreviousHostOnReturn`) | ✅ | fixed by `ae3a35b30` (cycle 2662) |
 | [2026-11-27 — the self-heal monitor gives every rerun-green event one fingerprint](2026-11-27-inboxcmd-empty-deps-leak-panics-a-parallel-test.md) | A rerun-green CI event gets the fingerprint `flaky-test:rerun-green` with no job or test name. Two different flaky tests share one incident, and neither gets a repro test. | `selfheal/ci.go` | ❌ | item `repair-inc-2026-10-27-6f89f94c` (filed 2026-11-27) |
+| [2026-11-28 — a focus pool test read the launch order from goroutine sends](2026-11-28-focus-pool-test-read-the-launch-order-from-goroutine-sends.md) | Before PR #1873, the focus tests read the lane order from a channel that each lane goroutine sends to, so the scheduler set the order. A loaded CI runner reversed two lanes. | `loopwave/focus_test.go` (`TestFocus_FiveLanePoolLaunchesFocusIDsFirstThenOthersInRankOrder`, `TestFocus_RefusedFocusIDWaitsThenTakesNextFreeLane`) | ✅ | fixed by PR #1873 |
 
 ## Prioritized gap backlog (13-agent sweep; agent confidence in parens)
 
