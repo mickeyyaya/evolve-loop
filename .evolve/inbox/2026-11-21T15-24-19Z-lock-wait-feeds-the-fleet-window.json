@@ -5,14 +5,6 @@
     "wave status shows the total lock wait of the wave.",
     "Wave 186 (2026-11-21): HOST_VERIFY_LOCK_WAIT is written only to runs/cycle-N/signals.ndjson, so wave-level readers saw 0; it is also published to the global signal log. Waits were 280 to 701 s with one 900 s unserialized; the design evaluates a lock with K slots against one holder."
   ],
-  "continuation": {
-    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2602",
-    "branch": "cycle-cd3ae73e-2602",
-    "snapshot_sha": "27b7d35f12166785aefb3e7a8d50332548972f84",
-    "base_sha": "1b3c402fc62975e2c5f4debbb03f822bbc0316bc",
-    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2602/audit-fail-reason.json",
-    "cycle": 2602
-  },
   "created_at": "2026-11-21T15:24:19Z",
   "files": [
     "go/internal/signalcenter/registry.go",
@@ -24,6 +16,19 @@
   "kind": "bug",
   "origin": "console",
   "priority_class": "performance",
+  "released_continuations": [
+    {
+      "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2602",
+      "branch": "cycle-cd3ae73e-2602",
+      "snapshot_sha": "27b7d35f12166785aefb3e7a8d50332548972f84",
+      "base_sha": "1b3c402fc62975e2c5f4debbb03f822bbc0316bc",
+      "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2602/audit-fail-reason.json",
+      "cycle": 2602,
+      "released_at": "2026-11-28T05:07:33Z",
+      "reason": "adoption declined in cycle 2676",
+      "released_by": "runtime (adoption declined)"
+    }
+  ],
   "summary": "The host-adaptive window reads CPU and memory only. In wave 185 the host looked idle while 7 of 8 lanes waited at the host verification lock, so the window would add lanes. Each acquire now emits HOST_VERIFY_LOCK_WAIT with fields.wait_ms, source and outcome (plan docs/plans/verify-lock-holder-budget-2026-11.md), but nothing reads it.",
   "title": "The host-adaptive fleet window reads the verification lock wait as a pressure input",
   "weight": 0.7

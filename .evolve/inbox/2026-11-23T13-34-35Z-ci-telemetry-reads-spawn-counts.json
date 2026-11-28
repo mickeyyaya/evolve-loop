@@ -3,15 +3,31 @@
     "evolve ci telemetry reads spawns.ndjson from a CI run and reports pkg.spawns.git and pkg.spawns.go per package.",
     "A package with no spawn lines reports 0, and a run with no spawns.ndjson reports the fields as absent, not 0."
   ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2678",
+    "branch": "cycle-cd3ae73e-2678",
+    "snapshot_sha": "1c4365f10ff90c52373d4076322babca9369898d",
+    "base_sha": "cfc86a56097563ce4aae9856979ab6844793e910",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2678/audit-fail-reason.json",
+    "cycle": 2678
+  },
   "created_at": "2026-11-23T13:34:35Z",
+  "failure_count": 1,
   "files": [
     "go/cmd/evolve"
   ],
   "fix": "Add the spawn-count reader to the CI telemetry report, next to the rusage and sampler readers, keyed by TESTRUSAGE_PKG.",
   "id": "ci-telemetry-reads-spawn-counts",
   "kind": "feature",
+  "last_failure_class": "capability",
+  "last_failure_cycle": 2678,
+  "last_failure_findings": "review gate: phase \"build\" deliverable rejected after 2 correction(s): build handoff floor: 1 deterministic check failure(s) — fix these exactly before handoff:\n  ./acs/cycle2678 (-tags acs): unit tests FAIL\n--- FAIL: TestC2678_006_MalformedSpawnLineFailsLoudlyAndPrintsNoReport (0.01s)\n    predicates_test.go:230: evolve ci telemetry did not run: subprocess /var/folders/11/n1_42bt961s29wjcr9qxj45m0000gn/T/evolve-acs-2678-3940955497/evolve exited 2\nFAIL\nFAIL\tgithub.com/mickeyyaya/evolve-loop/go/acs/cycle2678\t1.597s\nFAIL\n",
+  "last_failure_fingerprint": "text:458a7820b1df",
+  "last_failure_reason": "cycle-failure-release",
+  "last_failure_rung": "R3",
   "origin": "console",
   "priority_class": "stability",
+  "retry_plan": "fresh-deep-plan",
   "source": "design review of ci-wall-time C13, 2026-11-23",
   "summary": "ci-wall-time C13 adds a git/go spawn shim that writes one line per spawn to spawns.ndjson, keyed by package. The design review found no reader: the evolve ci telemetry report has no pkg.spawns fields, so the counts are collected and never read.",
   "title": "The CI telemetry report reads the per-package git and go spawn counts",

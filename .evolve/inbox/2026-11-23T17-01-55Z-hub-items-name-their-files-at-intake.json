@@ -4,6 +4,14 @@
     "The warning names the hub and suggests the verb file family.",
     "A test files an item with files [go/cmd/evolve] and sees the typed warning; one with named files sees none."
   ],
+  "continuation": {
+    "worktree": "~/ai/claude/evolve-loop/runtime/.evolve/worktrees/cycle-cd3ae73e-2682",
+    "branch": "cycle-cd3ae73e-2682",
+    "snapshot_sha": "f5b32a8cba63a5dc0f86e17ebdabb8416da1e6d1",
+    "base_sha": "bea93ef80479145e99fe423da52dea1da4aefb5d",
+    "findings_path": "~/ai/claude/evolve-loop/runtime/.evolve/runs/cycle-2682/audit-fail-reason.json",
+    "cycle": 2682
+  },
   "created_at": "2026-11-23T17:01:55Z",
   "files": [
     "go/internal/inboxmover",
