@@ -68,7 +68,7 @@ func TestAgy_NotesAndModelWarn(t *testing.T) {
 	if code != ExitOK {
 		t.Fatalf("agy exit = %d", code)
 	}
-	if !strings.Contains(se, "WARN") || !strings.Contains(se, "stream_output") || !strings.Contains(se, "session-name") {
+	if !strings.Contains(se, "[agy] tier 'some-weird-model'") || !strings.Contains(se, "stream_output") || !strings.Contains(se, "session-name") {
 		t.Fatalf("agy notes/warn missing; se=%q", se)
 	}
 }

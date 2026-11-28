@@ -23,7 +23,14 @@
   "default_args": [],
   "params": {
     "model_tier": {
-      "channel": "noop"
+      "channel": "flag",
+      "flag": "--model",
+      "from": "model_tier_map",
+      "unresolved": "fast"
+    },
+    "effort": {
+      "channel": "flag",
+      "flag": "--effort"
     }
   },
   "interactive_prompts": [
@@ -59,5 +66,5 @@
   ],
   "stub": false,
   "model_tier_map_from": "agy-tmux",
-  "note": "agy is Antigravity, Gemini-backed (NOT Anthropic). model_tier is channel=noop: agy 1.0.3 has NO -m/--model flag in ANY mode (verified live 2026-05-31: `agy -m X --print` → 'flags provided but not defined: -m'). The 2026-05 'correction' to channel=flag was wrong (it claimed `agy -m <model> -p` worked; it does not) and is the same root cause as the agy-tmux exit=80 incident — see docs/incidents/cycle-154-agy-tmux-m-flag-repl-boot-timeout.md. This headless manifest declares NO model_tier_map of its own: model_tier_map_from points at the agy FAMILY table (agy-tmux.json) and LoadManifest adopts it. Cost-leak guards: GEMINI_API_KEY / GOOGLE_API_KEY."
+  "note": "agy is Antigravity, Gemini-backed (NOT Anthropic). agy 1.5.17 headless takes --model and --effort: model_tier and effort are channel=flag and the values come from the route. -m is undefined ('flags provided but not defined: -m'; docs/incidents/cycle-154-agy-tmux-m-flag-repl-boot-timeout.md). This headless manifest declares NO model_tier_map of its own: model_tier_map_from points at the agy FAMILY table (agy-tmux.json) and LoadManifest adopts it. Cost-leak guards: GEMINI_API_KEY / GOOGLE_API_KEY."
 }

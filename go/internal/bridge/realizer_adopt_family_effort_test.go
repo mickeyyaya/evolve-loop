@@ -19,15 +19,15 @@ func TestAdoptFamilyEffort_AFamilyThatDoesNotLoadLeavesTheManifestAsItIs(t *test
 
 func TestAdoptFamilyEffort_AFamilyWithNoEffortTableAddsNoEffortParam(t *testing.T) {
 	t.Parallel()
-	family, err := loadManifestRaw("agy")
+	family, err := loadManifestRaw("claude-cloud")
 	if err != nil {
-		t.Fatalf("load agy: %v", err)
+		t.Fatalf("load claude-cloud: %v", err)
 	}
 	if _, declares := family.Params["effort"]; declares {
-		t.Fatal("agy declares an effort param: this test needs a family manifest with none")
+		t.Fatal("claude-cloud declares an effort param: this test needs a family manifest with none")
 	}
 	own := map[string]ParamSpec{"model_tier": {Flag: "--model"}}
-	headless := Manifest{CLI: "headless", ModelTierMapFrom: "agy", Params: own}
+	headless := Manifest{CLI: "headless", ModelTierMapFrom: "claude-cloud", Params: own}
 
 	got := adoptFamilyEffort(headless)
 

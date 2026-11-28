@@ -193,4 +193,11 @@ var serialTests = map[string]string{
 	"bridge.TestLaunch_AmplifiedAuditorKeepsOnlyTheFableSuccessWhenFableLeads":                "swaps seam modelCatalogDirFn through the process-global setter SetModelCatalogDirFn",
 	"bridge.TestClaudeCloudDriver_AManifestThatDoesNotLoadRefusesTheLaunch":                   "swaps seam bridgeManifestDirFn",
 	"bridge.TestLoadManifest_TheCloudSeatKeepsNoTierMapUnderALiveCatalog":                     "swaps seam modelCatalogDirFn",
+	"bridge.TestAgyDriver_HeadlessArgvCarriesTheRoutedModelAndEffort":                         "swaps seam modelCatalogDirFn",
+	"bridge.TestAgyDriver_HeadlessArgvWithoutRouteDataHasNoModelOrEffortFlag":                 "swaps seam modelCatalogDirFn",
+	"bridge.TestAgyDriver_MessageNamesTheRoutedFlags":                                         "swaps seam modelCatalogDirFn",
+	"bridge.TestAgyDriver_MessageWithoutRouteDataNamesTheAgyDefault":                          "swaps seam modelCatalogDirFn",
+	"bridge.TestAgyDriver_NoMessageSaysAgyHasNoModelFlag":                                     "swaps seam modelCatalogDirFn",
+	"bridge.TestAgyDriver_RouteChangeChangesTheArgv":                                          "swaps seam modelCatalogDirFn",
+	"bridge.TestAgyDriver_RouteIntentFromConfigReachesTheArgv":                                "swaps seam modelCatalogDirFn",
 }

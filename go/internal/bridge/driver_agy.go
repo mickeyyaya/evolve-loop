@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"fmt"
+	"strings"
 )
 
 type agyDriver struct{}
@@ -27,12 +28,7 @@ func (agyDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error
 		fmt.Fprintf(deps.Stderr, "[agy] NOTE: --session-name='%s' is no-op for this driver (single-shot process).\n", cfg.SessionName)
 	}
 
-	switch cfg.Model {
-	case "haiku", "sonnet", "opus", "auto", "":
-		fmt.Fprintf(deps.Stderr, "[agy] tier '%s' → agy default; agy has no -m flag\n", cfg.Model)
-	default:
-		fmt.Fprintf(deps.Stderr, "[agy] WARN: model '%s' is not a Claude tier alias — agy ignores it anyway\n", cfg.Model)
-	}
+	logAgyRoute(deps, cfg)
 
 	prompt, err := preparePrompt(cfg, deps)
 	if err != nil {
@@ -59,6 +55,25 @@ func (agyDriver) Launch(ctx context.Context, cfg *Config, deps Deps) (int, error
 	}
 	fmt.Fprintf(deps.Stderr, "[agy] agy exited rc=%d\n", rc)
 	return rc, nil
+}
+
+func logAgyRoute(deps Deps, cfg *Config) {
+	flags := agyRouteFlags(cfg.Realization.LaunchFlags)
+	if len(flags) == 0 {
+		fmt.Fprintf(deps.Stderr, "[agy] tier '%s' → no model flag in the route; agy uses its own default model\n", cfg.Model)
+		return
+	}
+	fmt.Fprintf(deps.Stderr, "[agy] tier '%s' → route flags: %s\n", cfg.Model, strings.Join(flags, " "))
+}
+
+func agyRouteFlags(launchFlags []string) []string {
+	var flags []string
+	for i, tok := range launchFlags {
+		if (tok == "--model" || tok == "--effort") && i+1 < len(launchFlags) {
+			flags = append(flags, tok, launchFlags[i+1])
+		}
+	}
+	return flags
 }
 
 func init() { Register(agyDriver{}) }
