@@ -83,7 +83,6 @@
   "internal/fleet/preflight_test.go": 1,
   "internal/gc/worktrees_realgit_test.go": 1,
   "internal/gitexec/relation_test.go": 2,
-  "internal/guards/docdelete_uncommitted_test.go": 1,
   "internal/inboxmover/lifecycle_seam_test.go": 1,
   "internal/loopchain/refresh_test.go": 1,
   "internal/phasecoherence/unpaired_tracked_edge_test.go": 1,
