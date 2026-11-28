@@ -194,6 +194,7 @@ the ship phase's own `ship-error.json` and ledger entries keep the unprefixed sp
 
 | Code | Meaning |
 |---|---|
+| `CYCLE_RESUME_IDENTITY_SHADOW` | at resume.identity.stage shadow, a cycle resume found that the phase graph, the phase contracts or the policy changed since the cycle recorded its identity (W2.2). The resume went on. At enforce the resume refuses with the same parts. Fields: stage, parts (graph, contract, policy), recorded, current |
 | `CYCLE_SPEND_LIMIT` | cycle spend passed a workflow.cycle_spend limit at a phase boundary (ADR-0158 decisions 14-16). fields.decision is would_stop (shadow), over (enforce, stop illegal), or stop (enforce at failed audit; passing audit still ships). fields.stage is shadow or enforce; fields.partial is true if ledger load was incomplete. Fields: limit, value, max, phase |
 
 ### failurediag

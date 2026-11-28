@@ -142,6 +142,7 @@ type CycleRequest struct {
 	Context               map[string]string
 	DisableWorkspaceGuard bool
 	BypassPolicy          bool
+	AcceptIdentityChange  bool
 }
 
 type legacyExplanationTestStorage interface {
@@ -222,6 +223,7 @@ type Orchestrator struct {
 	retryConfig policy.RetryConfig
 
 	workflowConfig policy.WorkflowConfig
+	resumeIdentity ResumeIdentityConfig
 
 	continuationFor func(projectRoot string, cycle int, scopeIDs []string) *continuation.Continuation
 	scopePathFor    func(projectRoot, taskID string) string
@@ -586,7 +588,7 @@ func (o *Orchestrator) RunCycle(ctx context.Context, req CycleRequest) (_ CycleR
 	cr.ctxSnap = plan.ctxSnap
 	cr.preCycleHEAD = plan.preCycleHEAD
 	cr.cs.PreCycleHEAD = plan.preCycleHEAD
-	o.persistResumeWitness(req.ProjectRoot, cr.cs)
+	o.sealResumeBinding(ctx, req.ProjectRoot, cr.cs)
 	cr.benchedCLIs = plan.benchedCLIs
 	cr.clampedPlan = plan.clampedPlan
 	cr.directivesSet = plan.directivesSet

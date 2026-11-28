@@ -69,7 +69,7 @@ func (o *Orchestrator) loadResumeBootstrap(
 	if err := requireResumeExplanationIdentity(req.ProjectRoot, identity.workspace, resumeCycle, cs, resumePoint.CycleID); err != nil {
 		return boot, err
 	}
-	if err := o.verifyResumeIdentityAndHealCarrier(ctx, req.ProjectRoot, resumePoint, cs); err != nil {
+	if err := o.verifyResume(ctx, resumeCheck{req: req, point: resumePoint, state: cs}); err != nil {
 		return boot, err
 	}
 

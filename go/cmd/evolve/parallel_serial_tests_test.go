@@ -80,6 +80,8 @@ var serialTests = map[string]string{
 	"main.TestCycleResumeAll_AGrantErrorIsReportedAndTheOthersAreStillGranted":                                        "swaps seam cycleGrantResume",
 	"main.TestCycleResumeAll_AGrantErrorUnderJSONStillExitsNonZero":                                                   "swaps seam cycleGrantResume",
 	"main.TestCycleResume_ReadsTheCheckpointOfTheRoot":                                                                "swaps seam loopLaunchFn",
+	"main.TestCycleResume_AcceptIdentityChangeReachesTheLoopConfig":                                                   "swaps seam loopLaunchFn",
+	"main.TestRunResumeBatch_TheMigrationFlagReachesTheCycleRequest":                                                  "sets the process PATH through t.Setenv",
 	"main.TestDossierShow_AnUnreadableWorkingDirectoryIsAnIOError":                                                    "swaps seam processGetwd",
 	"main.TestGC_TakesItsLeaseAndSkipsLiveRuns":                                                                       "swaps seams gcInjectedReapers and gcInjectedProcessHost",
 	"main.TestGC_WithNoLiveRunRunsTheProcessSweeps":                                                                   "swaps seam gcInjectedReapers",
