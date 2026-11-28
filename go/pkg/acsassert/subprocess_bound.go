@@ -49,13 +49,23 @@ func boundHit(ctx context.Context, name, output string) bool {
 	return ctx.Err() != nil || (name == "go" && strings.Contains(output, goTestTimedOut))
 }
 
-func boundLine(name string) string {
-	return "\n" + acsverdict.SubprocessBoundMarker + ": " + name + " did not finish inside the earlier of the lane end and " + subprocessCap.String() + "\n"
+func boundLine(name string, callerEnded bool) string {
+	earlier := "the earlier of the lane end and " + subprocessCap.String()
+	if callerEnded {
+		earlier = "the caller deadline"
+	}
+	return "\n" + acsverdict.SubprocessBoundMarker + ": " + name + " did not finish inside " + earlier + "\n"
 }
 
-func boundNote(ctx context.Context) string {
+func boundNote(ctx context.Context, callerDeadlines ...time.Time) string {
 	if ctx.Err() == nil {
 		return ""
 	}
-	return boundLine("go")
+	deadline, _ := ctx.Deadline()
+	for _, candidate := range callerDeadlines {
+		if candidate.Equal(deadline) {
+			return boundLine("go", true)
+		}
+	}
+	return boundLine("go", false)
 }

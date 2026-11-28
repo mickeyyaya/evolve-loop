@@ -175,7 +175,7 @@ func SubprocessOutputIn(dir, name string, args ...string) (stdout, stderr string
 	}
 	switch {
 	case boundHit(ctx, name, stdout+stderr):
-		return stdout, stderr + boundLine(name), code, fmt.Errorf("%w: %s", ErrSubprocessBound, name)
+		return stdout, stderr + boundLine(name, false), code, fmt.Errorf("%w: %s", ErrSubprocessBound, name)
 	case isExit:
 		return stdout, stderr, code, fmt.Errorf("subprocess %s exited %d", name, code)
 	}

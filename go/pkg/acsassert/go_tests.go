@@ -34,16 +34,17 @@ func GoTests(tb TB, spec GoTestSpec) bool {
 		return false
 	}
 	args := append(append([]string{"test", "-json", "-count=1", "-v"}, buildFlags(spec)...), "-run", spec.Pattern, spec.Package)
-	ctx, cancel := boundContext(callerDeadline(tb)...)
+	caller := callerDeadline(tb)
+	ctx, cancel := boundContext(caller...)
 	defer cancel()
 	importPath, err := resolveImportPath(ctx, spec)
 	if err != nil {
-		tb.Errorf("%v%s", err, boundNote(ctx))
+		tb.Errorf("%v%s", err, boundNote(ctx, caller...))
 		return false
 	}
 	out, stderr, code, err := sysexec.Capture(ctx, goTestRunner(), spec.Dir, "go", args...)
 	if err != nil || code != 0 {
-		tb.Errorf("go %v exited %d (err=%v)\nstdout:\n%s\nstderr:\n%s%s", args, code, err, out, stderr, boundNote(ctx))
+		tb.Errorf("go %v exited %d (err=%v)\nstdout:\n%s\nstderr:\n%s%s", args, code, err, out, stderr, boundNote(ctx, caller...))
 		return false
 	}
 	if err := validateGoTests(out, importPath, spec.Names); err != nil {
