@@ -1,0 +1,48 @@
+[
+  {
+    "Name": "work.DirectTarget",
+    "DefFile": "go/work/work.go",
+    "DefLine": 11,
+    "Sites": [
+      {
+        "File": "go/work/work.go",
+        "Line": 20,
+        "Func": "work.CallStatic"
+      }
+    ]
+  },
+  {
+    "Name": "work.Worker.Run",
+    "DefFile": "go/work/work.go",
+    "DefLine": 9,
+    "Sites": [
+      {
+        "File": "go/work/work.go",
+        "Line": 25,
+        "Func": "work.CallConcrete"
+      },
+      {
+        "File": "go/work/work.go",
+        "Line": 29,
+        "Func": "work.CallInterface"
+      }
+    ]
+  },
+  {
+    "Name": "work.Step",
+    "DefFile": "go/work/work.go",
+    "DefLine": 13,
+    "Sites": [
+      {
+        "File": "go/work/work.go",
+        "Line": 33,
+        "Func": "work.CallStepDirect"
+      },
+      {
+        "File": "go/work/work.go",
+        "Line": 16,
+        "Func": "work.InvokeFn"
+      }
+    ]
+  }
+]

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/adapters/codeindex/gotypes"
 	"github.com/mickeyyaya/evolve-loop/go/internal/codeindex"
+	"github.com/mickeyyaya/evolve-loop/go/internal/codeindex/codeindextest"
 )
 
 func benchProject(t *testing.T, source string) (root, indexDir string) {
@@ -183,5 +185,54 @@ func TestCodeBench_AStdoutThatCannotBeWrittenFailsTheRun(t *testing.T) {
 
 	if rc != codeExitFailed || !strings.Contains(stderr.String(), "evolve code bench:") {
 		t.Errorf("rc=%d stderr=%q, want codeExitFailed and the named write error", rc, stderr.String())
+	}
+}
+
+func TestRunCodeBench_PropagatesIndependentBenchFailure(t *testing.T) {
+	t.Parallel()
+	unknown := codeindextest.NewFake("unknown", codeindex.AllCapabilities(), nil)
+
+	report, err := runCodeBench(context.Background(), benchHost(""), codeIndexLocation{indexDir: t.TempDir()}, []codeindex.Backend{unknown}, nil, 1, 1)
+
+	if err == nil || len(report.Rows) != 0 {
+		t.Errorf("runCodeBench = %+v, err=%v; want non-nil error and empty report", report, err)
+	}
+}
+
+func TestRunIndependentBench_ReturnsStepErrors(t *testing.T) {
+	t.Parallel()
+	sentinel := errors.New("boom")
+	cases := []struct {
+		name  string
+		patch func(*independentBenchOps)
+	}{
+		{name: "truth", patch: func(o *independentBenchOps) {
+			o.truth = func() ([]codeindex.BenchSymbol, error) { return nil, sentinel }
+		}},
+		{name: "mkdtemp", patch: func(o *independentBenchOps) {
+			o.mkdtemp = func(string, string) (string, error) { return "", sentinel }
+		}},
+		{name: "writeFixture", patch: func(o *independentBenchOps) {
+			o.writeFixture = func(string) error { return sentinel }
+		}},
+		{name: "mkdirAll", patch: func(o *independentBenchOps) {
+			o.mkdirAll = func(string, os.FileMode) error { return sentinel }
+		}},
+		{name: "buildIndex", patch: func(o *independentBenchOps) {
+			o.buildIndex = func(context.Context, string, string) error { return sentinel }
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ops := defaultIndependentBenchOps()
+			tc.patch(&ops)
+
+			_, err := runIndependentBench(context.Background(), benchHost(""), codeIndexLocation{}, nil, 1, func() float64 { return 0 }, ops)
+
+			if !errors.Is(err, sentinel) {
+				t.Errorf("err = %v, want errors.Is(err, sentinel)", err)
+			}
+		})
 	}
 }

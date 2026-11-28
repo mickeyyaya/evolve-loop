@@ -1,0 +1,38 @@
+package work
+
+type Runner interface {
+	Run(n int) int
+}
+
+type Worker struct{}
+
+func (Worker) Run(n int) int { return n + 1 }
+
+func DirectTarget(n int) int { return n * 2 }
+
+func Step(n int) int { return n + 10 }
+
+func InvokeFn(fn func(int) int, n int) int {
+	return fn(n)
+}
+
+func CallStatic() int {
+	return DirectTarget(3)
+}
+
+func CallConcrete() int {
+	var w Worker
+	return w.Run(4)
+}
+
+func CallInterface(r Runner) int {
+	return r.Run(5)
+}
+
+func CallStepDirect() int {
+	return Step(6)
+}
+
+func CallStepViaValue() int {
+	return InvokeFn(Step, 7)
+}

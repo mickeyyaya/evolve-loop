@@ -27,6 +27,7 @@ type BenchSymbol struct {
 }
 
 type BenchRun struct {
+	TruthSet    string
 	Backends    []Backend
 	Symbols     []BenchSymbol
 	Rounds      int
@@ -37,6 +38,7 @@ type BenchRun struct {
 }
 
 type BenchRow struct {
+	TruthSet    string
 	Backend     string
 	Query       Query
 	TP, FP, FN  int
@@ -88,7 +90,7 @@ func grepSample(run BenchRun) error {
 }
 
 func benchCallers(ctx context.Context, backend Backend, run BenchRun) (BenchRow, error) {
-	row := BenchRow{Backend: backend.Name(), Query: QueryCallers}
+	row := BenchRow{TruthSet: run.TruthSet, Backend: backend.Name(), Query: QueryCallers}
 	var latencies []time.Duration
 	var sizes []int
 	answers := make([][]Hit, len(run.Symbols))
@@ -181,10 +183,10 @@ func (r BenchReport) Table() string {
 
 func (r BenchReport) WriteTable(out io.Writer) error {
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "backend\tquery\tprecision\trecall\tp50\tp95\tbytes\tfailures\ttp\tfp\tfn")
+	fmt.Fprintln(w, "set\tbackend\tquery\tprecision\trecall\tp50\tp95\tbytes\tfailures\ttp\tfp\tfn")
 	for _, row := range r.Rows {
-		fmt.Fprintf(w, "%s\t%s\t%.2f\t%.2f\t%s\t%s\t%d\t%d\t%d\t%d\t%d\n",
-			row.Backend, row.Query, row.Precision, row.Recall,
+		fmt.Fprintf(w, "%s\t%s\t%s\t%.2f\t%.2f\t%s\t%s\t%d\t%d\t%d\t%d\t%d\n",
+			row.TruthSet, row.Backend, row.Query, row.Precision, row.Recall,
 			row.P50.Round(time.Microsecond), row.P95.Round(time.Microsecond),
 			row.MedianBytes, row.Failures, row.TP, row.FP, row.FN)
 	}

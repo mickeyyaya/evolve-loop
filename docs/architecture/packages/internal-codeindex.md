@@ -31,14 +31,14 @@ A backend is done when it passes `Run`. The trail adapter runs the suite with a 
 
 ## The bench
 
-`RunBench` scores each backend that serves `callers` against a type-checked truth. The code is `bench.go`, `benchcheck.go` and `benchsample.go`.
+`RunBench` scores each backend that serves `callers` against a truth set. The code is `bench.go`, `benchcheck.go`, `benchsample.go` and `independent.go`.
 
-- **The truth.** A `BenchSymbol` holds a name, the place of its definition and its `TruthSite` list. The `gotypes` adapter makes the list with `gotypes.Truth`.
+- **The truth.** A `BenchSymbol` holds a name, the place of its definition and its `TruthSite` list. `gotypes.Truth` builds the `go-types` set from the type-checked index, and `IndependentTruth` loads a hand-checked fixture with static, interface-method and function-value calls. `WriteIndependentFixture` writes that fixture module to a directory.
 - **The score.** A caller is a file and function pair. A pair counts once, however many sites it has. Precision and recall are micro averages over all symbols. A rate with no denominator is 0. Rounds do not multiply the counts: the first round gives the answer that is scored.
 - **The latency.** Each call of each round gives one sample. `P50` and `P95` use the nearest rank. `MedianBytes` is the median size of the answers. A call that fails counts in `Failures`. `ErrNotFound` is an empty answer, not a failure.
 - **The grep check.** `GrepCheck` reads the files of a symbol and lists the lines that call its bare name. A definition line is not a call. The check fails with `ErrTruthDisagrees` when the lines and the truth sites differ in either direction. `RunBench` runs it on the first `GrepSymbols` symbols that have grep files, and returns no table when it fails.
 - **The sample.** `SampleSymbols` sorts by a hash of the definition position, takes the first `n`, and adds each symbol that a probe names. The sample does not depend on the input order or on the names.
-- **The report.** `BenchReport.Table` prints one row for each backend and the host load average. A query other than `callers` has no truth and no row.
+- **The report.** `BenchReport.Table` prints one row per backend labeled with `TruthSet` (`set` column) and the host load average. A query other than `callers` has no truth and no row.
 
 ## Invariants
 

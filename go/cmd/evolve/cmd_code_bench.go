@@ -8,6 +8,8 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -69,15 +71,85 @@ func codeBenchVerb(args []string, stdout, stderr io.Writer, host codeIndexHost) 
 	return 0
 }
 
+type independentBenchOps struct {
+	truth        func() ([]codeindex.BenchSymbol, error)
+	mkdtemp      func(dir, pattern string) (string, error)
+	writeFixture func(repoDir string) error
+	mkdirAll     func(path string, perm os.FileMode) error
+	buildIndex   func(ctx context.Context, moduleDir, out string) error
+}
+
+func defaultIndependentBenchOps() independentBenchOps {
+	return independentBenchOps{
+		truth:        codeindex.IndependentTruth,
+		mkdtemp:      os.MkdirTemp,
+		writeFixture: codeindex.WriteIndependentFixture,
+		mkdirAll:     os.MkdirAll,
+		buildIndex:   gotypes.Build,
+	}
+}
+
 func runCodeBench(ctx context.Context, host codeIndexHost, loc codeIndexLocation, measured []codeindex.Backend, pool []codeindex.BenchSymbol, symbols, rounds int) (codeindex.BenchReport, error) {
-	return codeindex.RunBench(ctx, codeindex.BenchRun{
+	loadAvg := func() float64 { return hostLoadAverage(ctx, host, os.ReadFile) }
+	derived, err := codeindex.RunBench(ctx, codeindex.BenchRun{
+		TruthSet:    "go-types",
 		Backends:    measured,
 		Symbols:     codeindex.SampleSymbols(pool, symbols, codeBenchProbes()),
 		Rounds:      rounds,
 		Now:         time.Now,
-		LoadAvg:     func() float64 { return hostLoadAverage(ctx, host, os.ReadFile) },
+		LoadAvg:     loadAvg,
 		Root:        loc.indexDir,
 		GrepSymbols: codeBenchGrepSymbols,
+	})
+	if err != nil {
+		return codeindex.BenchReport{}, err
+	}
+	independent, err := runIndependentBench(ctx, host, loc, measured, rounds, loadAvg, defaultIndependentBenchOps())
+	if err != nil {
+		return codeindex.BenchReport{}, err
+	}
+	derived.Rows = slices.Concat(derived.Rows, independent.Rows)
+	return derived, nil
+}
+
+func runIndependentBench(ctx context.Context, host codeIndexHost, loc codeIndexLocation, measured []codeindex.Backend, rounds int, loadAvg func() float64, ops independentBenchOps) (codeindex.BenchReport, error) {
+	truth, err := ops.truth()
+	if err != nil {
+		return codeindex.BenchReport{}, err
+	}
+	tmpDir, err := ops.mkdtemp("", "evolve-code-bench-*")
+	if err != nil {
+		return codeindex.BenchReport{}, err
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+	repoDir := filepath.Join(tmpDir, "repo")
+	indexDir := filepath.Join(tmpDir, "idx")
+	if err := ops.writeFixture(repoDir); err != nil {
+		return codeindex.BenchReport{}, err
+	}
+	if err := ops.mkdirAll(filepath.Join(repoDir, ".git"), 0o755); err != nil {
+		return codeindex.BenchReport{}, err
+	}
+	if err := ops.buildIndex(ctx, filepath.Join(repoDir, "go"), gotypes.IndexPath(indexDir)); err != nil {
+		return codeindex.BenchReport{}, err
+	}
+	names := make([]string, len(measured))
+	for i, b := range measured {
+		names[i] = b.Name()
+	}
+	fixtureLoc := loc
+	fixtureLoc.indexDir = indexDir
+	backends, err := codeindex.Resolve(names, codeBackendFactories(fixtureLoc, host.run, host.env))
+	if err != nil {
+		return codeindex.BenchReport{}, err
+	}
+	return codeindex.RunBench(ctx, codeindex.BenchRun{
+		TruthSet: "independent",
+		Backends: backends,
+		Symbols:  truth,
+		Rounds:   rounds,
+		Now:      time.Now,
+		LoadAvg:  loadAvg,
 	})
 }
 
