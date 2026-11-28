@@ -1,6 +1,7 @@
 package incidentkb_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,8 +16,23 @@ func TestAPICover_NamesEveryExportedSymbol(t *testing.T) {
 	if _, err := time.Parse("2006-01-02", incidentkb.LegacyCutoff); incidentkb.Schema != "incident-record/1" || incidentkb.RelDir == "" || err != nil {
 		t.Fatalf("unexpected constants: %q %q %q (%v)", incidentkb.Schema, incidentkb.RelDir, incidentkb.LegacyCutoff, err)
 	}
-	if incidentkb.ErrMissingMarker == nil || incidentkb.ErrOverlappingMarkers == nil {
-		t.Fatal("the marker errors must be set")
+	if incidentkb.ErrMissingMarker == nil || incidentkb.ErrOverlappingMarkers == nil || incidentkb.ErrCoverageRow == nil {
+		t.Fatal("the marker and coverage errors must be set")
+	}
+	line7 := &incidentkb.CoverageRowError{Line: 7, Reason: incidentkb.ErrMissingMarker}
+	line8 := &incidentkb.CoverageRowError{Line: 8, Reason: incidentkb.ErrMissingMarker}
+	if !errors.Is(line7, incidentkb.ErrCoverageRow) || line7.Unwrap() != incidentkb.ErrCoverageRow || line7.Error() == line8.Error() {
+		t.Fatalf("CoverageRowError must unwrap to ErrCoverageRow and name its line: %v", line7)
+	}
+	if incidentkb.CoverageIndexRel != incidentkb.RelDir+"/REGRESSION-COVERAGE-INDEX.md" {
+		t.Fatalf("CoverageIndexRel = %q", incidentkb.CoverageIndexRel)
+	}
+	coverage := []byte("<!-- GENERATED:coverage-summary BEGIN -->\n<!-- GENERATED:coverage-summary END -->\n## Coverage map\n| Incident | a | b | Coverage | c |\n|---|---|---|---|---|\n| [n](r.md) | m | f | ✅ | t |\n")
+	if counts, err := incidentkb.CoverageCountsOf(coverage); err != nil || counts != (incidentkb.CoverageCounts{Incidents: 1, Rows: 1, Covered: 1}) {
+		t.Fatalf("CoverageCountsOf = %+v, %v", counts, err)
+	}
+	if out, _, err := incidentkb.RenderCoverageSummary(coverage); err != nil || !strings.Contains(string(out), "| Incidents mapped | 1 |") {
+		t.Fatalf("RenderCoverageSummary = %q, %v", out, err)
 	}
 	if len(incidentkb.RequiredSections) != 10 {
 		t.Fatalf("RequiredSections = %d, want 10", len(incidentkb.RequiredSections))

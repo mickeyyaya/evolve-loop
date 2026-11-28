@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -21,7 +22,7 @@ func ValidID(id string) bool { return validIDRE.MatchString(id) }
 
 func IsSkipped(filename string) bool {
 	base := filepath.Base(filename)
-	return base == "REGRESSION-COVERAGE-INDEX.md" || sessionLogRE.MatchString(base)
+	return base == path.Base(CoverageIndexRel) || sessionLogRE.MatchString(base)
 }
 
 func IsRecordFile(filename string) bool {

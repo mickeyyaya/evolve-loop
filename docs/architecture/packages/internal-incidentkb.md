@@ -13,8 +13,10 @@
 - **Check.** `CheckBytes`, `Check`, and `CheckAll` validate frontmatter fields and verify that the filename matches `id`. They check the ten `## ` headings in order and compare each generated region against `Render`. Every failure names its field or section heading.
 - **Legacy rule.** Files without frontmatter that have no date prefix or a date before `LegacyCutoff` (`2026-11-25`, the day the template and `issue render` are live) are legacy. `IsLegacy` reports them without failure. Files dated on or after `LegacyCutoff` without frontmatter fail. `IsSkipped` skips `REGRESSION-COVERAGE-INDEX.md` and `<yyyy-mm-dd>-session-log.md`.
 - **List.** `List` reads all record and legacy files, skips index and session-log files, and filters by `--status` and `--code`.
+- **Coverage summary.** `CoverageCountsOf` reads the table under `## Coverage map` in `CoverageIndexRel` and counts the rows, each Coverage status and the incidents. A cell splits at each unescaped `|`, as in GFM. Each row must have five cells, an Incident cell that starts with a link `[name](record.md)`, and a Coverage cell of ✅, 🟡, ❌ or ⛔. An incident counts once for each distinct link name. A row that breaks a rule, or a conflict marker in the map, is `ErrCoverageRow` with its line number, never a skipped row.
+- **Coverage render.** `RenderCoverageSummary` writes the counts into the `coverage-summary` region with `findMarkerSpan`. `evolve issue coverage generate|check` calls it, and the `coverage-summary` entry of `internal/derived` makes the batch and the ship write the region again.
 
 ## Invariants
 
 - The enforced `apicover` gate lists `./internal/incidentkb`, and `apicover_named_test.go` executes every exported symbol.
-- `evolve issue check`, `evolve issue render` and `evolve issue list` in `go/cmd/evolve/cmd_issue.go` are the production callers.
+- `evolve issue check`, `evolve issue render` and `evolve issue list` in `go/cmd/evolve/cmd_issue.go`, and `evolve issue coverage` in `go/cmd/evolve/cmd_issue_coverage.go`, are the production callers.

@@ -45,8 +45,8 @@ func TestCatalog_SkillProjectionsAreDerivedOutputs(t *testing.T) {
 
 func TestCatalog_EveryOutputCarriesItsGeneratedMarker(t *testing.T) {
 	root := repoRootForTest(t)
-	if got := names(Catalog()); !reflect.DeepEqual(got, []string{"flag-index", "signal-codes", "research-index", "darwin-set", "skill-projections"}) {
-		t.Fatalf("Catalog entries = %v, want [flag-index signal-codes research-index darwin-set skill-projections]", got)
+	if got := names(Catalog()); !reflect.DeepEqual(got, []string{"flag-index", "signal-codes", "research-index", "coverage-summary", "darwin-set", "skill-projections"}) {
+		t.Fatalf("Catalog entries = %v, want [flag-index signal-codes research-index coverage-summary darwin-set skill-projections]", got)
 	}
 	for _, e := range Catalog() {
 		for _, o := range e.Outputs {

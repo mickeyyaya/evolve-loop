@@ -38,6 +38,10 @@ const (
 )
 
 func Catalog() []Entry {
+	return append(docIndexEntries(), projectionEntries()...)
+}
+
+func docIndexEntries() []Entry {
 	return []Entry{
 		{
 			Name:     "flag-index",
@@ -60,6 +64,18 @@ func Catalog() []Entry {
 			Generate: []string{"docs", "index", "generate"},
 			Check:    []string{"docs", "index", "check"},
 		},
+		{
+			Name:     "coverage-summary",
+			Outputs:  []Output{{Pattern: "docs/incidents/REGRESSION-COVERAGE-INDEX.md", Region: "GENERATED:coverage-summary"}},
+			Inputs:   []string{"docs/incidents/REGRESSION-COVERAGE-INDEX.md"},
+			Generate: []string{"issue", "coverage", "generate"},
+			Check:    []string{"issue", "coverage", "check"},
+		},
+	}
+}
+
+func projectionEntries() []Entry {
+	return []Entry{
 		{
 			Name:     "darwin-set",
 			Outputs:  []Output{{Pattern: "go/.darwin-set", Marker: darwinSetMarker}},
