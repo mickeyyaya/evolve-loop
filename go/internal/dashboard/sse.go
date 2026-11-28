@@ -11,6 +11,7 @@ import (
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
 	"github.com/mickeyyaya/evolve-loop/go/internal/dossier"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/llmcalls"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
@@ -35,7 +36,7 @@ func fingerprint(root string) string {
 	stamp(core.ResolveCycleStatePath(evolveDir))
 	stamp(dossier.CyclesDir(root))
 	stamp(inboxDir(root))
-	for _, d := range lifecycleDirs {
+	for _, d := range inboxmover.LifecycleStates() {
 		stamp(filepath.Join(inboxDir(root), d))
 	}
 	stamp(runsDir(root))

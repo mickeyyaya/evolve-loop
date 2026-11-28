@@ -70,6 +70,7 @@ The quality indexes (ADR-0153, proposed) plan a `Snapshot.Quality` panel of sepa
 ### The inbox queue
 
 - **The queue is the inbox rank.** `readQueue(root, now)` ranks every pending item against the whole queue with the evolve dir's own rank inputs (`rankinputs.Load(…, now)`, the collector's clock) and lists them in that order; `QueueItem` carries `score` beside `weight`, and the inbox table shows the score. A loader problem (an unreadable recurrence ledger, a malformed policy) is an `inbox rank: …` line in `Snapshot.Warnings`, never a page failure. Until P2 of the [inbox prioritization plan](../../plans/inbox-prioritization-2026-10.md) (2026-10-06) the queue sorted by weight, then id. Pinned by `TestReadQueue_PendingFollowsTheInboxRankAndCarriesEachScore` and `TestReadQueue_AnUnreadableLedgerIsAWarning`.
+- **The queue counts come from `inboxmover.LifecycleStates()`.** `readQueue` and `fingerprint` read the directory-backed state list from `inboxmover.LifecycleStates()` instead of a local slice. `QueueSummary` holds one count field for each state in that list (`delivered`, `rejected`, `quarantine`, `consumed`, `processing`, `retry`, `processed`). Pinned by `TestReadQueue_EveryLifecycleStateHasACount` and `TestFingerprint_TracksDeliveredDirectory`.
 
 ## Invariants
 

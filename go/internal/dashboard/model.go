@@ -55,6 +55,9 @@ type QueueSummary struct {
 	Processing int         `json:"processing"`
 	Retry      int         `json:"retry"`
 	Processed  int         `json:"processed"`
+	Delivered  int         `json:"delivered"`
+	Rejected   int         `json:"rejected"`
+	Quarantine int         `json:"quarantine"`
 }
 
 type QueueItem struct {

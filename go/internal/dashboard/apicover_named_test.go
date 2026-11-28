@@ -21,8 +21,8 @@ func TestAPICoverNamedExports(t *testing.T) {
 
 	snap := Collect(root, now)
 	var queue QueueSummary = snap.Queue
-	if len(queue.Pending) == 0 {
-		t.Fatal("seeded queue has no pending item")
+	if len(queue.Pending) == 0 || queue.Delivered < 0 || queue.Rejected < 0 || queue.Quarantine < 0 {
+		t.Fatal("seeded queue has no pending item or invalid lifecycle counts")
 	}
 	var item QueueItem = queue.Pending[0]
 	if item.ID == "" {

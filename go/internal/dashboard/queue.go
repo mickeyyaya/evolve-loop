@@ -7,11 +7,10 @@ import (
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxbatch"
+	"github.com/mickeyyaya/evolve-loop/go/internal/inboxmover"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxrank/rankinputs"
 	"github.com/mickeyyaya/evolve-loop/go/internal/paths"
 )
-
-var lifecycleDirs = []string{"consumed", "processing", "retry", "processed"}
 
 func inboxDir(root string) string { return filepath.Join(paths.EvolveDirOf(root), "inbox") }
 
@@ -37,10 +36,20 @@ func readQueue(root string, now time.Time) (QueueSummary, []string) {
 		q.Pending = append(q.Pending, QueueItem{ID: it.ID, Title: it.Title, Kind: it.Kind, Class: it.Class,
 			Route: it.Route, Priority: it.Priority, Weight: it.Weight, Score: r.Breakdown.Score})
 	}
-	q.Consumed = countJSON(filepath.Join(inbox, "consumed"))
-	q.Processing = countJSON(filepath.Join(inbox, "processing"))
-	q.Retry = countJSON(filepath.Join(inbox, "retry"))
-	q.Processed = countJSON(filepath.Join(inbox, "processed"))
+	counts := map[string]*int{
+		inboxmover.StateConsumed:   &q.Consumed,
+		inboxmover.StateProcessing: &q.Processing,
+		inboxmover.StateRetry:      &q.Retry,
+		inboxmover.StateProcessed:  &q.Processed,
+		inboxmover.StateDelivered:  &q.Delivered,
+		inboxmover.StateRejected:   &q.Rejected,
+		inboxmover.StateQuarantine: &q.Quarantine,
+	}
+	for _, state := range inboxmover.LifecycleStates() {
+		if dst := counts[state]; dst != nil {
+			*dst = countJSON(filepath.Join(inbox, state))
+		}
+	}
 	return q, warnings
 }
 

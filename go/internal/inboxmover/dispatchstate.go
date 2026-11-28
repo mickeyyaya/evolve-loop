@@ -21,6 +21,18 @@ const (
 
 var retirementStates = []string{StateConsumed, StateQuarantine, StateProcessed, StateRejected, StateRetry}
 
+func LifecycleStates() []string {
+	return []string{
+		StateProcessing,
+		StateProcessed,
+		StateConsumed,
+		StateRetry,
+		StateDelivered,
+		StateRejected,
+		StateQuarantine,
+	}
+}
+
 type DispatchState struct {
 	State  string
 	Detail string

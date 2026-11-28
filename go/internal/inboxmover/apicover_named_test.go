@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/integration"
@@ -162,5 +163,12 @@ func TestPromoter_NamedExport(t *testing.T) {
 	}
 	if len(fx.processedFiles(t)) != 1 {
 		t.Errorf("processed files = %v, want 1", fx.processedFiles(t))
+	}
+}
+
+func TestLifecycleStates_NamedExport(t *testing.T) {
+	got := LifecycleStates()
+	if !slices.Contains(got, StateDelivered) || len(got) != 7 {
+		t.Fatalf("LifecycleStates() = %v, want 7 directory-backed states including %q", got, StateDelivered)
 	}
 }

@@ -3,6 +3,7 @@ package inboxmover
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -63,5 +64,30 @@ func TestResolveDispatchState(t *testing.T) {
 				t.Errorf("non-pending states carry no deps, got %v", got.Deps)
 			}
 		})
+	}
+}
+
+func TestLifecycleStates_ListsDirectoryBackedStatesAsFreshCopy(t *testing.T) {
+	states := LifecycleStates()
+	want := []string{
+		StateProcessing, StateProcessed, StateConsumed,
+		StateRetry, StateDelivered, StateRejected, StateQuarantine,
+	}
+	if len(states) != len(want) {
+		t.Fatalf("LifecycleStates() = %v, want %v", states, want)
+	}
+	for _, s := range want {
+		if !slices.Contains(states, s) {
+			t.Errorf("LifecycleStates() = %v, missing %q", states, s)
+		}
+	}
+	for _, s := range []string{StatePending, StateUnknown} {
+		if slices.Contains(states, s) {
+			t.Errorf("LifecycleStates() = %v includes non-directory state %q", states, s)
+		}
+	}
+	states[0] = "mutated"
+	if slices.Contains(LifecycleStates(), "mutated") {
+		t.Errorf("LifecycleStates() leaked caller mutation across calls")
 	}
 }
