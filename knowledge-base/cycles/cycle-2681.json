@@ -1,0 +1,99 @@
+{
+  "schema_version": 2,
+  "cycle": 2681,
+  "run_id": "01M8GFQAHWMD2MXBTWG9Y1A1S5",
+  "goal": "Wave 193.\n\nWork the highest-weight lane-eligible inbox items from start to end: claim, tdd, build, audit and ship. Keep full phase integrity.\n\nEvery cycle must:\n- commit to a claimed inbox item (an empty top_n must not run the spine);\n- bind its audit to the changes tree that it ships;\n- disposition its own defect ledger and the inherited ids;\n- record a terminal outcome on every exit;\n- never change a protected control-plane file with a tool;\n- leave no stale worktree.\n\nRouting:\n- An item whose declared fix surface is a protected file is console work. A pipeline-integrity item that the operator did not route to the lanes is also console work.\n- An item that has `route: lane` is lane work. ADR-0099 document deliverables are lane work.\n- A card on a protected surface is a route, not a verdict. The cycle ends as planned no-work, and the item goes to the console.\n\nCraft:\n- New and changed code has no comments. Names, types and tests give the intent.\n- Write each new document and each new log text in ASD-STE100.\n- A git-backed test fixture uses internal/gittest. It never uses a raw `git init`.\n- A lane never changes go/internal/sizeratchet/offenders.json or the deadline of a gate.\n\nEvidence:\n- To know what a cycle did, read the cycle state and the signals (`evolve wave status`). Do not read the text log.\n\nThe measure of this wave is the number of shipped cycles. Keep each cycle shipping.\n\nWave 192 facts (run 20261127T055022Z): 5 of 5 cycles shipped.\n- Cycle 2660: final verdict PASS. It shipped.\n- Cycle 2661: final verdict PASS. It shipped.\n- Cycle 2662: final verdict PASS. It shipped.\n- Cycle 2663: final verdict PASS. It shipped.\n- Cycle 2664: final verdict PASS. It shipped.\n- Pull requests merged at this boundary: none.\n\nFocus items for wave 193: persona-diet-c1-debugger-reasoning-field, queue-authority-b1-breaker-charges-prebuild-failures, dashboard-queue-counts-delivered-items, split-cmd-evolve-gccmd, code-index-second-independent-truth-set. These items take the first lanes; other items fill each free lane.\n\nOperator notes for wave 193:\n- Boundary 192: batch landed 1850-1853 1855-1858 1860; #1862 ejected for rebuild (stale baseline rows after K4).\n\nEarlier waves:\n- Wave 189 (run 20261125T020616Z): 15 of 20 cycles shipped.\n- Wave 190 (run 20261126T115446Z): 2 of 4 cycles shipped.\n- Wave 191 (run 20261126T214239Z): 3 of 3 cycles shipped.",
+  "final_verdict": "WARN",
+  "tasks": [
+    "acs-cycle2501-predicate-names-a-renamed-test"
+  ],
+  "phases": [
+    {
+      "name": "scout",
+      "verdict": "PASS",
+      "duration_ms": 54736,
+      "started_at": "2026-11-28T07:09:01Z",
+      "ended_at": "2026-11-28T07:09:58Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 14,
+        "output": 2844,
+        "cache_read": 418926,
+        "cache_write": 25810
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "PASS",
+      "duration_ms": 33092,
+      "started_at": "2026-11-28T07:10:28Z",
+      "ended_at": "2026-11-28T07:11:04Z",
+      "archetype": "plan",
+      "model_source": "profile",
+      "resolved_model": "balanced",
+      "tokens": {
+        "input": 8,
+        "output": 1653,
+        "cache_read": 278924,
+        "cache_write": 38864
+      }
+    },
+    {
+      "name": "triage",
+      "verdict": "WARN",
+      "ended_at": "2026-11-28T07:11:04Z",
+      "archetype": "plan",
+      "tokens": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      }
+    }
+  ],
+  "timing": {
+    "total_ms": 87828,
+    "phase_count": 3,
+    "retried_count": 0,
+    "longest_phase": "scout",
+    "longest_ms": 54736,
+    "by_archetype_ms": {
+      "plan": 87828
+    },
+    "total_tokens": {
+      "input": 22,
+      "output": 4497,
+      "cache_read": 697850,
+      "cache_write": 64674
+    },
+    "tokens_by_archetype": {
+      "plan": {
+        "input": 22,
+        "output": 4497,
+        "cache_read": 697850,
+        "cache_write": 64674
+      }
+    },
+    "wasted_tokens": {
+      "input": 0,
+      "output": 0,
+      "cache_read": 0,
+      "cache_write": 0
+    },
+    "cache_hit_ratio": 0.9999684755943783,
+    "hot_phase_count": 2,
+    "hot_phases": [
+      "scout",
+      "triage"
+    ]
+  },
+  "recalled_lessons": [
+    "cycle-1502-closure-citation-contract-never-reaches-the-auditor-it-grades",
+    "cycle-93-build-report-commit-sha-fabrication",
+    "cycle-1492-remedy-on-disk-in-four-places-reaches-no-agent-with-authority-to-apply-it",
+    "inst-L1549b",
+    "inst-L1565b"
+  ]
+}
