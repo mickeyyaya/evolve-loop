@@ -10,9 +10,11 @@ import (
 const contractTimeout = 2 * time.Second
 
 type clockHarness struct {
-	clock  Clock
-	delay  time.Duration
-	elapse func()
+	clock      Clock
+	delay      time.Duration
+	stopDelay  time.Duration
+	laterDelay time.Duration
+	elapse     func()
 }
 
 type clockContractCase struct {
@@ -23,11 +25,23 @@ type clockContractCase struct {
 func fakeHarness() clockHarness {
 	fake := newFakeClock()
 	delay := time.Hour
-	return clockHarness{clock: fake, delay: delay, elapse: func() { fake.Advance(2 * delay) }}
+	return clockHarness{
+		clock:      fake,
+		delay:      delay,
+		stopDelay:  delay,
+		laterDelay: 2 * delay,
+		elapse:     func() { fake.Advance(2 * delay) },
+	}
 }
 
 func systemHarness() clockHarness {
-	return clockHarness{clock: SystemClock{}, delay: time.Millisecond, elapse: func() {}}
+	return clockHarness{
+		clock:      SystemClock{},
+		delay:      time.Millisecond,
+		stopDelay:  250 * time.Millisecond,
+		laterDelay: 350 * time.Millisecond,
+		elapse:     func() {},
+	}
 }
 
 type inlineClock struct{ pending []func() }
@@ -45,11 +59,17 @@ func (*inlineTimer) Stop() bool { return true }
 
 func inlineHarness() clockHarness {
 	c := &inlineClock{}
-	return clockHarness{clock: c, delay: time.Hour, elapse: func() {
-		for _, f := range c.pending {
-			f()
-		}
-	}}
+	return clockHarness{
+		clock:      c,
+		delay:      time.Hour,
+		stopDelay:  time.Hour,
+		laterDelay: 2 * time.Hour,
+		elapse: func() {
+			for _, f := range c.pending {
+				f()
+			}
+		},
+	}
 }
 
 func awaitSignal(ch <-chan struct{}, what string) error {
@@ -81,7 +101,7 @@ func runsTheFunctionOnce(h clockHarness) error {
 func stopBeforeTheDelayPreventsTheRun(h clockHarness) error {
 	var mu sync.Mutex
 	ran := false
-	stopped := h.clock.AfterFunc(h.delay, func() { mu.Lock(); ran = true; mu.Unlock() })
+	stopped := h.clock.AfterFunc(h.stopDelay, func() { mu.Lock(); ran = true; mu.Unlock() })
 	if !stopped.Stop() {
 		return errors.New("Stop of a pending timer returned false")
 	}
@@ -89,7 +109,7 @@ func stopBeforeTheDelayPreventsTheRun(h clockHarness) error {
 		return errors.New("a second Stop returned true")
 	}
 	later := make(chan struct{})
-	h.clock.AfterFunc(2*h.delay, func() { close(later) })
+	h.clock.AfterFunc(h.laterDelay, func() { close(later) })
 	h.elapse()
 	if err := awaitSignal(later, "the later timer never ran"); err != nil {
 		return err
