@@ -15,6 +15,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/fleet"
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/triagecap"
 )
 
@@ -33,12 +34,28 @@ func (dirCells) Deps(string) []string { return nil }
 func (dirCells) Hubs() map[string]bool { return map[string]bool{} }
 
 type laneMeter struct {
-	mu       sync.Mutex
-	live     int
-	peak     int
-	total    int
-	launched chan string
-	release  chan struct{}
+	mu         sync.Mutex
+	live       int
+	peak       int
+	total      int
+	dispatched []string
+	launched   chan string
+	release    chan struct{}
+}
+
+func (m *laneMeter) publish(ev signalcenter.Event) {
+	if ev.Code != orchestrator.CodeLaneLaunched && ev.Code != orchestrator.CodeLaneBackfilled {
+		return
+	}
+	m.mu.Lock()
+	m.dispatched = append(m.dispatched, ev.Fields["todo"])
+	m.mu.Unlock()
+}
+
+func (m *laneMeter) dispatchOrder() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Clone(m.dispatched)
 }
 
 func newLaneMeter() *laneMeter {
@@ -115,7 +132,7 @@ func poolBacklog(t *testing.T, h *harness, fc policy.FleetConfig) []fleet.Todo {
 
 func runMeteredPool(fc policy.FleetConfig, admit orchestrator.Admit, backlog []fleet.Todo, m *laneMeter) <-chan []fleet.Result {
 	done := make(chan []fleet.Result, 1)
-	pool := orchestrator.Pool{Target: fc.Count, Concurrency: fc.Concurrency, MaxLanes: fc.Orchestrator.RunMaxLanes, Admit: admit, Launch: m.launch}
+	pool := orchestrator.Pool{Target: fc.Count, Concurrency: fc.Concurrency, MaxLanes: fc.Orchestrator.RunMaxLanes, Admit: admit, Launch: m.launch, Publish: m.publish}
 	go func() { done <- pool.Run(context.Background(), backlog) }()
 	return done
 }
