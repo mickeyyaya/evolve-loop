@@ -1,0 +1,274 @@
+# AGENTS.md — Full Cross-CLI Rules and Runtime Facts
+
+> Moved out of the root [AGENTS.md](../../AGENTS.md) on 2026-11-28 to keep `AGENTS.md` under the `24,000`-byte per-file cut of `agy`. The root [AGENTS.md](../../AGENTS.md) carries the digest, the `Shared Constraints`, the `cli_routing` table summary and links here.
+
+## Cross-CLI invariants (the universal rules)
+
+These rules apply on every CLI that you run under. They are STRUCTURAL: the OS sandbox, the worktree fence and the ship gates enforce them for every family, not prompt instructions. The Claude Code kernel hooks are defence in depth ([llm-isolation.md §9.1](../architecture/llm-isolation.md#91-as-built-x7)). The protected write rule of the sandbox denies only at `isolation.i7.stage` `enforce`; at the default `shadow` it only reports.
+
+### 1. Pipeline ordering is non-negotiable
+Phases run Scout → Builder → Auditor → Ship/Record, in that exact order. The Go orchestrator state machine (`go/internal/core`) enforces the phase ORDER. The phase-gate kernel hook (`evolve guard phase`, matcher `Agent|Task` since ADR-0075) is defence in depth. During a cycle, it denies an `Agent` or `Task` call outside a phase cell when its `subagent_type` names a phase persona (`evolve-*`). Inside a cell (the phase marker of the launcher is set), each `Agent` and `Task` call passes. A phase agent can start any subagent of its own harness (llm-isolation §7.2).
+
+The cell marker is advisory, and the cell boundary is the real limit (X7 of ADR-0154, matrix row N11).
+
+The emergency operator override is the explicit `evolve guard phase --bypass` CLI flag. With it, the guard allows the call and writes no special log line. Each use is a CRITICAL violation.
+
+### 2. Subagents start through the native bridge, never through in-process tool calls
+The native runner spawns every phase agent. The runner is `evolve subagent run <agent> <cycle> <workspace>`, or the in-process `go/internal/bridge` launcher that `evolve loop` / `evolve cycle run` drive. During a cycle, the phase-gate hook denies an in-process start of a phase persona (`evolve-*`) outside a phase cell. Reason: a phase persona that starts in-process bypasses the profile-scoped permissions and the tamper-evident ledger. Inside a cell, a phase agent can start subagents of its own harness, and the cell boundary limits them (invariant 1).
+
+### 3. Commits go through `evolve ship`, never bare `git commit / git push`
+The ship-gate kernel hook (`evolve guard ship`) denies a bare git commit/push/gh release create. The only canonical entry point is the native `evolve ship`. It enforces audit verification, cycle binding (HEAD + tree_state_sha match) and version-aware self-SHA pinning. Operator escape: `--class manual` (interactive) or the explicit `evolve guard ship --bypass` emergency flag.
+
+Interactive `--class manual` commits also require a fresh **commit-gate review attestation** (v13.0.0+). The attestation is a `.commit-gate/attestation.json` whose `tree_state_sha` matches the staged tree. To make it, use `/commit` (code-simplifier + code-reviewer + language reviewer + lint + targeted tests). `evolve ship --bypass-commit-gate` skips the check. A routine use is a policy violation, identical in spirit to the emergency bypass of the ship guard.
+
+### 4. Builder writes only inside its worktree
+Each cycle gets its own git worktree. The orchestrator in `go/internal/core` provisions it natively and records it in `cycle-state.json:active_worktree`. The Builder profile (`.evolve/profiles/builder.json`) restricts Edit/Write to the worktree path. The role-gate kernel hook (`evolve guard role`) denies edits outside that boundary. This includes the leaks through interpreter-execution Bash redirects.
+
+### 5. Audits are gated by the EGPS binary verdict
+The Auditor writes `audit-report.md`. The ship gate is the binary `acs-verdict.json:red_count == 0` (EGPS v10.0.0+). EGPS v10.0.0 removed the scalar PASS/WARN/FAIL confidence level. The native audit phase (`go/internal/phases/audit` + `evolve acs suite`) computes the verdict from sandbox exit codes, never from the narrative of a model. (Strict WARN→FAIL promotion is opt-in through `.evolve/policy.json` `workflow.strict_audit`; see [reference/env-vars](../../knowledge/reference/env-vars.md).)
+
+### 6. The ledger is tamper-evident (v8.37.0+)
+`.evolve/ledger.jsonl` records every subagent invocation with the cycle binding, the challenge token, the artifact SHA, **prev_hash** and **entry_seq**. The prev_hash of each new entry is the SHA256 of the full JSON line of the previous entry. `.evolve/ledger.tip` records the SHA of the latest entry atomically, for truncation detection. To confirm the history integrity, run `evolve ledger verify` (or `evolve guard chain`). A change to any historical entry breaks the chain at the next entry.
+
+### 7. Failure adaptation is fluent-by-default (v8.28.0+)
+`state.json:failedApproaches[]` records the prior failures, with structured classifications (for example, infrastructure-transient, code-audit-fail, code-audit-warn). The native failure-adapter (`go/internal/core`) returns deterministic decisions. The orchestrator follows them verbatim. The default mode is fluent: a rule that finds a block condition emits awareness, not BLOCK. Strict mode (`.evolve/policy.json` → `workflow.strict_audit: true`) restores the legacy behavior: block when a failure occurs again.
+
+### 8. Cost adaptation (v8.35.0+)
+The auditor profile defaults to Opus. But for trivial diffs (≤3 files, ≤100 lines, no security paths), the native diff-complexity check (`go/internal/subagent`, modeltier) auto-downgrades to Sonnet. This saves about $1.89/cycle on routine cycles. Operator override: `MODEL_TIER_HINT=opus` forces Opus in all cases.
+
+### 9. Knowledge Stewardship Rule (Day-One)
+
+> **Knowledge Stewardship Rule (Day-One):** You MUST document every research finding, discovery, cycle lesson or tried-and-failed approach before the cycle ships. All documentation is under `docs/`, never in code comments ([code-comments convention](../conventions/code-comments.md)). Research notes go in `docs/research/`. (The former `knowledge-base/research/` tree moved there on 2026-08-05; see [docs/MOVED.md](../MOVED.md).) `knowledge-base/` is a runtime write surface only (`cycles/` dossiers), not documentation.
+>
+> **Never delete; always archive.** When a new doc supersedes an old doc, MOVE the old doc to `docs/private/research/archived-YYYY-MM-DD/`. Put a one-line note in the replacement that points to the archive. A failure to document is a HIGH-severity audit defect.
+
+The doc-deletion guard enforces this rule (`evolve guard docdelete`, `go/internal/guards/docdelete.go`; a PreToolUse kernel hook). It blocks an `rm`/`mv` that removes committed content from `docs/**` or `knowledge-base/**`, unless the destination is under `docs/`. To archive, use `git mv` into `docs/private/research/archived-YYYY-MM-DD/`, so that the archived copy stays staged. `knowledge-base/` is deliberately NOT a valid destination.
+
+The one exception: a Build can `git rm` the explanation document of the active cycle (`docs/explain/builds/cycle-<N>-<run>.md`) if that document was never committed. Operator escape: set `workflow.allow_doc_delete=true` in `.evolve/policy.json` (logged; emergency only).
+
+### 10. Code carries no comments; it explains itself (2026-09-30)
+
+> Every agent, phase and person writes code with no comments. Names, types, small functions and test names say what the code does. A design reason goes to the notes of the package under `docs/architecture/packages/`. Only the comments that a tool reads survive. [The code-comments convention](../conventions/code-comments.md) is the one list of them. When you remove a comment, the code must say what the comment said.
+
+The commit gate (`evolve commit-gate run`) refuses a commit that adds a comment. Loop lanes: the build handoff floor counts the comments that a build adds (`comment_floor`). The checked-in policy sets `comment_floor.stage` to `enforce` (2026-10-27), so a build that adds a comment gets a correction before its audit. [The code-comments convention](../conventions/code-comments.md) records the rollout.
+
+The build floor also names a build that removes a history-carrying comment group with no entry in `docs/history/code-comments` (`comment_floor.history_stage`). At `shadow` it WARNs. At `enforce` it sends the build back to run `commentaudit history`. Read the current stage with `policy.EffectiveStages`. A refused policy file sets this key to `enforce`, but a misspelled word for `comment_floor.stage` turns that floor off.
+
+### 11. Documents are written through the `docs-write` skill (2026-10-12)
+
+Before you write or change a document that a person reads, load the `docs-write` skill (`skills/docs-write/SKILL.md`). This covers research, plans, ADRs, architecture specs, conventions, guides and incident records. Each decision in the document cites its evidence and its rejected options. The new text passes `evolve docs ste-lint --strict` and the link check. The kernel preload of its compact form into each loop dispatch that writes a document is plan K2 ([ADR-0132](../architecture/adr/0132-documents-are-written-through-one-skill.md)).
+
+### 12. Outside services are reached through a CLI, never MCP (2026-10-17)
+
+No phase, lane or project config uses an MCP server. Reach each outside service through a CLI, and build an `evolve` verb or an adapter CLI when none exists ([the cli-only-no-mcp convention](../conventions/cli-only-no-mcp.md)).
+
+### 13. The pipeline is the only controller (2026-10-25, proposed)
+
+No LLM controls another LLM. The `evolve` binary starts each agent in an isolated cell, carries each message and routes each seat by data ([ADR-0154](../architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md), [spec](../architecture/llm-isolation.md)). The `evolve` CLI is the interface for other services ([cli-contract.md](../architecture/cli-contract.md)). The pipeline must read no control flag from the environment ([ADR-0156](../architecture/adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md)). The task assignment is CLI-neutral, and only the bridge drivers hold CLI specifics (ADR-0154 I-17). The components X1 to X19 build these rules, and X1 to X8 are on `main`.
+
+## 12 Core agent rules
+
+These are behavioral rules that every agent must follow, on every CLI. The kernel hooks above catch *structural* breaches. These rules catch *judgment* breaches. Bypass-permissions / autonomous mode overrides rule 4 ("stop and ask"): make the reasonable call and continue. All other rules apply unconditionally.
+
+### Karpathy foundations (1–4): think before acting
+
+1. **Think before coding.** Do not assume, and do not over-engineer. State the assumptions explicitly. If a requested approach is wrong, push back and propose the alternative.
+2. **Push for simplicity.** If a simpler approach exists, propose it. Three similar lines beat a premature abstraction. Do not design for hypothetical future requirements.
+3. **No silent changes.** When the instructions admit more than one interpretation, or the codebase offers more than one pattern, show both. Then pick one explicitly, with a one-line reason. Never guess silently.
+4. **Surface ambiguity.** If something is unclear or you do not have the context, stop and ask. (Bypass-permissions mode overrides this rule: make the reasonable call and continue. The user will redirect.)
+
+### Mnilax extensions (5–12): multi-step agent discipline
+
+5. **Reserve judgment tasks for AI.** Use LLM cycles for qualitative work: summaries, categories, drafts, designs. Put deterministic work (retries, error codes, state transitions, hashes) in the Go kernel. evolve-loop already enforces this rule. The phase gate, ship and the failure-adapter (`go/internal/core`, `go/internal/phases/ship`) are deterministic Go. Scout/Builder/Auditor are LLM.
+6. **Strict token budgeting.** Stay in your per-task and per-session token budget. When you come near the limit, summarize the state to a markdown file and stop the phase. Do not let the phase auto-resume. See [docs/architecture/checkpoint-resume.md](../architecture/checkpoint-resume.md).
+
+   (This rule is about your own work discipline, not a runtime cap. The product removed its token-budget *cost* gates, because the dollar-cost calculation was unreliable across LLM models. Thus the former dollar-cost budget flags (and `--budget-usd N`) are gone, and cost is display-only telemetry.)
+7. **Address conflicting patterns.** If two patterns conflict in scope, do not mix them. For example: bash 3.2 vs bash 4 features; `skills/` canonical vs `.agents/skills/` canonical. Pick one. Record the reason in the commit body. Tag the other for cleanup.
+8. **Read first.** Before you import from a module or call into it, `Read` it and list its real exports. Do not invent function names from context. This rule prevents a failure mode that recurs: Builder agents ship code against imagined APIs.
+9. **Write meaningful tests.** Tests verify *intent*, not surface behavior. The eval-quality check (`evolve eval quality-check`, EGPS v10.0+) rejects EGPS predicates that pass with `echo PASS; exit 0` or `grep -q presence`. The same principle applies to Go unit tests. A test that passes but does not probe the behavior change is a no-op.
+10. **Use checkpoints.** For multi-phase work, after every phase, summarize what is done and what remains. evolve-loop encodes this rule in the native cycle-state checkpoint + `phase report` artifacts. If you cannot clearly describe the current status in 3 bullets, stop. You lost the plot.
+11. **Follow existing conventions.** Match the codebase, even if you disagree. Specifics:
+    - Go is the runtime (`go/internal/...`).
+    - The few shell helpers that remain (test fixtures, the commit-gate runner) target bash 3.2 (no `declare -A`, no `mapfile`, no `${var^^}`). They use `printf > tmp && mv` for atomic writes.
+    - Commits go through `evolve ship`.
+    - Kernel guards are `evolve guard <name>`. They split read roots (`PLUGIN_ROOT`) from write roots (`PROJECT_ROOT`).
+12. **Fail loudly.** Do not silently skip steps. Do not swallow errors. Do not report success when the work is incomplete. This rule prevents a failure mode: a "migration complete" claim that secretly skipped 3 files. The format for completion claims: `cd go && go test ./internal/<pkg>/... — N/N PASS, no regression`.
+
+## Operating rules and runtime facts
+
+These rules and facts apply on every CLI. The full runtime detail is in [docs/operations/runtime-reference.md](runtime-reference.md): the env-var table, the operator commands, the ship classes and the publish pipeline. Read it before you change loop behavior, flags, gates or releases.
+
+### Automation Loop Guardrails
+
+- When you run the evolve loop or any batch/merge-train automation, evaluate the output after EVERY cycle. If 2 consecutive cycles produce zero ships (0 merged PRs), STOP the loop immediately. Find the root cause in the pipeline before you run another wave. The canonical zero-ship halt rule is an operator guardrail, not a compiled breaker: [docs/operations/operating-policy.md §4.1](operating-policy.md).
+- Never let a batch run more than 2 unproductive waves "to see if it self-corrects".
+- ADR-0072 reconciliation: a zero-ship streak is evidence of a SYSTEM fail, so HALT + P0 applies. This does not conflict with "never stop the queue". That rule governs task-level failures.
+
+### Status Reporting
+
+When you report on a batch or a pipeline run, always include these items:
+
+- the cycles that ran;
+- the ships or lanes that completed (for example, 2/2);
+- the open PR numbers;
+- the names of the failed CI jobs, with the failure class;
+- the specific next action.
+
+Do not report "running" or "in progress" as a status without these numbers.
+
+### Session conventions
+
+- **Confirm direction first**: multi-step or multi-cycle work needs a 3-bullet plan and an approval. These tasks are exempt: single-cycle bug fixes, tasks that specify a file path, and tasks from an approved plan.
+- **Output discipline**: give summaries with `file:line` refs. Put findings of more than 300 lines in a markdown file, not in the chat.
+- **Jobs that run for a long time**: after the launch, verify the health (exit codes, log tail). Make a checkpoint every cycle so that `--resume` works. Report failures immediately.
+- **Pre-commit review fleet**: change → code-simplifier → (**architecture-reviewer ∥ code-reviewer**, parallel, both read-only) → address the findings → commit.
+  - Each reviewer is a profile: `evolve agent run <name>` runs it on any family, with the diff as the input. The profile of each reviewer is `.evolve/profiles/diff-<name>.json`. The four reviewers are `architecture-reviewer`, `code-reviewer`, `code-simplifier` and `go-reviewer`. Their personas are `agents/evolve-diff-<name>.md`.
+  - architecture-reviewer ([agents/evolve-diff-architecture-reviewer.md](../../agents/evolve-diff-architecture-reviewer.md)) blocks the commit: you must fix each CRITICAL finding (by the rubric of the profile) before the commit.
+  - A pure-docs diff (every changed path ends in `.md`) gets a docs review, not a code review. Run `git diff --cached | evolve agent run docs-review --json`, and pass `--reviewers run:<run label>`. The commit gate requires that capability, and the code reviewers do not satisfy it. A plain reviewer name passes the gate but proves nothing, so `evolve integration record-pr --reviewed` refuses it.
+  - Only a proven comment removal needs no reviewer.
+  - **The console seats** (X11, [agent-run.md](../architecture/agent-run.md) §8). The console runs each build and each review through `evolve agent run` and the bridge. Routing data picks the family of each seat, and the Claude floor keeps `code-reviewer` and `adversarial-review` on Claude:
+    - A review: `evolve agent run <reviewer> --json --project-root <dev worktree>`, with the staged diff on stdin. The reviewers are the four above and `docs-review`. The audit of a diff is `adversarial-review`; no profile is named `auditor`.
+    - A build: `evolve agent run console-builder --worktree <dev worktree> --writable <path>...`, with the item and the brief as the input. The cell changes only the `--writable` files, and the console commits.
+    - Each run writes `.evolve/agent-runs/<run label>.json`. Pass `--reviewers run:<run label>` for each review run. The gate accepts only a review with a report, the verdict `PASS` or `WARN`, and the staged tree.
+
+### Autonomous execution (bypass mode)
+
+Bypass = "don't ask the user", NOT "skip integrity checks". These rules are mandatory (the full text is in runtime-reference.md):
+
+1. Continue all cycles without a pause. Never ask "should I continue?".
+2. Run the FULL pipeline every cycle: real `scout-report.md` / `build-report.md` / `audit-report.md`.
+3. The Go orchestrator state machine (`go/internal/core`) enforces the phase order at every transition.
+   `evolve guard phase`: during a cycle, a session outside a phase cell cannot start a phase persona (`evolve-*`). Inside a cell, each `Agent` and `Task` call passes (`go/internal/guards/phase.go`, wired by ADR-0075; matrix row N11, X7 of [ADR-0154](../architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md)).
+   The four `evolve guard` hooks are defence in depth in Claude Code panes only. The OS sandbox write rules, the worktree fence and the ship gates hold each guarantee for every family ([llm-isolation.md §9.1](../architecture/llm-isolation.md#91-as-built-x7)). The protected write rule of the sandbox denies only at `isolation.i7.stage` `enforce`; at the default `shadow` it only reports.
+4. Never fabricate cycle numbers (CRITICAL violation).
+5. Phase agents go through the native bridge (`evolve subagent run` / `evolve loop`). A phase agent can start subagents of its own harness inside its cell.
+6. The OS sandbox wraps subprocesses (policy.json `sandbox.mode`, `auto` by default). When the sandbox is nested, the EPERM fallback turns on automatically. Only the audited `--sandbox-off=<reason>` parameter turns it off.
+7. Run the eval-quality pre-flight on every eval (`evolve eval quality-check`).
+8. The Adversarial Auditor is on by default. The auditor runs Claude Opus on Claude Code, and the builder runs agy first. `ADVERSARIAL_AUDIT=0` turns it off.
+
+Maximum velocity, zero shortcuts. The runtime provisions worktrees natively: agents must NOT call `git worktree`. Follow the failure-adapter verdicts (PROCEED/RETRY/BLOCK) verbatim. `evolve ledger verify` checks the chain.
+
+### Verification before claiming done
+
+1. Before you declare a CLI unavailable, probe it: `evolve doctor probe <tool>`. List what you checked.
+2. Read the actual exports before you import from a module or call it.
+3. Run the tests and report the counts: `cd go && go test ./internal/<pkg>/... — N/N PASS, no regression`.
+
+### CI Failures
+
+- Classify each CI failure as a flake or a real defect before you retry it. Use `evolve ci classify <run-id|pr:N|sha:H> [--json] [--rerun]`. Exit 0 = retry-safe: every red is pre-existing or flake-evidence. Do not retry an unclassified red.
+- File a regression issue for each failure class that occurs 2+ times. Link the issue in the PR description.
+- Ship gates: if a gate reports RED, verify the logic of the gate before you assume that the code is broken. False-RED gates shipped in the past.
+
+### Go Project Conventions
+
+After you edit a Go file, run `gofmt -l .`, `go vet ./...` and `go test -count=1 ./...` (from the `go/` module root) before you open a PR.
+
+**`-count=1` is required, not optional.** The Go test cache does not track file reads that escape the module root through `..`. Many tests read `.evolve/profiles/*.json` that way. Thus, after a config-only edit, a bare `go test ./...` serves a stale `ok (cached)` while the regression is live on disk (reproduced 2026-08-28). CI and `make test` already pass `-count=1`. The gap was local verification.
+
+Add table-driven edge-case tests for each bug whose root cause was found during a pipeline stall.
+
+### Shell conventions
+
+- The target is bash 3.2.
+- Banned: `declare -A`, `mapfile`, `${var^^}`, `sed -i ''`, `date -d`.
+- Required: `set -uo pipefail` (not `set -e`), atomic writes through `mv "${f}.tmp.$$"`, and `git diff HEAD` for the tree-state SHA.
+- `skills/<name>/` is canonical. `.agents/skills/` are symlinks.
+- The full table, with the reasons and the portable alternatives, is in [runtime-reference.md](runtime-reference.md).
+
+### /evo:loop task priority
+
+Task priority is the computed inbox rank ([ADR-0121](../architecture/adr/0121-inbox-priority-is-a-computed-rank.md), `evolve inbox rank --explain`). The class order is in `.evolve/policy.json` `inbox_priority.class_order`.
+
+### Critical runtime facts (full table → runtime-reference.md)
+
+- The gates are default-ON as **compiled Go defaults** (`internal/policy` + `internal/config`). These defaults apply when the policy block is absent:
+  - `eval_gate=enforce`;
+  - `contract_gate=enforce`;
+  - `repo_contract_gate=enforce`: the ship-time repo-contract scanner pack (`internal/phases/ship/repocontract.go`). Lane ships can no longer red main. The build handoff floor runs the same pack first, so a red goes back to the build. Both run the pack only in the module of evolve-loop itself (`internal/repocontract`);
+  - EGPS `red_count==0` to ship;
+  - the tdd phase is enabled.
+- `.evolve/policy.json` CAN override these defaults through a `gates`/`workflow` block. But the checked-in file sets only floor/cli_health/cli_routing/catalog/acs/parallel_evaluate/fleet/failure_disposition/gc/inbox_priority/docs_floor/audit_cascade/comment_floor/retrospectives. It does not contain the gate keys. Do not assume that policy.json is the source of the defaults. Details for some of these keys (see runtime-reference):
+  - `gc`: the retention horizons, since 2026-09-29.
+  - `inbox_priority`: the class order and the factor weights of the inbox rank, since 2026-10-06 (ADR-0121). It is strict-decoded. The plan's P2 (2026-10-06) wired it: every lane consumer reads `inboxrank.Order`.
+  - `docs_floor`: `ste_stage: enforce`, since 2026-10-21 (operator decision). A lane doc that fails the STE lint goes back to the build.
+  - `audit_cascade`: `stage: shadow`, since 2026-10-21 (operator decision). Each audit records if a cheap-tier pass escalates. No dispatch and no verdict change.
+  - `catalog`: `auto_refresh: true` and `refresh_stage: enforce`, since 2026-10-27 (operator decision, model-currency C3). The cycle-start refresh commits the live model catalog when it is older than its TTL. Dispatch then uses the new picks.
+  - `comment_floor`: `stage: enforce`, since 2026-10-27 (operator decision). A build that adds a comment goes back to the build.
+  - `retrospectives`: `stage: enforce`, since 2026-10-27 (operator decision). The publish and the todo retirement of that stage are not built, so the closeout still writes the documents into the cycle workspace only.
+  - `gc.mode: enforce`, since 2026-10-06. Thus the batch-start and batch-end GC of the loop applies its run-dir and worktree sweeps, and does not only report them. `evolve gc` at the boundary still owns the cache, temp and process sweeps. The cache has a 20 GB compiled-default cap, `gc.go_cache_max_gb`.
+  - `cli_routing`: the CLI routing table, since 2026-10-07 (L2, [cli-routing-table-2026-10.md](../plans/cli-routing-table-2026-10.md)). It replaces the former `workflow.universal_fallback_exclude` and `pins` keys. `evolve cli-routing migrate` moves `pins`, `workflow.universal_fallback` and `router.cli/model` into it. It refuses a non-empty `workflow.universal_fallback_exclude`: drop those families from `clis`, then remove the key.
+- Since 2026-08-10: `failure_disposition.stage=enforce`. The escalation boundary is LIVE (it was shadow).
+- `fleet.count=5`, `fleet.min_lanes=5` and `fleet.orchestrator.window.start=5`, since 2026-11-21 (operator decision). The width goes back up after the fix of the item `verify-lock-holder-gets-the-host-budget`. The quota shrink counts a bench only when a chain has no healthy family (O1).
+  - Wave 185 ran at 8 lanes. The host verification lock lets one verification run at a time, and each run got 1 CPU (14 CPUs divided by 8 lanes). The lock wait timed out 73 times in cycles 2582 to 2590, against 6 times at 4 to 5 lanes in wave 184.
+  - From 2026-11-14 to 2026-11-21 the width was 8 (PRs #1433 and #1446).
+  - From 2026-10-18 to 2026-11-14 the width was 4, after the burn window ended (ADR-0139 D3). The burn window ran on 2026-10-18 with `fleet.count=8` and `fleet.min_lanes=8`. It ended after the weekly Claude reset.
+  - `fleet.orchestrator.stage=enforce`, since 2026-10-18. The stage stays `enforce` after the burn window. At `enforce`, admission by cell holds a todo whose cell is busy, and the rolling pool (O4) backfills a free slot at once.
+  - From 2026-10-17 to 2026-10-18, before the burn window, `fleet.count` was 4 and `fleet.min_lanes` was 2 (ADR-0139 D3).
+  - Before that, `fleet.count=3` was restored from the August codex-quota reduction. It was verified live on 2026-08-24. Over cycles 1530-1552 there were 76 codex dispatches / 44% share and zero quota halts.
+  - From 2026-09-10 until 2026-10-07, deep/top ran the deep model of the codex family manifest (gpt-5.6-sol) at high effort. On 2026-10-07 the routing table took codex out of every chain.
+  - gpt-5.6-sol is the value record of the CHANGELOG. The 2026-09-09 gpt-6-astra cutover was withdrawn the next day for token cost. Claude deep/top stay opus.
+  - The resolution is policy pin > live catalog > manifest baseline. The manifest `codex-tmux.json` is the ONE tier table of the family.
+- Since 2026-10-07 the `cli_routing` table decides every dispatch:
+  - The burn window of 2026-10-18 routed every phase to Claude Code and ended after the weekly reset. In the table today, `clis` is `[agy, agy-claude, claude]`, `default` is `[claude, agy, agy-claude]`, and `agents.builder` is `[agy, agy-claude, claude]`.
+  - Non-deep, non-top seats follow `default` (`claude`, then `agy`, then `agy-claude`). On `agy`, `fast` pins Gemini 4 Hydrogen (Medium) and `balanced` pins Gemini 4 Hydrogen (High), which `builder` runs first. No tracked profile defaults to `fast`, and none lets an envelope fall to `fast`.
+  - Since 2026-10-21 (ADR-0150), `tiers.deep` is `[claude, agy, agy-claude]` with `share_pct` 50. Thus `claude` takes half of the deep seats, paced by its week window. On `agy`, `deep` runs Gemini 4 Neon (High) and `top` runs Gemini 4 Neon (XHigh) (operator, 2026-11-21), and `agy-claude-tmux` runs Claude Opus 5.5. Since cycle 1911, a quota wall on one model group benches only that group, not all of `agy`. `tiers.top` is `[agy-claude, claude]`.
+  - `agy-claude-tmux` waits up to 10 s for a claude-family footer label before the prompt. If no label shows, it exits 87. Exit 87 is a walk trigger, so the seat falls through. The usage query that follows can bench an exhausted Claude group, and preflight only warns on it.
+  - The Claude floor seats (auditor, adversarial-review, tdd-engineer, code-reviewer and the spec verifiers) run Claude Code only. Here `code-reviewer` is the profile of the code-review phase, not the `diff-code-reviewer` profile of the review fleet. The floor is routing data, not code: `cli_routing.floors.claude` in `.evolve/policy.json`. With no `floors` key, the compiled default is the same list in `go/internal/policy/routing_defaults.json` (ADR-0154 I-6, X6 #1123). The floor profiles hold no `allowed_clis`; the floor is their only ceiling. Only `router` keeps its own ceiling.
+  - codex is reachable only under `--bypass-policy`.
+  - `evolve cli-routing explain <agent>` prints the chain of any agent.
+- Documents: load `docs-write` before you write any document that a person reads. Each decision cites its evidence and its rejected options ([ADR-0132](../architecture/adr/0132-documents-are-written-through-one-skill.md), AGENTS.md invariant 11).
+- MCP: no phase, lane or project config uses an MCP server. Reach each outside service through a CLI, or build one (AGENTS.md invariant 12, [docs/conventions/cli-only-no-mcp.md](../conventions/cli-only-no-mcp.md)). Each Claude Code launch gets `--strict-mcp-config` from its manifest, and preflight warns about a configured MCP server.
+- Comments: code has no comments. The code explains itself (AGENTS.md invariant 10, [docs/conventions/code-comments.md](../conventions/code-comments.md)). The commit gate refuses a commit that adds one. In loop lanes, the `comment_floor` of the build floor refuses them at `enforce` (the checked-in stage since 2026-10-27).
+- Boot self-heal: `boot.binary_refresh=auto` is a **compiled default** (`cmd_loop_boot_refresh.go`). If the build stamp of the current binary is behind HEAD with a go/ delta, the boot does a rebuild + re-exec. Use `off` only for deliberate pins of an old binary. Unknown words resolve to `auto`.
+- Contract blocks: the second consecutive contract-gate block escalates the re-dispatch CLI (a soft overlay, `internal/core/contract_escalation.go`). Escalation comes before breaker demotion. Salvage rungs are breaker-neutral.
+  - Exception: an optional evaluate phase past the ship floor that is not configured mandatory (code-review, ADR-0124) is breaker-exempt. Thus it gets no escalation and no salvage re-prompt. An exhausted ladder degrades a present-but-malformed report to SKIPPED+WARN. It aborts on an absent report.
+  - When an identical-fingerprint halt occurs again, run `evolve loop --reset --fingerprint <fp>`. The command acks the fingerprint into `.evolve/resolved-fingerprints.json`.
+- The default execution is the tmux-LLM drivers (for example, `claude-tmux`). Headless `claude -p` is opt-in only. The runtime detects the Claude OAuth from the macOS Keychain. There are five routing families:
+  - claude;
+  - codex;
+  - agy (the Gemini models of Antigravity);
+  - agy-claude (the Claude models that the agy binary serves, driver `agy-claude-tmux`);
+  - ollama.
+- Commits: the ship gate denies a bare `git commit` / `git push origin main`. Interactive commits: `/commit` → attestation → `evolve ship --class manual`. A routine use of `--bypass-commit-gate` is a violation. Cycle commits: `--class cycle` (full audit-binding). Releases: `evolve release X.Y.Z`. "publish" ≠ "push".
+- For an unfinished cycle, use `evolve loop --resume` or `evolve cycle reset`. `evolve loop --force-fresh` is the last-resort escape hatch. It does NOT seal the history.
+- Routing:
+  - `router.dynamic_routing` in `.evolve/policy.json` is `advisory` by default since 2026-06-06, when retro steps 1-3 landed. `off` is the static escape hatch.
+  - The integrity floor is `ship ⇒ build ∧ audit ∧ (tdd unless trivial or deliverable_kind=document — ADR-0099)`.
+  - CLI routing is in `.evolve/policy.json` `cli_routing` (one table: `clis`, `default`, `work`, `tiers`, `agents`, `floors`).
+  - `pins` beside a table refuse every launch. Thus `evolve cli-routing init|set|unset|migrate` is the only writer of the table. It compiles before it writes. It refuses to write inside a phase or while a cycle holds a live lease.
+  - `evolve setup recommend|apply` refuse on a declared project.
+  - The policy bypass (`--bypass-policy`) is off by default.
+  - Swarm: stage=shadow. This is a **compiled default**. `.evolve/policy.json` `swarm.stage` can override it (the checked-in file does not set it).
+- Observer auto-spawn is on by default as a **compiled Go default** (`internal/policy`; stall 600s).
+  - The observer judges a tmux phase on the pane-watch snapshot of the bridge (`<ws>/<agent>-pane-watch.json`: a normalized transcript hash, with the writer pid checked).
+  - It judges a headless phase on stdout and on workspace growth.
+  - A stall signals `LIVENESS_PHASE_STALLED` and kills nothing.
+  - `evolve bridge sessions` lists every live pane, read-only.
+  - A `.evolve/policy.json` `observer` block can override the default (the checked-in file does not set it).
+- Operator verbs since v22.27.0 (details in runtime-reference):
+  - `evolve checkpoint save|list|restore|prune` keeps the uncommitted work of a dev worktree as refs (ADR-0122).
+  - `evolve cli update` installs a newer Claude Code or agy and smoke-tests it. The loop runs it at each wave boundary.
+  - `evolve wave next|status|watch|note` (2026-10-08) runs and watches waves. `wave next` runs the boundary, composes the goal from facts and records the wave. Its `--json` prints one envelope on every exit ([wave-operations.md](wave-operations.md)). `boundary run` stays the low-level primitive.
+  - `evolve convergence decide` gives the next step of a console lane's review chain (ADR-0126). The pipeline loops do not call it yet.
+  - `workflow.convergence` is a compiled default at stage shadow.
+  - `evolve agent run <profile>` runs one read-only phase agent with no cycle and prints its report; `evolve agent list` names the profiles ([ADR-0152](../architecture/adr/0152-one-phase-agent-runs-from-the-command-line-with-no-cycle-through-the-phase-runner.md)).
+  - `evolve quality report --scope wave|tree|judges|replay` and `evolve quality compare` compute the quality indexes and publish them through the Signal Center ([ADR-0153](../architecture/adr/0153-quality-is-a-panel-of-separate-indexes-with-intervals-that-the-signal-center-publishes.md)). The scope `wave` reads PQ1, PQ4, CQ2 and CQ1, and `tree` reads CQ3, CQ4 and CQ5. `judges` and `replay` have no readers yet. The boundary runs `quality report --scope wave` after `sync-main`. The stage of each index is `quality.indexes.<id>.stage` (strict), and the checked-in policy does not set it.
+  - `evolve signals tail --channel NAME` reads one event channel under `.evolve/events/ch/`, for example `quality.reading`.
+- When only the deterministic audit gates force a FAIL over a PASS narrative, the cycle gets a bounded Build repair round (ADR-0093).
+- Waves: the console starts each wave with `<plane>/go/bin/evolve wave next` and follows it with `evolve wave watch`. These read cycle state and signals, never the text log. Do not write goal scripts. The standing goal is the tracked `.evolve/wave-goal.md`; queue facts with `evolve wave note add`.
+- Clear the session context before a new evolve-loop batch. This isolates the session cost.
+- LLM isolation ([ADR-0154](../architecture/adr/0154-the-pipeline-is-the-only-controller-and-each-agent-is-an-isolated-replaceable-worker.md), [ADR-0155](../architecture/adr/0155-the-loop-heals-itself-inside-its-boundaries-an-agent-proposes-and-the-pipeline-disposes.md), [ADR-0156](../architecture/adr/0156-the-cli-is-the-service-interface-and-the-pipeline-reads-no-ambient-control-flags.md)): the pipeline is the only controller, and each LLM runs in an isolated cell. The state on 2026-10-25:
+  - X1 is merged (#1121): the conformance matrix `isolation.Rows` and the `isolation.violation` channel. Each open gap is an expected-failure row.
+  - X6 is merged (#1123): the Claude floor and the flow seat defaults are routing data.
+  - X2 is merged (#1122): at `enforce` each LLM child gets an allowlisted environment. At the default `shadow` the child keeps today's environment, and the bridge only logs each name that `enforce` drops. The policy key `isolation.i2.stage` defaults to `shadow`, and the checked-in policy does not set it. The flip to `enforce` is an operator decision.
+  - The CLI is the service interface for other services: [cli-contract.md](../architecture/cli-contract.md). `evolve loop status <word>` starts a loop today; X17a fixes it.
+  - The pipeline must read no control flag from the environment (X18). [control-flags.md](../architecture/control-flags.md) lists each reader by class.
+- Events ([event-notification-protocol-2026-10](../plans/event-notification-protocol-2026-10.md)): the channels, the filter, the wake, the reader, the publisher and the root wiring (E10) are on `main`. The `events` CLI verbs (E9) are not started, so `evolve wave watch` still polls every 5 s.
+
+### References
+
+- [docs/operations/workspace-layout.md](workspace-layout.md) — the hub layout: the .repo.git bare store, the console/runtime planes and the dev/ worktrees (since 2026-09-01)
+- [docs/operations/runtime-reference.md](runtime-reference.md) — the env-var table, the operator commands, the ship classes, how to publish
+- [docs/architecture/](../architecture/) — design docs; [control-flags.md](../architecture/control-flags.md) — all `EVOLVE_*` flags
+- [CHANGELOG.md](../../CHANGELOG.md) · [release-notes/](release-notes/index.md)

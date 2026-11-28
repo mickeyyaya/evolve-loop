@@ -13,7 +13,12 @@
       "skill_root": ".agents/skills",
       "host_frontmatter": ["argument-hint"],
       "description_limit": 1024,
-      "budgets": [{"file": "GEMINI.md", "bytes": 16384}]
+      "budgets": [{"file": "GEMINI.md", "bytes": 16384}],
+      "rule_budgets": [
+        {"file": "AGENTS.md", "bytes": 24000},
+        {"file": "GEMINI.md", "bytes": 24000},
+        {"file": ".agents/rules/*.md", "bytes": 24000}
+      ]
     }
   ]
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -296,4 +297,99 @@ func TestSkillProblems_TheFrontmatterProblemsComeInSortedOrder(t *testing.T) {
 	if err != nil || len(problems) != 2 || !strings.Contains(problems[0], "alpha-key") || !strings.Contains(problems[1], "zeta-key") {
 		t.Fatalf("problems=%v err=%v, want alpha-key then zeta-key", problems, err)
 	}
+}
+
+func TestHostProfiles_AgyHasRuleBudgets(t *testing.T) {
+	agy := profileNamed(t, "agy")
+	want := []FileBudget{
+		{File: "AGENTS.md", Bytes: 24000},
+		{File: "GEMINI.md", Bytes: 24000},
+		{File: ".agents/rules/*.md", Bytes: 24000},
+	}
+	if !slices.Equal(agy.RuleBudgets, want) {
+		t.Fatalf("agy RuleBudgets = %+v, want %+v", agy.RuleBudgets, want)
+	}
+}
+
+func TestRuleFileProblems_EnforcesTheAgyCut(t *testing.T) {
+	cases := []struct {
+		name    string
+		rel     string
+		size    int
+		wantErr bool
+	}{
+		{"AGENTS.md at limit", "AGENTS.md", 24000, false},
+		{"AGENTS.md over limit", "AGENTS.md", 24001, true},
+		{"GEMINI.md at limit", "GEMINI.md", 24000, false},
+		{"GEMINI.md over limit", "GEMINI.md", 24001, true},
+		{"agents rule at limit", ".agents/rules/a.md", 24000, false},
+		{"agents rule over limit", ".agents/rules/a.md", 24001, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeRel(t, root, c.rel, strings.Repeat("a", c.size))
+			problems, err := ruleFileProblems(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !c.wantErr {
+				if len(problems) != 0 {
+					t.Fatalf("problems = %v, want none", problems)
+				}
+				return
+			}
+			if len(problems) != 1 || !strings.Contains(problems[0], c.rel) || !strings.Contains(problems[0], "24000") {
+				t.Fatalf("problems = %v, want one line naming %s and 24000", problems, c.rel)
+			}
+		})
+	}
+}
+
+func TestRuleFileProblems_ReportsStatErrorAndRejectsOverCutInRunAndCheck(t *testing.T) {
+	t.Run("stat error on symlink loop", func(t *testing.T) {
+		root := t.TempDir()
+		if err := os.Symlink("AGENTS.md", filepath.Join(root, "AGENTS.md")); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ruleFileProblems(root); err == nil {
+			t.Fatal("want stat error for symlink loop")
+		}
+	})
+
+	t.Run("bad glob pattern returns error", func(t *testing.T) {
+		if _, err := ruleBudgetProblems(t.TempDir(), "agy", FileBudget{File: "[", Bytes: 10}); err == nil {
+			t.Fatal("want glob error for malformed pattern")
+		}
+	})
+
+	t.Run("Run and Check report rule file over cut and stat error", func(t *testing.T) {
+		root := prepareSkillsTree(t)
+		writeRel(t, root, "AGENTS.md", strings.Repeat("a", 24001))
+		var out, errBuf bytes.Buffer
+		if code := Run(root, false, &out, &errBuf); code != 2 || !strings.Contains(errBuf.String(), "RULE_FILE: AGENTS.md") {
+			t.Fatalf("Run(write=false) = %d, stderr=%q; want 2 and RULE_FILE line", code, errBuf.String())
+		}
+		out.Reset()
+		errBuf.Reset()
+		if code := Run(root, true, &out, &errBuf); code != 0 || !strings.Contains(errBuf.String(), "RULE_FILE: AGENTS.md") {
+			t.Fatalf("Run(write=true) = %d, stderr=%q; want 0 and RULE_FILE warning", code, errBuf.String())
+		}
+		drift, err := Check(root)
+		if err != nil || !slices.ContainsFunc(drift, func(s string) bool { return strings.HasPrefix(s, "RULE_FILE: AGENTS.md") }) {
+			t.Fatalf("Check = %v, %v; want RULE_FILE problem", drift, err)
+		}
+		badRoot := prepareSkillsTree(t)
+		if err := os.Symlink("AGENTS.md", filepath.Join(badRoot, "AGENTS.md")); err != nil {
+			t.Fatal(err)
+		}
+		out.Reset()
+		errBuf.Reset()
+		if code := Run(badRoot, false, &out, &errBuf); code != 1 {
+			t.Fatalf("Run(symlink loop) = %d, want 1", code)
+		}
+		if _, err := Check(badRoot); err == nil {
+			t.Fatal("Check(symlink loop) = nil, want error")
+		}
+	})
 }

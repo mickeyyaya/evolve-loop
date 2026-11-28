@@ -1023,4 +1023,10 @@ approaches / decision / results / retro) — lives at
 | [architecture/adr/0172-every-deliverable-has-a-registered-static-check-and-an-authentic-check.md](architecture/adr/0172-every-deliverable-has-a-registered-static-check-and-an-authentic-check.md) | ADR-0172, Proposed. It gives 19 decision rules, the confirmation by the meta-guard, the good and bad consequences, and the rejected options. |
 | [architecture/deliverable-verification.md](architecture/deliverable-verification.md) | The spec of record. It defines the classes, the registry schema and the five rules of the meta-guard. It gives the designs of V1 to V6 with their stage, the exemption marker, a worked example of one PR and a table of guards. |
 
+## 2026-11-28 — agy rule file probe
+
+| Document | What it records |
+|---|---|
+| [research/agy-rule-file-probe-2026-11.md](research/agy-rule-file-probe-2026-11.md) | Probe of `agy` `1.5.18` rule discovery (`AGENTS.md`, `GEMINI.md`, `.agents/rules/*.md`) and its `24,000`-byte per-file cut, plus the `rule_budgets` check design. |
+
 <!-- GENERATED:research-index END -->

@@ -4,6 +4,11 @@
     "A test fails when a rule file that agy loads is over 24,000 bytes.",
     "evolve skills check passes after the change."
   ],
+  "consumed": {
+    "at": "2026-11-28T16:59:57Z",
+    "cycle": "",
+    "via": "ship"
+  },
   "created_at": "2026-11-26T00:45:03Z",
   "files": [
     "AGENTS.md",

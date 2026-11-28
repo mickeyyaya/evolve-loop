@@ -208,7 +208,14 @@ func projectSurfaces(projectRoot string, diffs []factsDiff, write bool, stdout, 
 	for _, p := range overBudget {
 		fmt.Fprintln(stderr, p)
 	}
-	return drift || cmdDrift || renderDrift || len(overBudget) > 0, nil
+	ruleProblems, rErr := ruleFileProblems(projectRoot)
+	if rErr != nil {
+		return false, rErr
+	}
+	for _, p := range ruleProblems {
+		fmt.Fprintln(stderr, p)
+	}
+	return drift || cmdDrift || renderDrift || len(overBudget) > 0 || len(ruleProblems) > 0, nil
 }
 
 func projectCommandDiffs(diffs []commandDiff, write bool, stdout, stderr io.Writer) (bool, error) {
@@ -280,8 +287,13 @@ func Check(projectRoot string) ([]string, error) {
 	if hErr != nil {
 		return nil, hErr
 	}
+	ruleProblems, rErr := ruleFileProblems(projectRoot)
+	if rErr != nil {
+		return nil, rErr
+	}
 	problems := append(append(drift, nameErrs...), manifestProblems...)
-	return append(append(problems, hostProblems...), budgetProblems(renderDiffs, instructionRenders())...), nil
+	problems = append(append(problems, hostProblems...), budgetProblems(renderDiffs, instructionRenders())...)
+	return append(problems, ruleProblems...), nil
 }
 
 func sortedPhaseSkillNames() []string {

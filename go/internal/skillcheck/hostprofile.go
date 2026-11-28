@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/prompts"
@@ -25,6 +26,7 @@ type HostProfile struct {
 	Frontmatter      []string     `json:"-"`
 	DescriptionLimit int          `json:"description_limit"`
 	Budgets          []FileBudget `json:"budgets"`
+	RuleBudgets      []FileBudget `json:"rule_budgets"`
 }
 
 //go:embed templates/host_profiles.json
@@ -131,4 +133,56 @@ func frontmatterProblems(p HostProfile, rel string, fm map[string]any) []string 
 		}
 	}
 	return problems
+}
+
+func ruleFileProblems(projectRoot string) ([]string, error) {
+	var problems []string
+	for _, p := range HostProfiles() {
+		for _, rb := range p.RuleBudgets {
+			found, err := ruleBudgetProblems(projectRoot, p.Name, rb)
+			if err != nil {
+				return nil, err
+			}
+			problems = append(problems, found...)
+		}
+	}
+	return problems, nil
+}
+
+func ruleBudgetProblems(projectRoot, host string, rb FileBudget) ([]string, error) {
+	paths, err := matchingRulePaths(projectRoot, rb.File)
+	if err != nil {
+		return nil, err
+	}
+	var problems []string
+	for _, rel := range paths {
+		info, statErr := os.Stat(filepath.Join(projectRoot, filepath.FromSlash(rel)))
+		if os.IsNotExist(statErr) {
+			continue
+		}
+		if statErr != nil {
+			return nil, fmt.Errorf("stat %s: %w", rel, statErr)
+		}
+		if info.Size() > int64(rb.Bytes) {
+			problems = append(problems, fmt.Sprintf("RULE_FILE: %s is %d bytes; the %s limit is %d bytes (move detail to docs/)", rel, info.Size(), host, rb.Bytes))
+		}
+	}
+	return problems, nil
+}
+
+func matchingRulePaths(projectRoot, pattern string) ([]string, error) {
+	if !strings.ContainsAny(pattern, "*?[") {
+		return []string{pattern}, nil
+	}
+	matches, err := filepath.Glob(filepath.Join(projectRoot, filepath.FromSlash(pattern)))
+	if err != nil {
+		return nil, fmt.Errorf("glob %s: %w", pattern, err)
+	}
+	sort.Strings(matches)
+	rels := make([]string, 0, len(matches))
+	for _, m := range matches {
+		rel, _ := filepath.Rel(projectRoot, m)
+		rels = append(rels, filepath.ToSlash(rel))
+	}
+	return rels, nil
 }
