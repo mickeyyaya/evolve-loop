@@ -153,7 +153,7 @@ func SubprocessOutputIn(dir, name string, args ...string) (stdout, stderr string
 	}
 	ctx, cancel := boundContext()
 	defer cancel()
-	if name == "go" {
+	if name == goTool {
 		args = lanebudget.WithTimeout(args, innerTimeout(ctx))
 	}
 	cmd := sysexec.Command(ctx, name, args...)

@@ -15,6 +15,8 @@ var ErrSubprocessBound = errors.New(acsverdict.SubprocessBoundMarker)
 
 var subprocessCap = 300 * time.Second
 
+const goTool = "go"
+
 const goTestTimedOut = "panic: test timed out"
 
 func laneEnd() (time.Time, bool) {
@@ -46,7 +48,7 @@ func innerTimeout(ctx context.Context) time.Duration {
 }
 
 func boundHit(ctx context.Context, name, output string) bool {
-	return ctx.Err() != nil || (name == "go" && strings.Contains(output, goTestTimedOut))
+	return ctx.Err() != nil || (name == goTool && strings.Contains(output, goTestTimedOut))
 }
 
 func boundLine(name string, callerEnded bool) string {
@@ -64,8 +66,8 @@ func boundNote(ctx context.Context, callerDeadlines ...time.Time) string {
 	deadline, _ := ctx.Deadline()
 	for _, candidate := range callerDeadlines {
 		if candidate.Equal(deadline) {
-			return boundLine("go", true)
+			return boundLine(goTool, true)
 		}
 	}
-	return boundLine("go", false)
+	return boundLine(goTool, false)
 }

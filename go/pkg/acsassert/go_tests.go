@@ -42,7 +42,7 @@ func GoTests(tb TB, spec GoTestSpec) bool {
 		tb.Errorf("%v%s", err, boundNote(ctx, caller...))
 		return false
 	}
-	out, stderr, code, err := sysexec.Capture(ctx, goTestRunner(), spec.Dir, "go", args...)
+	out, stderr, code, err := sysexec.Capture(ctx, goTestRunner(), spec.Dir, goTool, args...)
 	if err != nil || code != 0 {
 		tb.Errorf("go %v exited %d (err=%v)\nstdout:\n%s\nstderr:\n%s%s", args, code, err, out, stderr, boundNote(ctx, caller...))
 		return false
@@ -80,7 +80,7 @@ func buildFlags(spec GoTestSpec) []string {
 
 func resolveImportPath(ctx context.Context, spec GoTestSpec) (string, error) {
 	args := append(append([]string{"list", "-f", "{{.ImportPath}}"}, buildFlags(spec)...), spec.Package)
-	out, stderr, code, err := sysexec.Capture(ctx, goTestRunner(), spec.Dir, "go", args...)
+	out, stderr, code, err := sysexec.Capture(ctx, goTestRunner(), spec.Dir, goTool, args...)
 	path := strings.TrimSpace(out)
 	if err != nil || code != 0 || path == "" || strings.Contains(path, "\n") {
 		return "", fmt.Errorf("go list cannot resolve package %q to one import path: exit %d (err=%v)\nstdout:\n%s\nstderr:\n%s", spec.Package, code, err, out, stderr)
