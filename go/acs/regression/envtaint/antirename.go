@@ -13,7 +13,8 @@ import (
 
 var externalEnvAllowlist = map[string]bool{
 	"CI": true, "HOME": true, "CODEX_HOME": true, "CLAUDE_CONFIG_DIR": true, "XDG_RUNTIME_DIR": true,
-	"TMUX_TMPDIR":  true,
+	"TMUX_TMPDIR": true,
+	"GOCACHE":     true, "GOPATH": true,
 	"GITHUB_TOKEN": true,
 	"CYCLE":        true, "SHIP_CLASS": true, "WORKSPACE_PATH": true, "WORKTREE_PATH": true,
 	"PROFILE_PATH": true, "PROMPT_FILE": true, "PROMPT_FILE_OVERRIDE": true, "MODEL_TIER_HINT": true,
