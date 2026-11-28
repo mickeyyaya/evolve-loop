@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 	"sync"
@@ -143,6 +144,7 @@ func (p Pool) prepare(td fleet.Todo, spec fleet.CycleSpec) (fleet.CycleSpec, boo
 	if p.Freshen != nil {
 		fresh, ok := p.Freshen(spec)
 		if !ok {
+			p.FamilyHolds.forget(td.ID)
 			return fresh, false
 		}
 		spec = fresh
@@ -164,6 +166,7 @@ func (p Pool) transition(t fleet.PoolTransition) {
 	var cause IdleCause
 	if idleOrHeld {
 		cause = p.idleCause(t)
+		maps.Copy(fields, p.idleFields(cause))
 	}
 	if t.Kind == fleet.PoolIdle {
 		p.Publish.emitIdle(CodePoolIdle, reason, fields, cause)
@@ -183,6 +186,7 @@ func (p Pool) transition(t fleet.PoolTransition) {
 		if held := p.FamilyHolds.Summary(); held != "" {
 			uFields["family_held"] = held
 		}
+		maps.Copy(uFields, p.idleFields(cause))
 		uReason := fmt.Sprintf("pool underfilled: %d of %d lanes live, min_lanes %d", t.Live, t.Target, p.MinLanes)
 		p.Publish.emitIdle(CodePoolUnderfilled, uReason, uFields, cause)
 	}
