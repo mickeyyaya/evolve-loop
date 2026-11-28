@@ -8,6 +8,7 @@ import (
 const (
 	CausePressureHigh = "pressure_high"
 	CausePressureLow  = "pressure_low"
+	CauseLockWaitHigh = "lock_wait_high"
 	CauseBlind        = "blind"
 	CauseHold         = "hold"
 )
@@ -24,6 +25,7 @@ type Config struct {
 	Ceiling          int
 	Cooldown         time.Duration
 	IncreaseCooldown time.Duration
+	LockWaitMax      time.Duration
 }
 
 type State struct {
@@ -34,11 +36,12 @@ type State struct {
 }
 
 type Decision struct {
-	Old   int
-	New   int
-	Cause string
-	Score float64
-	Blind bool
+	Old          int
+	New          int
+	Cause        string
+	Score        float64
+	Blind        bool
+	LockWaitHeld bool
 }
 
 func NewState(ceiling int) State { return State{Cap: ceiling} }
@@ -56,15 +59,19 @@ func Decide(s State, r Reading, ok bool, cfg Config, now time.Time) (State, Deci
 	score := Score(r, cfg)
 	s.Scores = window(s.Scores, score, cfg.SmoothSamples)
 	mean := average(s.Scores)
-	next, cause := s.Cap, CauseHold
+	next, cause, lockWaitHeld := s.Cap, CauseHold, false
 	since := now.Sub(s.Changed)
 	switch {
 	case mean > 1 && since >= cfg.Cooldown && s.Cap > cfg.Floor:
 		next, cause = max(cfg.Floor, int(float64(s.Cap)*cfg.DecreaseFactor)), CausePressureHigh
 	case mean < cfg.LoadLow/cfg.LoadHigh && since >= cfg.IncreaseCooldown && s.Cap < cfg.Ceiling:
-		next, cause = min(cfg.Ceiling, s.Cap+cfg.Step), CausePressureLow
+		if cfg.LockWaitMax > 0 && r.LockWait > cfg.LockWaitMax {
+			cause, lockWaitHeld = CauseLockWaitHigh, true
+		} else {
+			next, cause = min(cfg.Ceiling, s.Cap+cfg.Step), CausePressureLow
+		}
 	}
-	d := Decision{Old: s.Cap, New: next, Cause: cause, Score: score}
+	d := Decision{Old: s.Cap, New: next, Cause: cause, Score: score, LockWaitHeld: lockWaitHeld}
 	if next != s.Cap {
 		s.Cap, s.Changed = next, now
 	}

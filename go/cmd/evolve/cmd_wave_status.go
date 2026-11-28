@@ -58,6 +58,7 @@ type waveStatusReport struct {
 	Seats         []waveSeat              `json:"seats"`
 	Health        *pipelinerates.WaveView `json:"health,omitempty"`
 	Host          *waveHostReading        `json:"host,omitempty"`
+	LockWaitMS    int64                   `json:"lock_wait_ms"`
 	Blockers      []waveBlocker           `json:"blockers"`
 	BlockerCounts map[string]int          `json:"blocker_counts"`
 }
@@ -135,6 +136,7 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 	read, warnings := readWaveOf(plane, cur)
 	cycles, loop := read.Cycles, read.Loop
 	report.Wave, report.RunID, report.PID, report.Focus = cur.Number, cur.RunID, cur.PID, cur.Focus
+	report.LockWaitMS = waveLockWaitMS(plane.evolveDir, cur, loop)
 	report.Warnings = append(report.Warnings, warnings...)
 	report.Warnings = append(report.Warnings, poolPreflightWarnings(loop, cur.StartedAt)...)
 	var startWarning string
@@ -158,11 +160,16 @@ func buildWaveStatus(env waveEnv, plane wavePlaneDirs, records []wave.Record) wa
 		cycles, report.CyclesOmitted = cycles[over:], over
 	}
 	report.Cycles = append(report.Cycles, cycles...)
-	if len(records) > 1 {
-		prev := records[len(records)-2]
-		report.LastWave = &waveSummary{Wave: prev.Number, Outcome: prev.Outcome}
-	}
+	report.LastWave = lastWaveSummary(records)
 	return report
+}
+
+func lastWaveSummary(records []wave.Record) *waveSummary {
+	if len(records) < 2 {
+		return nil
+	}
+	prev := records[len(records)-2]
+	return &waveSummary{Wave: prev.Number, Outcome: prev.Outcome}
 }
 
 func waveHealth(root string, now time.Time, warnings []string) (*pipelinerates.WaveView, []string) {
@@ -203,6 +210,7 @@ func writeWaveStatusText(w io.Writer, r waveStatusReport) {
 		fmt.Fprintln(w, r.Health.Line())
 	}
 	writeWaveHostText(w, r.Host)
+	fmt.Fprintf(w, "lock wait: %s\n", time.Duration(r.LockWaitMS)*time.Millisecond)
 	if r.CyclesOmitted > 0 {
 		fmt.Fprintf(w, "  (%d older cycle(s) not shown)\n", r.CyclesOmitted)
 	}
@@ -570,4 +578,44 @@ func writeWaveFocusText(w io.Writer, focus []string) {
 	if len(focus) > 0 {
 		fmt.Fprintf(w, "focus:   %s\n", strings.Join(focus, ", "))
 	}
+}
+
+type waitSignalKey struct {
+	pid int
+	seq uint64
+}
+
+func waveLockWaitMS(evolveDir string, cur wave.Record, global []signalcenter.Event) int64 {
+	seen := map[waitSignalKey]bool{}
+	var totalMS int64
+	add := func(e signalcenter.Event) {
+		ms, ok := verifyLockWaitMS(e)
+		if !ok {
+			return
+		}
+		if e.PID != 0 || e.Seq != 0 {
+			k := waitSignalKey{pid: e.PID, seq: e.Seq}
+			if seen[k] {
+				return
+			}
+			seen[k] = true
+		}
+		totalMS += ms
+	}
+	readRunLockWaitSignals(evolveDir, cur.CycleFloor, add)
+	from := wave.RunFrom(cur)
+	for _, e := range global {
+		if e.Cycle > 0 {
+			if e.Cycle <= cur.CycleFloor {
+				continue
+			}
+		} else {
+			ts, err := time.Parse(time.RFC3339Nano, e.TS)
+			if err != nil || (!from.IsZero() && ts.Before(from)) || (cur.EndedAt != nil && ts.After(*cur.EndedAt)) {
+				continue
+			}
+		}
+		add(e)
+	}
+	return totalMS
 }

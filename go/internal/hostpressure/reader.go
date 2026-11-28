@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -16,6 +17,7 @@ type Reading struct {
 	CPUs            int
 	MemAvailablePct float64
 	SwapUsedMB      float64
+	LockWait        time.Duration
 }
 
 func (r Reading) LoadPerCore() float64 { return r.Load1 / float64(max(r.CPUs, 1)) }

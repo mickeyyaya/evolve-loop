@@ -236,3 +236,21 @@ func TestState_AFreshStateStartsAtTheCeilingAndAChangeStampsTheClock(t *testing.
 		t.Errorf("state after a cut = %+v, want cap %d changed at %v", next, d.New, t0)
 	}
 }
+
+func TestDecide_LockWaitOverTheBoundHoldsWideningWithoutStampingChanged(t *testing.T) {
+	cfg := testConfig()
+	cfg.LockWaitMax = 10 * time.Minute
+	s := State{Cap: cfg.Floor}
+	heldReading := calm()
+	heldReading.LockWait = 601 * time.Second
+	next, d := Decide(s, heldReading, true, cfg, t0)
+	if next.Cap != cfg.Floor || d.New != cfg.Floor || d.Cause != CauseLockWaitHigh || !d.LockWaitHeld || !next.Changed.IsZero() {
+		t.Fatalf("held decision = %+v state %+v, want held at %d with %s and zero Changed", d, next, cfg.Floor, CauseLockWaitHigh)
+	}
+	cleared := calm()
+	cleared.LockWait = cfg.LockWaitMax
+	next, d = Decide(next, cleared, true, cfg, t0)
+	if next.Cap != cfg.Floor+1 || d.New != cfg.Floor+1 || d.Cause != CausePressureLow || d.LockWaitHeld {
+		t.Fatalf("cleared decision = %+v state %+v, want immediate widen to %d", d, next, cfg.Floor+1)
+	}
+}

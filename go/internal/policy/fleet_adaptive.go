@@ -26,6 +26,7 @@ type FleetAdaptivePolicy struct {
 	IncreaseCooldownS  int           `json:"increase_cooldown_s,omitempty"`
 	SampleS            int           `json:"sample_s,omitempty"`
 	SmoothSamples      int           `json:"smooth_samples,omitempty"`
+	LockWaitMaxS       int           `json:"lock_wait_max_s,omitempty"`
 }
 
 type AdaptiveConfig struct {
@@ -41,6 +42,7 @@ type AdaptiveConfig struct {
 	IncreaseCooldownS int
 	SampleS           int
 	SmoothSamples     int
+	LockWaitMaxS      int
 }
 
 const (
@@ -54,6 +56,7 @@ const (
 	defaultAdaptiveIncreaseCooldownS = 180
 	defaultAdaptiveSampleS           = 15
 	defaultAdaptiveSmoothSamples     = 3
+	defaultAdaptiveLockWaitMaxS      = 600
 	adaptiveMemPctCeiling            = 100
 )
 
@@ -79,7 +82,7 @@ func (a *FleetAdaptivePolicy) validate() error {
 
 func (a *FleetAdaptivePolicy) hasNegative() bool {
 	for _, v := range []float64{a.LoadPerCoreHigh, a.LoadPerCoreLow, a.MemAvailableMinPct, a.SwapUsedMaxMB, a.DecreaseFactor,
-		float64(a.Step), float64(a.CooldownS), float64(a.IncreaseCooldownS), float64(a.SampleS), float64(a.SmoothSamples)} {
+		float64(a.Step), float64(a.CooldownS), float64(a.IncreaseCooldownS), float64(a.SampleS), float64(a.SmoothSamples), float64(a.LockWaitMaxS)} {
 		if v < 0 {
 			return true
 		}
@@ -104,6 +107,7 @@ func (a *FleetAdaptivePolicy) resolve() AdaptiveConfig {
 		IncreaseCooldownS: orInt(a.IncreaseCooldownS, defaultAdaptiveIncreaseCooldownS),
 		SampleS:           orInt(a.SampleS, defaultAdaptiveSampleS),
 		SmoothSamples:     orInt(a.SmoothSamples, defaultAdaptiveSmoothSamples),
+		LockWaitMaxS:      orInt(a.LockWaitMaxS, defaultAdaptiveLockWaitMaxS),
 	}
 }
 

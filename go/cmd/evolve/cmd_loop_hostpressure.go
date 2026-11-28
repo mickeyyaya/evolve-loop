@@ -8,29 +8,33 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/mickeyyaya/evolve-loop/go/internal/hostpressure"
 	"github.com/mickeyyaya/evolve-loop/go/internal/orchestrator"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/sysexec"
 )
 
 const hostToolTimeout = 800 * time.Millisecond
 
 type hostSampler struct {
-	cfg     hostpressure.Config
-	stage   string
-	read    func() (hostpressure.Reading, error)
-	apply   func(int)
-	publish orchestrator.Publish
-	now     func() time.Time
-	goos    string
-	state   hostpressure.State
-	record  func([]byte) error
-	warn    func(error)
-	warned  bool
+	cfg      hostpressure.Config
+	stage    string
+	read     func() (hostpressure.Reading, error)
+	lockWait func() time.Duration
+	apply    func(int)
+	publish  orchestrator.Publish
+	now      func() time.Time
+	goos     string
+	state    hostpressure.State
+	record   func([]byte) error
+	warn     func(error)
+	warned   bool
 }
 
 type hostSampleLine struct {
@@ -44,10 +48,15 @@ type hostSampleLine struct {
 	Cap             int     `json:"cap"`
 	Decided         int     `json:"decided"`
 	Stage           string  `json:"stage"`
+	LockWaitMS      int64   `json:"lock_wait_ms"`
+	LockWaitHeld    bool    `json:"lock_wait_held"`
 }
 
 func (s *hostSampler) sample() {
 	reading, err := s.read()
+	if err == nil && s.lockWait != nil {
+		reading.LockWait = s.lockWait()
+	}
 	state, d := hostpressure.Decide(s.state, reading, err == nil, s.cfg, s.now())
 	s.state = state
 	if d.Blind {
@@ -57,8 +66,11 @@ func (s *hostSampler) sample() {
 		return
 	}
 	loadPerCore := reading.LoadPerCore()
-	s.appendSample(hostSampleLine{TS: s.now().UTC().Format(time.RFC3339), Load1: reading.Load1, CPUs: reading.CPUs, LoadPerCore: loadPerCore,
-		MemAvailablePct: reading.MemAvailablePct, SwapUsedMB: reading.SwapUsedMB, Score: d.Score, Cap: d.Old, Decided: d.New, Stage: s.stage})
+	s.appendSample(hostSampleLine{
+		TS: s.now().UTC().Format(time.RFC3339), Load1: reading.Load1, CPUs: reading.CPUs, LoadPerCore: loadPerCore,
+		MemAvailablePct: reading.MemAvailablePct, SwapUsedMB: reading.SwapUsedMB, Score: d.Score, Cap: d.Old, Decided: d.New, Stage: s.stage,
+		LockWaitMS: reading.LockWait.Milliseconds(), LockWaitHeld: d.LockWaitHeld,
+	})
 	enforce := s.stage == orchestrator.StageEnforce
 	changed := s.publish.HostPressureChange(orchestrator.HostPressureEvent{
 		Old: d.Old, New: d.New, Sized: s.cfg.Ceiling, Cause: d.Cause, Stage: s.stage, Applied: enforce,
@@ -98,6 +110,7 @@ func hostConfig(a policy.AdaptiveConfig, floor, ceiling int) hostpressure.Config
 		DecreaseFactor: a.DecreaseFactor, Step: a.Step, SmoothSamples: a.SmoothSamples,
 		Floor: min(floor, ceiling), Ceiling: ceiling,
 		Cooldown: time.Duration(a.CooldownS) * time.Second, IncreaseCooldown: time.Duration(a.IncreaseCooldownS) * time.Second,
+		LockWaitMax: time.Duration(a.LockWaitMaxS) * time.Second,
 	}
 }
 
@@ -170,7 +183,11 @@ func (b *loopBatchCoordinator) startHostPressure(ctx context.Context, fc policy.
 		warn: func(err error) {
 			fmt.Fprintf(b.stderr, "[loop] WARN: orchestrator: host pressure samples file: %v; sampling goes on without it\n", err)
 		},
-		cfg: cfg, stage: a.Stage, read: read, publish: b.deps.Signals.Emit, now: b.clock, goos: runtime.GOOS,
+		cfg: cfg, stage: a.Stage, read: read,
+		lockWait: func() time.Duration {
+			return sumWindowLockWait(b.cfg.EvolveDir, lockWaitWindow(cfg, a), b.clock())
+		},
+		publish: b.deps.Signals.Emit, now: b.clock, goos: runtime.GOOS,
 		state: hostpressure.NewState(cfg.Ceiling),
 		apply: func(limit int) {
 			seat.window.SetCeiling(limit)
@@ -190,4 +207,67 @@ func (b *loopBatchCoordinator) startHostPressure(ctx context.Context, fc policy.
 		wg.Wait()
 		stopTicker()
 	}
+}
+
+func lockWaitWindow(cfg hostpressure.Config, a policy.AdaptiveConfig) time.Duration {
+	sample := time.Duration(max(a.SampleS, 1)) * time.Duration(max(a.SmoothSamples, 1)) * time.Second
+	return max(cfg.IncreaseCooldown, sample)
+}
+
+func verifyLockWaitMS(e signalcenter.Event) (int64, bool) {
+	if e.Code != signalcenter.CodeHostVerifyLockWait {
+		return 0, false
+	}
+	ms, err := strconv.ParseInt(e.Fields["wait_ms"], 10, 64)
+	return ms, err == nil && ms > 0
+}
+
+func parseRunCycleDir(name string) (int, bool) {
+	rest, ok := strings.CutPrefix(name, "cycle-")
+	if !ok || rest == "" {
+		return 0, false
+	}
+	id, err := strconv.Atoi(rest)
+	return id, err == nil && id >= 0
+}
+
+func readRunLockWaitSignals(evolveDir string, minCycle int, visit func(signalcenter.Event)) {
+	runsDir := filepath.Join(evolveDir, "runs")
+	entries, err := os.ReadDir(runsDir)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		id, ok := parseRunCycleDir(entry.Name())
+		if !ok || id <= minCycle {
+			continue
+		}
+		chunk, err := signalcenter.ReadStream(filepath.Join(runsDir, entry.Name(), signalcenter.StreamFileName), 0)
+		if err != nil {
+			continue
+		}
+		for _, e := range chunk.Events {
+			visit(e)
+		}
+	}
+}
+
+func sumWindowLockWait(evolveDir string, window time.Duration, at time.Time) time.Duration {
+	from := at.Add(-window)
+	var totalMS int64
+	readRunLockWaitSignals(evolveDir, -1, func(e signalcenter.Event) {
+		ms, ok := verifyLockWaitMS(e)
+		if !ok {
+			return
+		}
+		ts, err := time.Parse(time.RFC3339Nano, e.TS)
+		if err != nil || ts.Before(from) || ts.After(at) {
+			return
+		}
+		totalMS += ms
+	})
+	return time.Duration(totalMS) * time.Millisecond
 }

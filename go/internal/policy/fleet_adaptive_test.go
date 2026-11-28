@@ -30,7 +30,7 @@ func TestFleetConfig_AdaptiveEmptyBlockEnablesTheShadowDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := policy.AdaptiveConfig{Enabled: true, Stage: "shadow", LoadHigh: 1.5, LoadLow: 1.0, MemMinPct: 15, SwapMaxMB: 4096,
-		DecreaseFactor: 0.5, Step: 1, CooldownS: 60, IncreaseCooldownS: 180, SampleS: 15, SmoothSamples: 3}
+		DecreaseFactor: 0.5, Step: 1, CooldownS: 60, IncreaseCooldownS: 180, SampleS: 15, SmoothSamples: 3, LockWaitMaxS: 600}
 	got := p.FleetConfig().Orchestrator
 	if got.Adaptive != want {
 		t.Fatalf("Adaptive = %+v, want %+v", got.Adaptive, want)
@@ -42,13 +42,13 @@ func TestFleetConfig_AdaptiveEmptyBlockEnablesTheShadowDefaults(t *testing.T) {
 
 func TestFleetConfig_AdaptiveKeysOverrideTheDefaults(t *testing.T) {
 	raw := `{"fleet":{"count":12,"orchestrator":{"stage":"enforce","window":{"start":8,"adaptive":{"stage":"enforce","load_per_core_high":3,"load_per_core_low":2.5,
-		"mem_available_min_pct":20,"swap_used_max_mb":1000,"step":2,"decrease_factor":0.75,"cooldown_s":30,"increase_cooldown_s":90,"sample_s":5,"smooth_samples":4}}}}}`
+		"mem_available_min_pct":20,"swap_used_max_mb":1000,"step":2,"decrease_factor":0.75,"cooldown_s":30,"increase_cooldown_s":90,"sample_s":5,"smooth_samples":4,"lock_wait_max_s":420}}}}}`
 	p, err := policy.Parse([]byte(raw))
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := policy.AdaptiveConfig{Enabled: true, Stage: "enforce", LoadHigh: 3, LoadLow: 2.5, MemMinPct: 20, SwapMaxMB: 1000,
-		DecreaseFactor: 0.75, Step: 2, CooldownS: 30, IncreaseCooldownS: 90, SampleS: 5, SmoothSamples: 4}
+		DecreaseFactor: 0.75, Step: 2, CooldownS: 30, IncreaseCooldownS: 90, SampleS: 5, SmoothSamples: 4, LockWaitMaxS: 420}
 	if got := p.FleetConfig().Orchestrator.Adaptive; got != want {
 		t.Fatalf("Adaptive = %+v, want %+v", got, want)
 	}
@@ -73,6 +73,7 @@ func TestParse_FleetAdaptiveStrictAndValidated(t *testing.T) {
 		"a negative increase cooldown":  `{"increase_cooldown_s":-1}`,
 		"a negative sample interval":    `{"sample_s":-1}`,
 		"a negative smoothing":          `{"smooth_samples":-1}`,
+		"a negative lock wait bound":    `{"lock_wait_max_s":-1}`,
 		"a stage that is not a string":  `{"stage":4}`,
 		"a block that is not an object": `4`,
 	}
