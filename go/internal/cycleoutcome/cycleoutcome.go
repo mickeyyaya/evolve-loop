@@ -237,7 +237,14 @@ func LaneScopeIDs(workspace string) []string {
 
 func IsTaskLevelResult(cls cycleclassify.Result) bool {
 	if cls.Class == cycleclassify.ClassPhaseRefusal {
-		return cyclestate.RefusalDisposition(cls.Marker).TaskLevel
+		d := cyclestate.RefusalDisposition(cls.Marker)
+		if d.TaskLevel {
+			return true
+		}
+		if d.HostFault {
+			return false
+		}
+		return cyclestate.Phase(cls.Phase).IsPreBuild()
 	}
 	return IsTaskLevelFailure(cls.Class)
 }

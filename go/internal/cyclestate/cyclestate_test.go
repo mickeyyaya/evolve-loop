@@ -39,6 +39,19 @@ func TestPhaseIsValid_Unknown(t *testing.T) {
 	}
 }
 
+func TestPhaseIsPreBuild(t *testing.T) {
+	for _, p := range []Phase{PhaseIntent, PhaseScout, PhaseTriage, PhaseTDD, PhaseBuildPlanner, PhaseSwarmPlan, Phase("plan-review")} {
+		if !p.IsPreBuild() {
+			t.Errorf("Phase(%q).IsPreBuild() = false, want true", p)
+		}
+	}
+	for _, p := range []Phase{PhaseStart, PhaseBuild, PhaseAudit, PhaseShip, PhaseRetro, PhaseDebugger, PhaseEnd, Phase(""), Phase("unknown")} {
+		if p.IsPreBuild() {
+			t.Errorf("Phase(%q).IsPreBuild() = true, want false", p)
+		}
+	}
+}
+
 func TestVerdictConstants(t *testing.T) {
 	cases := []struct {
 		got  string

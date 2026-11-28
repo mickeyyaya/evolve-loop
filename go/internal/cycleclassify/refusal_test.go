@@ -263,3 +263,17 @@ func TestClassify_AnUncodedFailureWithNoEvidenceStaysABreach(t *testing.T) {
 		t.Fatalf("Classify = %+v; with no noise and no evidence the fallback is unchanged", r)
 	}
 }
+
+func TestClassify_PreBuildCodedRefusalBeforeRetroStaysPhaseRefusal(t *testing.T) {
+	ws := t.TempDir()
+	writePhaseTiming(t, ws, []phasetiming.Entry{
+		{Phase: "scout", Verdict: "FAIL", Diagnostics: []cyclestate.Diagnostic{{Severity: cyclestate.SeverityError, Message: "scout rejected", Code: "SCOUT_REPORT_REJECTED"}}},
+		{Phase: string(cyclestate.PhaseRetro), Verdict: "PASS"},
+	})
+
+	r := Classify(ws)
+
+	if r.Class != ClassPhaseRefusal || r.Marker != "SCOUT_REPORT_REJECTED" || r.Phase != "scout" {
+		t.Fatalf("Classify = %+v, want phase-refusal SCOUT_REPORT_REJECTED in scout", r)
+	}
+}

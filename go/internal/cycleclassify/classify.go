@@ -368,7 +368,7 @@ func classifyFromRecord(workspace string) (Result, bool) {
 		return Result{}, false
 	}
 	codes := cyclestate.ErrorCodes(last.Diagnostics)
-	if len(codes) == 0 || afterRetro && cyclestate.RefusalDisposition(codes[0]) == (cyclestate.Disposition{}) {
+	if len(codes) == 0 || afterRetro && cyclestate.RefusalDisposition(codes[0]) == (cyclestate.Disposition{}) && !cyclestate.Phase(last.Phase).IsPreBuild() {
 		return Result{}, false
 	}
 	res := Result{Class: ClassPhaseRefusal, Marker: codes[0], Source: phasetiming.FileName, Phase: last.Phase}

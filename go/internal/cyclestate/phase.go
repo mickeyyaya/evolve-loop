@@ -30,3 +30,12 @@ func (p Phase) IsValid() bool {
 	}
 	return false
 }
+
+func (p Phase) IsPreBuild() bool {
+	switch p {
+	case PhaseIntent, PhaseScout, PhaseTriage,
+		PhaseTDD, PhaseBuildPlanner, PhaseSwarmPlan:
+		return true
+	}
+	return p == "plan-review"
+}

@@ -404,3 +404,33 @@ func TestReadCreatedAt_IsEmptyForAnUnreadableOrMalformedClaim(t *testing.T) {
 		}
 	}
 }
+
+func TestMover_Release_BlockedParkKeepsContinuation(t *testing.T) {
+	inbox := newInbox(t)
+	writeItem(t, procPath(inbox, 21, "held.json"), `{"id":"held","failure_count":2,"continuation":{"snapshot_sha":"keep-me","cycle":19}}`)
+	writeItem(t, filepath.Join(inbox, "quarantine"), "blocked")
+	m := New(inbox, nil)
+	res, err := m.Release(21, "cycle-failure-release", &Policy{Ceiling: 3})
+	if err != nil || res.Recovered != 1 || res.Paths[0] != filepath.Join(inbox, "held.json") {
+		t.Fatalf("res = %+v, err = %v", res, err)
+	}
+	doc := readJSON(t, filepath.Join(inbox, "held.json"))
+	if !strings.Contains(string(doc["continuation"]), `"keep-me"`) || string(doc["failure_count"]) != "3" {
+		t.Errorf("blocked park must keep continuation and bump count: %v", doc)
+	}
+}
+
+func TestMover_Release_ContinuationShedFailed_EmitsItemRewriteFailed(t *testing.T) {
+	inbox := newInbox(t)
+	writeItem(t, procPath(inbox, 22, "parked.json"), `{"id":"parked","failure_count":2,"continuation":{"snapshot_sha":"shed-me","cycle":19}}`)
+	mkdirAll(t, tmpPathOf(filepath.Join(inbox, "quarantine", "parked.json")))
+	rc := newRecordingCenter()
+	m := New(inbox, nil, WithSignals(rc.accessor()))
+	res, err := m.Release(22, "cycle-failure-release", &Policy{Ceiling: 3})
+	if err != nil || res.Recovered != 1 || res.Paths[0] != filepath.Join(inbox, "quarantine", "parked.json") {
+		t.Fatalf("res = %+v, err = %v", res, err)
+	}
+	if len(rc.faults()) != 1 || rc.faults()[0].Code != CodeItemRewriteFailed || rc.faults()[0].Fields["step"] != "continuation_shed" {
+		t.Errorf("events = %+v", rc.faults())
+	}
+}

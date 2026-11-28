@@ -57,28 +57,28 @@ func TestErrorCodes_ProjectsErrorSeverityCodesOnce(t *testing.T) {
 
 func TestRefusalDisposition_TableBesideTheVocabulary(t *testing.T) {
 	cases := []struct {
-		code                 string
-		task, route, outrank bool
+		code                            string
+		task, route, outrank, hostFault bool
 	}{
-		{DiagCodeTriageProtectedSurface, true, true, false},
-		{DiagCodeProtectedPredicateRoute, true, true, false},
-		{DiagCodeBlockerRoute, true, true, true},
-		{DiagCodeHandoffRoute, true, true, true},
-		{DiagCodeBlockerUnroutable, true, false, true},
-		{DiagCodeBlockerIncomplete, false, false, true},
-		{DiagCodeBuildRejected, true, false, false},
-		{DiagCodeTriageTopNEmpty, true, false, false},
-		{DiagCodeTriageCommitmentInvalid, false, false, false},
-		{DiagCodeTriageScopeUnanswered, true, false, false},
-		{DiagCodeTriageLanePinMissing, false, false, false},
-		{"", false, false, false},
-		{"SOMETHING_NEW", false, false, false},
+		{DiagCodeTriageProtectedSurface, true, true, false, false},
+		{DiagCodeProtectedPredicateRoute, true, true, false, false},
+		{DiagCodeBlockerRoute, true, true, true, false},
+		{DiagCodeHandoffRoute, true, true, true, false},
+		{DiagCodeBlockerUnroutable, true, false, true, false},
+		{DiagCodeBlockerIncomplete, false, false, true, true},
+		{DiagCodeBuildRejected, true, false, false, false},
+		{DiagCodeTriageTopNEmpty, true, false, false, false},
+		{DiagCodeTriageCommitmentInvalid, false, false, false, true},
+		{DiagCodeTriageScopeUnanswered, true, false, false, false},
+		{DiagCodeTriageLanePinMissing, false, false, false, true},
+		{"", false, false, false, false},
+		{"SOMETHING_NEW", false, false, false, false},
 	}
 	var _ Disposition = RefusalDisposition(DiagCodeTriageProtectedSurface)
 	for _, c := range cases {
 		d := RefusalDisposition(c.code)
-		if d.TaskLevel != c.task || d.RouteConsole != c.route || d.OutranksSentinel != c.outrank {
-			t.Errorf("RefusalDisposition(%q) = %+v, want task=%v route=%v outrank=%v", c.code, d, c.task, c.route, c.outrank)
+		if d.TaskLevel != c.task || d.RouteConsole != c.route || d.OutranksSentinel != c.outrank || d.HostFault != c.hostFault {
+			t.Errorf("RefusalDisposition(%q) = %+v, want task=%v route=%v outrank=%v hostFault=%v", c.code, d, c.task, c.route, c.outrank, c.hostFault)
 		}
 	}
 }

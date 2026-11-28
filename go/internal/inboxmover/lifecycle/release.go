@@ -108,7 +108,7 @@ func (m *Mover) parkAtCeiling(d drained, reason string, cycle int, q *Policy) (b
 		findings:    findings,
 		cycle:       cycle,
 		ceiling:     q.Ceiling,
-	}, func(n int) bool { return ShouldQuarantine(n, q.Ceiling, q.SystemLevel) })
+	}, nil)
 	if bumpErr != nil {
 		m.warn(fault{code: CodeItemRewriteFailed, origin: "Mover.Release", cycle: cycle, legacy: "WARN: ",
 			reason: fmt.Sprintf("release-cycle: failure_count bump failed for %s (%v) — quarantine skipped, releasing to inbox root", d.base, bumpErr),
@@ -137,8 +137,20 @@ func (m *Mover) parkAtCeiling(d drained, reason string, cycle int, q *Policy) (b
 			reason: fmt.Sprintf("quarantine no-op for '%s' (task-level failure #%d >= ceiling %d) — not parked, releasing to inbox root instead", d.taskID, count, q.Ceiling)})
 		return false, ""
 	}
+	m.shedAfterPark(pr.DestPath, d.taskID, cycle)
 	m.linef("quarantined: %s (task-level failure #%d >= ceiling %d) ← processing/cycle-%d/", d.base, count, q.Ceiling, cycle)
 	return true, pr.DestPath
+}
+
+func (m *Mover) shedAfterPark(path, taskID string, cycle int) {
+	if serr := UpdateItemJSON(path, func(item map[string]json.RawMessage) {
+		delete(item, inboxbatch.ContinuationField)
+		delete(item, inboxbatch.RetryPlanField)
+	}); serr != nil {
+		m.warn(fault{code: CodeItemRewriteFailed, origin: "Mover.Release", cycle: cycle, legacy: "WARN: ",
+			reason: fmt.Sprintf("release-cycle: continuation shed failed for %s: %v", filepath.Base(path), serr),
+			fields: map[string]string{"task_id": taskID, "path": path, "err": serr.Error(), "step": "continuation_shed"}})
+	}
 }
 
 func (m *Mover) releaseOne(d drained, reason string, cycle int, stamp *continuation.Continuation) bool {

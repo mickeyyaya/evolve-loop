@@ -10,7 +10,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/committedset"
 	"github.com/mickeyyaya/evolve-loop/go/internal/core"
+	"github.com/mickeyyaya/evolve-loop/go/internal/cyclestate"
+	"github.com/mickeyyaya/evolve-loop/go/internal/phasetiming"
 )
 
 func seedFailedCycleInbox(t *testing.T, root, id string, cycle int) (string, string) {
@@ -111,5 +114,60 @@ func TestLoopApplyCycleFailureOutcome_WarnsInTheLoopsVoiceOnAFailedWalk(t *testi
 	b.applyCycleFailureOutcome(7)
 	if !strings.Contains(stderr.String(), "[loop] WARN: could not apply cycle 7 failure outcome to the inbox: ") {
 		t.Errorf("the loop's voice on a failed walk: %q", stderr.String())
+	}
+}
+
+func TestApplyResultFailureOutcome_PreBuildChargesPinnedAndHostFaultExempt(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name  string
+		code  string
+		phase string
+		want  int
+	}{
+		{"real scout refusal", "SCOUT_REPORT_REJECTED", "scout", 1},
+		{"host fault pin missing", cyclestate.DiagCodeTriageLanePinMissing, "triage", 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			evolveDir := filepath.Join(root, ".evolve")
+			inbox := filepath.Join(evolveDir, "inbox")
+			if err := os.MkdirAll(inbox, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			itemPath := filepath.Join(inbox, "2026-09-13T00-00-00Z-pin.json")
+			if err := os.WriteFile(itemPath, []byte(`{"id":"pin","title":"fixture pin","kind":"bug"}`), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			ws := cycleWorkspace(root, 18)
+			if err := os.MkdirAll(ws, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := committedset.WriteRecord(root, committedset.Record{Cycle: 18, ItemIDs: []string{"pin"}}); err != nil {
+				t.Fatal(err)
+			}
+			raw, _ := json.Marshal([]phasetiming.Entry{{Phase: tc.phase, Verdict: "FAIL", Diagnostics: []cyclestate.Diagnostic{{Severity: cyclestate.SeverityError, Code: tc.code}}}})
+			if err := os.WriteFile(phasetiming.Path(ws), raw, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if err := applyResultFailureOutcome(core.CycleResult{Cycle: 18, FinalVerdict: cyclestate.VerdictFAIL}, root, evolveDir, io.Discard, newFakeLedger(), nil); err != nil {
+				t.Fatalf("applyResultFailureOutcome: %v", err)
+			}
+			body, err := os.ReadFile(itemPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got struct {
+				FailureCount int `json:"failure_count"`
+			}
+			if err := json.Unmarshal(body, &got); err != nil {
+				t.Fatal(err)
+			}
+			if got.FailureCount != tc.want {
+				t.Errorf("failure_count = %d, want %d", got.FailureCount, tc.want)
+			}
+		})
 	}
 }
