@@ -22,7 +22,8 @@ const issueUsage = `Usage:
   evolve issue evidence add [--project-root P] <incident-id> <source-file>
   evolve issue check [--project-root P] [<incident-id>]
   evolve issue render [--project-root P] <incident-id>
-  evolve issue list [--project-root P] [--status S] [--code C] [--json]`
+  evolve issue list [--project-root P] [--status S] [--code C] [--json]
+  evolve issue coverage generate|check [--project-root P]`
 
 func runIssue(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	switch {
@@ -34,8 +35,10 @@ func runIssue(args []string, _ io.Reader, stdout, stderr io.Writer) int {
 		return runIssueRender(args[1:], stdout, stderr)
 	case len(args) >= 1 && args[0] == "list":
 		return runIssueList(args[1:], stdout, stderr)
+	case len(args) >= 1 && args[0] == "coverage":
+		return runIssueCoverage(args[1:], stdout, stderr)
 	}
-	fmt.Fprintln(stderr, "evolve issue: expected `evidence add`, `check`, `render`, or `list`\n"+issueUsage)
+	fmt.Fprintln(stderr, "evolve issue: expected `evidence add`, `check`, `render`, `list`, or `coverage`\n"+issueUsage)
 	return 10
 }
 
