@@ -43,6 +43,8 @@
 - `Complete` preserves unmodeled `state.json` keys, is idempotent, and fails loudly when its directory cannot be created. Pinned by `TestCompletePreservesUnmodeledKeys` and `TestCompleteMkdirFails`.
 - `ComputeLatest`'s lineage, alias and observed semantics and the JSON keys the skill reads. Pinned by `TestComputeLatest_OtherLineageNeverPromotes`, `TestComputeLatest_AliasPreferredWhenPolicySaysSo`, `TestComputeLatest_TierWordFallbackIsNotObserved`, `TestComputeLatest_EmptyCurrentIsInert` and `TestFamilyLatestAndLatestReport_AreTheWireShape`.
 
+- **`TestMain` home isolation.** `main_test.go` calls `gittest.IsolateHome()` so `Detect` with a nil `Doctor` seam never reads the real `~/.codex/auth.json`. Pinned by `TestPackageHome_IsAScratchDirAndTheDefaultDoctorProbeReadsUnderIt` (`hermetic_home_test.go`).
+
 ## Findings
 
 - agy answers a model name it does not recognize with a one-time warning and serves a different model for the session, so a mistyped `model_tier_map` entry silently downgrades a tier instead of failing; a test that pins the wrong name stays green the whole time. The manifest test pins agy's exact model names.

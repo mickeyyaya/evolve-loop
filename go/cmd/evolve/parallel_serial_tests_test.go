@@ -1036,4 +1036,5 @@ var serialTests = map[string]string{
 	"main.TestX11_OwnedPrefixesComeFromPolicy":                                                                             "TDD-owned test calling newWorldX11 which sets env and swaps gcInjectedReapers and gcInjectedProcessHost",
 	"main.TestX11_ShadowPrintsWouldDeleteAndDeletesNothing":                                                                "TDD-owned test calling newWorldX11 which sets env and swaps gcInjectedReapers and gcInjectedProcessHost",
 	"main.TestX11_TheDefaultBranchThatOriginHeadNamesStays":                                                                "TDD-owned test calling newWorldX11 which sets env and swaps gcInjectedReapers and gcInjectedProcessHost",
+	"main.TestPackageHome_IsAScratchDirAndTheDefaultRoutingDoctorReadsUnderIt":                                             "writes and removes .codex/auth.json under the package scratch HOME",
 }
