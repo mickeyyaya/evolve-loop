@@ -18,6 +18,7 @@ import (
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxfile"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxtest"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"github.com/mickeyyaya/evolve-loop/go/internal/verifylock"
 )
 
@@ -330,5 +331,25 @@ func TestRefusedError_NamesTheSentinelAndTheCause(t *testing.T) {
 	}
 	if got, want := err.Error(), "the inbox intake refused the item: kind \"wish\" is not listed"; got != want || !errors.Is(err, agentrequest.ErrItemRefused) || !errors.Is(err, cause) {
 		t.Fatalf("Error() = %q, want %q wrapping the sentinel", got, want)
+	}
+}
+
+func TestFiler_WarnsOnWholeHubDirectoryViaSharedIntake(t *testing.T) {
+	t.Parallel()
+	root := inboxtest.EmptyRoot(t)
+	var events []signalcenter.Event
+	deps := testDeps()
+	deps.NewSignalCenter = func(string, string, string, io.Writer) (*signalcenter.Center, func()) {
+		c := signalcenter.New()
+		c.Subscribe(func(e signalcenter.Event) { events = append(events, e) })
+		return c, c.Flush
+	}
+	hubItem := strings.Replace(agentItem, "go/internal/fleet/pool.go", "go/internal/core", 1)
+
+	if _, err := fileAs(t, root, hubItem, "request:7/inbox-add-1", deps); err != nil {
+		t.Fatalf("fileAs: %v", err)
+	}
+	if len(events) != 1 || events[0].Code != "INBOX_HUB_FILES_UNNAMED" || events[0].Fields["hub"] != "go/internal/core" {
+		t.Fatalf("events = %+v, want one INBOX_HUB_FILES_UNNAMED for go/internal/core", events)
 	}
 }

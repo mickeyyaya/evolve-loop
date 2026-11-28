@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/mickeyyaya/evolve-loop/go/internal/inboxtest"
+	"github.com/mickeyyaya/evolve-loop/go/internal/signalcenter"
 	"io"
 	"os"
 	"path/filepath"
@@ -301,5 +302,39 @@ func TestCmd_InboxAdd_AnUnreadableTestFileFailsTheProbeCheck(t *testing.T) {
 
 	if rc, _, stderr := addItem(t, body); rc != 2 || !strings.Contains(stderr, "probe check") {
 		t.Errorf("rc = %d stderr = %q, want 2 naming the probe check", rc, stderr)
+	}
+}
+
+func TestCmd_InboxAdd_WarnsOnWholeHubDirAndStaysQuietOnNamedFiles(t *testing.T) {
+	root := inboxtest.EmptyRoot(t)
+	t.Setenv("EVOLVE_PROJECT_ROOT", root)
+	deps := testDeps()
+	deps.NewSignalCenter = func(role, projectRoot, evolveDir string, console io.Writer) (*signalcenter.Center, func()) {
+		c := signalcenter.New()
+		c.Subscribe(signalcenter.ConsoleSink(console))
+		return c, c.Flush
+	}
+	hubItem := `{"id":"hub-cmd-whole","kind":"feature","priority_class":"debuggability","weight":0.5,` +
+		`"title":"whole cmd hub dir","files":["go/cmd/evolve"],` +
+		`"summary":"Probe whole hub intake.","fix":"Name cmd_<verb>.go instead.",` +
+		`"acceptance":["warning fires at intake"]}`
+	var stdout, stderr bytes.Buffer
+	if rc := Run([]string{"add", "--file", "-"}, strings.NewReader(hubItem), &stdout, &stderr, deps); rc != 0 {
+		t.Fatalf("rc = %d stderr = %q, want 0 in shadow", rc, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "INBOX_HUB_FILES_UNNAMED") || !strings.Contains(stderr.String(), "hub=go/cmd/evolve") || !strings.Contains(stderr.String(), "cmd_") {
+		t.Errorf("stderr = %q, want INBOX_HUB_FILES_UNNAMED naming go/cmd/evolve and cmd_", stderr.String())
+	}
+
+	stderr.Reset()
+	namedItem := `{"id":"hub-cmd-named","kind":"feature","priority_class":"debuggability","weight":0.5,` +
+		`"title":"named cmd hub file","files":["go/cmd/evolve/cmd_inbox.go"],` +
+		`"summary":"Probe named hub file intake.","fix":"Keep file named.",` +
+		`"acceptance":["no hub warning fires"]}`
+	if rc := Run([]string{"add", "--file", "-"}, strings.NewReader(namedItem), &stdout, &stderr, deps); rc != 0 {
+		t.Fatalf("rc = %d stderr = %q", rc, stderr.String())
+	}
+	if strings.Contains(stderr.String(), "INBOX_HUB_FILES_UNNAMED") {
+		t.Errorf("named hub file drew unexpected warning: %q", stderr.String())
 	}
 }

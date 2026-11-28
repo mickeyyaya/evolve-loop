@@ -139,6 +139,7 @@ func admitInboxItem(raw []byte, req inboxAddRequest, cfg policy.InboxCuratorConf
 	if err != nil {
 		return refusalOf(item.ID, err)
 	}
+	inboxmover.WarnUnnamedHubFiles(item, opts.Signals)
 	if adm.Record != nil {
 		opts.IntakeRecord, _ = json.Marshal(adm.Record)
 	}
