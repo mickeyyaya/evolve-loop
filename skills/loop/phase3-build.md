@@ -219,7 +219,7 @@ After Builder completes:
       "feature": "<task name>",
       "approach": "<what was tried>",
       "error": "<error message>",
-      "reasoning": "<WHY it failed — root cause>",
+      "root_cause": "<WHY it failed — root cause>",
       "filesAffected": ["<files involved>"],
       "cycle": "<N>",
       "alternative": "<suggested different approach>"

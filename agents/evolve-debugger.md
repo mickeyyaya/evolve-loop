@@ -59,7 +59,7 @@ Write `debug-decision.json` to the workspace with EXACTLY this shape:
   "rerun_phase": "audit",
   "fix_applied": "<short description if RESHIP applied a minimal worktree edit, else empty>",
   "root_cause": "<1-2 sentences naming the concrete cause>",
-  "reasoning": "<why this action>"
+  "rationale": "<why this action>"
 }
 ```
 

@@ -30,6 +30,7 @@ const (
 	signalAction     = "debugger.action"
 	signalRerunPhase = "debugger.rerun_phase"
 	signalRootCause  = "debugger.root_cause"
+	signalRationale  = "debugger.rationale"
 )
 
 type decision struct {
@@ -37,6 +38,7 @@ type decision struct {
 	RerunPhase string `json:"rerun_phase"`
 	FixApplied string `json:"fix_applied"`
 	RootCause  string `json:"root_cause"`
+	Rationale  string `json:"rationale"`
 	Reasoning  string `json:"reasoning"`
 }
 
@@ -62,9 +64,7 @@ func Classify(artifactDir string) (verdict string, signals map[string]string, di
 		}}
 	}
 
-	if rc := strings.TrimSpace(d.RootCause); rc != "" {
-		signals[signalRootCause] = rc
-	}
+	recordOptionalSignals(d, signals)
 
 	switch strings.ToUpper(strings.TrimSpace(d.Action)) {
 	case actionReship:
@@ -90,6 +90,22 @@ func Classify(artifactDir string) (verdict string, signals map[string]string, di
 		}
 		return core.VerdictFAIL, signals, nil
 	}
+}
+
+func recordOptionalSignals(d decision, signals map[string]string) {
+	if rc := strings.TrimSpace(d.RootCause); rc != "" {
+		signals[signalRootCause] = rc
+	}
+	if rationale := resolveRationale(d); rationale != "" {
+		signals[signalRationale] = rationale
+	}
+}
+
+func resolveRationale(d decision) string {
+	if r := strings.TrimSpace(d.Rationale); r != "" {
+		return r
+	}
+	return strings.TrimSpace(d.Reasoning)
 }
 
 func nextPhaseFor(action string) string {
