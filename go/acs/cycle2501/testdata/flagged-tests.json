@@ -554,7 +554,7 @@
     },
     {
       "package": "internal/phases/audit",
-      "test": "TestProductionPath_BothShadowSignalsReachTheCenter",
+      "test": "TestProductionPath_TheCascadeShadowSignalReachesTheCenter",
       "rule": "asserts-own-setup",
       "file": "shadow_wiring_seam_test.go"
     },
