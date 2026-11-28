@@ -7,13 +7,13 @@ import (
 	"path/filepath"
 )
 
-//go:embed testdata/independent/go.mod.txt
+//go:embed benchdata/independent/go.mod.txt
 var independentGoMod []byte
 
-//go:embed testdata/independent/work/work.go.txt
+//go:embed benchdata/independent/work/work.go.txt
 var independentWorkGo []byte
 
-//go:embed testdata/independent/truth.json
+//go:embed benchdata/independent/truth.json
 var independentTruthJSON []byte
 
 func IndependentTruth() ([]BenchSymbol, error) {
