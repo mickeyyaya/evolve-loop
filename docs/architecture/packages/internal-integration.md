@@ -267,12 +267,12 @@ The files are `consolepr.go`, `train.go` and `deliverable.go`.
 - **One compose home.** `EnforceActor.Batcher` is the compose port. `Flush` returns `errTwoComposeHomes` when `Merger.Compose` is also set.
 - **The cut base.** `Flush` records `Composition.Batch.Base` as the base of the batch, not the base that the driver passed.
 - **Readiness.** `EnforceActor.Missing()` lists `Requeue`, `Promote`, `Briefs`, `Plane`, `CI`, `Main`, `Batcher` and the `Gate` of the batcher. The driver reads it through its own `readiness` interface, and `Check` returns `*MissingPortError`.
-- **The plane sync.** `Flush` calls `syncPlane` when a member merged. The result goes to `FlushResult.Failures` and never to the returned error. `PlaneOf(repo)` wraps `SyncToOrigin`.
+- **The plane sync.** `Flush` calls `syncPlane` when a member merged. The result goes to `FlushResult.Failures` and never to the returned error. `PlaneOf(repo)` wraps `SyncToOrigin`. `SyncToOrigin` fetches `origin/main` with `gitexec.FetchMainArgs`, the explicit refspec shared with `mainsync`.
 - **The merged signal.** `recordLanded` emits `SHIP_INTEGRATION_MERGED` with the kind `ship.merged`, `fields.cycle`, `fields.pr` and `fields.tip`, for each landed member.
 - **An ejection with no `Requeue` port** records a `DriverFailure` and returns an error. `LandingFeed` and `EnforceActor.Landing` no longer exist: the window feed lives in `orchestrator.Oversight`.
 - **Persist before return.** `Driver.flush` copies `FlushResult.Batch`, `Members` and `Failures` into the record and adds the decision before it returns a `Flush` error. A merge followed by an error is thus persisted (`TestDriverFlush_AMergeFollowedByAnErrorStillPersistsMerged`).
 - **Telemetry.** `publishFlush` and `fail` name the real stage and the PR of the batch. They stamp `shadow` only at the stage `shadow`. `IsShadow(fields)` reads that stamp.
-- **Limits.** Enforce stays refused until slice 2 supplies the ledger ports; slice 4 wired `l2Gate` into the production batcher and L2. The batcher fetch has its own refspec until `integration-sync-to-origin-uses-the-mainsync-fetch` lands.
+- **Limits.** Enforce stays refused until slice 2 supplies the ledger ports; slice 4 wired `l2Gate` into the production batcher and L2. `LaneBatcher.cut` fetches `origin/main` with `gitexec.OriginBranchRefspec`.
 
 - **The rollout gate (H6.0 to H6.4).** `RolloutCount.Count` is the one home of the clean shadow-wave count. The status verb and the driver gate both call it. A pool counts only when `Stage` is not `enforce`, `PoolVerdict` returns `clean` and `Chained` returns true. `Count` returns `Readiness` with clean pools, per-pool exclusion reasons and any chain fault.
   - `ChainPort` has two methods, `Seal` and `SealedAll`. `SealedAll` reads the chain once per count. `SealedWaveStore` wraps a `WaveStore` and passes `Ctx` to `Seal`. Each `Write` publishes the file, then seals the sha256 of the file bytes under the pool scope.

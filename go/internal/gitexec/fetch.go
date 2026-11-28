@@ -31,14 +31,21 @@ func RetryableFetchFailure(_ int, stderr string) bool {
 	return false
 }
 
+func OriginBranchRefspec(branch string) string {
+	return "+refs/heads/" + branch + ":refs/remotes/" + Remote + "/" + branch
+}
+
+func FetchMainArgs() []string {
+	return []string{"fetch", "-q", Remote, OriginBranchRefspec(MainBranch)}
+}
+
 func (g Git) FetchOriginBranch(ctx context.Context, r FetchRetry, branch string) (stdout, stderr string, exitCode int, err error) {
 	attempts := r.Attempts
 	if attempts <= 0 {
 		attempts = DefaultFetchAttempts
 	}
-	refspec := "+refs/heads/" + branch + ":refs/remotes/origin/" + branch
 	return g.captureWithRetry(ctx, retryLoop{
 		what: "fetch", attempts: attempts,
 		sleep: r.Sleep, onRetry: r.OnRetry, retryable: RetryableFetchFailure,
-	}, []string{"fetch", "origin", refspec})
+	}, []string{"fetch", Remote, OriginBranchRefspec(branch)})
 }

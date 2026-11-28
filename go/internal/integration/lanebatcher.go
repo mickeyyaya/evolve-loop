@@ -4,10 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 	"github.com/mickeyyaya/evolve-loop/go/internal/policy"
 )
-
-const originMainRefspec = "+refs/heads/" + mainBranch + ":" + originMainRef
 
 type Batcher interface {
 	For(b PendingBatch) func(ctx context.Context, recs []DeliverableRecord) (Composition, error)
@@ -43,7 +42,7 @@ func (l LaneBatcher) cut(ctx context.Context, pb PendingBatch) (Batch, error) {
 	if err := deleteBranchRef(ctx, l.Repo, branchRef(PoolBranch(pb.Pool, pb.Index))); err != nil {
 		return Batch{}, err
 	}
-	if _, err := l.Repo.Git(ctx, l.Repo.Dir, "", "fetch", "--quiet", "--no-tags", "origin", originMainRefspec); err != nil {
+	if _, err := l.Repo.Git(ctx, l.Repo.Dir, "", "fetch", "--quiet", "--no-tags", gitexec.Remote, gitexec.OriginBranchRefspec(mainBranch)); err != nil {
 		return Batch{}, fmt.Errorf("integration: fetch origin %s: %w", mainBranch, err)
 	}
 	return l.Repo.CutFromOrigin(ctx, Batch{Wave: l.Wave, Pool: pb.Pool, Index: pb.Index})

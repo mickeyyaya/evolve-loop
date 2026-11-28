@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"github.com/mickeyyaya/evolve-loop/go/internal/gitexec"
 )
 
 type SyncOutcome string
@@ -17,7 +19,7 @@ const (
 )
 
 func SyncToOrigin(ctx context.Context, r Repo) (SyncOutcome, error) {
-	if _, err := r.Git(ctx, r.Dir, "", "fetch", "origin", mainBranch); err != nil {
+	if _, err := r.Git(ctx, r.Dir, "", gitexec.FetchMainArgs()...); err != nil {
 		return "", fmt.Errorf("integration: fetch origin %s: %w", mainBranch, err)
 	}
 	local, err := r.revParse(ctx, branchRef(mainBranch))

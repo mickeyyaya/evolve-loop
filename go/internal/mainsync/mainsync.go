@@ -19,8 +19,6 @@ const (
 	OutcomeDiverged       Outcome = "diverged"
 	OutcomeBlocked        Outcome = "blocked"
 	OutcomeFastForwarded  Outcome = "fast-forwarded"
-
-	fetchRefspec = "+refs/heads/" + gitexec.MainBranch + ":refs/remotes/" + gitexec.RemoteMain
 )
 
 type Result struct {
@@ -39,7 +37,7 @@ type Policy struct {
 }
 
 func Run(ctx context.Context, g gitexec.Git, p Policy) Result {
-	if _, stderr, code, err := g.Capture(ctx, "fetch", "-q", gitexec.Remote, fetchRefspec); err != nil || code != 0 {
+	if _, stderr, code, err := g.Capture(ctx, gitexec.FetchMainArgs()...); err != nil || code != 0 {
 		return Result{Outcome: OutcomeFetchFailed, Err: err, Code: code, Stderr: strings.TrimSpace(stderr)}
 	}
 	rel, err := g.RelationToRemote(ctx, gitexec.RemoteMain)

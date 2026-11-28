@@ -8,7 +8,7 @@
 
 `Run(ctx, g, Policy)` does these steps, in this order:
 
-1. It fetches with the refspec `+refs/heads/main:refs/remotes/origin/main`. A failed fetch ends the run with `OutcomeFetchFailed`. No caller trusts a stale `origin/main`.
+1. It fetches with `gitexec.FetchMainArgs`, the explicit refspec `+refs/heads/main:refs/remotes/origin/main` shared with `integration.SyncToOrigin`. A failed fetch ends the run with `OutcomeFetchFailed`. No caller trusts a stale `origin/main`.
 2. It reads the relation of `HEAD` to `origin/main` (`gitexec.RelationToRemote`). A failed read ends the run with `OutcomeRelationFailed`.
 3. It calls `Policy.Gate` unless the relation is `diverged`. A gate error ends the run with `OutcomeGated`.
 4. It returns `OutcomeCurrent`, `OutcomeAhead` or `OutcomeDiverged` when the local main is not strictly behind. It never resets or forces a main.

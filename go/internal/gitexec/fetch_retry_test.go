@@ -3,6 +3,7 @@ package gitexec
 import (
 	"context"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -147,5 +148,18 @@ func TestRetryableFetchFailure_ClassifiesRefLockContention(t *testing.T) {
 		if got := RetryableFetchFailure(1, tc.stderr); got != tc.want {
 			t.Errorf("%s: RetryableFetchFailure(%q) = %v, want %v", tc.name, tc.stderr, got, tc.want)
 		}
+	}
+}
+
+func TestFetchMainArgs_UsesExplicitMainRefspec(t *testing.T) {
+	if got := OriginBranchRefspec("main"); got != "+refs/heads/main:refs/remotes/origin/main" {
+		t.Fatalf("OriginBranchRefspec(main) = %q", got)
+	}
+	if got := OriginBranchRefspec("feature"); got != "+refs/heads/feature:refs/remotes/origin/feature" {
+		t.Fatalf("OriginBranchRefspec(feature) = %q", got)
+	}
+	want := []string{"fetch", "-q", "origin", "+refs/heads/main:refs/remotes/origin/main"}
+	if got := FetchMainArgs(); !slices.Equal(got, want) {
+		t.Fatalf("FetchMainArgs() = %v, want %v", got, want)
 	}
 }
