@@ -16,11 +16,13 @@ import (
 
 var versionCaptureTimeout = 5 * time.Second
 
+var versionCellBinRoot func() (string, error)
+
 var execVersion = func(bin string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), versionCaptureTimeout)
 	defer cancel()
 	var out strings.Builder
-	code, err := bridge.LaunchLLM(ctx, bridge.Deps{}, bridge.LLMExec{Purpose: bridge.PurposeInventory, Binary: bin, Args: []string{"--version"}, Stdout: &out, Stderr: io.Discard})
+	code, err := bridge.LaunchLLM(ctx, bridge.Deps{CellBinRoot: versionCellBinRoot}, bridge.LLMExec{Purpose: bridge.PurposeInventory, Binary: bin, Args: []string{"--version"}, Stdout: &out, Stderr: io.Discard})
 	if err == nil && code != 0 {
 		err = fmt.Errorf("exit %d", code)
 	}

@@ -1042,4 +1042,5 @@ var serialTests = map[string]string{
 	"main.TestGCDispatchReadOnce_ATaggedProcessWithoutARecordWarnsNeverAndStillStops":                                      "TDD-owned test swapping seam gcInjectedProcessHost via gcRunOver",
 	"main.TestGCDispatchReadOnce_RecordsCreatedAfterTheFirstPassWaitForTheNextRun":                                         "TDD-owned test swapping seam gcInjectedProcessHost via withGCProcessHost",
 	"main.TestGCDispatchReadOnce_TheTagProofWarningPrintsOncePerTaggedProcessInEveryMode":                                  "TDD-owned test swapping seam gcInjectedProcessHost via gcRunOver",
+	"main.TestPackageHome_IsAScratchDirAndTheDefaultRoutingDoctorReadsUnderIt":                                             "writes and removes .codex/auth.json under the package scratch HOME",
 }

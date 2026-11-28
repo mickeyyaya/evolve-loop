@@ -32,6 +32,11 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "TestMain: isolate host credentials: %v\n", err)
 		os.Exit(1)
 	}
+	restoreHome, err := gittest.IsolateHome()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "TestMain: isolate HOME: %v\n", err)
+		os.Exit(1)
+	}
 	for _, name := range ipcenv.CellMarkers() {
 		if err := os.Unsetenv(name); err != nil {
 			fmt.Fprintf(os.Stderr, "TestMain: unset %s: %v\n", name, err)
@@ -75,15 +80,6 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "TestMain: unset TMUX: %v\n", err)
 		os.Exit(1)
 	}
-	codexHome, err := os.MkdirTemp("", "evcodexhome")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "TestMain: isolate CODEX_HOME: %v\n", err)
-		os.Exit(1)
-	}
-	if err := os.Setenv("CODEX_HOME", codexHome); err != nil {
-		fmt.Fprintf(os.Stderr, "TestMain: set CODEX_HOME: %v\n", err)
-		os.Exit(1)
-	}
 	usageDir, err := os.MkdirTemp("", "evcodeusage")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "TestMain: isolate the code usage log: %v\n", err)
@@ -106,8 +102,8 @@ func TestMain(m *testing.M) {
 	if err := os.RemoveAll(cellBinDir); err != nil {
 		fmt.Fprintf(os.Stderr, "TestMain: remove %s: %v\n", cellBinDir, err)
 	}
-	if err := os.RemoveAll(codexHome); err != nil {
-		fmt.Fprintf(os.Stderr, "TestMain: remove %s: %v\n", codexHome, err)
+	if err := restoreHome(); err != nil {
+		fmt.Fprintf(os.Stderr, "TestMain: restore HOME: %v\n", err)
 	}
 	if err := os.RemoveAll(usageDir); err != nil {
 		fmt.Fprintf(os.Stderr, "TestMain: remove %s: %v\n", usageDir, err)
