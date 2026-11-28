@@ -29,43 +29,44 @@ var validStrategies = map[string]struct{}{
 }
 
 type loopConfig struct {
-	ProjectRoot       string                   `json:"project_root"`
-	EvolveDir         string                   `json:"evolve_dir"`
-	GoalHash          string                   `json:"goal_hash"`
-	GoalText          string                   `json:"goal_text,omitempty"`
-	GoalSource        string                   `json:"goal_source,omitempty"`
-	Strategy          string                   `json:"strategy"`
-	MaxCycles         int                      `json:"max_cycles"`
-	MaxCyclesExplicit bool                     `json:"max_cycles_explicit,omitempty"`
-	Resume            bool                     `json:"resume,omitempty"`
-	AutoResume        bool                     `json:"auto_resume,omitempty"`
-	Reset             bool                     `json:"reset,omitempty"`
-	Fingerprint       string                   `json:"fingerprint,omitempty"`
-	ConsensusAudit    bool                     `json:"consensus_audit,omitempty"`
-	DryRun            bool                     `json:"dry_run,omitempty"`
-	ForceFresh        bool                     `json:"force_fresh,omitempty"`
-	SkipPreflight     bool                     `json:"skip_preflight,omitempty"`
-	SkipPreflightBoot bool                     `json:"skip_preflight_boot,omitempty"`
-	BypassPolicy      bool                     `json:"bypass_policy,omitempty"`
-	SandboxOff        string                   `json:"sandbox_off,omitempty"`
-	ChainMode         bool                     `json:"chain_mode,omitempty"`
-	PerAgentCLI       map[string]string        `json:"per_agent_cli,omitempty"`
-	PerAgentModel     map[string]string        `json:"per_agent_model,omitempty"`
-	PreflightOnly     bool                     `json:"preflight_only,omitempty"`
-	Detach            bool                     `json:"detach,omitempty"`
-	Relaunch          bool                     `json:"relaunch,omitempty"`
-	LogPath           string                   `json:"log_path,omitempty"`
-	Only              []string                 `json:"only,omitempty"`
-	Exclude           []string                 `json:"exclude,omitempty"`
-	Focus             []string                 `json:"focus,omitempty"`
-	DetachArgv        []string                 `json:"-"`
-	JSON              bool                     `json:"-"`
-	ResumeWaves       int                      `json:"-"`
-	HandedOff         bool                     `json:"-"`
-	Epoch             *integration.EpochHolder `json:"-"`
-	announce          loopAnnouncer
-	retire            func()
-	resumePoint       *core.ResumePoint
+	ProjectRoot          string                   `json:"project_root"`
+	EvolveDir            string                   `json:"evolve_dir"`
+	GoalHash             string                   `json:"goal_hash"`
+	GoalText             string                   `json:"goal_text,omitempty"`
+	GoalSource           string                   `json:"goal_source,omitempty"`
+	Strategy             string                   `json:"strategy"`
+	MaxCycles            int                      `json:"max_cycles"`
+	MaxCyclesExplicit    bool                     `json:"max_cycles_explicit,omitempty"`
+	Resume               bool                     `json:"resume,omitempty"`
+	AutoResume           bool                     `json:"auto_resume,omitempty"`
+	Reset                bool                     `json:"reset,omitempty"`
+	Fingerprint          string                   `json:"fingerprint,omitempty"`
+	ConsensusAudit       bool                     `json:"consensus_audit,omitempty"`
+	DryRun               bool                     `json:"dry_run,omitempty"`
+	ForceFresh           bool                     `json:"force_fresh,omitempty"`
+	SkipPreflight        bool                     `json:"skip_preflight,omitempty"`
+	SkipPreflightBoot    bool                     `json:"skip_preflight_boot,omitempty"`
+	BypassPolicy         bool                     `json:"bypass_policy,omitempty"`
+	AcceptIdentityChange bool                     `json:"accept_identity_change,omitempty"`
+	SandboxOff           string                   `json:"sandbox_off,omitempty"`
+	ChainMode            bool                     `json:"chain_mode,omitempty"`
+	PerAgentCLI          map[string]string        `json:"per_agent_cli,omitempty"`
+	PerAgentModel        map[string]string        `json:"per_agent_model,omitempty"`
+	PreflightOnly        bool                     `json:"preflight_only,omitempty"`
+	Detach               bool                     `json:"detach,omitempty"`
+	Relaunch             bool                     `json:"relaunch,omitempty"`
+	LogPath              string                   `json:"log_path,omitempty"`
+	Only                 []string                 `json:"only,omitempty"`
+	Exclude              []string                 `json:"exclude,omitempty"`
+	Focus                []string                 `json:"focus,omitempty"`
+	DetachArgv           []string                 `json:"-"`
+	JSON                 bool                     `json:"-"`
+	ResumeWaves          int                      `json:"-"`
+	HandedOff            bool                     `json:"-"`
+	Epoch                *integration.EpochHolder `json:"-"`
+	announce             loopAnnouncer
+	retire               func()
+	resumePoint          *core.ResumePoint
 }
 
 func emitSignalStop(stdout, stderr io.Writer, lr *loopResult, cycle int) {

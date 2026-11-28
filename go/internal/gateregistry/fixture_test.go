@@ -65,6 +65,12 @@ func seedFixtures() []seedFixture {
 			name: "raw-git-ratchet",
 			tree: func() map[string]string { return map[string]string{"go/p/raw_test.go": rawGitTest} },
 		},
+		{
+			name: "named-tests",
+			tree: func() map[string]string {
+				return map[string]string{"go/p/p_test.go": "package p\n\nfunc TestReal(t *testing.T) {}\n", "docs/architecture/a.md": "`TestReal` `TestGhost`\n"}
+			},
+		},
 	}
 }
 
@@ -72,10 +78,12 @@ var baselineFiles = map[string]map[string]string{
 	"testdup-ratchet": {"go/.test-dup-baseline": "count=0\ndate=2026-11-09\n"},
 	"size-ratchet":    {"go/internal/sizeratchet/offenders.json": "{}"},
 	"raw-git-ratchet": {"go/internal/rawgitratchet/baseline.json": "{}"},
+	"named-tests":     {"go/internal/testrefs/baseline.json": "{}"},
 }
 
 var greenFiles = map[string]map[string]string{
 	"testdup-ratchet": {"go/.test-dup-baseline": "count=1\ndate=2026-11-09\n"},
 	"size-ratchet":    {"go/internal/sizeratchet/offenders.json": `{"p.F": 100}`},
 	"raw-git-ratchet": {"go/internal/rawgitratchet/baseline.json": `{"p/raw_test.go": 1}`},
+	"named-tests":     {"go/internal/testrefs/baseline.json": `{"docs/architecture/a.md":["TestGhost"]}`},
 }

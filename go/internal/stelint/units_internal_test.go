@@ -205,3 +205,19 @@ func TestNewMatcher_SkipsEmptyPhrasesAndListsAbbreviations(t *testing.T) {
 		t.Errorf("abbrevs = %v, want only al.", m.abbrevs)
 	}
 }
+
+func TestRegionEdge_ReadsABeginAnEndAndNeitherOfAGeneratedRegion(t *testing.T) {
+	cases := map[string]int{
+		"<!-- GENERATED:x BEGIN from y -->": 1,
+		"  <!-- GENERATED:x END -->  ":      -1,
+		"<!-- GENERATED:odd -->":            0,
+		"<!-- plain comment BEGIN -->":      0,
+		"GENERATED:x BEGIN outside comment": 0,
+		"text":                              0,
+	}
+	for line, want := range cases {
+		if got := RegionEdge(line); got != want {
+			t.Errorf("RegionEdge(%q) = %d, want %d", line, got, want)
+		}
+	}
+}

@@ -6,7 +6,7 @@
 
 ## Design
 
-- `Entries` returns a fresh table of seven entries: `testdup-ratchet`, `size-ratchet`, `raw-git-ratchet`, `empty-tests`, `repo-contract-floor`, `unit-test-floor` and `cover-changed-floor`. Each is at `enforce`.
+- `Entries` returns a fresh table of eight entries: `testdup-ratchet`, `size-ratchet`, `raw-git-ratchet`, `empty-tests`, `named-tests`, `repo-contract-floor`, `unit-test-floor` and `cover-changed-floor`. Each is at `enforce`.
 - The three floor entries have the kind `phase-floor`. Each runs a `core.FloorJudge` through `core.FloorEntryRun`. The judge and the build floor call the same check function.
 - One `floorSpec` value gives the name, the files, the judge and the verified lists of a floor entry. The subject of each is `go/`.
 - `Input.Base` is the base commit of a floor entry. A failed read of the tree or of the base is an error. A lane-only red is a red.
@@ -48,3 +48,4 @@
 - The test counts the rows, so a new entry needs its row in the same change.
 - `TestGenesisRequiredIsOneWay` pins `genesis_required` against a floor in the test. The value may go from false to true and never back. The operator raises the floor and the file in one change.
 - The ratchet file and its tests are on the protected surface (the `gateregistry` row of the manifest). A lane cannot weaken them.
+- The key `resume.identity.stage` has a seed since W2.2. Its signal is `CYCLE_RESUME_IDENTITY_SHADOW`. The emit site is `emitResumeIdentityShadow` in `internal/core/resume_identity.go`. Its closure is `internal/cycleidentity`. The seed test pins the row.

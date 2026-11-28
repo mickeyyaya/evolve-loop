@@ -21,6 +21,6 @@
 
 ## Invariants
 
-- The exit codes and the output of each verb are the same as before the move (`TestC2466_003_TheInboxVerbBehavesTheSameThroughTheProductionBinary`).
-- Only the shim stays among the non-test `cmd_inbox*.go` files of `main` (`TestC2466_002_OnlyTheShimRemainsAmongTheNonTestInboxFilesOfMain`).
+- The exit codes and the output of each verb are the same as before the move (`TestC2503_003_TheInboxVerbBehavesTheSameThroughTheProductionBinary`).
+- Only the shim stays among the non-test `cmd_inbox*.go` files of `main` (`TestC2503_002_OnlyTheShimRemainsAmongTheNonTestInboxFilesOfMain`).
 - The package tests use `testDeps` in `host_test.go`. The tests that need the real queue gate stay in `main` and go through the shim (`cmd_inbox_live_lane_test.go`).

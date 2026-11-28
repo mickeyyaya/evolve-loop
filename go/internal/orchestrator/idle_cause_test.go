@@ -1,6 +1,7 @@
 package orchestrator
 
 import (
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -176,5 +177,137 @@ func TestIdleCause_SystemHaltIsNotOperatorStop(t *testing.T) {
 	}
 	if got := (Pool{}).idleCause(stopped); got != CauseOperatorStop {
 		t.Errorf("idleCause without a halt = %q, want %q", got, CauseOperatorStop)
+	}
+}
+
+func TestIdleCause_AnAdmissionRefusalBeatsAnUnrelatedBench(t *testing.T) {
+	yes, no := func() bool { return true }, func() bool { return false }
+	refuse := func() *FamilyHolds {
+		h := NewFamilyHolds()
+		h.Record(admission.Decision{ID: "todo-a", Rank: 0, Cells: []string{"internal/x", "internal/y"}, BlockedBy: "lane-1"})
+		return h
+	}
+	familyHeld := func() *FamilyHolds {
+		h := NewFamilyHolds()
+		h.Record(admission.Decision{ID: "todo-f", Cells: []string{admission.FamilyCellPrefix + "x"}, FamilyHold: true, BlockedBy: "lane-2"})
+		return h
+	}
+	idle := fleet.PoolTransition{Kind: fleet.PoolIdle, Live: 1, Target: 4, Pending: 3}
+	tests := []struct {
+		name     string
+		pool     Pool
+		want     IdleCause
+		wantAlso string
+	}{
+		{"refused and benched", Pool{Benched: yes, FamilyHolds: refuse()}, CauseAdmissionRefused, "bench"},
+		{"refused and not benched", Pool{Benched: no, FamilyHolds: refuse()}, CauseAdmissionRefused, ""},
+		{"refused without a bench probe", Pool{FamilyHolds: refuse()}, CauseAdmissionRefused, ""},
+		{"family hold and benched", Pool{Benched: yes, FamilyHolds: familyHeld()}, CauseFamilyHeld, ""},
+		{"benched and nothing refused", Pool{Benched: yes, FamilyHolds: NewFamilyHolds()}, CauseBench, ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.pool.idleCause(idle); got != tc.want {
+				t.Errorf("idleCause = %q, want %q", got, tc.want)
+			}
+			if got := tc.pool.idleFields(tc.want)["also"]; got != tc.wantAlso {
+				t.Errorf("also = %q, want %q", got, tc.wantAlso)
+			}
+		})
+	}
+}
+
+func TestPool_IdleSignalsNameTheRefusedTodoAndItsBlockingCell(t *testing.T) {
+	events := &eventLog{}
+	holds := NewFamilyHolds()
+	for i, id := range []string{"t6", "t5", "t4", "t3", "t2", "t1"} {
+		holds.Record(admission.Decision{ID: id, Rank: 6 - i, Cells: []string{"internal/cell-" + id}, BlockedBy: "lane-9"})
+	}
+	p := Pool{MinLanes: 4, Publish: events.publish, FamilyHolds: holds, Benched: func() bool { return true }}
+	p.transition(fleet.PoolTransition{Kind: fleet.PoolIdle, Live: 1, Target: 4, Pending: 6})
+	for _, code := range []signalcenter.Code{CodePoolIdle, CodePoolUnderfilled} {
+		got := events.withCode(code)
+		if len(got) != 1 {
+			t.Fatalf("%s events = %d, want 1", code, len(got))
+		}
+		f := got[0].Fields
+		if f["cause"] != "admission_refused" || f["also"] != "bench" {
+			t.Errorf("%s cause/also = %q/%q, want admission_refused/bench", code, f["cause"], f["also"])
+		}
+		if f["refused"] != "t1,t2,t3,t4,t5" {
+			t.Errorf("%s refused = %q, want the five best-ranked todos", code, f["refused"])
+		}
+		if !strings.HasPrefix(f["refused_by"], "t1 (footprint internal/cell-t1, held by lane-9); t2") {
+			t.Errorf("%s refused_by = %q, want the blocking cell and lane of each todo", code, f["refused_by"])
+		}
+	}
+}
+
+func TestFamilyHolds_RefusedIsNilSafeAndForgetsALaunchedTodo(t *testing.T) {
+	var nilHolds *FamilyHolds
+	if nilHolds.Refused(3) != nil || nilHolds.refusedCount() != 0 {
+		t.Error("a nil FamilyHolds must report no refusal")
+	}
+	h := NewFamilyHolds()
+	h.Record(admission.Decision{ID: "b", Rank: 1, BlockedBy: "l"})
+	h.Record(admission.Decision{ID: "a", Rank: 1, BlockedBy: "l"})
+	if got := h.Refused(9); len(got) != 2 || got[0].ID != "a" || got[1].ID != "b" {
+		t.Errorf("Refused = %+v, want a then b by rank then id", got)
+	}
+	h.forget("a")
+	if h.refusedCount() != 1 {
+		t.Errorf("refusedCount = %d, want 1 after the launch of a", h.refusedCount())
+	}
+}
+
+func TestPool_HeldSignalNamesTheRefusedTodoAndItsBlockingCell(t *testing.T) {
+	events := &eventLog{}
+	holds := NewFamilyHolds()
+	holds.Record(admission.Decision{ID: "t1", Rank: 1, Cells: []string{"internal/cell-t1"}, BlockedBy: "lane-9"})
+	p := Pool{Publish: events.publish, FamilyHolds: holds, Benched: func() bool { return true }}
+	p.transition(fleet.PoolTransition{Kind: fleet.PoolHeld, Live: 1, Target: 4, Pending: 1})
+	got := events.withCode(CodePoolHeld)
+	if len(got) != 1 {
+		t.Fatalf("%s events = %d, want 1", CodePoolHeld, len(got))
+	}
+	f := got[0].Fields
+	if f["refused"] != "t1" || f["refused_by"] != "t1 (footprint internal/cell-t1, held by lane-9)" || f["also"] != "bench" {
+		t.Errorf("held fields = %v, want refused t1, its footprint and lane, and also=bench", f)
+	}
+}
+
+func TestFamilyHolds_RefusedOrdersByRankBeforeId(t *testing.T) {
+	h := NewFamilyHolds()
+	h.Record(admission.Decision{ID: "a", Rank: 2})
+	h.Record(admission.Decision{ID: "b", Rank: 1})
+	got := h.Refused(9)
+	if len(got) != 2 || got[0].ID != "b" || got[1].ID != "a" {
+		t.Errorf("Refused = %+v, want b then a: the rank order is the inverse of the id order", got)
+	}
+}
+
+func TestFamilyHolds_SummaryDropsATodoThatIsNoLongerFamilyHeld(t *testing.T) {
+	h := NewFamilyHolds()
+	family := admission.Decision{ID: "a", Cells: []string{admission.FamilyCellPrefix + "x"}, FamilyHold: true, BlockedBy: "l"}
+	h.Record(family)
+	if h.Summary() == "" {
+		t.Fatal("Summary is empty, want the family-held todo")
+	}
+	family.FamilyHold = false
+	h.Record(family)
+	if got := h.Summary(); got != "" {
+		t.Errorf("Summary = %q, want empty once the todo is refused for another reason", got)
+	}
+}
+
+func TestPool_AFreshenDropForgetsTheRefusalOfTheTodo(t *testing.T) {
+	holds := NewFamilyHolds()
+	holds.Record(admission.Decision{ID: "t1", Rank: 1, BlockedBy: "lane-9"})
+	p := Pool{FamilyHolds: holds, Freshen: func(fleet.CycleSpec) (fleet.CycleSpec, bool) { return fleet.CycleSpec{}, false }}
+	if _, ok := p.prepare(fleet.Todo{ID: "t1"}, fleet.CycleSpec{}); ok {
+		t.Fatal("prepare ok = true, want the drop")
+	}
+	if got := holds.Refused(9); len(got) != 0 {
+		t.Errorf("Refused = %+v, want none: the dropped todo is not refused any more", got)
 	}
 }

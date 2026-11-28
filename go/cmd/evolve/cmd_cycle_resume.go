@@ -33,9 +33,10 @@ func runCycleResume(args []string, stdout, stderr io.Writer) int {
 	all := fs.Bool("all", false, "grant an auto-resume to every paused cycle and start nothing")
 	grant := fs.Bool("grant", false, "grant an auto-resume to the cycle named by --cycle and start nothing")
 	dryRun := fs.Bool("dry-run", false, "name the paused cycle and start nothing")
+	acceptChange := fs.Bool("accept-identity-change", false, "resume although the phase graph, the phase contracts or the policy changed since the cycle started; the ledger records the override")
 	asJSON := fs.Bool("json", false, "print the result as JSON")
 	if err := fs.Parse(args); err != nil || fs.NArg() > 0 || *cycle < 0 || (*all && *cycle > 0) || (*grant && (*all || *cycle == 0)) {
-		fmt.Fprintln(stderr, "usage: evolve cycle resume [--cycle N [--grant] | --all] [--dry-run] [--json] [--project-root P]")
+		fmt.Fprintln(stderr, "usage: evolve cycle resume [--cycle N [--grant] | --all] [--dry-run] [--accept-identity-change] [--json] [--project-root P]")
 		return cliExitUsage
 	}
 	root, err := loopStopRoot(*projectRoot, stderr)
@@ -51,7 +52,7 @@ func runCycleResume(args []string, stdout, stderr io.Writer) int {
 		return rc
 	}
 	if !*dryRun {
-		return runLoop([]string{"--resume", "--project-root", root}, nil, stdout, stderr)
+		return runLoop(resumeLoopArgs(root, *acceptChange), nil, stdout, stderr)
 	}
 	result := cycleResumeResult{Cycle: rp.CycleID, Phase: rp.Phase, Reason: rp.Reason, State: rp.StatePath, DryRun: true}
 	if *asJSON {
@@ -76,4 +77,12 @@ func pausedCycleOf(root string, want int, stderr io.Writer) (*core.ResumePoint, 
 		return nil, cliExitInput
 	}
 	return rp, cliExitOK
+}
+
+func resumeLoopArgs(root string, acceptChange bool) []string {
+	args := []string{"--resume", "--project-root", root}
+	if acceptChange {
+		args = append(args, "--accept-identity-change")
+	}
+	return args
 }

@@ -6,26 +6,31 @@ import (
 )
 
 type ResumeConfig struct {
-	MaxCheckpointAgeH int `json:"max_checkpoint_age_h,omitempty"`
+	MaxCheckpointAgeH int                   `json:"max_checkpoint_age_h,omitempty"`
+	Identity          *ResumeIdentityPolicy `json:"identity,omitempty"`
 }
 
 const defaultMaxCheckpointAge = 192 * time.Hour
 
 func (c *ResumeConfig) UnmarshalJSON(raw []byte) error {
 	var decoded struct {
-		MaxCheckpointAgeH *int `json:"max_checkpoint_age_h"`
+		MaxCheckpointAgeH *int                  `json:"max_checkpoint_age_h"`
+		Identity          *ResumeIdentityPolicy `json:"identity"`
 	}
 	if err := decodeStrict(raw, &decoded); err != nil {
 		return fmt.Errorf("resume: %w", err)
 	}
+	if err := decoded.Identity.validate(); err != nil {
+		return err
+	}
 	if decoded.MaxCheckpointAgeH == nil {
-		*c = ResumeConfig{}
+		*c = ResumeConfig{Identity: decoded.Identity}
 		return nil
 	}
 	if *decoded.MaxCheckpointAgeH <= 0 {
 		return fmt.Errorf("resume: max_checkpoint_age_h must be positive, got %d; remove the key for the default of %s", *decoded.MaxCheckpointAgeH, defaultMaxCheckpointAge)
 	}
-	*c = ResumeConfig{MaxCheckpointAgeH: *decoded.MaxCheckpointAgeH}
+	*c = ResumeConfig{MaxCheckpointAgeH: *decoded.MaxCheckpointAgeH, Identity: decoded.Identity}
 	return nil
 }
 

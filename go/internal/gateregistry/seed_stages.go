@@ -117,6 +117,13 @@ var stageSeeds = []stageSeed{
 		fields: []string{"stage", "pr", "head", "decision", "reason", "head_gate", "content_gate", "scans", "skipped_push", "candidate"},
 	},
 	{
+		key:     "resume.identity.stage",
+		signal:  core.CodeResumeIdentityShadow,
+		site:    gatecontract.EmitSite{Path: "internal/core/resume_identity.go", Func: "emitResumeIdentityShadow", Ref: "CodeResumeIdentityShadow"},
+		fields:  []string{"stage", "parts", "recorded", "current"},
+		closure: []string{"internal/cycleidentity"},
+	},
+	{
 		key:    "healing.repair_cycle.stage",
 		signal: selfheal.CodeRepairRouted,
 		site:   gatecontract.EmitSite{Path: "internal/selfheal/repair_item.go", Func: "repairRouted", Ref: "CodeRepairRouted"},

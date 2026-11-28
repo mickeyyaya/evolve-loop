@@ -919,3 +919,6 @@
 ./internal/core/auditfacts
 ./internal/diskfloor
 ./internal/journeys
+./internal/testrefs
+# the resume identity digest of the phase graph, the phase contracts and the policy (W2.2 of the OSS harness plan). 100% API + 100% line coverage gated.
+./internal/cycleidentity

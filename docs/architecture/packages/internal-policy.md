@@ -192,3 +192,8 @@
 - **Pinned by** `TestAuditRereviewStage_DefaultsToShadowAndNeverFollowsTheConvergenceStage` and `TestAuditRereviewStage_ItsOwnKeyFlipsItAlone`.
 
 - **Import rule.** `TestPolicyPackageImportsNeitherLedgerNorScorers` fails when a non-test file of this package imports the ledger adapter, `stageevidence`, `gateregistry` or `gatecontract`. The stage key list and the effective stages need none of them.
+## resume.identity (W2.2)
+
+- **The key.** `resume.identity.stage` has the type `ResumeIdentityStage`. The words are `off`, `shadow` and `enforce`. The default is `shadow`. Another word is refused when the policy loads.
+- **The home.** The key is the `identity` block of `ResumeConfig`, next to `max_checkpoint_age_h`. `Policy.ResumeIdentityStage` reads it.
+- **The seed.** `internal/gateregistry` seeds the key with the signal `CYCLE_RESUME_IDENTITY_SHADOW`. `internal/core` emits the signal.
